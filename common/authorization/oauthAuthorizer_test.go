@@ -36,12 +36,10 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common"
 	"github.com/cadence-workflow/shard-manager/common/cache"
-	"github.com/cadence-workflow/shard-manager/common/cluster"
 	"github.com/cadence-workflow/shard-manager/common/config"
 	"github.com/cadence-workflow/shard-manager/common/constants"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
-	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 type (

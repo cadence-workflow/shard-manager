@@ -26,15 +26,11 @@ import (
 	adminv1 "github.com/uber/cadence-idl/go/proto/admin/v1"
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 
-	historyv1 "github.com/cadence-workflow/shard-manager/.gen/proto/history/v1"
-	matchingv1 "github.com/cadence-workflow/shard-manager/.gen/proto/matching/v1"
-	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
-	"github.com/cadence-workflow/shard-manager/client/admin"
-	"github.com/cadence-workflow/shard-manager/client/frontend"
-	"github.com/cadence-workflow/shard-manager/client/history"
-	"github.com/cadence-workflow/shard-manager/client/matching"
-	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
-	"github.com/cadence-workflow/shard-manager/client/sharddistributorexecutor"
+	historyv1 "github.com/uber/cadence/.gen/proto/history/v1"
+	matchingv1 "github.com/uber/cadence/.gen/proto/matching/v1"
+	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
+	"github.com/uber/cadence/client/sharddistributor"
+	"github.com/uber/cadence/client/sharddistributorexecutor"
 )
 
 type (
@@ -64,27 +60,6 @@ type (
 		c sharddistributorv1.ShardDistributorExecutorAPIYARPCClient
 	}
 )
-
-func NewAdminClient(c adminv1.AdminAPIYARPCClient) admin.Client {
-	return adminClient{c}
-}
-
-func NewFrontendClient(
-	domain apiv1.DomainAPIYARPCClient,
-	workflow apiv1.WorkflowAPIYARPCClient,
-	worker apiv1.WorkerAPIYARPCClient,
-	visibility apiv1.VisibilityAPIYARPCClient,
-) frontend.Client {
-	return frontendClient{&frontendGRPCClientWrapper{domain, workflow, worker, visibility}}
-}
-
-func NewHistoryClient(c historyv1.HistoryAPIYARPCClient) history.Client {
-	return historyClient{c}
-}
-
-func NewMatchingClient(c matchingv1.MatchingAPIYARPCClient) matching.Client {
-	return matchingClient{c}
-}
 
 func NewShardDistributorClient(c sharddistributorv1.ShardDistributorAPIYARPCClient) sharddistributor.Client {
 	return sharddistributorClient{c}

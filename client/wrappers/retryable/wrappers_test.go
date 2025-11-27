@@ -29,45 +29,45 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/cadence-workflow/shard-manager/client/frontend"
-	"github.com/cadence-workflow/shard-manager/common"
-	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/uber/cadence/client/sharddistributorexecutor"
+	"github.com/uber/cadence/common"
+	"github.com/uber/cadence/common/types"
 )
 
-func TestFrontendClientRetryableError(t *testing.T) {
+func TestShardDistributorExecutorClientRetryableError(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	clientMock := frontend.NewMockClient(ctrl)
+	clientMock := sharddistributorexecutor.NewMockClient(ctrl)
 	// One failure, one success
-	clientMock.EXPECT().CountWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).
+	clientMock.EXPECT().Heartbeat(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, &types.ServiceBusyError{
 			Message: "error",
 		}).Times(1)
-	clientMock.EXPECT().CountWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).
+	clientMock.EXPECT().Heartbeat(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, nil).Times(1)
 
-	retryableClient := NewFrontendClient(
+	retryableClient := NewShardDistributorExecutorClient(
 		clientMock,
 		common.CreateFrontendServiceRetryPolicy(),
 		common.IsServiceBusyError)
 
-	_, err := retryableClient.CountWorkflowExecutions(context.Background(), &types.CountWorkflowExecutionsRequest{})
+	_, err := retryableClient.Heartbeat(context.Background(), &types.ExecutorHeartbeatRequest{})
 	assert.NoError(t, err)
 }
 
-func TestFrontendClientNonRetryableError(t *testing.T) {
+func TestShardDistributorExecutorClientNonRetryableError(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	clientMock := frontend.NewMockClient(ctrl)
+	clientMock := sharddistributorexecutor.NewMockClient(ctrl)
 	// One failure, one success
-	clientMock.EXPECT().CountWorkflowExecutions(gomock.Any(), gomock.Any(), gomock.Any()).
+	clientMock.EXPECT().Heartbeat(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, &types.BadRequestError{
 			Message: "error",
 		}).Times(1)
 
-	retryableClient := NewFrontendClient(
+	retryableClient := NewShardDistributorExecutorClient(
 		clientMock,
 		common.CreateFrontendServiceRetryPolicy(),
 		common.IsServiceBusyError)
 
-	_, err := retryableClient.CountWorkflowExecutions(context.Background(), &types.CountWorkflowExecutionsRequest{})
+	_, err := retryableClient.Heartbeat(context.Background(), &types.ExecutorHeartbeatRequest{})
 	assert.Error(t, err)
 }

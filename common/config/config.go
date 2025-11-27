@@ -36,7 +36,6 @@ import (
 	c "github.com/cadence-workflow/shard-manager/common/dynamicconfig/configstore/config"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	"github.com/cadence-workflow/shard-manager/common/peerprovider/ringpopprovider"
 	"github.com/cadence-workflow/shard-manager/common/service"
 )
 

@@ -29,11 +29,11 @@ import (
 	cclient "go.uber.org/cadence/client"
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/service/worker/scanner/executions"
-	"github.com/uber/cadence/service/worker/scanner/history"
-	"github.com/uber/cadence/service/worker/scanner/tasklist"
-	"github.com/uber/cadence/service/worker/scanner/timers"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/executions"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/history"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/tasklist"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/timers"
 )
 
 const (

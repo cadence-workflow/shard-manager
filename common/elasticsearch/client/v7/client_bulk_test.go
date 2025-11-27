@@ -31,7 +31,7 @@ import (
 	elastic "github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/elasticsearch/bulk"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/bulk"
 )
 
 func TestFromV7toGenericBulkResponse(t *testing.T) {

@@ -25,8 +25,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 var _ nosqlplugin.WorkflowCRUD = (*mdb)(nil)

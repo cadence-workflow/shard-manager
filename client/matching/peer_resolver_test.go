@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	gomock "go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 func TestPeerResolver(t *testing.T) {

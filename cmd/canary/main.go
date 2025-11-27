@@ -29,9 +29,9 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/canary"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/canary"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 func startHandler(c *cli.Context) error {

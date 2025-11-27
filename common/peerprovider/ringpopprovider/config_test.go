@@ -32,7 +32,7 @@ import (
 	"github.com/uber/ringpop-go/discovery/statichosts"
 	"gopkg.in/yaml.v2"
 
-	"github.com/uber/cadence/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 )
 
 type RingpopSuite struct {

@@ -26,14 +26,14 @@ import (
 	"fmt"
 	"time"
 
-	workflow "github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common/checksum"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
+	workflow "github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common/checksum"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
-//go:generate mockgen -package $GOPACKAGE -destination data_store_interfaces_mock.go -self_package github.com/uber/cadence/common/persistence github.com/uber/cadence/common/persistence ExecutionStore,ShardStore,DomainStore,TaskStore,HistoryStore,ConfigStore
-//go:generate mockgen -package $GOPACKAGE -destination visibility_store_mock.go -self_package github.com/uber/cadence/common/persistence github.com/uber/cadence/common/persistence VisibilityStore
+//go:generate mockgen -package $GOPACKAGE -destination data_store_interfaces_mock.go -self_package github.com/cadence-workflow/shard-manager/common/persistence github.com/cadence-workflow/shard-manager/common/persistence ExecutionStore,ShardStore,DomainStore,TaskStore,HistoryStore,ConfigStore
+//go:generate mockgen -package $GOPACKAGE -destination visibility_store_mock.go -self_package github.com/cadence-workflow/shard-manager/common/persistence github.com/cadence-workflow/shard-manager/common/persistence VisibilityStore
 
 type (
 	// ////////////////////////////////////////////////////////////////////

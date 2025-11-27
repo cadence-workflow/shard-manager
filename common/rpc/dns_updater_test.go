@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/yarpc/api/peer"
 
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 type mockDNSHostResolver struct {

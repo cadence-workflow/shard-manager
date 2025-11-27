@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination controller_mock.go -self_package github.com/uber/cadence/service/history/shard
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination controller_mock.go -self_package github.com/cadence-workflow/shard-manager/service/history/shard
 
 package shard
 
@@ -28,20 +28,20 @@ import (
 	"sync/atomic"
 	"time"
 
-	workflow "github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/config"
-	"github.com/uber/cadence/service/history/engine"
-	"github.com/uber/cadence/service/history/lookup"
-	"github.com/uber/cadence/service/history/resource"
+	workflow "github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/config"
+	"github.com/cadence-workflow/shard-manager/service/history/engine"
+	"github.com/cadence-workflow/shard-manager/service/history/lookup"
+	"github.com/cadence-workflow/shard-manager/service/history/resource"
 )
 
 const (

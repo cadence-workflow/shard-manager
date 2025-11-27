@@ -27,8 +27,8 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/metrics/mocks"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/metrics/mocks"
 )
 
 func TestPublish(t *testing.T) {

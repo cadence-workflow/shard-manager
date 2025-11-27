@@ -28,13 +28,13 @@ import (
 
 	"github.com/uber-go/tally"
 
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 var (
 	// Revision is the VCS revision associated with this build. Overridden using ldflags
 	// at compile time. Example:
-	// $ go build -ldflags "-X github.com/uber/cadence/common/metrics.Revision=abcdef" ...
+	// $ go build -ldflags "-X github.com/cadence-workflow/shard-manager/common/metrics.Revision=abcdef" ...
 	// see get-ldflags.sh for GIT_REVISION
 	Revision = "unknown"
 

@@ -23,7 +23,7 @@
 package queuev2
 
 import (
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 type Range struct {

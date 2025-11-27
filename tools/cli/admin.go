@@ -28,8 +28,8 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/service/worker/scanner/executions"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/executions"
 )
 
 func newAdminWorkflowCommands() []*cli.Command {
@@ -916,7 +916,7 @@ func newAdminAsyncQueueCommands() []*cli.Command {
 			Flags: []cli.Flag{
 				&cli.StringFlag{
 					Name:     FlagJSON,
-					Usage:    `AsyncWorkflowConfiguration in json format. Schema can be found in https://github.com/uber/cadence/blob/master/common/types/admin.go`,
+					Usage:    `AsyncWorkflowConfiguration in json format. Schema can be found in https://github.com/cadence-workflow/shard-manager/blob/master/common/types/admin.go`,
 					Required: true,
 				},
 			},

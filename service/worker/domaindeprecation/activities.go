@@ -27,8 +27,8 @@ import (
 
 	"go.uber.org/cadence"
 
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // DisableArchivalActivity disables archival for the domain

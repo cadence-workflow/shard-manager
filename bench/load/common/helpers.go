@@ -27,7 +27,7 @@ import (
 
 	"go.uber.org/cadence/.gen/go/shared"
 
-	"github.com/uber/cadence/bench/lib"
+	"github.com/cadence-workflow/shard-manager/bench/lib"
 )
 
 const (

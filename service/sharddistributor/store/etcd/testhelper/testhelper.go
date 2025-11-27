@@ -13,10 +13,10 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"gopkg.in/yaml.v2"
 
-	"github.com/uber/cadence/common/config"
-	shardDistributorCfg "github.com/uber/cadence/service/sharddistributor/config"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdkeys"
-	"github.com/uber/cadence/testflags"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	shardDistributorCfg "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
+	"github.com/cadence-workflow/shard-manager/testflags"
 )
 
 type StoreTestCluster struct {

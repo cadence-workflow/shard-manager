@@ -21,7 +21,7 @@
 
 package testcluster
 
-import "github.com/uber/cadence/common/config"
+import "github.com/cadence-workflow/shard-manager/common/config"
 
 type (
 	// PersistenceTestCluster exposes management operations on a database

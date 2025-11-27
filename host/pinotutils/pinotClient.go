@@ -24,9 +24,9 @@ import (
 	"github.com/startreedata/pinot-client-go/pinot"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
-	pnt "github.com/uber/cadence/common/pinot"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	pnt "github.com/cadence-workflow/shard-manager/common/pinot"
 )
 
 func CreatePinotClient(s *suite.Suite, pinotConfig *config.PinotVisibilityConfig, logger log.Logger) pnt.GenericClient {

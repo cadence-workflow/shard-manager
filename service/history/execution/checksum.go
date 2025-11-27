@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"slices"
 
-	checksumgen "github.com/uber/cadence/.gen/go/checksum"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/checksum"
-	"github.com/uber/cadence/common/types/mapper/thrift"
+	checksumgen "github.com/cadence-workflow/shard-manager/.gen/go/checksum"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/checksum"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/thrift"
 )
 
 const (

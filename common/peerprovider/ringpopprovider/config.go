@@ -32,8 +32,8 @@ import (
 	"github.com/uber/ringpop-go/discovery/jsonfile"
 	"github.com/uber/ringpop-go/discovery/statichosts"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 )
 
 // BootstrapMode is an enum type for ringpop bootstrap mode

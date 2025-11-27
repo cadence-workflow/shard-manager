@@ -7,14 +7,14 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/service/history/config"
-	"github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/queue"
-	"github.com/uber/cadence/service/history/shard"
-	"github.com/uber/cadence/service/history/task"
-	"github.com/uber/cadence/service/worker/archiver"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/service/history/config"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/queue"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
+	"github.com/cadence-workflow/shard-manager/service/worker/archiver"
 )
 
 func TestTransferQueueFactory_CreateQueuev2(t *testing.T) {

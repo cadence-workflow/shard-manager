@@ -21,7 +21,7 @@
 package thrift
 
 import (
-	"github.com/uber/cadence/common/types/mapper/errorutils"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/errorutils"
 )
 
 // FromError convert error to Thrift type if it comes as its internal equivalent

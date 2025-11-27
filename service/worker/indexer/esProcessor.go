@@ -27,17 +27,17 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/uber/cadence/.gen/go/indexer"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/codec"
-	"github.com/uber/cadence/common/collection"
-	"github.com/uber/cadence/common/definition"
-	es "github.com/uber/cadence/common/elasticsearch"
-	"github.com/uber/cadence/common/elasticsearch/bulk"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/.gen/go/indexer"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/codec"
+	"github.com/cadence-workflow/shard-manager/common/collection"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	es "github.com/cadence-workflow/shard-manager/common/elasticsearch"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/bulk"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 const (

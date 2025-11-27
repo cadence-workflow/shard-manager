@@ -39,16 +39,16 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gopkg.in/yaml.v2"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/definition"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/environment"
-	"github.com/uber/cadence/host"
-	"github.com/uber/cadence/host/esutils"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/environment"
+	"github.com/cadence-workflow/shard-manager/host"
+	"github.com/cadence-workflow/shard-manager/host/esutils"
 )
 
 const (

@@ -26,10 +26,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
-	"github.com/uber/cadence/tools/common/schema"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema"
 )
 
 type (

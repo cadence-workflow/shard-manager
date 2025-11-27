@@ -31,14 +31,14 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation/entity"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/common/reconciliation/store"
-	"github.com/uber/cadence/service/worker/scanner/executions"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/entity"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/store"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/executions"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 // AdminDBClean is the command to clean up unhealthy executions.

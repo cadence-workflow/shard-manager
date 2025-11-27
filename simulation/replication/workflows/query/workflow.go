@@ -23,7 +23,7 @@ package query
 import (
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/simulation/replication/types"
+	"github.com/cadence-workflow/shard-manager/simulation/replication/types"
 )
 
 const (

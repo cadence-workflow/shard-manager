@@ -32,14 +32,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	cassandra_db "github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
-	"github.com/uber/cadence/environment"
-	"github.com/uber/cadence/testflags"
-	"github.com/uber/cadence/tools/cassandra"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	cassandra_db "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	"github.com/cadence-workflow/shard-manager/environment"
+	"github.com/cadence-workflow/shard-manager/testflags"
+	"github.com/cadence-workflow/shard-manager/tools/cassandra"
 )
 
 type (

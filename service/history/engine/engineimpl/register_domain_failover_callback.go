@@ -25,12 +25,12 @@ import (
 	"context"
 	"sort"
 
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	hcommon "github.com/uber/cadence/service/history/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	hcommon "github.com/cadence-workflow/shard-manager/service/history/common"
 )
 
 func (e *historyEngineImpl) registerDomainFailoverCallback() {

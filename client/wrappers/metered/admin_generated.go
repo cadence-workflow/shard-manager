@@ -9,9 +9,9 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // adminClient implements admin.Client interface instrumented with retries

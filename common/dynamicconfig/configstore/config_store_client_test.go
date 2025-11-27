@@ -32,15 +32,15 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/config"
-	c "github.com/uber/cadence/common/dynamicconfig/configstore/config"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	c "github.com/cadence-workflow/shard-manager/common/dynamicconfig/configstore/config"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

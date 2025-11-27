@@ -25,8 +25,8 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	cliflag "github.com/uber/cadence/tools/common/flag"
-	"github.com/uber/cadence/tools/common/schema"
+	cliflag "github.com/cadence-workflow/shard-manager/tools/common/flag"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema"
 )
 
 const defaultSQLPort = 3306

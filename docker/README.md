@@ -8,7 +8,7 @@ along with all its dependencies (cassandra, prometheus, grafana). Exposes cadenc
 frontend on ports 7933 (tchannel) / 7833 (grpc), web on port 8088, and grafana on port 3000.
 
 ```
-cd $GOPATH/src/github.com/uber/cadence/docker
+cd $GOPATH/src/github.com/cadence-workflow/shard-manager/docker
 docker compose up
 ```
 > Note: Above command will run with `master-auto-setup` image, which is a changing image all the time.

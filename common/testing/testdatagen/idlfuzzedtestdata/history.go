@@ -27,9 +27,9 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
-	"github.com/uber/cadence/common/testing/testdatagen"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/testdata"
+	"github.com/cadence-workflow/shard-manager/common/testing/testdatagen"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 // NewFuzzerWithIDLTypes creates a new fuzzer, notes down the deterministic seed

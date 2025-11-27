@@ -30,7 +30,7 @@ import (
 // creating a new Histogram in the prometheus registry.
 // Cadence uses Histogram to report both latency and non-latency metrics(like history_count/history_size).
 // The buckets need to set correct boundary for both
-// See more in https://github.com/uber/cadence/issues/4006
+// See more in https://github.com/cadence-workflow/shard-manager/issues/4006
 func DefaultHistogramBuckets() []prometheus.HistogramObjective {
 
 	// For latency metrics, this is a nanoSecond.

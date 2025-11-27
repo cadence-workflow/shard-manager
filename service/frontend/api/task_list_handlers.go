@@ -25,8 +25,8 @@ package api
 import (
 	"context"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/validate"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/validate"
 )
 
 // DescribeTaskList returns information about the target tasklist, right now this API returns the

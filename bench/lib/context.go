@@ -24,7 +24,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 const (

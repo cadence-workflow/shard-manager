@@ -35,10 +35,10 @@ import (
 	"go.uber.org/yarpc/transport/grpc"
 	"gopkg.in/yaml.v2"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/client/frontend"
-	grpcClient "github.com/uber/cadence/client/wrappers/grpc"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	grpcClient "github.com/cadence-workflow/shard-manager/client/wrappers/grpc"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type ReplicationSimulationOperation string

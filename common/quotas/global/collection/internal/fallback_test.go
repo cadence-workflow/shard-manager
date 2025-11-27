@@ -33,8 +33,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
 )
 
 func TestFallbackRegression(t *testing.T) {

@@ -9,9 +9,9 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/sharddistributorexecutor"
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributorexecutor"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // sharddistributorexecutorClient implements sharddistributorexecutor.Client interface instrumented with retries

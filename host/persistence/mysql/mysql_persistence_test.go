@@ -26,9 +26,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	pt "github.com/uber/cadence/common/persistence/persistence-tests"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin/mysql"
-	"github.com/uber/cadence/testflags"
+	pt "github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/mysql"
+	"github.com/cadence-workflow/shard-manager/testflags"
 )
 
 func TestMySQLHistoryV2PersistenceSuite(t *testing.T) {

@@ -27,13 +27,13 @@ import (
 	"github.com/golang/snappy"
 	"github.com/google/uuid"
 
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/codec"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/thrift"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/codec"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/thrift"
 )
 
 type (

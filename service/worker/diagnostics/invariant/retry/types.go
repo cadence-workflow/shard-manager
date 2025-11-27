@@ -22,7 +22,7 @@
 
 package retry
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 type RetryType string
 

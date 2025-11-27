@@ -9,8 +9,8 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/proto"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/proto"
 )
 
 func (g sharddistributorexecutorClient) Heartbeat(ctx context.Context, ep1 *types.ExecutorHeartbeatRequest, p1 ...yarpc.CallOption) (ep2 *types.ExecutorHeartbeatResponse, err error) {

@@ -23,7 +23,7 @@ package mongodb
 import (
 	"context"
 
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 // InsertIntoHistoryTreeAndNode inserts one or two rows: tree row and node row(at least one of them)

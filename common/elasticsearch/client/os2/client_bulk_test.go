@@ -35,8 +35,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/uber/cadence/common/elasticsearch/bulk"
-	"github.com/uber/cadence/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/bulk"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 )
 
 func TestStart(t *testing.T) {

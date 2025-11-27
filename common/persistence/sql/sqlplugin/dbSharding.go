@@ -23,7 +23,7 @@ package sqlplugin
 import (
 	"github.com/dgryski/go-farm"
 
-	"github.com/uber/cadence/common/persistence/serialization"
+	"github.com/cadence-workflow/shard-manager/common/persistence/serialization"
 )
 
 // This section defines the special dbShardID, they must all below 0

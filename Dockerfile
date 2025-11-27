@@ -18,7 +18,6 @@ ENV GOFLAGS="-mod=readonly"
 # Copy go mod dependencies and try to share the module download cache
 COPY go.* ./
 COPY cmd/server/go.* ./cmd/server/
-COPY common/archiver/gcloud/go.* ./common/archiver/gcloud/
 # go.work means this downloads everything, not just the top module
 RUN go mod download
 

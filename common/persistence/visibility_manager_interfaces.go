@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination visibility_manager_interfaces_mock.go -self_package github.com/uber/cadence/common/persistence github.com/uber/cadence/common/persistence VisibilityManager
+//go:generate mockgen -package $GOPACKAGE -destination visibility_manager_interfaces_mock.go -self_package github.com/cadence-workflow/shard-manager/common/persistence github.com/cadence-workflow/shard-manager/common/persistence VisibilityManager
 // Generate rate limiter wrapper.
 //go:generate gowrap gen -g -p . -i VisibilityManager -t ./wrappers/templates/ratelimited.tmpl -o wrappers/ratelimited/visibility_generated.go
 
@@ -33,8 +33,8 @@ package persistence
 import (
 	"context"
 
-	"github.com/uber/cadence/common/definition"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // Interfaces for the Visibility Store.

@@ -29,9 +29,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/uber/cadence/common/blobstore"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/util"
+	"github.com/cadence-workflow/shard-manager/common/blobstore"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/util"
 )
 
 type (

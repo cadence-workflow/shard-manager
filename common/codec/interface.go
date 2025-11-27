@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination interfaces_mock.go -self_package github.com/uber/cadence/common/codec github.com/uber/cadence/common/codec BinaryEncoder
+//go:generate mockgen -package $GOPACKAGE -destination interfaces_mock.go -self_package github.com/cadence-workflow/shard-manager/common/codec github.com/cadence-workflow/shard-manager/common/codec BinaryEncoder
 
 package codec
 
@@ -26,7 +26,7 @@ import (
 	"go.uber.org/thriftrw/protocol/stream"
 	"go.uber.org/thriftrw/wire"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

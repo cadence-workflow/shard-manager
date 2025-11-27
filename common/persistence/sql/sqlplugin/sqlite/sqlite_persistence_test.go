@@ -25,7 +25,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	pt "github.com/uber/cadence/common/persistence/persistence-tests"
+	pt "github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests"
 )
 
 func TestSQLiteHistoryV2PersistenceSuite(t *testing.T) {

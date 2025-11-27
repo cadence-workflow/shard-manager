@@ -23,7 +23,7 @@ package constants
 import (
 	"time"
 
-	"github.com/uber/cadence/.gen/go/shadower"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shadower"
 )
 
 const (

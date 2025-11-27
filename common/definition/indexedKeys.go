@@ -20,7 +20,7 @@
 
 package definition
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 // valid indexed fields on ES
 const (

@@ -23,9 +23,9 @@
 package serialization
 
 import (
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func ToInternalWorkflowExecutionInfo(info *WorkflowExecutionInfo) *persistence.InternalWorkflowExecutionInfo {

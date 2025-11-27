@@ -12,15 +12,15 @@ import (
 	"go.uber.org/fx/fxtest"
 	"gopkg.in/yaml.v2"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/sharddistributor/store"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdkeys"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdtypes"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/executorstore/common"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/leaderstore"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/testhelper"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/common"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/leaderstore"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/testhelper"
 )
 
 // TestRecordHeartbeat verifies that an executor's heartbeat is correctly stored.

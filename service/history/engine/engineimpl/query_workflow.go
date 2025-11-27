@@ -28,13 +28,13 @@ import (
 
 	"go.uber.org/yarpc/yarpcerrors"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/query"
-	"github.com/uber/cadence/service/history/workflow"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/query"
+	"github.com/cadence-workflow/shard-manager/service/history/workflow"
 )
 
 func (e *historyEngineImpl) QueryWorkflow(

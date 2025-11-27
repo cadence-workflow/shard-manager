@@ -29,7 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 
-	"github.com/uber/cadence/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 var errAWSSigningCredential = fmt.Errorf("must provide exactly one type of credential, EnvironmentCredential or StaticCredential")

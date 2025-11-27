@@ -31,7 +31,7 @@ import (
 // go test -bench=. --benchtime=10s --benchmem
 // goos: linux
 // goarch: amd64
-// pkg: github.com/uber/cadence/service/history/shard
+// pkg: github.com/cadence-workflow/shard-manager/service/history/shard
 // cpu: AMD EPYC 7B13
 // With the old approach, the benchmark result is:
 // BenchmarkController_ShardIDs-96            39314            324629 ns/op          272333 B/op         19 allocs/op

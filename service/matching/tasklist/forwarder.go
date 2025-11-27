@@ -25,12 +25,12 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/uber/cadence/client/matching"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/matching/config"
+	"github.com/cadence-workflow/shard-manager/client/matching"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/matching/config"
 )
 
 type (

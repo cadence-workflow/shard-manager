@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination authority_mock.go -self_package github.com/uber/cadence/common/authorization
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination authority_mock.go -self_package github.com/cadence-workflow/shard-manager/common/authorization
 
 package authorization
 
@@ -32,8 +32,8 @@ import (
 
 	clientworker "go.uber.org/cadence/worker"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

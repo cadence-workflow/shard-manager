@@ -23,7 +23,7 @@ package nosqlplugin
 import (
 	"fmt"
 
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // Condition Errors for NoSQL interfaces

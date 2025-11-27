@@ -24,7 +24,7 @@ package types
 
 import "context"
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination persister_mock.go -package types github.com/uber/cadence/common/mapq/types Persister
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination persister_mock.go -package types github.com/cadence-workflow/shard-manager/common/mapq/types Persister
 
 type Persister interface {
 	Persist(ctx context.Context, items []ItemToPersist) error

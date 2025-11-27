@@ -26,18 +26,18 @@ import (
 
 	"github.com/golang/snappy"
 
-	"github.com/uber/cadence/.gen/go/config"
-	"github.com/uber/cadence/.gen/go/history"
-	"github.com/uber/cadence/.gen/go/replicator"
-	workflow "github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common/checksum"
-	"github.com/uber/cadence/common/codec"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/thrift"
+	"github.com/cadence-workflow/shard-manager/.gen/go/config"
+	"github.com/cadence-workflow/shard-manager/.gen/go/history"
+	"github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	workflow "github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common/checksum"
+	"github.com/cadence-workflow/shard-manager/common/codec"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/thrift"
 )
 
-//go:generate mockgen -package $GOPACKAGE -destination serializer_mock.go -self_package github.com/uber/cadence/common/persistence github.com/uber/cadence/common/persistence PayloadSerializer
+//go:generate mockgen -package $GOPACKAGE -destination serializer_mock.go -self_package github.com/cadence-workflow/shard-manager/common/persistence github.com/cadence-workflow/shard-manager/common/persistence PayloadSerializer
 
 type (
 	// PayloadSerializer is used by persistence to serialize/deserialize history event(s) and others

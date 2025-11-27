@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/service/matching/event"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/service/matching/event"
 )
 
 // Benchmark the ReportCounter function to see how it handles frequent updates

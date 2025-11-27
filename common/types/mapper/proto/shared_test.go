@@ -30,11 +30,11 @@ import (
 	"github.com/stretchr/testify/require"
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 
-	sharedv1 "github.com/uber/cadence/.gen/proto/shared/v1"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/testutils"
-	"github.com/uber/cadence/common/types/testdata"
+	sharedv1 "github.com/cadence-workflow/shard-manager/.gen/proto/shared/v1"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/testutils"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestHostInfo(t *testing.T) {

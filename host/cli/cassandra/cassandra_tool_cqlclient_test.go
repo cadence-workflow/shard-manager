@@ -26,12 +26,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/testflags"
-	"github.com/uber/cadence/tools/cassandra"
-	"github.com/uber/cadence/tools/common/schema/test"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/testflags"
+	"github.com/cadence-workflow/shard-manager/tools/cassandra"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema/test"
 
-	_ "github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql/public" // needed to load the default gocql client
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql/public" // needed to load the default gocql client
 )
 
 type (

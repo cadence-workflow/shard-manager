@@ -32,11 +32,11 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/failovermanager"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/failovermanager"
 )
 
 func TestAdminFailoverStart(t *testing.T) {

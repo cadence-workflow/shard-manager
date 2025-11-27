@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	gomock "go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 func Test_GetRegisteredClient(t *testing.T) {

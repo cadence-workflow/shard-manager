@@ -23,9 +23,9 @@ package permember
 import (
 	"math"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
 )
 
 // PerMember allows creating per instance RPS based on globalRPS averaged by member count for a given service.

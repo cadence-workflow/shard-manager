@@ -25,10 +25,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	historyv1 "github.com/uber/cadence/.gen/proto/history/v1"
-	sharedv1 "github.com/uber/cadence/.gen/proto/shared/v1"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/testdata"
+	historyv1 "github.com/cadence-workflow/shard-manager/.gen/proto/history/v1"
+	sharedv1 "github.com/cadence-workflow/shard-manager/.gen/proto/shared/v1"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestHistoryCloseShardRequest(t *testing.T) {

@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 type StoreTestSuite struct {

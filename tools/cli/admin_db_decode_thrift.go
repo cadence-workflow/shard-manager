@@ -33,13 +33,13 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/.gen/go/config"
-	"github.com/uber/cadence/.gen/go/history"
-	"github.com/uber/cadence/.gen/go/replicator"
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/.gen/go/sqlblobs"
-	"github.com/uber/cadence/common/codec"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/.gen/go/config"
+	"github.com/cadence-workflow/shard-manager/.gen/go/history"
+	"github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/.gen/go/sqlblobs"
+	"github.com/cadence-workflow/shard-manager/common/codec"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 var decodingTypes = map[string]func() codec.ThriftObject{

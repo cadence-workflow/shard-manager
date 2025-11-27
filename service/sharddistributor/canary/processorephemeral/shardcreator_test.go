@@ -9,9 +9,9 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap/zaptest"
 
-	"github.com/uber/cadence/client/sharddistributor"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestShardCreator_Lifecycle(t *testing.T) {

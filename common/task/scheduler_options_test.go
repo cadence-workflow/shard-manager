@@ -23,7 +23,7 @@ package task
 import (
 	"testing"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 )
 
 func TestSchedulerOptionsString(t *testing.T) {

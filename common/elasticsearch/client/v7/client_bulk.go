@@ -28,7 +28,7 @@ import (
 
 	"github.com/olivere/elastic/v7"
 
-	"github.com/uber/cadence/common/elasticsearch/bulk"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/bulk"
 )
 
 type // bulkProcessorParametersV7 holds all required and optional parameters for executing bulk service

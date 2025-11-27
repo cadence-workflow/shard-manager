@@ -26,15 +26,15 @@ import (
 	adminv1 "github.com/uber/cadence-idl/go/proto/admin/v1"
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 
-	historyv1 "github.com/uber/cadence/.gen/proto/history/v1"
-	matchingv1 "github.com/uber/cadence/.gen/proto/matching/v1"
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/client/history"
-	"github.com/uber/cadence/client/matching"
-	"github.com/uber/cadence/client/sharddistributor"
-	"github.com/uber/cadence/client/sharddistributorexecutor"
+	historyv1 "github.com/cadence-workflow/shard-manager/.gen/proto/history/v1"
+	matchingv1 "github.com/cadence-workflow/shard-manager/.gen/proto/matching/v1"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/client/history"
+	"github.com/cadence-workflow/shard-manager/client/matching"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributorexecutor"
 )
 
 type (

@@ -31,8 +31,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/.gen/go/indexer"
-	"github.com/uber/cadence/common/mocks"
+	"github.com/cadence-workflow/shard-manager/.gen/go/indexer"
+	"github.com/cadence-workflow/shard-manager/common/mocks"
 )
 
 func Test__EmitUsageData(t *testing.T) {

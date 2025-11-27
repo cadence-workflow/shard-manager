@@ -21,8 +21,8 @@
 package service
 
 import (
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 )
 
 type (

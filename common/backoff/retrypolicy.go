@@ -25,7 +25,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/uber/cadence/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/clock"
 )
 
 const (

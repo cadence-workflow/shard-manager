@@ -23,9 +23,9 @@ package domain
 import (
 	"fmt"
 
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (
@@ -101,7 +101,7 @@ func (d *AttrValidatorImpl) validateDomainReplicationConfigForLocalDomain(
 func (d *AttrValidatorImpl) validateDomainReplicationConfigForGlobalDomain(
 	replicationConfig *persistence.DomainReplicationConfig,
 ) error {
-	// TODO: https://github.com/uber/cadence/issues/4345 add checking for "pending active" as well
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/4345 add checking for "pending active" as well
 	// Right now we only have checking if clusters to remove are "current active cluster" in this method.
 	// However, there could be edge cases that a cluster is in "pending active" state during graceful failover.
 	// It's better to do this check so that people won't make mistake.

@@ -7,9 +7,9 @@ package grpc
 import (
 	"context"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/common/types/mapper/proto"
-	"github.com/uber/cadence/service/sharddistributor/handler"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/proto"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/handler"
 )
 
 type ExecutorGRPCExecutor struct {

@@ -212,7 +212,7 @@ To debug a specific test case when you see some failure, you can trigger it from
 ```
 go test -v <path> -run <TestSuite> -testify.m <TestSpercificTaskName>
 # example:
-go test -v github.com/uber/cadence/common/persistence/persistence-tests -run TestVisibilitySamplingSuite -testify.m TestListClosedWorkflowExecutions
+go test -v github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests -run TestVisibilitySamplingSuite -testify.m TestListClosedWorkflowExecutions
 ```
 
 ## IDL Changes

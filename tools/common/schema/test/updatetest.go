@@ -38,9 +38,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 )
 
 // UpdateSchemaTestBase is the base test suite for all tests

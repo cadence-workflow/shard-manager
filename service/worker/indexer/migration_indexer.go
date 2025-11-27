@@ -21,12 +21,12 @@
 package indexer
 
 import (
-	"github.com/uber/cadence/common/constants"
-	es "github.com/uber/cadence/common/elasticsearch"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	es "github.com/cadence-workflow/shard-manager/common/elasticsearch"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 // NewMigrationDualIndexer create a new Indexer that will be used during visibility migration

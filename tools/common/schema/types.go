@@ -26,7 +26,7 @@ import (
 	"regexp"
 )
 
-//go:generate mockgen -source $GOFILE -destination schema_client_mock.go -package schema github.com/uber/cadence/tools/common/schema SchemaClient
+//go:generate mockgen -source $GOFILE -destination schema_client_mock.go -package schema github.com/cadence-workflow/shard-manager/tools/common/schema SchemaClient
 
 type (
 	// ConfigError is an error type that

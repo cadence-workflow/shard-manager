@@ -28,9 +28,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	c "github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/common/reconciliation/store"
+	c "github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/store"
 )
 
 type aggregatorsSuite struct {

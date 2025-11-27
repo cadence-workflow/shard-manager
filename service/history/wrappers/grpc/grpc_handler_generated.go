@@ -7,9 +7,9 @@ package grpc
 import (
 	"context"
 
-	historyv1 "github.com/uber/cadence/.gen/proto/history/v1"
-	"github.com/uber/cadence/common/types/mapper/proto"
-	"github.com/uber/cadence/service/history/handler"
+	historyv1 "github.com/cadence-workflow/shard-manager/.gen/proto/history/v1"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/proto"
+	"github.com/cadence-workflow/shard-manager/service/history/handler"
 )
 
 type GRPCHandler struct {

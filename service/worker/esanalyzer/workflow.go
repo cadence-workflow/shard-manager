@@ -32,7 +32,7 @@ import (
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common/pinot"
+	"github.com/cadence-workflow/shard-manager/common/pinot"
 )
 
 const (

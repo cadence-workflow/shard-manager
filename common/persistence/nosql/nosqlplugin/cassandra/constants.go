@@ -24,8 +24,8 @@ package cassandra
 import (
 	"time"
 
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
 )
 
 var (
@@ -35,7 +35,7 @@ var (
 
 const (
 	// Cassandra max support time is 2038-01-19T03:14:06+00:00. Updated this to 5 years to support until year 2033
-	// See https://github.com/uber/cadence/issues/4200
+	// See https://github.com/cadence-workflow/shard-manager/issues/4200
 	maxCassandraTTL = int64(157680000)
 
 	// We use local serial consistency level as the default consistency level for conditional updates

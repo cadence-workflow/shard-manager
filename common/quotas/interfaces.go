@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package=$GOPACKAGE -destination=limiter_mock.go github.com/uber/cadence/common/quotas Limiter
+//go:generate mockgen -package=$GOPACKAGE -destination=limiter_mock.go github.com/cadence-workflow/shard-manager/common/quotas Limiter
 
 package quotas
 
@@ -27,7 +27,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/clock"
 )
 
 // RPSFunc returns a float64 as the RPS

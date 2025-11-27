@@ -30,9 +30,9 @@ import (
 	gogocql "github.com/gocql/gocql"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
-	"github.com/uber/cadence/environment"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	"github.com/cadence-workflow/shard-manager/environment"
 )
 
 func Test_toGoCqlConfig(t *testing.T) {

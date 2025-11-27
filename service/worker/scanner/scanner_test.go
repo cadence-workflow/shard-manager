@@ -39,13 +39,13 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/metrics"
-	commonResource "github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/service/history/resource"
-	"github.com/uber/cadence/service/worker/scanner/shardscanner"
-	worker2 "github.com/uber/cadence/service/worker/worker"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	commonResource "github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/service/history/resource"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/shardscanner"
+	worker2 "github.com/cadence-workflow/shard-manager/service/worker/worker"
 )
 
 type scannerTestSuite struct {

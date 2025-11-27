@@ -21,17 +21,17 @@
 package queue
 
 import (
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/reset"
-	"github.com/uber/cadence/service/history/shard"
-	"github.com/uber/cadence/service/history/task"
-	"github.com/uber/cadence/service/history/workflowcache"
-	"github.com/uber/cadence/service/worker/archiver"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/reset"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
+	"github.com/cadence-workflow/shard-manager/service/history/workflowcache"
+	"github.com/cadence-workflow/shard-manager/service/worker/archiver"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination factory_mock.go -self_package github.com/uber/cadence/service/history/queue
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination factory_mock.go -self_package github.com/cadence-workflow/shard-manager/service/history/queue
 
 type (
 	Factory interface {

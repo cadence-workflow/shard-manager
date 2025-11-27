@@ -29,15 +29,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	mmocks "github.com/uber/cadence/common/metrics/mocks"
-	"github.com/uber/cadence/common/mocks"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/wrappers/sampled"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	mmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
+	"github.com/cadence-workflow/shard-manager/common/mocks"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/wrappers/sampled"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type VisibilitySamplingSuite struct {

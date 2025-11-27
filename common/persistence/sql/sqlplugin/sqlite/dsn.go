@@ -28,7 +28,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 const (

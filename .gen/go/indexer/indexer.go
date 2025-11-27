@@ -18,7 +18,7 @@ import (
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
 
-	shared "github.com/uber/cadence/.gen/go/shared"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 type Field struct {
@@ -2263,7 +2263,7 @@ func (v *VisibilityOperation) UnmarshalJSON(text []byte) error {
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "indexer",
-	Package:  "github.com/uber/cadence/.gen/go/indexer",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/indexer",
 	FilePath: "indexer.thrift",
 	SHA1:     "d5b60fa082530a64a77c19c573c0f3ccfce5c408",
 	Includes: []*thriftreflect.ThriftModule{

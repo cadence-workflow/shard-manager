@@ -21,7 +21,7 @@
 package ratelimited
 
 import (
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var (

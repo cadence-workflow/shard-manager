@@ -18,16 +18,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/uber/cadence/service/history/queue
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/cadence-workflow/shard-manager/service/history/queue
 
 package queue
 
 import (
 	"context"
 
-	"github.com/uber/cadence/common"
-	hcommon "github.com/uber/cadence/service/history/common"
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/common"
+	hcommon "github.com/cadence-workflow/shard-manager/service/history/common"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 type (

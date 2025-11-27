@@ -25,10 +25,10 @@ package matching
 import (
 	"math/rand"
 
-	"github.com/uber/cadence/common/dynamicconfig"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/isolationgroup"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/isolationgroup"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type isolationLoadBalancer struct {

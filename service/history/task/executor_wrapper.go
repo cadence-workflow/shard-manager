@@ -27,9 +27,9 @@ import (
 	"encoding/json"
 	"runtime/debug"
 
-	"github.com/uber/cadence/common/activecluster"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/activecluster"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 )
 
 type (

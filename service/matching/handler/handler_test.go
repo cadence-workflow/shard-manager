@@ -32,15 +32,15 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/dynamicconfig"
-	dynamicquotas "github.com/uber/cadence/common/dynamicconfig/quotas"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/matching/config"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	dynamicquotas "github.com/cadence-workflow/shard-manager/common/dynamicconfig/quotas"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/matching/config"
 )
 
 const (

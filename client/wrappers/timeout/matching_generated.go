@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/matching"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/matching"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var _ matching.Client = (*matchingClient)(nil)

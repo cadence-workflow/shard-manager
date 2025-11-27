@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var _ admin.Client = (*adminClient)(nil)

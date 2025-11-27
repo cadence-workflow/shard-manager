@@ -25,7 +25,7 @@ package events
 import (
 	"bytes"
 
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 type (

@@ -24,11 +24,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 const (
-	// TODO https://github.com/uber/cadence/issues/3686
+	// TODO https://github.com/cadence-workflow/shard-manager/issues/3686
 	oneMicroSecondInNano = int64(time.Microsecond / time.Nanosecond)
 
 	esDocIDDelimiter = "~"

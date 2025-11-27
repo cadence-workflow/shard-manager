@@ -23,7 +23,7 @@ package thrift
 import (
 	"time"
 
-	"github.com/uber/cadence/common"
+	"github.com/cadence-workflow/shard-manager/common"
 )
 
 func timeToNano(t *time.Time) *int64 {

@@ -23,8 +23,8 @@ package dynamodb
 import (
 	"testing"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/dynamodb"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/dynamodb"
 )
 
 // This is to make sure adding new noop method when adding new nosql interfaces

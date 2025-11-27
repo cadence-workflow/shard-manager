@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package=$GOPACKAGE -destination=collection_mock.go github.com/uber/cadence/common/quotas ICollection
-//go:generate mockgen -package=$GOPACKAGE -destination=limiterfactory_mock.go github.com/uber/cadence/common/quotas LimiterFactory
+//go:generate mockgen -package=$GOPACKAGE -destination=collection_mock.go github.com/cadence-workflow/shard-manager/common/quotas ICollection
+//go:generate mockgen -package=$GOPACKAGE -destination=limiterfactory_mock.go github.com/cadence-workflow/shard-manager/common/quotas LimiterFactory
 
 package quotas
 

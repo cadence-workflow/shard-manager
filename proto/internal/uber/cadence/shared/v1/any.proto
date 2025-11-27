@@ -24,7 +24,7 @@ syntax = "proto3";
 
 package uber.cadence.shared.v1;
 
-option go_package = "github.com/uber/cadence/.gen/proto/shared/v1;sharedv1";
+option go_package = "github.com/cadence-workflow/shard-manager/.gen/proto/shared/v1;sharedv1";
 
 // Any is a logical duplicate of google.protobuf.Any, but is intentionally
 // breaking compatibility because it will not be directly used as a

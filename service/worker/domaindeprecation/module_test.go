@@ -28,10 +28,10 @@ import (
 	"go.uber.org/cadence/.gen/go/shared"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/client"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/resource"
+	"github.com/cadence-workflow/shard-manager/client"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/resource"
 )
 
 func Test__Start(t *testing.T) {

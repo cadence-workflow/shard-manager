@@ -28,7 +28,7 @@ var localOffset = getLocalOffset()
 type (
 	// DataConverter defines the API for conversions to/from
 	// go types to postgres datatypes
-	// TODO https://github.com/uber/cadence/issues/2892
+	// TODO https://github.com/cadence-workflow/shard-manager/issues/2892
 	// There are some reasons:
 	// r application layer is not consistent with timezone: for example,
 	// in some case we write timestamp with local timezone but when the time.Time

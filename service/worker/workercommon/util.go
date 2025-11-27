@@ -27,10 +27,10 @@ import (
 
 	"go.uber.org/cadence/client"
 
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/resource"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/resource"
 )
 
 func StartWorkflowWithRetry(

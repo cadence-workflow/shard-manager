@@ -29,13 +29,13 @@ import (
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/rpc"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/rpc"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 func TestFxStartStop(t *testing.T) {

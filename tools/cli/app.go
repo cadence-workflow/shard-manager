@@ -26,8 +26,8 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common/client"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/client"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 const depsKey = "deps"

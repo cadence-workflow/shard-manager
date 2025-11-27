@@ -25,7 +25,7 @@ Package collection contains the limiting-host ratelimit usage tracking and enfor
 which acts as a quotas.Collection.
 
 At a very high level, this wraps [quotas.Limiter] values to do a few additional things
-in the context of the [github.com/uber/cadence/common/quotas/global] ratelimiter system:
+in the context of the [github.com/cadence-workflow/shard-manager/common/quotas/global] ratelimiter system:
   - keep track of usage per key (quotas.Limiter does not support this natively)
   - periodically report usage to each key's "aggregator" host (batched and fanned out in parallel)
   - apply the aggregator's returned per-key RPS limits to future requests
@@ -43,15 +43,15 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/quotas/global/collection/internal"
-	"github.com/uber/cadence/common/quotas/global/rpc"
-	"github.com/uber/cadence/common/quotas/global/shared"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/collection/internal"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/rpc"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/shared"
 )
 
 type (

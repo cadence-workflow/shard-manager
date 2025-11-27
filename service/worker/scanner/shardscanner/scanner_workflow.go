@@ -28,10 +28,10 @@ import (
 
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/pagination"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/pagination"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
 )
 
 const (

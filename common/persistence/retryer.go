@@ -20,14 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination retryer_mock.go -package persistence github.com/uber/cadence/common/persistence Retryer
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination retryer_mock.go -package persistence github.com/cadence-workflow/shard-manager/common/persistence Retryer
 
 package persistence
 
 import (
 	"context"
 
-	"github.com/uber/cadence/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
 )
 
 // Retryer is used to retry requests to persistence with provided retry policy

@@ -28,11 +28,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/environment"
-	"github.com/uber/cadence/tools/common/schema/test"
-	"github.com/uber/cadence/tools/sql"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/environment"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema/test"
+	"github.com/cadence-workflow/shard-manager/tools/sql"
 )
 
 type (
@@ -78,7 +78,7 @@ func (s *SQLConnTestSuite) TestParseCQLFile() {
 
 // TestSQLConn test
 // TODO refactor the whole package to support testing against Postgres
-// https://github.com/uber/cadence/issues/2856
+// https://github.com/cadence-workflow/shard-manager/issues/2856
 func (s *SQLConnTestSuite) TestSQLConn() {
 	port, err := environment.GetMySQLPort()
 	s.Nil(err)

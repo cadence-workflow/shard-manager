@@ -20,7 +20,7 @@
 
 package execution
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 // TerminateWorkflow is a helper function to terminate workflow
 func TerminateWorkflow(

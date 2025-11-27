@@ -32,15 +32,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/elasticsearch/bulk"
-	"github.com/uber/cadence/common/elasticsearch/client"
-	"github.com/uber/cadence/common/elasticsearch/query"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/thrift"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/bulk"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/client"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/query"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/thrift"
 )
 
 var _ GenericClient = (*ESClient)(nil)

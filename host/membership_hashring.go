@@ -23,7 +23,7 @@ package host
 import (
 	"github.com/dgryski/go-farm"
 
-	"github.com/uber/cadence/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/membership"
 )
 
 type simpleHashring struct {

@@ -32,11 +32,11 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/testflags"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/testflags"
 
-	_ "github.com/uber/cadence/service/sharddistributor/store/etcd" // needed for shard distributor storage
+	_ "github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd" // needed for shard distributor storage
 )
 
 func TestFxDependencies(t *testing.T) {

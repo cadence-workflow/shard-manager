@@ -16,9 +16,9 @@ import (
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
 
-	config "github.com/uber/cadence/.gen/go/config"
-	replicator "github.com/uber/cadence/.gen/go/replicator"
-	shared "github.com/uber/cadence/.gen/go/shared"
+	config "github.com/cadence-workflow/shard-manager/.gen/go/config"
+	replicator "github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 type AddSearchAttributeRequest struct {
@@ -11332,7 +11332,7 @@ func (v *UpdateGlobalIsolationGroupsResponse) MarshalLogObject(enc zapcore.Objec
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "admin",
-	Package:  "github.com/uber/cadence/.gen/go/admin",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/admin",
 	FilePath: "admin.thrift",
 	SHA1:     "cd332257c2e6f1bcc07bdfaae63cb757ecf2cba3",
 	Includes: []*thriftreflect.ThriftModule{

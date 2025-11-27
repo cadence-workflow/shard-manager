@@ -21,10 +21,10 @@
 package thrift
 
 import (
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
-	cadence_errors "github.com/uber/cadence/common/errors"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
+	cadence_errors "github.com/cadence-workflow/shard-manager/common/errors"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var (

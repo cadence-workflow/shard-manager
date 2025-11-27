@@ -43,12 +43,12 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/valyala/fastjson"
 
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/authorization"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/pagination"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/authorization"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/pagination"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // JSONHistorySerializer is used to encode history event in JSON

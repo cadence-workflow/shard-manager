@@ -20,7 +20,7 @@
 
 package queue
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 type (
 	// ActionType specifies the type of the Action

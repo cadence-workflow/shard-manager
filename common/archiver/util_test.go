@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type UtilSuite struct {

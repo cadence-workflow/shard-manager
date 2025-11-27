@@ -6,7 +6,7 @@ go version go1.22.1 linux/amd64
 ❯ go test -bench . -test.run xxx -cpu 1,2,4,8,32,128 .
 goos: linux
 goarch: amd64
-pkg: github.com/uber/cadence/common/clock
+pkg: github.com/cadence-workflow/shard-manager/common/clock
 cpu: AMD EPYC 7B13
 BenchmarkLimiter/allow/serial/real             	10606200	       113.4 ns/op
 --- BENCH: BenchmarkLimiter/allow/serial/real
@@ -1084,4 +1084,4 @@ BenchmarkLimiter/wait/parallel/1µs_rate/mocked_timesource-128                  
     ratelimiter_test.go:138: allowed: 1000000,    denied: 0,           time per allow:     617ns
     ratelimiter_test.go:138: allowed: 1944561,    denied: 0,           time per allow:     598ns
 PASS
-ok  	github.com/uber/cadence/common/clock	239.738s
+ok  	github.com/cadence-workflow/shard-manager/common/clock	239.738s

@@ -14,7 +14,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	persistence "github.com/uber/cadence/common/persistence"
+	persistence "github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // MockBean is a mock of Bean interface.

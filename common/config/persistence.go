@@ -23,7 +23,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/uber/cadence/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 const (

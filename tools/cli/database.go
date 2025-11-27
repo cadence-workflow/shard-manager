@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination mock_manager_factory.go -self_package github.com/uber/cadence/tools/cli github.com/uber/cadence/tools/cli ManagerFactory
+//go:generate mockgen -package $GOPACKAGE -destination mock_manager_factory.go -self_package github.com/cadence-workflow/shard-manager/tools/cli github.com/cadence-workflow/shard-manager/tools/cli ManagerFactory
 
 package cli
 
@@ -28,17 +28,17 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/client"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra"
-	"github.com/uber/cadence/common/persistence/sql"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/tools/common/flag"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/client"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/tools/common/flag"
 )
 
 var supportedDBs = append(sql.GetRegisteredPluginNames(), "cassandra")

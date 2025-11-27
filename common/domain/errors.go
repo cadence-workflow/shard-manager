@@ -20,7 +20,7 @@
 
 package domain
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 var (
 	// err indicating that this cluster is not the primary, so cannot do domain registration or update

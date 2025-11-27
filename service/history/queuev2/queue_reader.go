@@ -20,14 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination queue_reader_mock.go github.com/uber/cadence/service/history/queuev2 QueueReader
+//go:generate mockgen -package $GOPACKAGE -destination queue_reader_mock.go github.com/cadence-workflow/shard-manager/service/history/queuev2 QueueReader
 package queuev2
 
 import (
 	"context"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
 )
 
 type (

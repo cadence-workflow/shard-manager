@@ -15,8 +15,8 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	config "github.com/uber/cadence/service/sharddistributor/config"
-	store "github.com/uber/cadence/service/sharddistributor/store"
+	config "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	store "github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
 // MockProcessor is a mock of Processor interface.

@@ -8,7 +8,7 @@ import (
 	transport "go.uber.org/yarpc/api/transport"
 	thrift "go.uber.org/yarpc/encoding/thrift"
 
-	adminserviceserver "github.com/uber/cadence/.gen/go/admin/adminserviceserver"
+	adminserviceserver "github.com/cadence-workflow/shard-manager/.gen/go/admin/adminserviceserver"
 )
 
 // ServerParams defines the dependencies for the AdminService server.

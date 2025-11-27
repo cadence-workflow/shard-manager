@@ -26,8 +26,8 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 
-	. "github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
+	. "github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 func TestSimplePolicyWithSharding(t *testing.T) {

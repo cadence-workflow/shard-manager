@@ -28,8 +28,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/mapq/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/mapq/types"
 )
 
 type Dispatcher struct {

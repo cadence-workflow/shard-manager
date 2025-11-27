@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/uber-go/tally"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 func TestUpdatePerDomainMaxWFRequestCount(t *testing.T) {

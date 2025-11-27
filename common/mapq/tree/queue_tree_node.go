@@ -26,11 +26,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/mapq/dispatcher"
-	"github.com/uber/cadence/common/mapq/types"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/mapq/dispatcher"
+	"github.com/cadence-workflow/shard-manager/common/mapq/types"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 // QueueTreeNode represents a node in the queue tree

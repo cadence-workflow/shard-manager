@@ -32,9 +32,9 @@ import (
 	gomock "go.uber.org/mock/gomock"
 	"golang.org/x/exp/maps"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 func TestPeerResolver(t *testing.T) {

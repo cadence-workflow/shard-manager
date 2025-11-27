@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log/testlogger"
-	metricsmocks "github.com/uber/cadence/common/metrics/mocks"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	metricsmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
 )
 
 func TestBudgetManager_ReserveForCache(t *testing.T) {

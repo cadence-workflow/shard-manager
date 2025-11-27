@@ -12,8 +12,8 @@ import (
 	thrift "go.uber.org/yarpc/encoding/thrift"
 	yarpcerrors "go.uber.org/yarpc/yarpcerrors"
 
-	cadence "github.com/uber/cadence/.gen/go/cadence"
-	shared "github.com/uber/cadence/.gen/go/shared"
+	cadence "github.com/cadence-workflow/shard-manager/.gen/go/cadence"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 // Interface is the server-side interface for the WorkflowService service.

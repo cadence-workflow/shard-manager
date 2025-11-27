@@ -1,6 +1,6 @@
 package persistence
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 // ToType converts persistence.GetDomainResponse to types.DescribeDomainResponse. Take care when using this mapper
 // as not all the fields between the two types are symmetrical

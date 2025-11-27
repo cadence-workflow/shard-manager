@@ -14,7 +14,7 @@ import (
 	types "github.com/gogo/protobuf/types"
 	v1 "github.com/uber/cadence-idl/go/proto/api/v1"
 
-	v11 "github.com/uber/cadence/.gen/proto/shared/v1"
+	v11 "github.com/cadence-workflow/shard-manager/.gen/proto/shared/v1"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

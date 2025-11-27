@@ -27,8 +27,8 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
 )
 
 const (

@@ -31,10 +31,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/common/errors"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/common/errors"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestInjector(t *testing.T) {

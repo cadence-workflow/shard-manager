@@ -14,8 +14,8 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	persistence "github.com/uber/cadence/common/persistence"
-	service "github.com/uber/cadence/common/service"
+	persistence "github.com/cadence-workflow/shard-manager/common/persistence"
+	service "github.com/cadence-workflow/shard-manager/common/service"
 )
 
 // MockFactory is a mock of Factory interface.

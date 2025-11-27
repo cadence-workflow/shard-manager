@@ -45,9 +45,9 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/uber/cadence/common"
-	simTypes "github.com/uber/cadence/simulation/replication/types"
-	"github.com/uber/cadence/simulation/replication/workflows"
+	"github.com/cadence-workflow/shard-manager/common"
+	simTypes "github.com/cadence-workflow/shard-manager/simulation/replication/types"
+	"github.com/cadence-workflow/shard-manager/simulation/replication/workflows"
 )
 
 var (

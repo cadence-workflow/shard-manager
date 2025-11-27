@@ -25,11 +25,11 @@ package ringpopfx
 import (
 	"go.uber.org/fx"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/peerprovider/ringpopprovider"
-	"github.com/uber/cadence/common/rpc"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/peerprovider/ringpopprovider"
+	"github.com/cadence-workflow/shard-manager/common/rpc"
 )
 
 // Module provides a peer resolver based on ringpop for fx app.

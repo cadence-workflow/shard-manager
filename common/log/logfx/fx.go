@@ -26,8 +26,8 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 // Module provides fx options to initialize logger from configuration.

@@ -27,9 +27,9 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/uber/cadence/common/persistence/sql/sqldriver"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin/mysql"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqldriver"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/mysql"
 
 	// import sqlite driver
 	_ "github.com/ncruces/go-sqlite3/driver"

@@ -26,8 +26,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/common/reconciliation/store"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/store"
 )
 
 const (

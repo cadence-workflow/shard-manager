@@ -26,20 +26,20 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/collection"
-	"github.com/uber/cadence/common/definition"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/collection"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (
 	eventsChanSize = 1000
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination notifier_mock.go -self_package github.com/uber/cadence/service/history/events
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination notifier_mock.go -self_package github.com/cadence-workflow/shard-manager/service/history/events
 
 type (
 	// Notifier is a pub-sub for sending and receiving notifications on new history events

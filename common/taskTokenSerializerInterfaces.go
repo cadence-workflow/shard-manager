@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination taskTokenSerializerInterfaces_mock.go -self_package github.com/uber/cadence/common
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination taskTokenSerializerInterfaces_mock.go -self_package github.com/cadence-workflow/shard-manager/common
 
 package common
 

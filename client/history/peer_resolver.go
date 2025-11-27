@@ -25,17 +25,17 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/service/history/lookup"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/service/history/lookup"
 )
 
 // PeerResolver is used to resolve history peers.
 // Those are deployed instances of Cadence history services that participate in the cluster ring.
 // The resulting peer is simply an address of form ip:port where RPC calls can be routed to.
 //
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination peer_resolver_mock.go -package history github.com/uber/cadence/client/history PeerResolver
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination peer_resolver_mock.go -package history github.com/cadence-workflow/shard-manager/client/history PeerResolver
 type PeerResolver interface {
 	FromWorkflowID(workflowID string) (string, error)
 	FromDomainID(domainID string) (string, error)

@@ -29,8 +29,8 @@ import (
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/service/worker/batcher"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/service/worker/batcher"
 )
 
 const (

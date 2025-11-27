@@ -23,11 +23,11 @@ package proto
 import (
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 
-	historyv1 "github.com/uber/cadence/.gen/proto/history/v1"
-	sharedv1 "github.com/uber/cadence/.gen/proto/shared/v1"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	historyv1 "github.com/cadence-workflow/shard-manager/.gen/proto/history/v1"
+	sharedv1 "github.com/cadence-workflow/shard-manager/.gen/proto/shared/v1"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func FromHistoryCloseShardRequest(t *types.CloseShardRequest) *historyv1.CloseShardRequest {

@@ -27,11 +27,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/diagnostics/analytics"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/analytics"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant"
 )
 
 const (

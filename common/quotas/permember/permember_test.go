@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/membership"
 )
 
 func Test_PerMember(t *testing.T) {

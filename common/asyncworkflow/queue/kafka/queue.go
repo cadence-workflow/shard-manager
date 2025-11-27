@@ -29,13 +29,13 @@ import (
 
 	"github.com/IBM/sarama"
 
-	"github.com/uber/cadence/common/asyncworkflow/queue/consumer"
-	"github.com/uber/cadence/common/asyncworkflow/queue/provider"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/messaging/kafka"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue/consumer"
+	"github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue/provider"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/messaging/kafka"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 type (

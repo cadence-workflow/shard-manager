@@ -31,11 +31,11 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/batcher"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/batcher"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 // TerminateBatchJob stops abatch job

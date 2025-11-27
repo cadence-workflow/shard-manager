@@ -9,9 +9,9 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/service/matching/config"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/service/matching/config"
 )
 
 const precision = 0.001

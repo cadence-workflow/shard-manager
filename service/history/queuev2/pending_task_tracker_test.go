@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/persistence"
-	ctask "github.com/uber/cadence/common/task"
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	ctask "github.com/cadence-workflow/shard-manager/common/task"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 func TestPendingTaskTracker(t *testing.T) {

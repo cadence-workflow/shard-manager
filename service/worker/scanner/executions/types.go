@@ -30,13 +30,13 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/pagination"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation/entity"
-	"github.com/uber/cadence/common/reconciliation/fetcher"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/service/worker/scanner/shardscanner"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/pagination"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/entity"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/fetcher"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/shardscanner"
 )
 
 const (

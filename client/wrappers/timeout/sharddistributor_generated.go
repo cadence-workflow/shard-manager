@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/sharddistributor"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var _ sharddistributor.Client = (*sharddistributorClient)(nil)

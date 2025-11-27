@@ -6,10 +6,10 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/sharddistributor"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/sharddistributor/client/spectatorclient/metricsconstants"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient/metricsconstants"
 )
 
 // TODO: consider using gowrap to generate this code

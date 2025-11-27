@@ -7,8 +7,8 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/service/sharddistributor/store"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
 type NamespaceToShards map[string]*namespaceShardToExecutor

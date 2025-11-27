@@ -23,18 +23,17 @@ package main
 import (
 	"os"
 
-	"github.com/uber/cadence/cmd/server/cadence"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/cmd/server/cadence"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 
-	_ "github.com/uber/cadence/common/archiver/gcloud"                                      // needed to load the optional gcloud archiver plugin
-	_ "github.com/uber/cadence/common/asyncworkflow/queue/kafka"                            // needed to load kafka asyncworkflow queue
-	_ "github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra"              // needed to load cassandra plugin
-	_ "github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql/public" // needed to load the default gocql client
-	_ "github.com/uber/cadence/common/persistence/sql/sqlplugin/mysql"                      // needed to load mysql plugin
-	_ "github.com/uber/cadence/common/persistence/sql/sqlplugin/postgres"                   // needed to load postgres plugin
-	_ "github.com/uber/cadence/common/persistence/sql/sqlplugin/sqlite"                     // needed to load sqlite plugin
-	_ "github.com/uber/cadence/service/sharddistributor/store/etcd"                         // needed for shard distributor shard/heartbeat and leader election
+	_ "github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue/kafka"                            // needed to load kafka asyncworkflow queue
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra"              // needed to load cassandra plugin
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql/public" // needed to load the default gocql client
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/mysql"                      // needed to load mysql plugin
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/postgres"                   // needed to load postgres plugin
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/sqlite"                     // needed to load sqlite plugin
+	_ "github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd"                         // needed for shard distributor shard/heartbeat and leader election
 )
 
 // main entry point for the cadence server

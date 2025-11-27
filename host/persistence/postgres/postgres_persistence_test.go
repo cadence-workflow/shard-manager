@@ -26,9 +26,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	pt "github.com/uber/cadence/common/persistence/persistence-tests"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin/postgres"
-	"github.com/uber/cadence/testflags"
+	pt "github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/postgres"
+	"github.com/cadence-workflow/shard-manager/testflags"
 )
 
 func TestPostgresSQLHistoryV2PersistenceSuite(t *testing.T) {
@@ -114,7 +114,7 @@ func TestPostgresSQLVisibilityPersistenceSuite(t *testing.T) {
 }
 
 // TODO flaky test
-// https://github.com/uber/cadence/issues/2877
+// https://github.com/cadence-workflow/shard-manager/issues/2877
 /*
 FAIL: TestPostgresSQLQueuePersistence/TestDomainReplicationQueue (0.26s)
         queuePersistenceTest.go:102:

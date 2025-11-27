@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/service/sharddistributor/store"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
 func TestExecutorStatePubSub_SubscribeUnsubscribe(t *testing.T) {

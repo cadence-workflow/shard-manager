@@ -21,12 +21,12 @@
 package testing
 
 import (
-	"github.com/uber/cadence/common"
-	commonconstants "github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/constants"
-	"github.com/uber/cadence/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/common"
+	commonconstants "github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/constants"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 // AddWorkflowExecutionStartedEventWithParent adds WorkflowExecutionStarted event with parent workflow info

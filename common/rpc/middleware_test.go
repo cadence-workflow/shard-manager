@@ -34,10 +34,10 @@ import (
 	"go.uber.org/yarpc/api/transport"
 	"go.uber.org/yarpc/yarpctest"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/isolationgroup"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/isolationgroup"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 func TestAuthOubboundMiddleware(t *testing.T) {

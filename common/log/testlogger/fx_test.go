@@ -28,7 +28,7 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 func TestModule(t *testing.T) {

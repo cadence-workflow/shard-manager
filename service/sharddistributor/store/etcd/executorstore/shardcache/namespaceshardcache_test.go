@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdkeys"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdtypes"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/testhelper"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/testhelper"
 )
 
 // setupExecutorWithShards creates an executor in etcd with assigned shards and metadata

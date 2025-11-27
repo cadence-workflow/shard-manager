@@ -34,13 +34,13 @@ import (
 	"go.uber.org/thriftrw/protocol/binary"
 	"go.uber.org/thriftrw/ptr"
 
-	"github.com/uber/cadence/.gen/go/indexer"
-	"github.com/uber/cadence/.gen/go/replicator"
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/tools/cli/clitest"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/.gen/go/indexer"
+	"github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/tools/cli/clitest"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 func TestWriterChannel(t *testing.T) {

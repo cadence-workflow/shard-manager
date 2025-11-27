@@ -8,12 +8,12 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/service/sharddistributor/store"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdkeys"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdtypes"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/executorstore/common"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/common"
 )
 
 type namespaceShardToExecutor struct {

@@ -21,9 +21,9 @@
 package authorization
 
 import (
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 func NewAuthorizer(authorization config.Authorization, logger log.Logger, domainCache cache.DomainCache) (Authorizer, error) {

@@ -25,18 +25,18 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/uber/cadence/common/activecluster"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	frontendcfg "github.com/uber/cadence/service/frontend/config"
+	"github.com/cadence-workflow/shard-manager/common/activecluster"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	frontendcfg "github.com/cadence-workflow/shard-manager/service/frontend/config"
 )
 
-//go:generate mockgen -package $GOPACKAGE -destination policy_mock.go -self_package github.com/uber/cadence/service/frontend/wrappers/clusterredirection github.com/uber/cadence/service/frontend/wrappers/clusterredirection ClusterRedirectionPolicy
+//go:generate mockgen -package $GOPACKAGE -destination policy_mock.go -self_package github.com/cadence-workflow/shard-manager/service/frontend/wrappers/clusterredirection github.com/cadence-workflow/shard-manager/service/frontend/wrappers/clusterredirection ClusterRedirectionPolicy
 
 const (
 	// DCRedirectionPolicyDefault means no redirection

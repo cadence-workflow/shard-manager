@@ -7,12 +7,12 @@ package accesscontrolled
 import (
 	"context"
 
-	"github.com/uber/cadence/common/authorization"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/admin"
+	"github.com/cadence-workflow/shard-manager/common/authorization"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/admin"
 )
 
 // adminHandler frontend handler wrapper for authentication and authorization

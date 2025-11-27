@@ -26,14 +26,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
-	persistenceutils "github.com/uber/cadence/common/persistence/persistence-utils"
-	"github.com/uber/cadence/common/persistence/serialization"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	persistenceutils "github.com/cadence-workflow/shard-manager/common/persistence/persistence-utils"
+	"github.com/cadence-workflow/shard-manager/common/persistence/serialization"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (
@@ -466,7 +466,7 @@ func (m *sqlHistoryStore) DeleteHistoryBranch(
 	})
 }
 
-// TODO: Limit the underlying query to a specific shard at a time. See https://github.com/uber/cadence/issues/4064
+// TODO: Limit the underlying query to a specific shard at a time. See https://github.com/cadence-workflow/shard-manager/issues/4064
 func (m *sqlHistoryStore) GetAllHistoryTreeBranches(
 	ctx context.Context,
 	request *persistence.GetAllHistoryTreeBranchesRequest,

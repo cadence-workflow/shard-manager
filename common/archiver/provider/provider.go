@@ -25,12 +25,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/uber/cadence/common/archiver"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/syncmap"
+	"github.com/cadence-workflow/shard-manager/common/archiver"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/syncmap"
 )
 
-//go:generate mockgen -package=$GOPACKAGE -destination=provider_mock.go -self_package=github.com/uber/cadence/common/archiver/provider github.com/uber/cadence/common/archiver/provider ArchiverProvider
+//go:generate mockgen -package=$GOPACKAGE -destination=provider_mock.go -self_package=github.com/cadence-workflow/shard-manager/common/archiver/provider github.com/cadence-workflow/shard-manager/common/archiver/provider ArchiverProvider
 
 var (
 	// ErrUnknownScheme is the error for unknown archiver scheme

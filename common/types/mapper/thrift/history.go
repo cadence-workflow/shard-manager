@@ -21,8 +21,8 @@
 package thrift
 
 import (
-	"github.com/uber/cadence/.gen/go/history"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/.gen/go/history"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var (

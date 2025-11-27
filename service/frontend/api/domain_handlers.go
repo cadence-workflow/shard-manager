@@ -26,10 +26,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/validate"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/validate"
 )
 
 // RegisterDomain creates a new domain which can be used as a container for all resources.  Domain is a top level

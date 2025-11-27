@@ -32,16 +32,16 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/client"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra"
-	"github.com/uber/cadence/common/persistence/sql"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	commonFlag "github.com/uber/cadence/tools/common/flag"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/client"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	commonFlag "github.com/cadence-workflow/shard-manager/tools/common/flag"
 )
 
 func TestDefaultManagerFactory(t *testing.T) {

@@ -27,8 +27,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common/testing/testdatagen"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/testing/testdatagen"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestGetDomainResponse_ToType(t *testing.T) {

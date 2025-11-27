@@ -23,7 +23,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/uber/cadence/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 type (

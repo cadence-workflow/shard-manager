@@ -29,22 +29,22 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/config"
-	dc "github.com/uber/cadence/common/dynamicconfig"
-	csc "github.com/uber/cadence/common/dynamicconfig/configstore/config"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql"
-	"github.com/uber/cadence/common/persistence/sql"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	dc "github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	csc "github.com/cadence-workflow/shard-manager/common/dynamicconfig/configstore/config"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination configstore_mock.go -self_package github.com/uber/cadence/common/dynamicconfig/configstore
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination configstore_mock.go -self_package github.com/cadence-workflow/shard-manager/common/dynamicconfig/configstore
 
 var _ dc.Client = (*configStoreClient)(nil)
 

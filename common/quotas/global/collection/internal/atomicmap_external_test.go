@@ -34,7 +34,7 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/uber/cadence/common/quotas/global/collection/internal"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/collection/internal"
 )
 
 func TestMapBasics(t *testing.T) {

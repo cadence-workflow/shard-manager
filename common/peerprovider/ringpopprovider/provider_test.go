@@ -33,8 +33,8 @@ import (
 	"github.com/uber/tchannel-go"
 	"go.uber.org/goleak"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/membership"
 )
 
 const testServiceName = "test-service"

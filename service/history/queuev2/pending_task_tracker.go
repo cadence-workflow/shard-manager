@@ -20,13 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination pending_task_tracker_mock.go github.com/uber/cadence/service/history/queuev2 PendingTaskTracker
+//go:generate mockgen -package $GOPACKAGE -destination pending_task_tracker_mock.go github.com/cadence-workflow/shard-manager/service/history/queuev2 PendingTaskTracker
 package queuev2
 
 import (
-	"github.com/uber/cadence/common/persistence"
-	ctask "github.com/uber/cadence/common/task"
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	ctask "github.com/cadence-workflow/shard-manager/common/task"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 type (

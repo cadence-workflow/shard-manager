@@ -31,8 +31,8 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/cadence/.gen/go/shared"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant"
 )
 
 type Timeout invariant.Invariant

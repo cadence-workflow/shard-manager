@@ -23,9 +23,9 @@
 package isolationgroupapi
 
 import (
-	"github.com/uber/cadence/common/domain"
-	"github.com/uber/cadence/common/dynamicconfig"
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/domain"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 type handlerImpl struct {

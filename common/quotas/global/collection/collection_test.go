@@ -36,15 +36,15 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	dynamicquotas "github.com/uber/cadence/common/dynamicconfig/quotas"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/quotas/global/collection/internal"
-	"github.com/uber/cadence/common/quotas/global/rpc"
-	"github.com/uber/cadence/common/quotas/global/shared"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	dynamicquotas "github.com/cadence-workflow/shard-manager/common/dynamicconfig/quotas"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/collection/internal"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/rpc"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/shared"
 )
 
 func TestLifecycleBasics(t *testing.T) {

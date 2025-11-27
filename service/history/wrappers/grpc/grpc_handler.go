@@ -28,8 +28,8 @@ import (
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/yarpc"
 
-	historyv1 "github.com/uber/cadence/.gen/proto/history/v1"
-	"github.com/uber/cadence/common/types/mapper/proto"
+	historyv1 "github.com/cadence-workflow/shard-manager/.gen/proto/history/v1"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/proto"
 )
 
 func (g GRPCHandler) Register(dispatcher *yarpc.Dispatcher) {

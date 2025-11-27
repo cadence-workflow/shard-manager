@@ -21,9 +21,9 @@
 package cassandra
 
 import (
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
-	"github.com/uber/cadence/environment"
-	"github.com/uber/cadence/tools/cassandra"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	"github.com/cadence-workflow/shard-manager/environment"
+	"github.com/cadence-workflow/shard-manager/tools/cassandra"
 )
 
 // NOTE: change this when moving the test files around during refactoring

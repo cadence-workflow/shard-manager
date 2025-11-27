@@ -25,10 +25,10 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common/errors"
-	"github.com/uber/cadence/common/future"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/errors"
+	"github.com/cadence-workflow/shard-manager/common/future"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var _ Client = (*clientImpl)(nil)

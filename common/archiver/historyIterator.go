@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination historyIterator_mock.go -self_package github.com/uber/cadence/common/archiver
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination historyIterator_mock.go -self_package github.com/cadence-workflow/shard-manager/common/archiver
 
 package archiver
 
@@ -27,11 +27,11 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	persistenceutils "github.com/uber/cadence/common/persistence/persistence-utils"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	persistenceutils "github.com/cadence-workflow/shard-manager/common/persistence/persistence-utils"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

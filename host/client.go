@@ -25,13 +25,13 @@ import (
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/yarpc"
 
-	historyv1 "github.com/uber/cadence/.gen/proto/history/v1"
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/client/history"
-	"github.com/uber/cadence/client/matching"
-	"github.com/uber/cadence/client/wrappers/grpc"
-	"github.com/uber/cadence/common/service"
+	historyv1 "github.com/cadence-workflow/shard-manager/.gen/proto/history/v1"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/client/history"
+	"github.com/cadence-workflow/shard-manager/client/matching"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/grpc"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 // AdminClient is the interface exposed by admin service client

@@ -24,13 +24,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/persistence-tests/testcluster"
-	"github.com/uber/cadence/common/testing"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/host"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests/testcluster"
+	"github.com/cadence-workflow/shard-manager/common/testing"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/host"
 )
 
 // NOTE: the following definitions can't be defined in *_test.go

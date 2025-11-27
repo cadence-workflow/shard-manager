@@ -3,8 +3,8 @@ package tasklist
 import (
 	"sync/atomic"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 type shardProcessorImpl struct {

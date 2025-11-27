@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination resource_mock.go -self_package github.com/uber/cadence/service/history/resource
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination resource_mock.go -self_package github.com/cadence-workflow/shard-manager/service/history/resource
 
 package resource
 
@@ -26,16 +26,16 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/quotas/global/algorithm"
-	"github.com/uber/cadence/common/quotas/permember"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/service/history/config"
-	"github.com/uber/cadence/service/history/events"
-	"github.com/uber/cadence/service/worker/archiver"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/algorithm"
+	"github.com/cadence-workflow/shard-manager/common/quotas/permember"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/service/history/config"
+	"github.com/cadence-workflow/shard-manager/service/history/events"
+	"github.com/cadence-workflow/shard-manager/service/worker/archiver"
 )
 
 // Resource is the interface which expose common history resources

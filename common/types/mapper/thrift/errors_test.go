@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/yarpc/yarpcerrors"
 
-	"github.com/uber/cadence/common/types/testdata"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestErrors(t *testing.T) {

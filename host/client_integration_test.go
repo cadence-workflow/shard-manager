@@ -48,8 +48,8 @@ import (
 	"go.uber.org/yarpc/transport/grpc"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 func init() {

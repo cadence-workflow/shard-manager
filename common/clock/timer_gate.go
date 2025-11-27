@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package=$GOPACKAGE -destination=timer_gate_mock.go github.com/uber/cadence/common/clock TimerGate
+//go:generate mockgen -package=$GOPACKAGE -destination=timer_gate_mock.go github.com/cadence-workflow/shard-manager/common/clock TimerGate
 package clock
 
 import (

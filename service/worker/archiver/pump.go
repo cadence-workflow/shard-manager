@@ -25,11 +25,11 @@ import (
 
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
-//go:generate mockgen -package=$GOPACKAGE -destination=pump_mock.go -self_package=github.com/uber/cadence/service/worker/archiver github.com/uber/cadence/service/worker/archiver Pump
+//go:generate mockgen -package=$GOPACKAGE -destination=pump_mock.go -self_package=github.com/cadence-workflow/shard-manager/service/worker/archiver github.com/cadence-workflow/shard-manager/service/worker/archiver Pump
 
 type (
 	// Pump pumps archival requests into request channel

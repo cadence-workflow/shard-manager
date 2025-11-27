@@ -25,13 +25,13 @@ import (
 	"context"
 	"errors"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	hcommon "github.com/uber/cadence/service/history/common"
-	"github.com/uber/cadence/service/history/events"
-	"github.com/uber/cadence/service/history/replication"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	hcommon "github.com/cadence-workflow/shard-manager/service/history/common"
+	"github.com/cadence-workflow/shard-manager/service/history/events"
+	"github.com/cadence-workflow/shard-manager/service/history/replication"
 )
 
 func (e *historyEngineImpl) NotifyNewHistoryEvent(event *events.Notification) {

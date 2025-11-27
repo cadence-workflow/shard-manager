@@ -26,9 +26,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/uber/cadence/.gen/go/indexer"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/messaging"
+	"github.com/cadence-workflow/shard-manager/.gen/go/indexer"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
 )
 
 type Emitter DataEmitter

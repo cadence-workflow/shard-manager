@@ -30,9 +30,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common/quotas/global/algorithm"
-	"github.com/uber/cadence/common/quotas/global/shared"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/algorithm"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/shared"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestMapping(t *testing.T) {

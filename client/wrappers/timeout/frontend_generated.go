@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var _ frontend.Client = (*frontendClient)(nil)

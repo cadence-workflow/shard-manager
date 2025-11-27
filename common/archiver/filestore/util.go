@@ -31,8 +31,8 @@ import (
 
 	"github.com/dgryski/go-farm"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/util"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/util"
 )
 
 var (

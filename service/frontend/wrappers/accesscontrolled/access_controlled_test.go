@@ -30,11 +30,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/authorization"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/metrics/mocks"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/admin"
+	"github.com/cadence-workflow/shard-manager/common/authorization"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/metrics/mocks"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/admin"
 )
 
 func TestIsAuthorized(t *testing.T) {

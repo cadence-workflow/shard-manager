@@ -32,10 +32,10 @@ import (
 	"go.uber.org/multierr"
 	"golang.org/x/exp/maps"
 
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 type (

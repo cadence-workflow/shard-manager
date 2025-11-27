@@ -23,6 +23,10 @@ jobs:
         PR_NUMBER=${{ github.event.pull_request.number }}
         PR_URL="https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}"
         BODY=$(curl $PR_URL | jq '.body')
+
+        echo "PR_NUMBER: $PR_NUMBER"
+        echo "BODY: $BODY"
+
         CHECKLIST=(
           "Detailed Description"
           "Impact Analysis"

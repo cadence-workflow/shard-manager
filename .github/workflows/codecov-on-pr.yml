@@ -3,6 +3,7 @@ on: pull_request
 
 jobs:
   codecov:
+    if: false # Workflow disabled we need to set up codecov when we have a codecov token
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

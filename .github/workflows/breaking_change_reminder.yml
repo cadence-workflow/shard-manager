@@ -3,10 +3,9 @@ on:
   pull_request:
     paths:
       - schema/**
-      - client/frontend/interface.go
-      - client/history/interface.go
-      - client/matching/interface.go
       - client/admin/interface.go
+      - client/sharddistributor/interface.go
+      - client/sharddistributorexecutor/interface.go
 
 jobs:
   breaking-change-pr-template-reminder:

@@ -3,7 +3,7 @@ on: push
 
 jobs:
   codecov:
-    if: github.repository == 'cadence-workflow/cadence'
+    if: false # Workflow disabled we need to set up codecov when we have a codecov token
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

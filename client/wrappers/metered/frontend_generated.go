@@ -9,9 +9,9 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // frontendClient implements frontend.Client interface instrumented with retries

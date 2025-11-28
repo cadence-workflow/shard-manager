@@ -16,7 +16,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	execution "github.com/uber/cadence/service/history/execution"
+	execution "github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 // MockWorkflowResetter is a mock of WorkflowResetter interface.

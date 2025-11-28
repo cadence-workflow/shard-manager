@@ -21,9 +21,9 @@
 package proto
 
 import (
-	matchingv1 "github.com/uber/cadence/.gen/proto/matching/v1"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
+	matchingv1 "github.com/cadence-workflow/shard-manager/.gen/proto/matching/v1"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func FromMatchingAddActivityTaskRequest(t *types.AddActivityTaskRequest) *matchingv1.AddActivityTaskRequest {

@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination loadbalancer_mock.go -package matching github.com/uber/cadence/client/matching LoadBalancer,WeightedLoadBalancer
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination loadbalancer_mock.go -package matching github.com/cadence-workflow/shard-manager/client/matching LoadBalancer,WeightedLoadBalancer
 
 package matching
 
@@ -26,8 +26,8 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func mergeActiveActiveScopes(existingDomain *types.ActiveClusters, incomingTask *types.ActiveClusters) (result *types.ActiveClusters, isChanged bool) {

@@ -24,9 +24,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/uber/cadence/environment"
-	"github.com/uber/cadence/tools/common/schema/test"
-	"github.com/uber/cadence/tools/sql"
+	"github.com/cadence-workflow/shard-manager/environment"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema/test"
+	"github.com/cadence-workflow/shard-manager/tools/sql"
 )
 
 type (

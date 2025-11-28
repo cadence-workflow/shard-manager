@@ -20,7 +20,7 @@
 
 package mocks
 
-import "github.com/uber/cadence/common/messaging"
+import "github.com/cadence-workflow/shard-manager/common/messaging"
 
 type (
 	// MessagingClient is the mock implementation for Service interface

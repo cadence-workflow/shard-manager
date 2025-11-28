@@ -23,9 +23,9 @@ package public
 import (
 	"testing"
 
-	persistencetests "github.com/uber/cadence/common/persistence/persistence-tests"
+	persistencetests "github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests"
 
-	_ "github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra" // needed to load cassandra plugin
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra" // needed to load cassandra plugin
 )
 
 // NewTestBaseWithPublicCassandra returns a persistence test base backed by cassandra datastore

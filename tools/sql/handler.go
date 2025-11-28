@@ -27,15 +27,15 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common/config"
-	mysql_db "github.com/uber/cadence/common/persistence/sql/sqlplugin/mysql"
-	postgres_db "github.com/uber/cadence/common/persistence/sql/sqlplugin/postgres"
-	sqlite_db "github.com/uber/cadence/common/persistence/sql/sqlplugin/sqlite"
-	"github.com/uber/cadence/schema/mysql"
-	"github.com/uber/cadence/schema/postgres"
-	"github.com/uber/cadence/schema/sqlite"
-	cliflag "github.com/uber/cadence/tools/common/flag"
-	"github.com/uber/cadence/tools/common/schema"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	mysql_db "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/mysql"
+	postgres_db "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/postgres"
+	sqlite_db "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/sqlite"
+	"github.com/cadence-workflow/shard-manager/schema/mysql"
+	"github.com/cadence-workflow/shard-manager/schema/postgres"
+	"github.com/cadence-workflow/shard-manager/schema/sqlite"
+	cliflag "github.com/cadence-workflow/shard-manager/tools/common/flag"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema"
 )
 
 // VerifyCompatibleVersion ensures that the installed version of cadence and visibility

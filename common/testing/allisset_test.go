@@ -26,7 +26,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/uber/cadence/common/types/testdata"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestAllFieldsSetInTestErrors(t *testing.T) {

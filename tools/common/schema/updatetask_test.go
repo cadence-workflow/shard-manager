@@ -35,10 +35,10 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/schema/cassandra"
-	"github.com/uber/cadence/schema/mysql"
-	"github.com/uber/cadence/schema/postgres"
-	"github.com/uber/cadence/schema/sqlite"
+	"github.com/cadence-workflow/shard-manager/schema/cassandra"
+	"github.com/cadence-workflow/shard-manager/schema/mysql"
+	"github.com/cadence-workflow/shard-manager/schema/postgres"
+	"github.com/cadence-workflow/shard-manager/schema/sqlite"
 )
 
 type UpdateTaskTestSuite struct {

@@ -23,7 +23,7 @@ package messaging
 import (
 	"context"
 
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 type MetricsProducer struct {

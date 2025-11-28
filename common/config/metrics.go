@@ -29,11 +29,11 @@ import (
 	"github.com/uber-go/tally/prometheus"
 	tallystatsdreporter "github.com/uber-go/tally/statsd"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	mprom "github.com/uber/cadence/common/metrics/tally/prometheus"
-	statsdreporter "github.com/uber/cadence/common/metrics/tally/statsd"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	mprom "github.com/cadence-workflow/shard-manager/common/metrics/tally/prometheus"
+	statsdreporter "github.com/cadence-workflow/shard-manager/common/metrics/tally/statsd"
 )
 
 const (

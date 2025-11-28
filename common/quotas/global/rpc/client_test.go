@@ -36,12 +36,12 @@ import (
 	"go.uber.org/yarpc"
 	"golang.org/x/exp/maps"
 
-	"github.com/uber/cadence/client/history"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas/global/algorithm"
-	"github.com/uber/cadence/common/quotas/global/shared"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/history"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/algorithm"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/shared"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestClient(t *testing.T) {

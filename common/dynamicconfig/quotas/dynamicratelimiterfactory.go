@@ -23,8 +23,8 @@
 package quotas
 
 import (
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
 )
 
 // NewSimpleDynamicRateLimiterFactory creates a new LimiterFactory which creates

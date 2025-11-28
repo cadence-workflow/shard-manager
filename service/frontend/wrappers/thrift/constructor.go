@@ -27,13 +27,13 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/.gen/go/admin/adminserviceserver"
-	"github.com/uber/cadence/.gen/go/cadence/workflowserviceserver"
-	"github.com/uber/cadence/.gen/go/health"
-	"github.com/uber/cadence/.gen/go/health/metaserver"
-	"github.com/uber/cadence/common/types/mapper/thrift"
-	"github.com/uber/cadence/service/frontend/admin"
-	"github.com/uber/cadence/service/frontend/api"
+	"github.com/cadence-workflow/shard-manager/.gen/go/admin/adminserviceserver"
+	"github.com/cadence-workflow/shard-manager/.gen/go/cadence/workflowserviceserver"
+	"github.com/cadence-workflow/shard-manager/.gen/go/health"
+	"github.com/cadence-workflow/shard-manager/.gen/go/health/metaserver"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/thrift"
+	"github.com/cadence-workflow/shard-manager/service/frontend/admin"
+	"github.com/cadence-workflow/shard-manager/service/frontend/api"
 )
 
 type (

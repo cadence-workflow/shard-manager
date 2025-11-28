@@ -15,8 +15,8 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	types "github.com/uber/cadence/common/types"
-	execution "github.com/uber/cadence/service/history/execution"
+	types "github.com/cadence-workflow/shard-manager/common/types"
+	execution "github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 // MockEventsReapplier is a mock of EventsReapplier interface.

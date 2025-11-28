@@ -25,10 +25,10 @@ package queuev2
 import (
 	"context"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/persistence"
-	hcommon "github.com/uber/cadence/service/history/common"
-	"github.com/uber/cadence/service/history/queue"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	hcommon "github.com/cadence-workflow/shard-manager/service/history/common"
+	"github.com/cadence-workflow/shard-manager/service/history/queue"
 )
 
 type (

@@ -13,7 +13,7 @@ import (
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
 
-	shared "github.com/uber/cadence/.gen/go/shared"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 type MutableStateChecksumPayload struct {
@@ -1601,7 +1601,7 @@ func (v *MutableStateChecksumPayload) IsSetVersionHistories() bool {
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "checksum",
-	Package:  "github.com/uber/cadence/.gen/go/checksum",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/checksum",
 	FilePath: "checksum.thrift",
 	SHA1:     "c3ee77b53c2e06c35a3296cfeeeadf140711ed95",
 	Includes: []*thriftreflect.ThriftModule{

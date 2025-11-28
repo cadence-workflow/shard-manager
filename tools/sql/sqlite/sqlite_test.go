@@ -29,11 +29,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common/config"
-	sqliteplugin "github.com/uber/cadence/common/persistence/sql/sqlplugin/sqlite"
-	"github.com/uber/cadence/schema/sqlite"
-	"github.com/uber/cadence/tools/common/schema"
-	"github.com/uber/cadence/tools/sql"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	sqliteplugin "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/sqlite"
+	"github.com/cadence-workflow/shard-manager/schema/sqlite"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema"
+	"github.com/cadence-workflow/shard-manager/tools/sql"
 )
 
 // Test_SetupSchema test that setup schema works for all database sqlite schemas

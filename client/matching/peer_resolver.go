@@ -21,15 +21,15 @@
 package matching
 
 import (
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 // PeerResolver is used to resolve matching peers.
 // Those are deployed instances of Cadence matching services that participate in the cluster ring.
 // The resulting peer is simply an address of form ip:port where RPC calls can be routed to.
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination peer_resolver_mock.go -package matching github.com/uber/cadence/client/matching PeerResolver
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination peer_resolver_mock.go -package matching github.com/cadence-workflow/shard-manager/client/matching PeerResolver
 
 type PeerResolver interface {
 	FromTaskList(taskListName string) (string, error)

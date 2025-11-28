@@ -28,7 +28,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // NoBackoff is used to represent backoff when no cron backoff is needed

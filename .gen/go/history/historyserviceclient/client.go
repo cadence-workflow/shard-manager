@@ -12,9 +12,9 @@ import (
 	transport "go.uber.org/yarpc/api/transport"
 	thrift "go.uber.org/yarpc/encoding/thrift"
 
-	history "github.com/uber/cadence/.gen/go/history"
-	replicator "github.com/uber/cadence/.gen/go/replicator"
-	shared "github.com/uber/cadence/.gen/go/shared"
+	history "github.com/cadence-workflow/shard-manager/.gen/go/history"
+	replicator "github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 // Interface is a client for the HistoryService service.

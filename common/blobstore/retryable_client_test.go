@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
 )
 
 func runCRUDTest(

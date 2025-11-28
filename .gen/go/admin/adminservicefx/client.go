@@ -10,7 +10,7 @@ import (
 	restriction "go.uber.org/yarpc/api/x/restriction"
 	thrift "go.uber.org/yarpc/encoding/thrift"
 
-	adminserviceclient "github.com/uber/cadence/.gen/go/admin/adminserviceclient"
+	adminserviceclient "github.com/cadence-workflow/shard-manager/.gen/go/admin/adminserviceclient"
 )
 
 // Params defines the dependencies for the AdminService client.

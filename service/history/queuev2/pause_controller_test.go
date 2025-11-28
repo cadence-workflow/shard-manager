@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/goleak"
 
-	"github.com/uber/cadence/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/clock"
 )
 
 func TestPauseController_Basic(t *testing.T) {

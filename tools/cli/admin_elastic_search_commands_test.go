@@ -39,8 +39,8 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/.gen/go/indexer"
-	"github.com/uber/cadence/common/elasticsearch"
+	"github.com/cadence-workflow/shard-manager/.gen/go/indexer"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch"
 )
 
 // Tests for timeKeyFilter function

@@ -16,8 +16,8 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	cache "github.com/uber/cadence/common/cache"
-	types "github.com/uber/cadence/common/types"
+	cache "github.com/cadence-workflow/shard-manager/common/cache"
+	types "github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // MockCache is a mock of Cache interface.

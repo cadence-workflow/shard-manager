@@ -25,8 +25,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/definition"
 )
 
 type (
@@ -1490,12 +1490,12 @@ const (
 	// Usage: VisibilityArchivalQueryMaxRangeInDays is the maximum number of days for a visibility archival query
 	// KeyName: N/A
 	// Default value: N/A
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	VisibilityArchivalQueryMaxRangeInDays
 	// Usage: VisibilityArchivalQueryMaxQPS is the timeout for a visibility archival query
 	// KeyName: N/A
 	// Default value: N/A
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	VisibilityArchivalQueryMaxQPS
 
 	// WorkflowDeletionJitterRange defines the duration in minutes for workflow close tasks jittering
@@ -1854,7 +1854,7 @@ const (
 	// Allowed filters: N/A
 	AllowArchivingIncompleteHistory
 	// EnableCleaningOrphanTaskInTasklistScavenger indicates if enabling the scanner to clean up orphan tasks
-	// Only implemented for single SQL database. TODO https://github.com/uber/cadence/issues/4064 for supporting multiple/sharded SQL database and NoSQL
+	// Only implemented for single SQL database. TODO https://github.com/cadence-workflow/shard-manager/issues/4064 for supporting multiple/sharded SQL database and NoSQL
 	// KeyName: worker.enableCleaningOrphanTaskInTasklistScavenger
 	// Value type: Bool
 	// Default value: false
@@ -2015,17 +2015,17 @@ const (
 	// EnableAuthorization is the key to enable authorization for a domain, only for extension binary:
 	// KeyName: N/A
 	// Default value: N/A
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	EnableAuthorization
 	// EnableServiceAuthorization is the key to enable authorization for a service, only for extension binary:
 	// KeyName: N/A
 	// Default value: N/A
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	EnableServiceAuthorization
 	// EnableServiceAuthorizationLogOnly is the key to enable authorization logging for a service, only for extension binary:
 	// KeyName: N/A
 	// Default value: N/A
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	EnableServiceAuthorizationLogOnly
 	// ESAnalyzerPause defines if we want to dynamically pause the analyzer workflow
 	// KeyName: worker.ESAnalyzerPause
@@ -2035,7 +2035,7 @@ const (
 	// EnableArchivalCompression indicates whether blobs are compressed before they are archived
 	// KeyName: N/A
 	// Default value: N/A
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	EnableArchivalCompression
 	// ESAnalyzerEnableAvgDurationBasedChecks controls if we want to enable avg duration based task refreshes
 	// KeyName: worker.ESAnalyzerEnableAvgDurationBasedChecks
@@ -2304,12 +2304,12 @@ const (
 	// WorkerDeterministicConstructionCheckProbability controls the probability of running a deterministic construction check for any given archival
 	// KeyName: N/A
 	// Default value: N/A
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	WorkerDeterministicConstructionCheckProbability
 	// WorkerBlobIntegrityCheckProbability controls the probability of running an integrity check for any given archival
 	// KeyName: N/A
 	// Default value: N/A
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	WorkerBlobIntegrityCheckProbability
 
 	// HistoryGlobalRatelimiterNewDataWeight defines how much weight to give each host's newest data, per update.  Must be between 0 and 1, higher values match new values more closely after a single update.
@@ -2419,7 +2419,7 @@ const (
 	//   - "x-shadow-y" means "use x, and shadow all calls to y but ignore the result".
 	//     this calls both, tracks and emits both metrics, and can be used to "warm" either limiter's in-memory state before switching.
 	//
-	// These values can be seen as constants of github.com/uber/cadence/common/quotas/global/collection.keyMode
+	// These values can be seen as constants of github.com/cadence-workflow/shard-manager/common/quotas/global/collection.keyMode
 	//
 	// KeyName: frontend.globalRatelimiterMode
 	// Value type: string enum: "disabled", "local", "global", "local-shadow-global", or "global-shadow-local"
@@ -2430,7 +2430,7 @@ const (
 	// KeyName: system.enableAuthorizationV2
 	// Value type: string ["disabled","shadow","enabled"]
 	// Default value: "disabled"
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	EnableAuthorizationV2
 	TasklistLoadBalancerStrategy
 
@@ -2438,7 +2438,7 @@ const (
 	// KeyName: system.enableAdminAuthorization
 	// Value type: string ["disabled","shadow","enabled"]
 	// Default value: "disabled"
-	// TODO: https://github.com/uber/cadence/issues/3861
+	// TODO: https://github.com/cadence-workflow/shard-manager/issues/3861
 	EnableAdminAuthorization
 
 	// MatchingShardDistributionMode is the mode of shard distribution for matching, we currently have four modes, we _highly_

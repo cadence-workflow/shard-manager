@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	config "github.com/uber/cadence/service/sharddistributor/config"
+	config "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 )
 
 // MockElector is a mock of Elector interface.

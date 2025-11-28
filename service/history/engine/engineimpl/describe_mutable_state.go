@@ -25,9 +25,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 func (e *historyEngineImpl) DescribeMutableState(

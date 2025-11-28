@@ -46,9 +46,9 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
-	simTypes "github.com/uber/cadence/simulation/replication/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	simTypes "github.com/cadence-workflow/shard-manager/simulation/replication/types"
 )
 
 func TestReplicationSimulation(t *testing.T) {

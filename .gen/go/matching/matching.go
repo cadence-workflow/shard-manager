@@ -19,7 +19,7 @@ import (
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
 
-	shared "github.com/uber/cadence/.gen/go/shared"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 type ActivityTaskDispatchInfo struct {
@@ -6794,7 +6794,7 @@ func (v *TaskSource) UnmarshalJSON(text []byte) error {
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "matching",
-	Package:  "github.com/uber/cadence/.gen/go/matching",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/matching",
 	FilePath: "matching.thrift",
 	SHA1:     "e7db050ae64980b33e3f8ed3f6a3bba3d63174b3",
 	Includes: []*thriftreflect.ThriftModule{

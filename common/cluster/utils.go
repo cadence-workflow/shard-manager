@@ -21,7 +21,7 @@
 package cluster
 
 import (
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // GetOrUseDefaultActiveCluster return the current cluster name or use the input if valid

@@ -26,10 +26,10 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
-	"github.com/uber/cadence/schema/cassandra"
-	"github.com/uber/cadence/tools/common/schema"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	"github.com/cadence-workflow/shard-manager/schema/cassandra"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema"
 )
 
 const defaultNumReplicas = 1

@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package=$GOPACKAGE -destination=ratelimiter_mock.go github.com/uber/cadence/common/clock Reservation
+//go:generate mockgen -package=$GOPACKAGE -destination=ratelimiter_mock.go github.com/cadence-workflow/shard-manager/common/clock Reservation
 
 package clock
 

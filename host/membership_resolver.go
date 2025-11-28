@@ -24,7 +24,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/uber/cadence/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/membership"
 )
 
 type simpleResolver struct {

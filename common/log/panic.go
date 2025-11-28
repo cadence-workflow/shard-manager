@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"github.com/uber/cadence/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 )
 
 // CapturePanic is used to capture panic, it will log the panic and also return the error through pointer.

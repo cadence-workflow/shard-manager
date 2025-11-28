@@ -3,13 +3,13 @@ package canary
 import (
 	"go.uber.org/fx"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/service/sharddistributor/canary/executors"
-	"github.com/uber/cadence/service/sharddistributor/canary/factory"
-	"github.com/uber/cadence/service/sharddistributor/canary/processor"
-	"github.com/uber/cadence/service/sharddistributor/canary/processorephemeral"
-	"github.com/uber/cadence/service/sharddistributor/canary/sharddistributorclient"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/executors"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/factory"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processorephemeral"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/sharddistributorclient"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 type NamespacesNames struct {

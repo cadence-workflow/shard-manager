@@ -27,12 +27,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/.gen/go/health"
-	m "github.com/uber/cadence/.gen/go/matching"
-	s "github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/matching/handler"
+	"github.com/cadence-workflow/shard-manager/.gen/go/health"
+	m "github.com/cadence-workflow/shard-manager/.gen/go/matching"
+	s "github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/matching/handler"
 )
 
 func TestThriftHandler(t *testing.T) {

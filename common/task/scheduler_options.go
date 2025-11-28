@@ -23,8 +23,8 @@ package task
 import (
 	"fmt"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 )
 
 type SchedulerOptions[K comparable] struct {

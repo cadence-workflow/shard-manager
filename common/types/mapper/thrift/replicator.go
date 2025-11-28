@@ -21,8 +21,8 @@
 package thrift
 
 import (
-	"github.com/uber/cadence/.gen/go/replicator"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // FromDLQType converts internal DLQType type to thrift

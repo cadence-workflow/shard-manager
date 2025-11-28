@@ -27,12 +27,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/.gen/go/admin"
-	"github.com/uber/cadence/.gen/go/replicator"
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
-	adminHandler "github.com/uber/cadence/service/frontend/admin"
+	"github.com/cadence-workflow/shard-manager/.gen/go/admin"
+	"github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	adminHandler "github.com/cadence-workflow/shard-manager/service/frontend/admin"
 )
 
 func TestAdminThriftHandler(t *testing.T) {

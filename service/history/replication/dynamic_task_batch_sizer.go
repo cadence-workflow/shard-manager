@@ -26,11 +26,11 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/rangeiter"
-	"github.com/uber/cadence/service/history/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/rangeiter"
+	"github.com/cadence-workflow/shard-manager/service/history/config"
 )
 
 // DynamicTaskBatchSizer is responsible for the batch size used to retrieve ReplicationTasks by TaskAckManager

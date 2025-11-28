@@ -4,18 +4,18 @@ package ratelimited
 // template: ../../templates/ratelimited.tmpl
 // gowrap: http://github.com/hexdigest/gowrap
 
-//go:generate gowrap gen -p github.com/uber/cadence/service/history/handler -i Handler -t ../../templates/ratelimited.tmpl -o handler_generated.go -v handler=History -l ""
+//go:generate gowrap gen -p github.com/cadence-workflow/shard-manager/service/history/handler -i Handler -t ../../templates/ratelimited.tmpl -o handler_generated.go -v handler=History -l ""
 
 import (
 	"context"
 	"time"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/validate"
-	"github.com/uber/cadence/service/history/handler"
-	"github.com/uber/cadence/service/history/workflowcache"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/validate"
+	"github.com/cadence-workflow/shard-manager/service/history/handler"
+	"github.com/cadence-workflow/shard-manager/service/history/workflowcache"
 )
 
 // historyHandler implements handler.Handler interface instrumented with rate limiter.

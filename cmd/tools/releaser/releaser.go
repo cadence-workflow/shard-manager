@@ -8,10 +8,10 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/cmd/tools/releaser/internal/console"
-	"github.com/uber/cadence/cmd/tools/releaser/internal/fs"
-	"github.com/uber/cadence/cmd/tools/releaser/internal/git"
-	"github.com/uber/cadence/cmd/tools/releaser/internal/release"
+	"github.com/cadence-workflow/shard-manager/cmd/tools/releaser/internal/console"
+	"github.com/cadence-workflow/shard-manager/cmd/tools/releaser/internal/fs"
+	"github.com/cadence-workflow/shard-manager/cmd/tools/releaser/internal/git"
+	"github.com/cadence-workflow/shard-manager/cmd/tools/releaser/internal/release"
 )
 
 func main() {

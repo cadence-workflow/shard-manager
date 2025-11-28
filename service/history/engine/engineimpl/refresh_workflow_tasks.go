@@ -24,8 +24,8 @@ package engineimpl
 import (
 	"context"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 func (e *historyEngineImpl) RefreshWorkflowTasks(

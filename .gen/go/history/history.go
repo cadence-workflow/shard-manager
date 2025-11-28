@@ -16,8 +16,8 @@ import (
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
 
-	replicator "github.com/uber/cadence/.gen/go/replicator"
-	shared "github.com/uber/cadence/.gen/go/shared"
+	replicator "github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 // Any{ValueType} identifier for WeightedRatelimitQuotas data
@@ -22588,7 +22588,7 @@ func (v *WeightedRatelimitUsageQuotas) IsSetQuotas() bool {
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "history",
-	Package:  "github.com/uber/cadence/.gen/go/history",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/history",
 	FilePath: "history.thrift",
 	SHA1:     "4f9bc03480287dbdd2c4c579e95be64a2750f07a",
 	Includes: []*thriftreflect.ThriftModule{

@@ -35,7 +35,7 @@ of concurrent updates and requests for aggregated data.
 
 # How this fits in the global ratelimiting system
 
-Going back to the [github.com/uber/cadence/common/quotas/global] package diagram:
+Going back to the [github.com/cadence-workflow/shard-manager/common/quotas/global] package diagram:
 each aggregating host will have one or more instances of this weight-calculator,
 and it will receive a shard worth of request data.
 
@@ -128,12 +128,12 @@ import (
 	"go.uber.org/multierr"
 	"golang.org/x/exp/constraints"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas/global/shared"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/shared"
 )
 
 type (

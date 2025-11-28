@@ -29,12 +29,12 @@ import (
 	"go.uber.org/yarpc"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/future"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/rpc"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/future"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/rpc"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var _ Client = (*clientImpl)(nil)

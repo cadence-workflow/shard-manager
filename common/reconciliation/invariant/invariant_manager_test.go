@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/reconciliation/entity"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/entity"
 )
 
 type InvariantManagerSuite struct {

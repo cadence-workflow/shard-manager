@@ -14,10 +14,10 @@ import (
 	"go.uber.org/fx/fxtest"
 	"gopkg.in/yaml.v2"
 
-	"github.com/uber/cadence/common/config"
-	shardDistributorCfg "github.com/uber/cadence/service/sharddistributor/config"
-	"github.com/uber/cadence/service/sharddistributor/store"
-	"github.com/uber/cadence/testflags"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	shardDistributorCfg "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
+	"github.com/cadence-workflow/shard-manager/testflags"
 )
 
 // TestCreateElection tests that an election can be created successfully

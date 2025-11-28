@@ -25,10 +25,10 @@ package isolationgroup
 import (
 	"context"
 
-	"github.com/uber/cadence/common"
+	"github.com/cadence-workflow/shard-manager/common"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination isolation_group_mock.go -self_package github.com/uber/cadence/common/isolationgroup
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination isolation_group_mock.go -self_package github.com/cadence-workflow/shard-manager/common/isolationgroup
 
 // State is a heavily cached in-memory library for returning the state of what zones are healthy or
 // drained presently. It may return an inclusive (allow-list based) or an exclusive (deny-list based) set of IsolationGroups

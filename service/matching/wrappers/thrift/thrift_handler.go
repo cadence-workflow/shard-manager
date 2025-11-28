@@ -27,11 +27,11 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/.gen/go/health"
-	"github.com/uber/cadence/.gen/go/health/metaserver"
-	"github.com/uber/cadence/.gen/go/matching/matchingserviceserver"
-	"github.com/uber/cadence/common/types/mapper/thrift"
-	"github.com/uber/cadence/service/matching/handler"
+	"github.com/cadence-workflow/shard-manager/.gen/go/health"
+	"github.com/cadence-workflow/shard-manager/.gen/go/health/metaserver"
+	"github.com/cadence-workflow/shard-manager/.gen/go/matching/matchingserviceserver"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/thrift"
+	"github.com/cadence-workflow/shard-manager/service/matching/handler"
 )
 
 type ThriftHandler struct {

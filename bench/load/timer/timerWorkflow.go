@@ -30,7 +30,7 @@ import (
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/bench/load/common"
+	"github.com/cadence-workflow/shard-manager/bench/load/common"
 )
 
 const (

@@ -23,8 +23,8 @@
 package common
 
 import (
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/service/history/events"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/service/history/events"
 )
 
 type (

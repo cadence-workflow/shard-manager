@@ -23,8 +23,8 @@ package validate
 import (
 	"github.com/google/uuid"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/config"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/config"
 )
 
 var (

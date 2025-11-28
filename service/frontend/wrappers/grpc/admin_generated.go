@@ -9,8 +9,8 @@ import (
 
 	adminv1 "github.com/uber/cadence-idl/go/proto/admin/v1"
 
-	"github.com/uber/cadence/common/types/mapper/proto"
-	"github.com/uber/cadence/service/frontend/admin"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/proto"
+	"github.com/cadence-workflow/shard-manager/service/frontend/admin"
 )
 
 type AdminHandler struct {

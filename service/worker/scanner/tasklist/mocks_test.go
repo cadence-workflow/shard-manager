@@ -27,7 +27,7 @@ import (
 
 	"github.com/pborman/uuid"
 
-	p "github.com/uber/cadence/common/persistence"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 type (

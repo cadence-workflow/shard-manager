@@ -29,12 +29,12 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	cclient "go.uber.org/cadence/client"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
-//go:generate mockgen -package=$GOPACKAGE -destination=client_mock.go -self_package=github.com/uber/cadence/service/worker/parentclosepolicy github.com/uber/cadence/service/worker/parentclosepolicy Client
+//go:generate mockgen -package=$GOPACKAGE -destination=client_mock.go -self_package=github.com/cadence-workflow/shard-manager/service/worker/parentclosepolicy github.com/cadence-workflow/shard-manager/service/worker/parentclosepolicy Client
 
 type (
 

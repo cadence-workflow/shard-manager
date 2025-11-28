@@ -20,14 +20,14 @@
 
 package log
 
-import "github.com/uber/cadence/common/log/tag"
+import "github.com/cadence-workflow/shard-manager/common/log/tag"
 
-//go:generate mockgen -package=$GOPACKAGE -destination=logger_mock.go -self_package=github.com/uber/cadence/common/log github.com/uber/cadence/common/log Logger
+//go:generate mockgen -package=$GOPACKAGE -destination=logger_mock.go -self_package=github.com/cadence-workflow/shard-manager/common/log github.com/cadence-workflow/shard-manager/common/log Logger
 
 // Logger is our abstraction for logging
 // Usage examples:
 //
-//	 import "github.com/uber/cadence/common/log/tag"
+//	 import "github.com/cadence-workflow/shard-manager/common/log/tag"
 //	 1) logger = logger.WithTags(
 //	         tag.WorkflowNextEventID( 123),
 //	         tag.WorkflowActionWorkflowStarted,

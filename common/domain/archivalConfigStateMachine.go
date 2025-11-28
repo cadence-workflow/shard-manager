@@ -20,7 +20,7 @@
 
 package domain
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 // domainArchivalConfigStateMachine is only used by domainHandler.
 // It is simply meant to simplify the logic around archival domain state changes.

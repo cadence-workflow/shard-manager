@@ -25,10 +25,10 @@ package provider
 import (
 	"fmt"
 
-	"github.com/uber/cadence/common/archiver"
-	"github.com/uber/cadence/common/archiver/filestore"
-	"github.com/uber/cadence/common/archiver/s3store"
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/archiver"
+	"github.com/cadence-workflow/shard-manager/common/archiver/filestore"
+	"github.com/cadence-workflow/shard-manager/common/archiver/s3store"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 func init() {

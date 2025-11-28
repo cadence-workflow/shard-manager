@@ -26,7 +26,7 @@ import (
 
 	"github.com/fatih/color"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

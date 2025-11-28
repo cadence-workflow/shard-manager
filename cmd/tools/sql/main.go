@@ -23,11 +23,11 @@ package main
 import (
 	"os"
 
-	"github.com/uber/cadence/tools/common/commoncli"
-	"github.com/uber/cadence/tools/sql"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/tools/sql"
 
-	_ "github.com/uber/cadence/common/persistence/sql/sqlplugin/mysql"    // needed to load mysql plugin
-	_ "github.com/uber/cadence/common/persistence/sql/sqlplugin/postgres" // needed to load postgres plugin
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/mysql"    // needed to load mysql plugin
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/postgres" // needed to load postgres plugin
 )
 
 func main() {

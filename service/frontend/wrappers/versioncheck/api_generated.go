@@ -7,10 +7,10 @@ package versioncheck
 import (
 	"context"
 
-	"github.com/uber/cadence/common/client"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/api"
-	"github.com/uber/cadence/service/frontend/config"
+	"github.com/cadence-workflow/shard-manager/common/client"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/api"
+	"github.com/cadence-workflow/shard-manager/service/frontend/config"
 )
 
 type (

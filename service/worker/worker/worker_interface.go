@@ -27,7 +27,7 @@ import (
 	"go.uber.org/cadence/workflow"
 )
 
-//go:generate mockgen -source $GOFILE -destination worker_mock.go -package worker github.com/uber/cadence/service/worker/worker Worker
+//go:generate mockgen -source $GOFILE -destination worker_mock.go -package worker github.com/cadence-workflow/shard-manager/service/worker/worker Worker
 
 type Worker interface {
 	RegisterActivity(activity interface{})

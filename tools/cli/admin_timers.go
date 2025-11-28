@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination admin_timers_mock.go github.com/uber/cadence/tools/cli LoadCloser,Printer
+//go:generate mockgen -package $GOPACKAGE -destination admin_timers_mock.go github.com/cadence-workflow/shard-manager/tools/cli LoadCloser,Printer
 
 package cli
 
@@ -33,10 +33,10 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 // LoadCloser loads timer task information

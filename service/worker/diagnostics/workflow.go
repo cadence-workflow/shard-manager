@@ -29,12 +29,12 @@ import (
 
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant/failure"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant/retry"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant/timeout"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant/failure"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant/retry"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant/timeout"
 )
 
 const (

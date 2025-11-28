@@ -10,7 +10,7 @@ import (
 	restriction "go.uber.org/yarpc/api/x/restriction"
 	thrift "go.uber.org/yarpc/encoding/thrift"
 
-	metaclient "github.com/uber/cadence/.gen/go/health/metaclient"
+	metaclient "github.com/cadence-workflow/shard-manager/.gen/go/health/metaclient"
 )
 
 // Params defines the dependencies for the Meta client.

@@ -14,13 +14,13 @@ import (
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
 
-	shared "github.com/uber/cadence/.gen/go/shared"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "cadence",
-	Package:  "github.com/uber/cadence/.gen/go/cadence",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/cadence",
 	FilePath: "cadence.thrift",
 	SHA1:     "8c644a4a8acae7e865a84d625bc845ffae7ff693",
 	Includes: []*thriftreflect.ThriftModule{

@@ -27,12 +27,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
-	"github.com/uber/cadence/tools/cassandra"
-	"github.com/uber/cadence/tools/common/schema"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	"github.com/cadence-workflow/shard-manager/tools/cassandra"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema"
 )
 
 const (

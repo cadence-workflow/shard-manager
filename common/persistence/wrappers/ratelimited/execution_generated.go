@@ -7,9 +7,9 @@ package ratelimited
 import (
 	"context"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // ratelimitedExecutionManager implements persistence.ExecutionManager interface instrumented with rate limiter.

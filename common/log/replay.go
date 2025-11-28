@@ -26,7 +26,7 @@ import (
 
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 )
 
 type replayLogger struct {

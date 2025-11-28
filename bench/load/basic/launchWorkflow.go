@@ -34,9 +34,9 @@ import (
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/bench/lib"
-	"github.com/uber/cadence/bench/load/common"
-	c "github.com/uber/cadence/common"
+	"github.com/cadence-workflow/shard-manager/bench/lib"
+	"github.com/cadence-workflow/shard-manager/bench/load/common"
+	c "github.com/cadence-workflow/shard-manager/common"
 )
 
 const (

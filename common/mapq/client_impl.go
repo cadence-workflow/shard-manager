@@ -27,10 +27,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/mapq/tree"
-	"github.com/uber/cadence/common/mapq/types"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/mapq/tree"
+	"github.com/cadence-workflow/shard-manager/common/mapq/types"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 type clientImpl struct {

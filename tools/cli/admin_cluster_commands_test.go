@@ -30,11 +30,11 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/visibility"
-	"github.com/uber/cadence/service/worker/failovermanager"
-	"github.com/uber/cadence/tools/cli/clitest"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/visibility"
+	"github.com/cadence-workflow/shard-manager/service/worker/failovermanager"
+	"github.com/cadence-workflow/shard-manager/tools/cli/clitest"
 )
 
 func TestAdminAddSearchAttribute_isValueTypeValid(t *testing.T) {

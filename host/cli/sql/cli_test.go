@@ -25,8 +25,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin/mysql"
-	"github.com/uber/cadence/testflags"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/mysql"
+	"github.com/cadence-workflow/shard-manager/testflags"
 )
 
 func TestMySQLConnTestSuite(t *testing.T) {

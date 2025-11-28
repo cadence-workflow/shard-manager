@@ -26,12 +26,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
-//go:generate mockgen -package $GOPACKAGE -destination manager_mock.go -self_package github.com/uber/cadence/common/activecluster github.com/uber/cadence/common/activecluster Manager
-//go:generate mockgen -package $GOPACKAGE -destination execution_manager_provider_mock.go -self_package github.com/uber/cadence/common/activecluster github.com/uber/cadence/common/activecluster ExecutionManagerProvider
+//go:generate mockgen -package $GOPACKAGE -destination manager_mock.go -self_package github.com/cadence-workflow/shard-manager/common/activecluster github.com/cadence-workflow/shard-manager/common/activecluster Manager
+//go:generate mockgen -package $GOPACKAGE -destination execution_manager_provider_mock.go -self_package github.com/cadence-workflow/shard-manager/common/activecluster github.com/cadence-workflow/shard-manager/common/activecluster ExecutionManagerProvider
 
 // Manager is the interface for active cluster manager.
 // It is used to get active cluster info by cluster attribute or workflow.

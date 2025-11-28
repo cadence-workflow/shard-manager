@@ -154,7 +154,7 @@ services:
         -tags pinotintegration
         -count 1
         -v
-        github.com/uber/cadence/host
+        github.com/cadence-workflow/shard-manager/host
         | tee test.log
     ports:
       - "7933:7933"

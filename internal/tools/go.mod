@@ -1,4 +1,4 @@
-module github.com/uber/cadence/internal/tools
+module github.com/cadence-workflow/shard-manager/internal/tools
 
 go 1.24.0
 

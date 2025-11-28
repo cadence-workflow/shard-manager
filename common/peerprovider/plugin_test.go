@@ -27,9 +27,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/syncmap"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/syncmap"
 )
 
 func TestProviderRetrunsErrorWhenNoProviderRegistered(t *testing.T) {

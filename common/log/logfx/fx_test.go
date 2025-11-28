@@ -30,8 +30,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 func TestLogFx(t *testing.T) {

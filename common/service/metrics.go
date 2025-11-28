@@ -21,8 +21,8 @@
 package service
 
 import (
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 // GetMetricsServiceIdx returns the metrics name

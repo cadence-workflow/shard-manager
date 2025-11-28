@@ -26,7 +26,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // InvariantCheckResult is the result from the invariant check

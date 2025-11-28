@@ -12,8 +12,8 @@ import (
 	transport "go.uber.org/yarpc/api/transport"
 	thrift "go.uber.org/yarpc/encoding/thrift"
 
-	matching "github.com/uber/cadence/.gen/go/matching"
-	shared "github.com/uber/cadence/.gen/go/shared"
+	matching "github.com/cadence-workflow/shard-manager/.gen/go/matching"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 // Interface is a client for the MatchingService service.

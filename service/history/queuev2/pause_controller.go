@@ -1,11 +1,11 @@
-//go:generate mockgen -package $GOPACKAGE -destination pause_controller_mock.go github.com/uber/cadence/service/history/queuev2 PauseController
+//go:generate mockgen -package $GOPACKAGE -destination pause_controller_mock.go github.com/cadence-workflow/shard-manager/service/history/queuev2 PauseController
 package queuev2
 
 import (
 	"sync"
 	"time"
 
-	"github.com/uber/cadence/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/clock"
 )
 
 type (

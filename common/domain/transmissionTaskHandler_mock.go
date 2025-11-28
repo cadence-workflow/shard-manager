@@ -15,8 +15,8 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	persistence "github.com/uber/cadence/common/persistence"
-	types "github.com/uber/cadence/common/types"
+	persistence "github.com/cadence-workflow/shard-manager/common/persistence"
+	types "github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // MockReplicator is a mock of Replicator interface.

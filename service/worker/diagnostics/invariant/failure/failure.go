@@ -26,9 +26,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant"
 )
 
 // Failure is an invariant that will be used to identify the different failures in the workflow execution history

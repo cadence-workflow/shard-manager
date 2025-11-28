@@ -26,7 +26,7 @@ import (
 
 	"go.uber.org/goleak"
 
-	"github.com/uber/cadence/service/history/engine/testdata"
+	"github.com/cadence-workflow/shard-manager/service/history/engine/testdata"
 )
 
 func TestHistoryEngineStartStop(t *testing.T) {

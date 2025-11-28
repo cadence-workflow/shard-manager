@@ -28,11 +28,11 @@ import (
 
 	"github.com/olivere/elastic/v7"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/elasticsearch/client"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/client"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

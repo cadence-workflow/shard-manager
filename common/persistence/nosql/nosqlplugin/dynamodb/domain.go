@@ -23,7 +23,7 @@ package dynamodb
 import (
 	"context"
 
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 // Insert a new record to domain, return error if failed or already exists

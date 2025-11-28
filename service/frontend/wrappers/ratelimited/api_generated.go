@@ -7,12 +7,12 @@ package ratelimited
 import (
 	"context"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/api"
-	"github.com/uber/cadence/service/frontend/validate"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/api"
+	"github.com/cadence-workflow/shard-manager/service/frontend/validate"
 )
 
 // apiHandler implements api.Handler interface instrumented with rate limiter.

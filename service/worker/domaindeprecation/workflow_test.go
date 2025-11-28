@@ -32,10 +32,10 @@ import (
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/service/worker/batcher"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/service/worker/batcher"
 )
 
 var (

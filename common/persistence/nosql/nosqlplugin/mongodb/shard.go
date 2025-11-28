@@ -24,7 +24,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 // InsertShard creates a new shard, return error is there is any.

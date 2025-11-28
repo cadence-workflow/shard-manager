@@ -21,10 +21,10 @@
 package cluster
 
 import (
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
-	commonMetrics "github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	commonMetrics "github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 const (

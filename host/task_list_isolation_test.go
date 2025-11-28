@@ -34,9 +34,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

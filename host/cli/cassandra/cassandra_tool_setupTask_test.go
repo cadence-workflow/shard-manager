@@ -27,10 +27,10 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/environment"
-	"github.com/uber/cadence/testflags"
-	"github.com/uber/cadence/tools/cassandra"
-	"github.com/uber/cadence/tools/common/schema/test"
+	"github.com/cadence-workflow/shard-manager/environment"
+	"github.com/cadence-workflow/shard-manager/testflags"
+	"github.com/cadence-workflow/shard-manager/tools/cassandra"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema/test"
 )
 
 type (

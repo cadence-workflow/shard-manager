@@ -25,7 +25,7 @@ package replication
 import (
 	"context"
 
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // TaskReader will read replication tasks from database

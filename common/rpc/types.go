@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination factory_mock.go -self_package github.com/uber/cadence/common/rpc
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination factory_mock.go -self_package github.com/cadence-workflow/shard-manager/common/rpc
 
 package rpc
 
@@ -26,7 +26,7 @@ import (
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/transport/tchannel"
 
-	"github.com/uber/cadence/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/membership"
 )
 
 // Factory Creates a dispatcher that knows how to transport requests.

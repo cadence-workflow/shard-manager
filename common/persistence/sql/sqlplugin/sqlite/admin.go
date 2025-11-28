@@ -25,7 +25,7 @@ package sqlite
 import (
 	"errors"
 
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
 )
 
 const (

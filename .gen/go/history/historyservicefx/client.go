@@ -10,7 +10,7 @@ import (
 	restriction "go.uber.org/yarpc/api/x/restriction"
 	thrift "go.uber.org/yarpc/encoding/thrift"
 
-	historyserviceclient "github.com/uber/cadence/.gen/go/history/historyserviceclient"
+	historyserviceclient "github.com/cadence-workflow/shard-manager/.gen/go/history/historyserviceclient"
 )
 
 // Params defines the dependencies for the HistoryService client.

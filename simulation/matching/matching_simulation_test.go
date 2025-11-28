@@ -56,17 +56,17 @@ import (
 	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/client/history"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/isolationgroup"
-	"github.com/uber/cadence/common/persistence"
-	pt "github.com/uber/cadence/common/persistence/persistence-tests"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/host"
+	"github.com/cadence-workflow/shard-manager/client/history"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/isolationgroup"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	pt "github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/host"
 
-	_ "github.com/uber/cadence/common/asyncworkflow/queue/kafka" // needed to load kafka asyncworkflow queue
+	_ "github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue/kafka" // needed to load kafka asyncworkflow queue
 )
 
 type operation string

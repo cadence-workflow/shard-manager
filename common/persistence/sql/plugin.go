@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
 )
 
 var supportedPlugins = map[string]sqlplugin.Plugin{}

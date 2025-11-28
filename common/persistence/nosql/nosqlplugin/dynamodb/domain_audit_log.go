@@ -23,7 +23,7 @@ package dynamodb
 import (
 	"context"
 
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 // InsertDomainAuditLog inserts a new audit log entry for a domain operation

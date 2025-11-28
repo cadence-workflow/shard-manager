@@ -22,7 +22,7 @@ syntax = "proto3";
 
 package uber.cadence.sharddistributor.v1;
 
-option go_package = "github.com/uber/cadence/.gen/proto/sharddistributor/v1;sharddistributorv1";
+option go_package = "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1;sharddistributorv1";
 
 // ShardDistributorAPI is used to query shard distributor for the current owner of a shard
 service ShardDistributorAPI {

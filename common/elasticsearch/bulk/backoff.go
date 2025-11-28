@@ -28,7 +28,7 @@ import (
 
 // exponentialBackoff implements the simple exponential backoff described by
 // Douglas Thain at http://dthain.blogspot.de/2009/02/exponential-backoff-in-distributed.html.
-// TODO https://github.com/uber/cadence/issues/3676
+// TODO https://github.com/cadence-workflow/shard-manager/issues/3676
 type exponentialBackoff struct {
 	initialTimeout float64 // initial timeout (in msec)
 	factor         float64 // exponential factor (e.g. 2)

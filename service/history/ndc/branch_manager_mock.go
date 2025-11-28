@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	persistence "github.com/uber/cadence/common/persistence"
+	persistence "github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // MockbranchManager is a mock of branchManager interface.

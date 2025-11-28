@@ -31,9 +31,9 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common/errors"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/errors"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

@@ -26,7 +26,7 @@ import (
 	adminv1 "github.com/uber/cadence-idl/go/proto/admin/v1"
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func FromAdminAddSearchAttributeRequest(t *types.AddSearchAttributeRequest) *adminv1.AddSearchAttributeRequest {

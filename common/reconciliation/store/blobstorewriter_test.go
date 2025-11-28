@@ -29,9 +29,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common/blobstore"
-	"github.com/uber/cadence/common/blobstore/filestore"
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/blobstore"
+	"github.com/cadence-workflow/shard-manager/common/blobstore/filestore"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 func TestBlobstoreWriter(t *testing.T) {

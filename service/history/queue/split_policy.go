@@ -24,12 +24,12 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	t "github.com/uber/cadence/common/task"
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	t "github.com/cadence-workflow/shard-manager/common/task"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 const (

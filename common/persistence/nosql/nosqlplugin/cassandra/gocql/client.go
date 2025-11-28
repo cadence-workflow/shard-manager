@@ -26,7 +26,7 @@ import (
 
 	"github.com/gocql/gocql"
 
-	"github.com/uber/cadence/environment"
+	"github.com/cadence-workflow/shard-manager/environment"
 )
 
 var (

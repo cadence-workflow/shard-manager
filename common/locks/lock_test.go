@@ -115,7 +115,7 @@ func fatalTest(t *testing.T) {
 			"This test intentionally crashes the process, and cannot be tested normally.\n"+
 				"Check output manually when running this test on its own:\n"+
 				"\tRUN_FATAL_TESTS=true go test -test.run %q %v",
-			t.Name(), "github.com/uber/cadence/common/locks",
+			t.Name(), "github.com/cadence-workflow/shard-manager/common/locks",
 		)
 	} else {
 		t.Cleanup(func() {

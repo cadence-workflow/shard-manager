@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination request_validator_mock.go -self_package github.com/uber/cadence/service/frontend/api requestValidator
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination request_validator_mock.go -self_package github.com/cadence-workflow/shard-manager/service/frontend/api requestValidator
 
 package api
 
@@ -28,13 +28,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/config"
-	"github.com/uber/cadence/service/frontend/validate"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/config"
+	"github.com/cadence-workflow/shard-manager/service/frontend/validate"
 )
 
 type (

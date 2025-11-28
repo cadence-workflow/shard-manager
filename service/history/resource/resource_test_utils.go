@@ -25,11 +25,11 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas/global/algorithm"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/service/history/events"
-	"github.com/uber/cadence/service/worker/archiver"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/algorithm"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/service/history/events"
+	"github.com/cadence-workflow/shard-manager/service/worker/archiver"
 )
 
 type (

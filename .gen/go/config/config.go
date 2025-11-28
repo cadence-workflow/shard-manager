@@ -13,7 +13,7 @@ import (
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
 
-	shared "github.com/uber/cadence/.gen/go/shared"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 type DynamicConfigBlob struct {
@@ -1535,7 +1535,7 @@ func (v *DynamicConfigValue) IsSetFilters() bool {
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "config",
-	Package:  "github.com/uber/cadence/.gen/go/config",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/config",
 	FilePath: "config.thrift",
 	SHA1:     "cbc9d97e2a2f4820452fc2d273d5102e4721cf34",
 	Includes: []*thriftreflect.ThriftModule{

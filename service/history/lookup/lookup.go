@@ -23,8 +23,8 @@
 package lookup
 
 import (
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 // HistoryServerByShardID calls resolver.Lookup with key based on provided shardID

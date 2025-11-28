@@ -33,9 +33,9 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/tools/cli/clitest"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/tools/cli/clitest"
 )
 
 func TestAdminDBScanErrorCases(t *testing.T) {

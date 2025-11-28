@@ -11,7 +11,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination release_mocks_test.go -self_package github.com/uber/cadence/cmd/tools/releaser/release
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination release_mocks_test.go -self_package github.com/cadence-workflow/shard-manager/cmd/tools/releaser/release
 
 // Git defines git operations for testing
 type Git interface {

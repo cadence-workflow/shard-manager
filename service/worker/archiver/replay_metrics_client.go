@@ -26,7 +26,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 type (

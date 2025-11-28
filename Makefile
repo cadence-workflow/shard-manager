@@ -110,7 +110,7 @@ ifeq ($(shell uname -sm),Darwin arm64)
 EMULATE_X86 = arch -x86_64
 endif
 
-PROJECT_ROOT = github.com/uber/cadence
+PROJECT_ROOT = github.com/cadence-workflow/shard-manager
 
 # helper for executing bins that need other bins, just `$(BIN_PATH) the_command ...`
 # I'd recommend not exporting this in general, to reduce the chance of accidentally using non-versioned tools.
@@ -375,7 +375,7 @@ $(BUILD)/proto-lint: $(PROTO_FILES) $(STABLE_BIN)/$(BUF_VERSION_BIN) | $(BUILD)
 
 # lints that go modules are as expected, e.g. parent does not import submodule.
 # tool builds that need to be in sync with the parent are partially checked through go_mod_build_tool, but should probably be checked here too
-$(BUILD)/gomod-lint: go.mod internal/tools/go.mod common/archiver/gcloud/go.mod | $(BUILD)
+$(BUILD)/gomod-lint: go.mod internal/tools/go.mod | $(BUILD)
 	$Q echo "checking for direct submodule dependencies in root go.mod..."
 	$Q ( \
 		MAIN_MODULE=$$(grep "^module " go.mod | awk '{print $$2}'); \
@@ -396,7 +396,7 @@ $(BUILD)/gomod-lint: go.mod internal/tools/go.mod common/archiver/gcloud/go.mod 
 $(BUILD)/code-lint: $(LINT_SRC) $(BIN)/revive $(BIN)/nilaway | $(BUILD)
 	$Q echo "lint..."
 	$Q # non-optional vet checks.  unfortunately these are not currently included in `go test`'s default behavior.
-	$Q go vet -copylocks ./... ./common/archiver/gcloud/...
+	$Q go vet -copylocks ./...
 	$Q $(BIN)/revive -config revive.toml -exclude './vendor/...' -exclude './.gen/...' -formatter stylish ./...
 	$Q # look for go files with "//comments", and ignore "//go:build"-style directives ("grep -n" shows "file:line: //go:build" so the regex is a bit complex)
 	$Q bad="$$(find . -type f -name '*.go' -not -path './idls/*' | xargs grep -n -E '^\s*//\S' | grep -E -v '^[^:]+:[^:]+:\s*//[a-z]+:[a-z]+' || true)"; \
@@ -407,7 +407,7 @@ $(BUILD)/code-lint: $(LINT_SRC) $(BIN)/revive $(BIN)/nilaway | $(BUILD)
 		fi
 	$Q echo "nilaway check..."
 	$Q # Disabled: too resource-intensive for CI, causing OOM/timeout issues
-	$Q # GOTOOLCHAIN=go1.24.0 $(BIN)/nilaway -test=false github.com/uber/cadence/common/types/mapper/...
+	$Q # GOTOOLCHAIN=go1.24.0 $(BIN)/nilaway -test=false github.com/cadence-workflow/shard-manager/common/types/mapper/...
 	$Q touch $@
 
 $(BUILD)/goversion-lint: go.work Dockerfile docker/github_actions/Dockerfile${DOCKERFILE_SUFFIX}
@@ -435,7 +435,7 @@ $(BUILD)/fmt: $(ALL_SRC) $(BIN)/goimports $(BIN)/gci | $(BUILD)
 	$Q # goimports thrashes on internal/tools, sadly.  just hide it.
 	$Q $(BIN)/goimports -w $(filter-out ./internal/tools/tools.go,$(FRESH_ALL_SRC))
 	$Q echo "grouping imports..."
-	$Q $(BIN)/gci write --section standard --section 'Prefix(github.com/uber/cadence/)' --section default --section blank $(FRESH_ALL_SRC)
+	$Q $(BIN)/gci write --section standard --section 'Prefix(github.com/cadence-workflow/shard-manager/)' --section default --section blank $(FRESH_ALL_SRC)
 	$Q touch $@
 # 	$Q $(MAYBE_TOUCH_COPYRIGHT)
 
@@ -570,20 +570,17 @@ release: ## Re-generate generated code and run tests
 build: ## `go build` all packages and tests (a quick compile check only, skips all other steps)
 	$Q echo 'Building all packages and submodules...'
 	$Q go build ./...
-	$Q cd common/archiver/gcloud; go build ./...
 	$Q cd cmd/server; go build ./...
 	$Q # "tests" by building and then running `true`, and hides test-success output
 	$Q echo 'Building all tests (~5x slower)...'
 	$Q # intentionally not -race due to !race build tags
 	$Q go test -exec /usr/bin/true ./... >/dev/null
-	$Q cd common/archiver/gcloud; go test -exec /usr/bin/true ./... >/dev/null
 	$Q cd cmd/server; go test -exec /usr/bin/true ./... >/dev/null
 
 tidy: ## `go mod tidy` all packages
 	$Q # tidy in dependency order
 	$Q go mod tidy
-	$Q cd common/archiver/gcloud; go mod tidy || (echo "failed to tidy gcloud plugin, try manually copying go.mod contents into common/archiver/gcloud/go.mod and rerunning" >&2; exit 1)
-	$Q cd cmd/server; go mod tidy || (echo "failed to tidy main server module, try manually copying go.mod and common/archiver/gcloud/go.mod contents into cmd/server/go.mod and rerunning" >&2; exit 1)
+	$Q cd cmd/server; go mod tidy || (echo "failed to tidy main server module, try manually copying go.mod contents into cmd/server/go.mod and rerunning" >&2; exit 1)
 
 clean: ## Clean build products and SQLite database
 	rm -f $(BINS)
@@ -619,7 +616,7 @@ TEST_ARG ?= -race $(if $(verbose),-v) -timeout $(TEST_TIMEOUT)
 
 # TODO to be consistent, use nosql as PERSISTENCE_TYPE and cassandra PERSISTENCE_PLUGIN
 # file names like integ_cassandra__cover should become integ_nosql_cassandra_cover
-# for https://github.com/uber/cadence/issues/3514
+# for https://github.com/cadence-workflow/shard-manager/issues/3514
 PERSISTENCE_TYPE ?= cassandra
 TEST_RUN_COUNT ?= 1
 ifdef TEST_TAG
@@ -654,7 +651,7 @@ INTEG_NDC_COVER_FILE_POSTGRES   := $(COVER_ROOT)/integ_ndc_sql_postgres_cover.ou
 #   The default is for each test to analyze only the package being tested.
 #   Packages are specified as import paths.
 COVER_PKGS = client common host service tools
-# pkg -> pkg/... -> github.com/uber/cadence/pkg/... -> join with commas
+# pkg -> pkg/... -> github.com/cadence-workflow/shard-manager/pkg/... -> join with commas
 GOCOVERPKG_ARG := -coverpkg="$(subst $(SPACE),$(COMMA),$(addprefix $(PROJECT_ROOT)/,$(addsuffix /...,$(COVER_PKGS))))"
 
 # iterates over a list of dirs and runs go test on each one, collecting errors as it runs.

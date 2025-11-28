@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	types "github.com/uber/cadence/common/types"
+	types "github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // MockDLQMessageHandler is a mock of DLQMessageHandler interface.

@@ -55,7 +55,7 @@ services:
         -count 1
         -v
         -tags cassandralwt
-        github.com/uber/cadence/host
+        github.com/cadence-workflow/shard-manager/host
         | tee test.log
     ports:
       - "7933:7933"

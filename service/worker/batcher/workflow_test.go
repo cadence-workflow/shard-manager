@@ -34,10 +34,10 @@ import (
 	"go.uber.org/cadence/worker"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/metrics"
-	mmocks "github.com/uber/cadence/common/metrics/mocks"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	mmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type workflowSuite struct {

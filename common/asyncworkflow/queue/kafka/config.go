@@ -28,8 +28,8 @@ import (
 
 	"github.com/IBM/sarama"
 
-	"github.com/uber/cadence/common/authorization"
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/authorization"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 type (

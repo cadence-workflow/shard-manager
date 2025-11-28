@@ -23,7 +23,7 @@
 package ratelimited
 
 import (
-	"github.com/uber/cadence/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
 )
 
 // ratelimitType differentiates between the three categories of ratelimiters

@@ -30,8 +30,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // Currently you cannot clear or remove any entries in cluster_config table

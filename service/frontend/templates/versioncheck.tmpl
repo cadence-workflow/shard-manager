@@ -1,9 +1,9 @@
 import (
     "context"
 
-	"github.com/uber/cadence/common/client"
-	"github.com/uber/cadence/service/frontend/api"
-	"github.com/uber/cadence/service/frontend/config"
+	"github.com/cadence-workflow/shard-manager/common/client"
+	"github.com/cadence-workflow/shard-manager/service/frontend/api"
+	"github.com/cadence-workflow/shard-manager/service/frontend/config"
 )
 
 {{$excludedAPIs := list "Health" "GetClusterInfo" "ListTaskListPartitions" "GetTaskListsByDomain" "RefreshWorkflowTasks" }}

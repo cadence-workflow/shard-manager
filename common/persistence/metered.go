@@ -25,8 +25,8 @@ package persistence
 import (
 	"unsafe"
 
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 // This file defines method for persistence requests/responses that affects metered persistence wrapper.

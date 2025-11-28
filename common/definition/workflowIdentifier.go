@@ -21,7 +21,7 @@
 package definition
 
 import (
-	"github.com/uber/cadence/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 type (

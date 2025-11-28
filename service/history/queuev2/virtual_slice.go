@@ -20,16 +20,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination virtual_slice_mock.go github.com/uber/cadence/service/history/queuev2 VirtualSlice
+//go:generate mockgen -package $GOPACKAGE -destination virtual_slice_mock.go github.com/cadence-workflow/shard-manager/service/history/queuev2 VirtualSlice
 package queuev2
 
 import (
 	"context"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 type (

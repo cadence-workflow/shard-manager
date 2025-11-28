@@ -296,7 +296,7 @@ func (v *HealthStatus) IsSetMsg() bool {
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "health",
-	Package:  "github.com/uber/cadence/.gen/go/health",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/health",
 	FilePath: "health.thrift",
 	SHA1:     "8d52f05c157e47bef27c86d2133e1cdb475f8024",
 	Raw:      rawIDL,

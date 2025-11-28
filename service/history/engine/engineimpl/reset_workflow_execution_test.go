@@ -32,15 +32,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common"
-	commonconstants "github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/mocks"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/constants"
-	"github.com/uber/cadence/service/history/engine/testdata"
-	"github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/reset"
+	"github.com/cadence-workflow/shard-manager/common"
+	commonconstants "github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/mocks"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/constants"
+	"github.com/cadence-workflow/shard-manager/service/history/engine/testdata"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/reset"
 )
 
 var (

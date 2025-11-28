@@ -6,7 +6,7 @@ go version go1.21.9 darwin/arm64
 ❯ go test -bench . -test.run xxx -cpu 1,2,4,8,32 .
 goos: darwin
 goarch: arm64
-pkg: github.com/uber/cadence/common/clock
+pkg: github.com/cadence-workflow/shard-manager/common/clock
 BenchmarkLimiter/allow/serial/real            	13040902	        77.94 ns/op
 --- BENCH: BenchmarkLimiter/allow/serial/real
     ratelimiter_test.go:114: allowed: 1,          denied: 0,           time per allow:  94.833µs
@@ -915,4 +915,4 @@ BenchmarkLimiter/wait/parallel/1µs_rate/mocked_timesource-32                  	
     ratelimiter_test.go:136: allowed: 1000000,    denied: 0,           time per allow:     427ns
     ratelimiter_test.go:136: allowed: 2807648,    denied: 0,           time per allow:     433ns
 PASS
-ok  	github.com/uber/cadence/common/clock	199.030s
+ok  	github.com/cadence-workflow/shard-manager/common/clock	199.030s

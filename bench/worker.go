@@ -28,14 +28,14 @@ import (
 	"go.uber.org/cadence/worker"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/bench/lib"
-	"github.com/uber/cadence/bench/load/basic"
-	"github.com/uber/cadence/bench/load/cancellation"
-	"github.com/uber/cadence/bench/load/common"
-	"github.com/uber/cadence/bench/load/concurrentexec"
-	"github.com/uber/cadence/bench/load/cron"
-	"github.com/uber/cadence/bench/load/signal"
-	"github.com/uber/cadence/bench/load/timer"
+	"github.com/cadence-workflow/shard-manager/bench/lib"
+	"github.com/cadence-workflow/shard-manager/bench/load/basic"
+	"github.com/cadence-workflow/shard-manager/bench/load/cancellation"
+	"github.com/cadence-workflow/shard-manager/bench/load/common"
+	"github.com/cadence-workflow/shard-manager/bench/load/concurrentexec"
+	"github.com/cadence-workflow/shard-manager/bench/load/cron"
+	"github.com/cadence-workflow/shard-manager/bench/load/signal"
+	"github.com/cadence-workflow/shard-manager/bench/load/timer"
 )
 
 type (

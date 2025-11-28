@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 type processingQueueCollection struct {

@@ -27,7 +27,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 var _ nosqlplugin.AdminDB = (*mdb)(nil)

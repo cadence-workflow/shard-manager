@@ -29,12 +29,10 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common/config"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
-	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/configstore"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // Module provides fx options for dynamic config initialization

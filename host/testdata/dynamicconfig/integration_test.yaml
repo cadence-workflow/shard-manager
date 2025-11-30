@@ -1,6 +1,0 @@
-frontend.warmupDuration:
-- value: "1s"
-  constraints: {}
-frontend.enableActiveClusterSelectionPolicyInStartWorkflow:
-- value: true
-  constraints: {}

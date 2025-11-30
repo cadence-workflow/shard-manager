@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributorexecutor"
 	"github.com/cadence-workflow/shard-manager/common/errors"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/types"
@@ -41,11 +41,11 @@ func TestInjector(t *testing.T) {
 	// All wrappers follow the same logic, so in this test we only test one of them.
 	t.Run("no error is forwarded", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		clientMock := admin.NewMockClient(ctrl)
+		clientMock := sharddistributorexecutor.NewMockClient(ctrl)
 
-		clientMock.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+		clientMock.EXPECT().Heartbeat(gomock.Any(), gomock.Any()).Times(1)
 
-		injector := NewAdminClient(clientMock, 1, testlogger.New(t)).(*adminClient)
+		injector := NewShardDistributorExecutorClient(clientMock, 1, testlogger.New(t)).(*sharddistributorexecutorClient)
 
 		injector.fakeErrFn = func(float64) error {
 			return nil
@@ -53,18 +53,18 @@ func TestInjector(t *testing.T) {
 		injector.forwardCallFn = func(err error) bool {
 			return err == nil
 		}
-		_, err := injector.DescribeWorkflowExecution(context.Background(), &types.AdminDescribeWorkflowExecutionRequest{})
+		_, err := injector.Heartbeat(context.Background(), &types.ExecutorHeartbeatRequest{})
 		assert.NoError(t, err)
 	})
 	t.Run("no fake error, but client returns an error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		clientMock := admin.NewMockClient(ctrl)
+		clientMock := sharddistributorexecutor.NewMockClient(ctrl)
 
 		clientErr := fmt.Errorf("fail")
 
-		clientMock.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, clientErr).Times(1)
+		clientMock.EXPECT().Heartbeat(gomock.Any(), gomock.Any()).Return(nil, clientErr).Times(1)
 
-		injector := NewAdminClient(clientMock, 1, testlogger.New(t)).(*adminClient)
+		injector := NewShardDistributorExecutorClient(clientMock, 1, testlogger.New(t)).(*sharddistributorexecutorClient)
 
 		injector.fakeErrFn = func(float64) error {
 			return nil
@@ -72,19 +72,19 @@ func TestInjector(t *testing.T) {
 		injector.forwardCallFn = func(err error) bool {
 			return err == nil
 		}
-		_, err := injector.DescribeWorkflowExecution(context.Background(), &types.AdminDescribeWorkflowExecutionRequest{})
+		_, err := injector.Heartbeat(context.Background(), &types.ExecutorHeartbeatRequest{})
 		assert.Error(t, err)
 		assert.True(t, stdErrors.Is(clientErr, err))
 	})
 	t.Run("fake error overrides client error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		clientMock := admin.NewMockClient(ctrl)
+		clientMock := sharddistributorexecutor.NewMockClient(ctrl)
 
 		clientErr := fmt.Errorf("fail")
 
-		clientMock.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, clientErr).Times(1)
+		clientMock.EXPECT().Heartbeat(gomock.Any(), gomock.Any()).Return(nil, clientErr).Times(1)
 
-		injector := NewAdminClient(clientMock, 1, testlogger.New(t)).(*adminClient)
+		injector := NewShardDistributorExecutorClient(clientMock, 1, testlogger.New(t)).(*sharddistributorexecutorClient)
 
 		injector.fakeErrFn = func(float64) error {
 			return errors.ErrFakeServiceBusy
@@ -92,17 +92,17 @@ func TestInjector(t *testing.T) {
 		injector.forwardCallFn = func(err error) bool {
 			return true
 		}
-		_, err := injector.DescribeWorkflowExecution(context.Background(), &types.AdminDescribeWorkflowExecutionRequest{})
+		_, err := injector.Heartbeat(context.Background(), &types.ExecutorHeartbeatRequest{})
 		assert.Error(t, err)
 		assert.True(t, stdErrors.Is(errors.ErrFakeServiceBusy, err))
 	})
 	t.Run("failed but not forwarded", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		clientMock := admin.NewMockClient(ctrl)
+		clientMock := sharddistributorexecutor.NewMockClient(ctrl)
 
-		clientMock.EXPECT().DescribeWorkflowExecution(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+		clientMock.EXPECT().Heartbeat(gomock.Any(), gomock.Any()).Times(1)
 
-		injector := NewAdminClient(clientMock, 1, testlogger.New(t)).(*adminClient)
+		injector := NewShardDistributorExecutorClient(clientMock, 1, testlogger.New(t)).(*sharddistributorexecutorClient)
 
 		injector.fakeErrFn = func(float64) error {
 			return errors.ErrFakeServiceBusy
@@ -110,14 +110,14 @@ func TestInjector(t *testing.T) {
 		injector.forwardCallFn = func(err error) bool {
 			return true
 		}
-		_, err := injector.DescribeWorkflowExecution(context.Background(), &types.AdminDescribeWorkflowExecutionRequest{})
+		_, err := injector.Heartbeat(context.Background(), &types.ExecutorHeartbeatRequest{})
 		assert.Error(t, err)
 	})
 	t.Run("failed and not forwarded", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		clientMock := admin.NewMockClient(ctrl)
+		clientMock := sharddistributorexecutor.NewMockClient(ctrl)
 
-		injector := NewAdminClient(clientMock, 1, testlogger.New(t)).(*adminClient)
+		injector := NewShardDistributorExecutorClient(clientMock, 1, testlogger.New(t)).(*sharddistributorexecutorClient)
 
 		injector.fakeErrFn = func(float64) error {
 			return errors.ErrFakeServiceBusy
@@ -125,7 +125,7 @@ func TestInjector(t *testing.T) {
 		injector.forwardCallFn = func(err error) bool {
 			return false
 		}
-		_, err := injector.DescribeWorkflowExecution(context.Background(), &types.AdminDescribeWorkflowExecutionRequest{})
+		_, err := injector.Heartbeat(context.Background(), &types.ExecutorHeartbeatRequest{})
 		assert.Error(t, err)
 	})
 }

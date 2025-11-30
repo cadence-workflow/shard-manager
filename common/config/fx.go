@@ -88,14 +88,10 @@ func New(p Params) (Result, error) {
 		return Result{}, fmt.Errorf("load config: %w", err)
 	}
 
-	cfg.fillDefaults()
-
 	svcCfg, err := cfg.GetServiceConfig(p.Service)
 	if err != nil {
 		return Result{}, fmt.Errorf("get service config: %w", err)
 	}
-
-	p.Lifecycle.Append(fx.StartHook(cfg.validate))
 
 	return Result{
 		Config:        cfg,

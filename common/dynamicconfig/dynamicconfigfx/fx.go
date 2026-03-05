@@ -29,12 +29,10 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common/config"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
-	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/configstore"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // Module provides fx options for dynamic config initialization
@@ -81,15 +79,6 @@ func New(p Params) Result {
 		res, err = dynamicconfig.NewFileBasedClient(&p.Cfg.DynamicConfigClient, p.Logger, stopped)
 	} else {
 		switch p.Cfg.DynamicConfig.Client {
-		case dynamicconfig.ConfigStoreClient:
-			p.Logger.Info("initialising ConfigStore dynamic config client")
-			res, err = configstore.NewConfigStoreClient(
-				&p.Cfg.DynamicConfig.ConfigStore,
-				&p.Cfg.Persistence,
-				p.Logger,
-				p.MetricsClient,
-				persistence.DynamicConfig,
-			)
 		case dynamicconfig.FileBasedClient:
 			p.Logger.Info("initialising File Based dynamic config client")
 			res, err = dynamicconfig.NewFileBasedClient(&p.Cfg.DynamicConfig.FileBased, p.Logger, stopped)

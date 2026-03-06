@@ -26,7 +26,6 @@ require (
 	github.com/jmoiron/sqlx v1.2.1-0.20200615141059-0794cb1f47ee
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/m3db/prometheus_client_golang v0.8.1
-	github.com/olekukonko/tablewriter v0.0.4
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/olivere/elastic/v7 v7.0.21
 	github.com/opentracing/opentracing-go v1.2.0
@@ -66,7 +65,6 @@ require (
 require (
 	github.com/IBM/sarama v1.45.2
 	github.com/Masterminds/semver/v3 v3.2.1
-	github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568
 	github.com/google/gofuzz v1.0.0
 	github.com/mark3labs/mcp-go v0.18.0
 	github.com/opensearch-project/opensearch-go/v4 v4.1.0
@@ -126,7 +124,6 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	github.com/mattn/go-runewidth v0.0.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

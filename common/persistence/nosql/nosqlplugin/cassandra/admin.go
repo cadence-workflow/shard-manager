@@ -22,17 +22,12 @@
 package cassandra
 
 import (
+	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"strings"
 
-	"github.com/cadence-workflow/shard-manager/common/config"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
-	"github.com/cadence-workflow/shard-manager/tools/cassandra"
-	"github.com/cadence-workflow/shard-manager/tools/common/schema"
 )
 
 const (
@@ -67,24 +62,14 @@ func (db *CDB) SetupTestDatabase(schemaBaseDir string, replicas int) error {
 
 // loadSchema from PersistenceTestCluster interface
 func (db *CDB) loadSchema(fileNames []string, schemaBaseDir string) error {
-	workflowSchemaDir := schemaBaseDir + "/cadence"
-	err := loadCassandraSchema(workflowSchemaDir, fileNames, db.cfg.Hosts, db.cfg.Port, db.cfg.Keyspace, true, nil, db.cfg.ProtoVersion)
-	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
-		// TODO: should we remove the second condition?
-		return err
-	}
-	return nil
+	// shard-manager only uses ETCD, Cassandra schema loading not supported
+	return errors.New("Cassandra schema loading not supported in shard-manager")
 }
 
 // loadVisibilitySchema from PersistenceTestCluster interface
 func (db *CDB) loadVisibilitySchema(fileNames []string, schemaBaseDir string) error {
-	workflowSchemaDir := schemaBaseDir + "/visibility"
-	err := loadCassandraSchema(workflowSchemaDir, fileNames, db.cfg.Hosts, db.cfg.Port, db.cfg.Keyspace, false, nil, db.cfg.ProtoVersion)
-	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
-		// TODO: should we remove the second condition?
-		return err
-	}
-	return nil
+	// shard-manager only uses ETCD, Cassandra schema loading not supported
+	return errors.New("Cassandra visibility schema loading not supported in shard-manager")
 }
 
 func (db *CDB) TeardownTestDatabase() error {
@@ -125,61 +110,5 @@ func (db *CDB) dropCassandraKeyspace(s gocql.Session, keyspace string) (err erro
 		return
 	}
 	db.logger.Debugf("dropped namespace %s", keyspace)
-	return
-}
-
-// loadCassandraSchema loads the schema from the given .cql files on this keyspace
-func loadCassandraSchema(
-	dir string,
-	fileNames []string,
-	hosts string,
-	port int,
-	keyspace string,
-	override bool,
-	tls *config.TLS,
-	protoVersion int,
-) (err error) {
-
-	tmpFile, err := ioutil.TempFile("", "_cadence_")
-	if err != nil {
-		return fmt.Errorf("error creating tmp file:%v", err.Error())
-	}
-	defer os.Remove(tmpFile.Name())
-
-	for _, file := range fileNames {
-		// Flagged for potential file inclusion via variable. No user supplied input is included here - this just reads
-		// schema files.
-		// #nosec
-		content, err := ioutil.ReadFile(dir + "/" + file)
-		if err != nil {
-			return fmt.Errorf("error reading contents of file %v:%v", file, err.Error())
-		}
-		_, err = tmpFile.WriteString(string(content) + "\n")
-		if err != nil {
-			return fmt.Errorf("error writing string to file, err: %v", err.Error())
-		}
-	}
-
-	tmpFile.Close()
-
-	config := &cassandra.SetupSchemaConfig{
-		CQLClientConfig: cassandra.CQLClientConfig{
-			Hosts:        hosts,
-			Port:         port,
-			Keyspace:     keyspace,
-			TLS:          tls,
-			ProtoVersion: protoVersion,
-		},
-		SetupConfig: schema.SetupConfig{
-			SchemaFilePath:    tmpFile.Name(),
-			Overwrite:         override,
-			DisableVersioning: true,
-		},
-	}
-
-	err = cassandra.SetupSchema(config)
-	if err != nil {
-		err = fmt.Errorf("error loading schema:%v", err.Error())
-	}
 	return
 }

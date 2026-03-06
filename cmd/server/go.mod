@@ -12,22 +12,17 @@ toolchain go1.23.4
 replace github.com/cadence-workflow/shard-manager => ../..
 
 require (
-	github.com/VividCortex/mysqlerr v1.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.54.12 // indirect
 	github.com/cactus/go-statsd-client/statsd v0.0.0-20191106001114-12b4e2b38748 // indirect
 	github.com/cch123/elasticsql v0.0.0-20190321073543-a1a440758eb9 // indirect
 	github.com/cristalhq/jwt/v3 v3.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-farm v0.0.0-20240924180020-3414d57e47da // indirect
-	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/gocql/gocql v0.0.0-20211015133455-b225f9b53fa1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-version v1.2.0 // indirect
-	github.com/iancoleman/strcase v0.2.0 // indirect
-	github.com/jmoiron/sqlx v1.2.1-0.20200615141059-0794cb1f47ee // indirect
-	github.com/lib/pq v1.2.0 // indirect
 	github.com/m3db/prometheus_client_golang v0.8.1 // indirect
 	github.com/olivere/elastic v6.2.37+incompatible // indirect
 	github.com/olivere/elastic/v7 v7.0.21 // indirect
@@ -56,7 +51,6 @@ require (
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
-	gonum.org/v1/gonum v0.7.0 // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	gopkg.in/validator.v2 v2.0.0-20180514200540-135c24b11c19 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -76,12 +70,9 @@ require (
 	github.com/google/gofuzz v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	github.com/ncruces/go-sqlite3 v0.22.0 // indirect
-	github.com/ncruces/julianday v1.0.0 // indirect
 	github.com/opensearch-project/opensearch-go/v4 v4.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
-	github.com/tetratelabs/wazero v1.8.2 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.5 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.5 // indirect

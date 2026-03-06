@@ -30,9 +30,6 @@ import (
 	_ "github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue/kafka"                            // needed to load kafka asyncworkflow queue
 	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra"              // needed to load cassandra plugin
 	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql/public" // needed to load the default gocql client
-	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/mysql"                      // needed to load mysql plugin
-	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/postgres"                   // needed to load postgres plugin
-	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/sqlite"                     // needed to load sqlite plugin
 	_ "github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd"                         // needed for shard distributor shard/heartbeat and leader election
 )
 

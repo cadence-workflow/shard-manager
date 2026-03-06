@@ -10,9 +10,8 @@ require (
 	github.com/cactus/go-statsd-client/statsd v0.0.0-20191106001114-12b4e2b38748
 	github.com/cch123/elasticsql v0.0.0-20190321073543-a1a440758eb9
 	github.com/dave/dst v0.26.2
-	github.com/davecgh/go-spew v1.1.1
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-farm v0.0.0-20240924180020-3414d57e47da
-	github.com/emirpasic/gods v0.0.0-20190624094223-e689965507ab
 	github.com/fatih/color v1.13.0
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/gocql/gocql v0.0.0-20211015133455-b225f9b53fa1

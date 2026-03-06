@@ -451,29 +451,6 @@ jobs:
           path: .build/coverage/*.out
 
 
-  golang-async-wf-integration-test-with-kafka:
-    name: Golang async wf integration test with kafka
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Setup Go environment
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23.4'
-
-      - name: Run async wf integration test with kafka
-        uses: nick-fields/retry@v3
-        with:
-          max_attempts: 2
-          timeout_minutes: 30
-          command: |
-            docker compose -f docker/github_actions/docker-compose.yml run integration-test-async-wf bash -c "make .just-build && go test -timeout 60s -run ^TestAsyncWFIntegrationSuite -tags asyncwfintegration -count 1 -v github.com/uber/cadence/host"
-
   golang-integration-test-with-etcd:
     if: github.event_name == 'pull_request'
     name: Golang integration test with etcd

@@ -273,7 +273,7 @@ $(STABLE_BIN)/$(PROTOC_VERSION_BIN): | $(STABLE_BIN)
 			exit 1; \
 		fi
 	$(Q) idlsha=$$(git ls-tree HEAD idls | awk '{print substr($$3,0,12)}') && \
-		gosha=$$(grep github.com/cadence-workflow/shard-manager-idl go.mod | tr '-' '\n' | tail -n1) && \
+		gosha=$$(grep github.com/uber/cadence-idl go.mod | tr '-' '\n' | tail -n1) && \
 		if [[ "$$idlsha" != "$$gosha" ]]; then \
 			echo "IDL submodule sha ($$idlsha) does not match go module sha ($$gosha)." >&2 && \
 			echo "Make sure the IDL PR has been merged, and this PR is updated, before merging here." >&2 && \

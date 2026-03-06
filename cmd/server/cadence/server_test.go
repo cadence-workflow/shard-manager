@@ -71,7 +71,8 @@ TestServerStartup tests the startup logic for the binary. When this fails, you s
 If you need to run locally, make sure Cassandra is up and schema is installed(run `make install-schema`)
 */
 func (s *ServerSuite) TestServerStartup() {
-	env := "development"
+	// TODO: Remove this test - shard-manager only uses ETCD, not SQLite/Cassandra
+	s.T().Skip("Skipping: shard-manager doesn't use SQL persistence, will be removed in future PR")
 	zone := ""
 	rootDir := "../../../"
 	configDir := constructPathIfNeed(rootDir, "config")

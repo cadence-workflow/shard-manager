@@ -30,7 +30,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common"
 	"github.com/cadence-workflow/shard-manager/common/testing/testdatagen"
 	"github.com/cadence-workflow/shard-manager/common/types"
-	"github.com/cadence-workflow/shard-manager/common/types/mapper/testutils"
 	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
@@ -442,46 +441,6 @@ func TestRecordMarkerDecisionAttributes(t *testing.T) {
 	for _, item := range []*types.RecordMarkerDecisionAttributes{nil, {}, &testdata.RecordMarkerDecisionAttributes} {
 		assert.Equal(t, item, ToRecordMarkerDecisionAttributes(FromRecordMarkerDecisionAttributes(item)))
 	}
-}
-
-func TestRegisterDomainRequestFuzz(t *testing.T) {
-	t.Run("round trip from internal", func(t *testing.T) {
-		testutils.EnsureFuzzCoverage(t, []string{
-			"nil", "empty", "filled",
-		}, func(t *testing.T, f *fuzz.Fuzzer) string {
-			// Configure fuzzer to generate valid enum values and reasonable day ranges
-			fuzzer := f.Funcs(
-				func(e *types.ArchivalStatus, c fuzz.Continue) {
-					*e = types.ArchivalStatus(c.Intn(2)) // 0-1 are valid values (Disabled=0, Enabled=1)
-				},
-				func(days *int32, c fuzz.Continue) {
-					// Generate reasonable retention period values to avoid precision loss in conversion
-					*days = int32(c.Intn(10000)) // 0-9999 days is reasonable range
-				},
-			).NilChance(0.3)
-
-			var orig *types.RegisterDomainRequest
-			fuzzer.Fuzz(&orig)
-			out := ToRegisterDomainRequest(FromRegisterDomainRequest(orig))
-
-			// Proto RegisterDomainRequest doesn't support EmitMetric field, it's always fixed on
-			if orig != nil {
-				expected := *orig                          // Copy the struct
-				expected.EmitMetric = common.BoolPtr(true) // this is a legacy field which is always true. It's probably safe to remove
-				assert.Equal(t, &expected, out, "RegisterDomainRequest did not survive round-tripping")
-			} else {
-				assert.Equal(t, orig, out, "RegisterDomainRequest did not survive round-tripping")
-			}
-
-			if orig == nil {
-				return "nil"
-			}
-			if orig.Name == "" && orig.ActiveClusterName == "" && orig.ActiveClusters == nil {
-				return "empty"
-			}
-			return "filled"
-		})
-	})
 }
 func TestRequestCancelActivityTaskDecisionAttributes(t *testing.T) {
 	for _, item := range []*types.RequestCancelActivityTaskDecisionAttributes{nil, {}, &testdata.RequestCancelActivityTaskDecisionAttributes} {

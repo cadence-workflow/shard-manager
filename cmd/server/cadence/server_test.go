@@ -73,6 +73,7 @@ If you need to run locally, make sure Cassandra is up and schema is installed(ru
 func (s *ServerSuite) TestServerStartup() {
 	// TODO: Remove this test - shard-manager only uses ETCD, not SQLite/Cassandra
 	s.T().Skip("Skipping: shard-manager doesn't use SQL persistence, will be removed in future PR")
+	env := "development"
 	zone := ""
 	rootDir := "../../../"
 	configDir := constructPathIfNeed(rootDir, "config")

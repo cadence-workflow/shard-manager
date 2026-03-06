@@ -24,107 +24,16 @@
 package cadence
 
 import (
-	"context"
-	"slices"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"github.com/uber-go/tally"
-	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
 
-	"github.com/cadence-workflow/shard-manager/common"
-	"github.com/cadence-workflow/shard-manager/common/config"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 	"github.com/cadence-workflow/shard-manager/common/log"
-	"github.com/cadence-workflow/shard-manager/common/log/tag"
-	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
-	"github.com/cadence-workflow/shard-manager/common/metrics"
-	pt "github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests"
-	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/sqlite"
 	"github.com/cadence-workflow/shard-manager/common/resource"
-	"github.com/cadence-workflow/shard-manager/common/service"
 )
-
-type ServerSuite struct {
-	*require.Assertions
-	suite.Suite
-
-	logger log.Logger
-}
-
-func TestServerSuite(t *testing.T) {
-	suite.Run(t, new(ServerSuite))
-}
-
-func (s *ServerSuite) SetupTest() {
-	s.Assertions = require.New(s.T())
-	s.logger = testlogger.New(s.T())
-}
-
-/*
-TestServerStartup tests the startup logic for the binary. When this fails, you should be able to reproduce by running "cadence-server start"
-If you need to run locally, make sure Cassandra is up and schema is installed(run `make install-schema`)
-*/
-func (s *ServerSuite) TestServerStartup() {
-	// TODO: Remove this test - shard-manager only uses ETCD, not SQLite/Cassandra
-	s.T().Skip("Skipping: shard-manager doesn't use SQL persistence, will be removed in future PR")
-	env := "development"
-	zone := ""
-	rootDir := "../../../"
-	configDir := constructPathIfNeed(rootDir, "config")
-
-	s.T().Logf("Loading config; env=%v,zone=%v,configDir=%v\n", env, zone, configDir)
-
-	var cfg config.Config
-	err := config.Load(env, configDir, zone, &cfg)
-	if err != nil {
-		s.logger.Fatal("Config file corrupted.", tag.Error(err))
-	}
-
-	// set up sqlite persistence layer and apply schema to sqlite db
-	testBase := pt.NewTestBaseWithSQL(s.T(), sqlite.GetTestClusterOption())
-	cfg.Persistence = testBase.Config()
-	testBase.Setup()
-
-	s.T().Logf("config=\n%v\n", cfg.String())
-
-	cfg.DynamicConfig.FileBased.Filepath = constructPathIfNeed(rootDir, cfg.DynamicConfig.FileBased.Filepath)
-
-	if err := cfg.ValidateAndFillDefaults(); err != nil {
-		s.logger.Fatal("config validation failed", tag.Error(err))
-	}
-
-	logger := testlogger.New(s.T())
-
-	lifecycle := fxtest.NewLifecycle(s.T())
-
-	var daemons []common.Daemon
-	// Shard distributor should be tested separately
-	distributorShortName := service.ShortName(service.ShardDistributor)
-	services := slices.DeleteFunc(service.ShortNames(service.List),
-		func(s string) bool {
-			return s == distributorShortName
-		})
-
-	for _, svc := range services {
-		server := newServer(svc, cfg, logger, dynamicconfig.NewNopClient(), tally.NoopScope, metrics.NewNoopMetricsClient())
-		daemons = append(daemons, server)
-		server.Start()
-	}
-
-	timer := time.NewTimer(time.Second * 10)
-
-	<-timer.C
-	s.NoError(lifecycle.Stop(context.Background()))
-	for _, daemon := range daemons {
-		daemon.Stop()
-	}
-}
 
 func TestSettingGettingZonalIsolationGroupsFromIG(t *testing.T) {
 	ctrl := gomock.NewController(t)

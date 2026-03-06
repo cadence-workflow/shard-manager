@@ -24,7 +24,6 @@ package cadence
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/uber-go/tally"
 	"go.uber.org/fx"
@@ -40,14 +39,11 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/metrics/metricsfx"
-	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
 	"github.com/cadence-workflow/shard-manager/common/rpc/rpcfx"
 	"github.com/cadence-workflow/shard-manager/common/service"
 	shardDistributorCfg "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/sharddistributorfx"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd"
-	"github.com/cadence-workflow/shard-manager/tools/cassandra"
-	"github.com/cadence-workflow/shard-manager/tools/sql"
 )
 
 var _commonModule = fx.Options(
@@ -145,14 +141,7 @@ func (a *App) Stop(ctx context.Context) error {
 }
 
 func (a *App) verifySchema(ctx context.Context) error {
-	// cassandra schema version validation
-	if err := cassandra.VerifyCompatibleVersion(a.cfg.Persistence, gocql.Quorum); err != nil {
-		return fmt.Errorf("cassandra schema version compatibility check failed: %w", err)
-	}
-	// sql schema version validation
-	if err := sql.VerifyCompatibleVersion(a.cfg.Persistence); err != nil {
-		return fmt.Errorf("sql schema version compatibility check failed: %w", err)
-	}
+	// shard-manager only uses ETCD, no schema verification needed for SQL/Cassandra
 	return nil
 }
 

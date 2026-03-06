@@ -63,7 +63,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/service"
 	"github.com/cadence-workflow/shard-manager/service/frontend"
 	"github.com/cadence-workflow/shard-manager/service/history"
-	"github.com/cadence-workflow/shard-manager/service/matching"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient"
 	"github.com/cadence-workflow/shard-manager/service/worker"
 	diagnosticsInvariant "github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant"
@@ -301,8 +300,6 @@ func (s *server) startService() common.Daemon {
 		daemon, err = frontend.NewService(&params)
 	case service.History:
 		daemon, err = history.NewService(&params)
-	case service.Matching:
-		daemon, err = matching.NewService(&params)
 	case service.Worker:
 		daemon, err = worker.NewService(&params)
 	default:

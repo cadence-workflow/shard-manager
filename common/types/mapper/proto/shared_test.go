@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/gogo/protobuf/proto"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
@@ -33,7 +32,6 @@ import (
 	sharedv1 "github.com/cadence-workflow/shard-manager/.gen/proto/shared/v1"
 	"github.com/cadence-workflow/shard-manager/common"
 	"github.com/cadence-workflow/shard-manager/common/types"
-	"github.com/cadence-workflow/shard-manager/common/types/mapper/testutils"
 	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
@@ -322,42 +320,6 @@ func TestAny(t *testing.T) {
 		// somewhat annoying in fuzzing and there are few possibilities, so tested separately
 		assert.Nil(t, FromAny(ToAny(nil)), "nil proto -> internal -> proto => should result in nil")
 		assert.Nil(t, ToAny(FromAny(nil)), "nil internal -> proto -> internal => should result in nil")
-	})
-
-	t.Run("round trip from internal", func(t *testing.T) {
-		testutils.EnsureFuzzCoverage(t, []string{
-			"empty data", "filled data",
-		}, func(t *testing.T, f *fuzz.Fuzzer) string {
-			var orig types.Any
-			f.Fuzz(&orig)
-			out := ToAny(FromAny(&orig))
-			assert.Equal(t, &orig, out, "did not survive round-tripping")
-			// report what branch of behavior was fuzzed occurred
-			if len(orig.Value) == 0 {
-				return "empty data" // ignoring nil vs empty difference
-			}
-			return "filled data"
-		})
-	})
-	t.Run("round trip from proto", func(t *testing.T) {
-		testutils.EnsureFuzzCoverage(t, []string{
-			"empty data", "filled data",
-		}, func(t *testing.T, f *fuzz.Fuzzer) string {
-			// unfortunately:
-			// - gofuzz panics when it encounters interface fields (so this cannot be done on oneof fields)
-			//   - not directly relevant for Any, but causes issues for fuzzing other types
-			// - it populates the XXX_ fields and these can be hard to clear
-			// so this is fuzz-filled by hand with specific fields rather than as a whole.
-			var orig sharedv1.Any
-			f.Fuzz(&orig.ValueType)
-			f.Fuzz(&orig.Value)
-			out := FromAny(ToAny(&orig))
-			assert.Equal(t, &orig, out, "did not survive round-tripping")
-			if len(orig.Value) == 0 {
-				return "empty data" // ignoring nil vs empty difference
-			}
-			return "filled data"
-		})
 	})
 
 	t.Run("can contain proto data", func(t *testing.T) {

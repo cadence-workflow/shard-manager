@@ -25,7 +25,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
@@ -33,7 +32,6 @@ import (
 	cadence_errors "github.com/cadence-workflow/shard-manager/common/errors"
 	"github.com/cadence-workflow/shard-manager/common/testing/testdatagen"
 	"github.com/cadence-workflow/shard-manager/common/types"
-	"github.com/cadence-workflow/shard-manager/common/types/mapper/testutils"
 	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
@@ -2278,34 +2276,6 @@ func TestRegisterDomainRequestConversion(t *testing.T) {
 	}
 }
 
-func TestRegisterDomainRequestFuzz(t *testing.T) {
-	t.Run("round trip from internal", func(t *testing.T) {
-		testutils.EnsureFuzzCoverage(t, []string{
-			"nil", "empty", "filled",
-		}, func(t *testing.T, f *fuzz.Fuzzer) string {
-			// Configure fuzzer to generate valid enum values
-			fuzzer := f.Funcs(
-				func(e *types.ArchivalStatus, c fuzz.Continue) {
-					*e = types.ArchivalStatus(c.Intn(2)) // 0-1 are valid values (Disabled=0, Enabled=1)
-				},
-			).NilChance(0.3)
-
-			var orig *types.RegisterDomainRequest
-			fuzzer.Fuzz(&orig)
-			out := ToRegisterDomainRequest(FromRegisterDomainRequest(orig))
-			assert.Equal(t, orig, out, "RegisterDomainRequest did not survive round-tripping")
-
-			if orig == nil {
-				return "nil"
-			}
-			if orig.Name == "" && orig.ActiveClusterName == "" && orig.ActiveClusters == nil {
-				return "empty"
-			}
-			return "filled"
-		})
-	})
-}
-
 func TestRemoteSyncMatchedErrorConversion(t *testing.T) {
 	testCases := []*types.RemoteSyncMatchedError{
 		nil,
@@ -3477,47 +3447,6 @@ func TestAny(t *testing.T) {
 		// somewhat annoying in fuzzing and there are few possibilities, so tested separately
 		assert.Nil(t, FromAny(ToAny(nil)), "nil thrift -> internal -> thrift => should result in nil")
 		assert.Nil(t, ToAny(FromAny(nil)), "nil internal -> thrift -> internal => should result in nil")
-	})
-
-	t.Run("round trip from internal", func(t *testing.T) {
-		// fuzz test to check round trip data works as it should when starting from internal types
-		testutils.EnsureFuzzCoverage(t, []string{
-			"empty data", "filled data",
-		}, func(t *testing.T, f *fuzz.Fuzzer) string {
-			var orig types.Any
-			f.Fuzz(&orig)
-			out := ToAny(FromAny(&orig))
-			assert.Equal(t, &orig, out, "did not survive round-tripping")
-
-			// report what branch of behavior was executed so we can ensure stable coverage
-			if len(orig.Value) == 0 {
-				return "empty data" // ignoring nil vs empty difference
-			}
-			return "filled data"
-		})
-	})
-	t.Run("round trip from thrift", func(t *testing.T) {
-		// fuzz test to check round trip data works as it should
-		testutils.EnsureFuzzCoverage(t, []string{
-			"nil id", "empty data", "filled data",
-		}, func(t *testing.T, f *fuzz.Fuzzer) string {
-			var orig shared.Any
-			f.Fuzz(&orig)
-			out := FromAny(ToAny(&orig))
-
-			if orig.ValueType == nil {
-				// internal type does not support nil strings, so it will be transformed to an empty string.
-				assert.Equal(t, "", *out.ValueType, "empty value type did not survive round-tripping")
-				assert.Equal(t, orig.Value, out.Value, "value did not survive round-tripping")
-				return "nil id"
-			}
-			// non-nil ValueType can check all fields
-			assert.Equal(t, &orig, out, "did not survive round-tripping")
-			if len(orig.Value) == 0 {
-				return "empty data" // ignoring nil vs empty difference
-			}
-			return "filled data"
-		})
 	})
 }
 

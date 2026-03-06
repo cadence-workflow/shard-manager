@@ -11,8 +11,6 @@ toolchain go1.23.4
 // relative file path.
 replace github.com/cadence-workflow/shard-manager => ../..
 
-replace github.com/cadence-workflow/shard-manager/common/archiver/gcloud => ../../common/archiver/gcloud
-
 require (
 	github.com/VividCortex/mysqlerr v1.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.54.12 // indirect
@@ -66,7 +64,6 @@ require (
 
 require (
 	github.com/cadence-workflow/shard-manager v0.0.0-00010101000000-000000000000
-	github.com/cadence-workflow/shard-manager/common/archiver/gcloud v0.0.0-00010101000000-000000000000
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.5.0
 )
@@ -79,13 +76,14 @@ require (
 	github.com/google/gofuzz v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mattn/go-sqlite3 v1.11.0 // indirect
 	github.com/ncruces/go-sqlite3 v0.22.0 // indirect
 	github.com/ncruces/julianday v1.0.0 // indirect
 	github.com/opensearch-project/opensearch-go/v4 v4.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/tetratelabs/wazero v1.8.2 // indirect
-	github.com/uber/cadence v1.4.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.5 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.5 // indirect
@@ -93,11 +91,6 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.110.8 // indirect
-	cloud.google.com/go/compute v1.23.1 // indirect
-	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/iam v1.1.3 // indirect
-	cloud.google.com/go/storage v1.30.1 // indirect
 	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/MicahParks/keyfunc/v2 v2.1.0 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 // indirect
@@ -116,12 +109,8 @@ require (
 	github.com/gogo/googleapis v1.3.2 // indirect
 	github.com/gogo/status v1.1.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.0 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/s2a-go v0.1.4 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.2.4 // indirect
-	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -155,7 +144,6 @@ require (
 	github.com/uber-go/mapdecode v1.0.0 // indirect
 	github.com/urfave/cli/v2 v2.27.4
 	github.com/xdg/stringprep v1.0.0 // indirect
-	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/dig v1.18.0 // indirect
 	go.uber.org/net/metrics v1.3.0 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
@@ -163,12 +151,8 @@ require (
 	golang.org/x/exp/typeparams v0.0.0-20220218215828-6cf2b201936e // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.18.0 // indirect
-	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
-	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	google.golang.org/api v0.128.0 // indirect
-	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231012201019-e917dd12ba7a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231030173426-d783a09b4405 // indirect

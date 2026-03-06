@@ -27,7 +27,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 
-	_ "github.com/cadence-workflow/shard-manager/common/archiver/gcloud"                                      // needed to load the optional gcloud archiver plugin
 	_ "github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue/kafka"                            // needed to load kafka asyncworkflow queue
 	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra"              // needed to load cassandra plugin
 	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql/public" // needed to load the default gocql client

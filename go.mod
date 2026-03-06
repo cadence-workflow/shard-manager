@@ -47,7 +47,6 @@ require (
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	go.etcd.io/etcd/client/v3 v3.5.5
-	go.mongodb.org/mongo-driver v1.7.3
 	go.uber.org/atomic v1.10.0
 	go.uber.org/cadence v0.19.0
 	go.uber.org/config v1.4.0
@@ -110,7 +109,6 @@ require (
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
-	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/go-zookeeper/zk v1.0.3 // indirect
 	github.com/gogo/googleapis v1.3.2 // indirect
 	github.com/gogo/status v1.1.0 // indirect
@@ -148,11 +146,7 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/uber-common/bark v1.2.1 // indirect
 	github.com/uber-go/mapdecode v1.0.0 // indirect
-	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
-	github.com/xdg-go/scram v1.1.1 // indirect
-	github.com/xdg-go/stringprep v1.0.3 // indirect
 	github.com/xdg/stringprep v1.0.0 // indirect
-	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	go.uber.org/dig v1.18.0 // indirect
 	go.uber.org/goleak v1.2.0
 	go.uber.org/net/metrics v1.3.0 // indirect

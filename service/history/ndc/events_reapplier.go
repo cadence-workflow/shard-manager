@@ -25,11 +25,11 @@ package ndc
 import (
 	ctx "context"
 
-	"github.com/uber/cadence/common/definition"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 type (

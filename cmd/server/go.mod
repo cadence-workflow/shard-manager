@@ -1,4 +1,4 @@
-module github.com/uber/cadence/cmd/server
+module github.com/cadence-workflow/shard-manager/cmd/server
 
 go 1.23.0
 
@@ -9,9 +9,9 @@ toolchain go1.23.4
 // anyone outside this repo using this needs to ensure that both the "main" module and this module
 // are at the same SHA for consistency, but internally we can cheat by telling Go that it's at a
 // relative file path.
-replace github.com/uber/cadence => ../..
+replace github.com/cadence-workflow/shard-manager => ../..
 
-replace github.com/uber/cadence/common/archiver/gcloud => ../../common/archiver/gcloud
+replace github.com/cadence-workflow/shard-manager/common/archiver/gcloud => ../../common/archiver/gcloud
 
 require (
 	github.com/VividCortex/mysqlerr v1.0.0 // indirect
@@ -65,8 +65,8 @@ require (
 )
 
 require (
-	github.com/uber/cadence v0.0.0-00010101000000-000000000000
-	github.com/uber/cadence/common/archiver/gcloud v0.0.0-00010101000000-000000000000
+	github.com/cadence-workflow/shard-manager v0.0.0-00010101000000-000000000000
+	github.com/cadence-workflow/shard-manager/common/archiver/gcloud v0.0.0-00010101000000-000000000000
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/mock v0.5.0
 )
@@ -85,6 +85,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/tetratelabs/wazero v1.8.2 // indirect
+	github.com/uber/cadence v1.4.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.5 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.5 // indirect

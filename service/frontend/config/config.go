@@ -21,10 +21,10 @@
 package config
 
 import (
-	"github.com/uber/cadence/common/domain"
-	"github.com/uber/cadence/common/dynamicconfig"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/domain"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 // Config represents configuration for cadence-frontend service

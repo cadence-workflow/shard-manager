@@ -25,10 +25,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cadence/common/log/tag"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/wrappers/ratelimited"
-	"github.com/uber/cadence/service/worker/scanner/executor"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/wrappers/ratelimited"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/executor"
 )
 
 type handlerStatus = executor.TaskStatus

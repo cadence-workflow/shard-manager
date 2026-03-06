@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type QueryRegistrySuite struct {

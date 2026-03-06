@@ -32,13 +32,13 @@ import (
 	"go.uber.org/cadence/worker"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/metrics"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation"
-	"github.com/uber/cadence/common/reconciliation/entity"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/service/history/constants"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/entity"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/service/history/constants"
 )
 
 const testWorkflowName = "default-test-workflow-type-name"

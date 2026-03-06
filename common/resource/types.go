@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination resource_mock.go -self_package github.com/uber/cadence/common/resource
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination resource_mock.go -self_package github.com/cadence-workflow/shard-manager/common/resource
 
 package resource
 
@@ -27,32 +27,32 @@ import (
 	"go.uber.org/cadence/.gen/go/cadence/workflowserviceclient"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client"
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/client/history"
-	"github.com/uber/cadence/client/matching"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/activecluster"
-	"github.com/uber/cadence/common/archiver"
-	"github.com/uber/cadence/common/archiver/provider"
-	"github.com/uber/cadence/common/asyncworkflow/queue"
-	"github.com/uber/cadence/common/blobstore"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/domain"
-	"github.com/uber/cadence/common/dynamicconfig/configstore"
-	"github.com/uber/cadence/common/isolationgroup"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	persistenceClient "github.com/uber/cadence/common/persistence/client"
-	qrpc "github.com/uber/cadence/common/quotas/global/rpc"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
+	"github.com/cadence-workflow/shard-manager/client"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/client/history"
+	"github.com/cadence-workflow/shard-manager/client/matching"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/activecluster"
+	"github.com/cadence-workflow/shard-manager/common/archiver"
+	"github.com/cadence-workflow/shard-manager/common/archiver/provider"
+	"github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue"
+	"github.com/cadence-workflow/shard-manager/common/blobstore"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/domain"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/configstore"
+	"github.com/cadence-workflow/shard-manager/common/isolationgroup"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	persistenceClient "github.com/cadence-workflow/shard-manager/common/persistence/client"
+	qrpc "github.com/cadence-workflow/shard-manager/common/quotas/global/rpc"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 type ResourceFactory interface {

@@ -33,12 +33,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/dynamicconfig"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var _staticMethods = map[string]bool{

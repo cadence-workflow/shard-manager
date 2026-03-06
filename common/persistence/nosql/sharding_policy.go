@@ -25,9 +25,9 @@ import (
 
 	"github.com/dgryski/go-farm"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 )
 
 // shardingPolicy holds the configuration for the sharding logic

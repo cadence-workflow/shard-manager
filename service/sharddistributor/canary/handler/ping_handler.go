@@ -6,10 +6,10 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/service/sharddistributor/canary/processor"
-	"github.com/uber/cadence/service/sharddistributor/canary/processorephemeral"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processorephemeral"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 // PingHandler handles ping requests to verify executor ownership of shards

@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/environment"
+	"github.com/cadence-workflow/shard-manager/environment"
 )
 
 type (

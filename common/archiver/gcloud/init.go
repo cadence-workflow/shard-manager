@@ -25,10 +25,10 @@ package gcloud
 import (
 	"fmt"
 
-	"github.com/uber/cadence/common/archiver"
-	"github.com/uber/cadence/common/archiver/gcloud/connector"
-	"github.com/uber/cadence/common/archiver/provider"
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/archiver"
+	"github.com/cadence-workflow/shard-manager/common/archiver/gcloud/connector"
+	"github.com/cadence-workflow/shard-manager/common/archiver/provider"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 func init() {

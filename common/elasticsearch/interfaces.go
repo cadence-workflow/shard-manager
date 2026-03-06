@@ -28,17 +28,17 @@ import (
 
 	esaws "github.com/olivere/elastic/aws/v4"
 
-	workflow "github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/elasticsearch/bulk"
-	esc "github.com/uber/cadence/common/elasticsearch/client"
-	"github.com/uber/cadence/common/elasticsearch/client/os2"
-	v6 "github.com/uber/cadence/common/elasticsearch/client/v6"
-	v7 "github.com/uber/cadence/common/elasticsearch/client/v7"
-	"github.com/uber/cadence/common/elasticsearch/query"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	p "github.com/uber/cadence/common/persistence"
+	workflow "github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/bulk"
+	esc "github.com/cadence-workflow/shard-manager/common/elasticsearch/client"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/client/os2"
+	v6 "github.com/cadence-workflow/shard-manager/common/elasticsearch/client/v6"
+	v7 "github.com/cadence-workflow/shard-manager/common/elasticsearch/client/v7"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/query"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // NewGenericClient create a ES client
@@ -110,7 +110,7 @@ type (
 		// ScanByQuery is also generic purpose searching, but implemented with ScrollService of ElasticSearch,
 		// which is more performant for pagination, but comes with some limitation of in-parallel requests.
 		ScanByQuery(ctx context.Context, request *ScanByQueryRequest) (*SearchResponse, error)
-		// TODO remove it in https://github.com/uber/cadence/issues/3682
+		// TODO remove it in https://github.com/cadence-workflow/shard-manager/issues/3682
 		SearchForOneClosedExecution(ctx context.Context, index string, request *SearchForOneClosedExecutionRequest) (*SearchForOneClosedExecutionResponse, error)
 		// CountByQuery is for returning the count of workflow executions that match the query
 		CountByQuery(ctx context.Context, index, query string) (int64, error)

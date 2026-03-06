@@ -28,13 +28,13 @@ import (
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
-	cadence_errors "github.com/uber/cadence/common/errors"
-	"github.com/uber/cadence/common/testing/testdatagen"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/testutils"
-	"github.com/uber/cadence/common/types/testdata"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
+	cadence_errors "github.com/cadence-workflow/shard-manager/common/errors"
+	"github.com/cadence-workflow/shard-manager/common/testing/testdatagen"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/testutils"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestCrossClusterTaskInfoConversion(t *testing.T) {

@@ -31,8 +31,8 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/tools/cli/clitest"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/tools/cli/clitest"
 )
 
 func TestAdminGetDynamicConfig(t *testing.T) {

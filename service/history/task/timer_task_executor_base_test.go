@@ -31,17 +31,17 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/mocks"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/config"
-	"github.com/uber/cadence/service/history/execution"
-	executioncache "github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/shard"
-	"github.com/uber/cadence/service/worker/archiver"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/mocks"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/config"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	executioncache "github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/service/worker/archiver"
 )
 
 type (

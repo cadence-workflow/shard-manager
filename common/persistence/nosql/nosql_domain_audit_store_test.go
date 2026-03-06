@@ -30,9 +30,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 func setUpMocksForDomainAuditStore(t *testing.T) (*nosqlDomainAuditStore, *nosqlplugin.MockDB) {

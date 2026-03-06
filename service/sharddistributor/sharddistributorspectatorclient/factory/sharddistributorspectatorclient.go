@@ -4,12 +4,12 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/fx"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/client/sharddistributor"
-	"github.com/uber/cadence/client/wrappers/grpc"
-	"github.com/uber/cadence/client/wrappers/retryable"
-	"github.com/uber/cadence/client/wrappers/timeout"
-	"github.com/uber/cadence/common"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/grpc"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/retryable"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/timeout"
+	"github.com/cadence-workflow/shard-manager/common"
 )
 
 type Params struct {

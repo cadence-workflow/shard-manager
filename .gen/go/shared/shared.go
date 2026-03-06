@@ -119313,7 +119313,7 @@ func (v *WorkflowTypeFilter) IsSetName() bool {
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "shared",
-	Package:  "github.com/uber/cadence/.gen/go/shared",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/shared",
 	FilePath: "shared.thrift",
 	SHA1:     "5a8ec0270fb416939964d113fdb6059662176745",
 	Raw:      rawIDL,

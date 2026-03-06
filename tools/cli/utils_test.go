@@ -39,10 +39,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common/authorization"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/testing/testdatagen/idlfuzzedtestdata"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/authorization"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/testing/testdatagen/idlfuzzedtestdata"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func Test_JSONHistorySerializer(t *testing.T) {

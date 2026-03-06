@@ -28,8 +28,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func Test__checkAndClearTimerFiredEvent(t *testing.T) {

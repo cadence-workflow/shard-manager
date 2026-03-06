@@ -28,17 +28,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	hcommon "github.com/uber/cadence/service/history/common"
-	"github.com/uber/cadence/service/history/queue"
-	"github.com/uber/cadence/service/history/shard"
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	hcommon "github.com/cadence-workflow/shard-manager/service/history/common"
+	"github.com/cadence-workflow/shard-manager/service/history/queue"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 type (

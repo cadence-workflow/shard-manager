@@ -1,14 +1,14 @@
 import (
 	"context"
 
-	"github.com/uber/cadence/common/authorization"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/authorization"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	{{- if eq .Interface.Name "Handler"}}
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 	{{end}}
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 {{$permissionMap := dict "CountWorkflowExecutions" "PermissionRead"}}

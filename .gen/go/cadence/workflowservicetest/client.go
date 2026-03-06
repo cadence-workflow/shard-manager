@@ -9,8 +9,8 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	yarpc "go.uber.org/yarpc"
 
-	workflowserviceclient "github.com/uber/cadence/.gen/go/cadence/workflowserviceclient"
-	shared "github.com/uber/cadence/.gen/go/shared"
+	workflowserviceclient "github.com/cadence-workflow/shard-manager/.gen/go/cadence/workflowserviceclient"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 // MockClient implements a gomock-compatible mock client for service

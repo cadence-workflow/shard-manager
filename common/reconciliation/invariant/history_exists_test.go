@@ -32,11 +32,11 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
-	c2 "github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/mocks"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	c2 "github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/mocks"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type HistoryExistsSuite struct {

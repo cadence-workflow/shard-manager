@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	ringpopproviderconfig "github.com/uber/cadence/common/peerprovider/ringpopprovider/config"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	ringpopproviderconfig "github.com/cadence-workflow/shard-manager/common/peerprovider/ringpopprovider/config"
 )
 
 type mockResolver struct {

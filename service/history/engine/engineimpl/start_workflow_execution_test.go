@@ -31,16 +31,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/activecluster"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/constants"
-	"github.com/uber/cadence/service/history/engine/testdata"
-	"github.com/uber/cadence/service/history/events"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/activecluster"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/constants"
+	"github.com/cadence-workflow/shard-manager/service/history/engine/testdata"
+	"github.com/cadence-workflow/shard-manager/service/history/events"
 )
 
 func TestStartWorkflowExecution(t *testing.T) {

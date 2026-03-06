@@ -25,8 +25,8 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
-	"github.com/uber/cadence/tools/common/schema"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	"github.com/cadence-workflow/shard-manager/tools/common/schema"
 )
 
 // RunTool runs the cadence-cassandra-tool command line tool

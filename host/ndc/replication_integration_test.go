@@ -28,9 +28,9 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"github.com/uber/cadence/common/persistence"
-	test "github.com/uber/cadence/common/testing"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	test "github.com/cadence-workflow/shard-manager/common/testing"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

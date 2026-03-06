@@ -30,8 +30,8 @@ import (
 
 	"go.uber.org/yarpc/api/peer"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 )
 
 type (

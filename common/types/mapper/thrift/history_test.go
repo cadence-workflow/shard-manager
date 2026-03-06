@@ -27,11 +27,11 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/.gen/go/history"
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/testdata"
+	"github.com/cadence-workflow/shard-manager/.gen/go/history"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestHistoryTerminateWorkflowExecutionRequestConversion(t *testing.T) {

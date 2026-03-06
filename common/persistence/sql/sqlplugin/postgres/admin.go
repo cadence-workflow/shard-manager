@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
 )
 
 const (
@@ -56,7 +56,7 @@ const (
 
 	// NOTE we have to use %v because somehow postgres doesn't work with ? here
 	// It's a small bug in sqlx library
-	// TODO https://github.com/uber/cadence/issues/2893
+	// TODO https://github.com/cadence-workflow/shard-manager/issues/2893
 	createDatabaseQuery = "CREATE database %v"
 
 	dropDatabaseQuery = "Drop database %v"

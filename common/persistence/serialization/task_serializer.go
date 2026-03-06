@@ -20,17 +20,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination task_serializer_mock.go github.com/uber/cadence/common/persistence/serialization TaskSerializer
+//go:generate mockgen -package $GOPACKAGE -destination task_serializer_mock.go github.com/cadence-workflow/shard-manager/common/persistence/serialization TaskSerializer
 
 package serialization
 
 import (
 	"fmt"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

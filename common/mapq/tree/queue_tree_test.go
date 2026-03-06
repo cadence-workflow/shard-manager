@@ -30,9 +30,9 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/mapq/types"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/mapq/types"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 func TestStartStop(t *testing.T) {

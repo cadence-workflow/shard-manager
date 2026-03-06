@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 type constantSuite struct {

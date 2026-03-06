@@ -31,8 +31,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestGettersForAllNilInfos(t *testing.T) {

@@ -30,13 +30,13 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation/entity"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/entity"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // Checker interface for initiating the validation process.

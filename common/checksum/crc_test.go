@@ -29,8 +29,8 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
 )
 
 func TestCRC32OverThrift(t *testing.T) {

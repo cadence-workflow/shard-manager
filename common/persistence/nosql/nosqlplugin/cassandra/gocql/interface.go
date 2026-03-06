@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql
 
 package gocql
 
@@ -28,8 +28,8 @@ import (
 
 	"github.com/gocql/gocql"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 // Note: this file defines the minimal interface that is needed by Cadence's cassandra

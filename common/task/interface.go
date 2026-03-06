@@ -18,11 +18,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/uber/cadence/common/task
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/cadence-workflow/shard-manager/common/task
 
 package task
 
-import "github.com/uber/cadence/common"
+import "github.com/cadence-workflow/shard-manager/common"
 
 type (
 	// Processor is the generic coroutine pool interface

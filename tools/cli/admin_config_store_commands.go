@@ -29,9 +29,9 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 type cliEntry struct {

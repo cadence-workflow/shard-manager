@@ -21,8 +21,8 @@
 package queue
 
 import (
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 type queueProcessorOptions struct {

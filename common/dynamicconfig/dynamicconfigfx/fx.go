@@ -27,14 +27,12 @@ import (
 
 	"go.uber.org/fx"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/dynamicconfig"
-	"github.com/uber/cadence/common/dynamicconfig/configstore"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 // Module provides fx options for dynamic config initialization
@@ -81,15 +79,6 @@ func New(p Params) Result {
 		res, err = dynamicconfig.NewFileBasedClient(&p.Cfg.DynamicConfigClient, p.Logger, stopped)
 	} else {
 		switch p.Cfg.DynamicConfig.Client {
-		case dynamicconfig.ConfigStoreClient:
-			p.Logger.Info("initialising ConfigStore dynamic config client")
-			res, err = configstore.NewConfigStoreClient(
-				&p.Cfg.DynamicConfig.ConfigStore,
-				&p.Cfg.Persistence,
-				p.Logger,
-				p.MetricsClient,
-				persistence.DynamicConfig,
-			)
 		case dynamicconfig.FileBasedClient:
 			p.Logger.Info("initialising File Based dynamic config client")
 			res, err = dynamicconfig.NewFileBasedClient(&p.Cfg.DynamicConfig.FileBased, p.Logger, stopped)

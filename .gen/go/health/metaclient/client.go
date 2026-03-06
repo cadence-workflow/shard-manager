@@ -12,7 +12,7 @@ import (
 	transport "go.uber.org/yarpc/api/transport"
 	thrift "go.uber.org/yarpc/encoding/thrift"
 
-	health "github.com/uber/cadence/.gen/go/health"
+	health "github.com/cadence-workflow/shard-manager/.gen/go/health"
 )
 
 // Interface is a client for the Meta service.

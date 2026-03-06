@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/history"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/history"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var _ history.Client = (*historyClient)(nil)

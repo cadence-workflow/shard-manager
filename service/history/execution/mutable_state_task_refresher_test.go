@@ -30,16 +30,16 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/config"
-	"github.com/uber/cadence/service/history/events"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/config"
+	"github.com/cadence-workflow/shard-manager/service/history/events"
 )
 
 func TestRefreshTasksForWorkflowStart(t *testing.T) {

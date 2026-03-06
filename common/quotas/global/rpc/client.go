@@ -25,7 +25,7 @@
 // with those details.
 package rpc
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination client_mock.go -self_package github.com/uber/cadence/common/quotas/global/rpc Client
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination client_mock.go -self_package github.com/cadence-workflow/shard-manager/common/quotas/global/rpc Client
 
 import (
 	"context"
@@ -38,12 +38,12 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/uber/cadence/client/history"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas/global/shared"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/history"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/shared"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

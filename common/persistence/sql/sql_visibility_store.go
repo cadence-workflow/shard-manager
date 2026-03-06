@@ -27,15 +27,15 @@ import (
 	"fmt"
 	"time"
 
-	workflow "github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/thrift"
+	workflow "github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/thrift"
 )
 
 type (

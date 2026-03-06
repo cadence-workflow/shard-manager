@@ -7,10 +7,10 @@ package metered
 import (
 	"context"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/service/sharddistributor/store"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
 // meteredStore implements store.Store interface instrumented with metrics.

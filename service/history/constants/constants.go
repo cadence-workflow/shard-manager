@@ -22,7 +22,7 @@
 
 package constants
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 var (
 	ErrDomainNotSet            = &types.BadRequestError{Message: "Domain not set on request."}

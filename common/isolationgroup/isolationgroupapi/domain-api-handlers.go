@@ -25,7 +25,7 @@ package isolationgroupapi
 import (
 	"context"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func (z *handlerImpl) GetDomainState(ctx context.Context, request types.GetDomainIsolationGroupsRequest) (*types.GetDomainIsolationGroupsResponse, error) {

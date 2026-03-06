@@ -27,9 +27,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 const flushBufferedMetricsScopeDuration = 10 * time.Second

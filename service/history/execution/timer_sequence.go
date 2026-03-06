@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination timer_sequence_mock.go -self_package github.com/uber/cadence/service/history/execution
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination timer_sequence_mock.go -self_package github.com/cadence-workflow/shard-manager/service/history/execution
 
 package execution
 
@@ -27,9 +27,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

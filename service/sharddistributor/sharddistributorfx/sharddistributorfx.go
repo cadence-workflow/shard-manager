@@ -25,19 +25,19 @@ package sharddistributorfx
 import (
 	"go.uber.org/fx"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/rpc"
-	"github.com/uber/cadence/service/sharddistributor/config"
-	"github.com/uber/cadence/service/sharddistributor/handler"
-	"github.com/uber/cadence/service/sharddistributor/leader/election"
-	"github.com/uber/cadence/service/sharddistributor/leader/namespace"
-	"github.com/uber/cadence/service/sharddistributor/leader/process"
-	"github.com/uber/cadence/service/sharddistributor/store"
-	meteredStore "github.com/uber/cadence/service/sharddistributor/store/wrappers/metered"
-	"github.com/uber/cadence/service/sharddistributor/wrappers/grpc"
-	"github.com/uber/cadence/service/sharddistributor/wrappers/metered"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/rpc"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/handler"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/election"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/namespace"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/process"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
+	meteredStore "github.com/cadence-workflow/shard-manager/service/sharddistributor/store/wrappers/metered"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/wrappers/grpc"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/wrappers/metered"
 )
 
 var Module = fx.Module("sharddistributor",

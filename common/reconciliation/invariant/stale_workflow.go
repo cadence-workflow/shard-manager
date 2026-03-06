@@ -31,11 +31,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation/entity"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/entity"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (
@@ -231,7 +231,7 @@ func (c *staleWorkflowCheck) CheckAge(workflow *persistence.GetWorkflowExecution
 	} else if info.State == persistence.WorkflowStateZombie {
 		// TODO: what exactly is zombie?  seems like probably "current but no concrete" but I'm surprised this is in the state.
 		//
-		// https://github.com/uber/cadence/issues/1800
+		// https://github.com/cadence-workflow/shard-manager/issues/1800
 		// "The ability to create workflow with zombie status allows replication stack to backfill finished workflow execution sent by remote, while not affecting local running workflow"
 		// so these are just replication of completed workflows?  why is this a special state?
 		stale, expected, result := c.checkZombieAge(workflow, maxLifespan, domainName)
@@ -257,7 +257,7 @@ func (c *staleWorkflowCheck) CheckAge(workflow *persistence.GetWorkflowExecution
 }
 
 func (c *staleWorkflowCheck) checkRunningAge(workflow *persistence.GetWorkflowExecutionResponse, maxLifespan time.Duration, domainName string) (pastExpiration bool, expected time.Time, result CheckResult) {
-	// workflow-expiration timer is calculated in GenerateWorkflowStartTasks, mimic it here for safety: https://github.com/uber/cadence/blob/master/service/history/execution/mutable_state_task_generator.go#L140-L163
+	// workflow-expiration timer is calculated in GenerateWorkflowStartTasks, mimic it here for safety: https://github.com/cadence-workflow/shard-manager/blob/master/service/history/execution/mutable_state_task_generator.go#L140-L163
 	/*
 		// running workflows might contain critical information in their first history record, so it must be retrieved.
 		info := workflow.State.ExecutionInfo

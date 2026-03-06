@@ -16,7 +16,7 @@ GIT_REVISION=$(git log -1 --format=%cI-%h) # use commit date time and hash: e.g.
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 BUILD_DATE=$(date '+%F-%T') # outputs something in this format 2017-08-21-18:58:45
 BUILD_TS_UNIX=$(date '+%s') # second since epoch
-BASE_PACKAGE=github.com/uber/cadence/common/metrics
+BASE_PACKAGE=github.com/cadence-workflow/shard-manager/common/metrics
 if [ -z ${CADENCE_RELEASE_VERSION} ]; then
   # If not set CADENCE_RELEASE_VERSION, then use the most recent tag.
   RELEASE_VERSION=$(git describe --tags --abbrev=0 --dirty 2>/dev/null || echo unknown)

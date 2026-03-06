@@ -10,15 +10,15 @@ import (
 
 	"github.com/uber-go/tally"
 
-	"github.com/uber/cadence/client/sharddistributorexecutor"
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/sharddistributor/client/clientcommon"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient/metricsconstants"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient/syncgeneric"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributorexecutor"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/metricsconstants"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/syncgeneric"
 )
 
 var (

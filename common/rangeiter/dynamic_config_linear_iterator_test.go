@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 )
 
 func TestDynamicConfigLinearIterator_Next(t *testing.T) {

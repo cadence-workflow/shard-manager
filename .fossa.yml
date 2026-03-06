@@ -5,27 +5,27 @@ cli:
   project: git@github.com:uber/cadence.git
 analyze:
   modules:
-  - name: github.com/uber/cadence/cmd/canary
+  - name: github.com/cadence-workflow/shard-manager/cmd/canary
     type: go
-    target: github.com/uber/cadence/cmd/canary
+    target: github.com/cadence-workflow/shard-manager/cmd/canary
     path: cmd/canary
-  - name: github.com/uber/cadence/cmd/server
+  - name: github.com/cadence-workflow/shard-manager/cmd/server
     type: go
-    target: github.com/uber/cadence/cmd/server
+    target: github.com/cadence-workflow/shard-manager/cmd/server
     path: cmd/server
-  - name: github.com/uber/cadence/cmd/tools/cassandra
+  - name: github.com/cadence-workflow/shard-manager/cmd/tools/cassandra
     type: go
-    target: github.com/uber/cadence/cmd/tools/cassandra
+    target: github.com/cadence-workflow/shard-manager/cmd/tools/cassandra
     path: cmd/tools/cassandra
-  - name: github.com/uber/cadence/cmd/tools/cli
+  - name: github.com/cadence-workflow/shard-manager/cmd/tools/cli
     type: go
-    target: github.com/uber/cadence/cmd/tools/cli
+    target: github.com/cadence-workflow/shard-manager/cmd/tools/cli
     path: cmd/tools/cli
-  - name: github.com/uber/cadence/cmd/tools/copyright
+  - name: github.com/cadence-workflow/shard-manager/cmd/tools/copyright
     type: go
-    target: github.com/uber/cadence/cmd/tools/copyright
+    target: github.com/cadence-workflow/shard-manager/cmd/tools/copyright
     path: cmd/tools/copyright
-  - name: github.com/uber/cadence/cmd/tools/sql
+  - name: github.com/cadence-workflow/shard-manager/cmd/tools/sql
     type: go
-    target: github.com/uber/cadence/cmd/tools/sql
+    target: github.com/cadence-workflow/shard-manager/cmd/tools/sql
     path: cmd/tools/sql

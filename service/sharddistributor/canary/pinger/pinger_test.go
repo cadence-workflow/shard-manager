@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/common/clock"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/common/clock"
 )
 
 func TestPingerStartStop(t *testing.T) {

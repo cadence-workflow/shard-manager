@@ -42,7 +42,7 @@ func init() {
 
 const (
 	// TODO: to get rid of them:
-	//  after batch job has an API, we should use the API: https://github.com/uber/cadence/issues/2225
+	//  after batch job has an API, we should use the API: https://github.com/cadence-workflow/shard-manager/issues/2225
 	sysBatchWFTypeName        = "cadence-sys-batch-workflow"
 	systemBatcherTaskListName = "cadence-sys-batcher-tasklist"
 
@@ -54,7 +54,7 @@ const (
 type (
 	// BatchParams is from server repo
 	// TODO: to get rid of it:
-	//  after batch job has an API, we should use the API: https://github.com/uber/cadence/issues/2225
+	//  after batch job has an API, we should use the API: https://github.com/cadence-workflow/shard-manager/issues/2225
 	BatchParams struct {
 		DomainName string
 		Query      string

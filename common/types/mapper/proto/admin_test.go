@@ -28,8 +28,8 @@ import (
 	adminv1 "github.com/uber/cadence-idl/go/proto/admin/v1"
 	v1 "github.com/uber/cadence-idl/go/proto/api/v1"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/testdata"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestAdminAddSearchAttributeRequest(t *testing.T) {

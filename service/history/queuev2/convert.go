@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func FromPersistenceQueueState(state *types.QueueState) *QueueState {

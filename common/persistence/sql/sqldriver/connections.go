@@ -25,7 +25,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 type CreateSingleDBConn func(cfg *config.SQL) (*sqlx.DB, error)

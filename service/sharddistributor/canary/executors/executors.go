@@ -3,12 +3,12 @@ package executors
 import (
 	"go.uber.org/fx"
 
-	"github.com/uber/cadence/client/sharddistributor"
-	"github.com/uber/cadence/service/sharddistributor/canary/config"
-	"github.com/uber/cadence/service/sharddistributor/canary/externalshardassignment"
-	"github.com/uber/cadence/service/sharddistributor/canary/processor"
-	"github.com/uber/cadence/service/sharddistributor/canary/processorephemeral"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/externalshardassignment"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processorephemeral"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 const (

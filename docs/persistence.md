@@ -14,14 +14,14 @@ brew services start cassandra
 ```
 ### Install cadence schema
 ```
-cd $GOPATH/github.com/uber/cadence
+cd /path/to/shard-manager
 make install-schema
 ```
 > NOTE: See [CONTRIBUTING](/CONTRIBUTING.md) for prerequisite of make command.
 >
 ### Start cadence server
 ```
-cd $GOPATH/github.com/uber/cadence
+cd /path/to/shard-manager
 ./cadence-server start --services=frontend,matching,history,worker
 ```
 
@@ -33,7 +33,7 @@ brew services start mysql
 ```
 ### Install cadence schema
 ```
-cd $GOPATH/github.com/uber/cadence
+cd /path/to/shard-manager
 make install-schema-mysql
 ```
 When run tests and CLI command locally, Cadence by default uses a user `uber` with password `uber`, with privileges of creating databases.
@@ -45,7 +45,7 @@ In the mysql shell:
 ```
 ### Start cadence server
 ```
-cd $GOPATH/github.com/uber/cadence
+cd /path/to/shard-manager
 cp config/development_mysql.yaml config/development.yaml
 ./cadence-server start --services=frontend,matching,history,worker
 ```
@@ -67,13 +67,13 @@ ALTER ROLE
 ```
 ### Install cadence schema
 ```
-cd $GOPATH/github.com/uber/cadence
+cd /path/to/shard-manager
 make install-schema-postgres
 ```
 
 ### Start cadence server
 ```
-cd $GOPATH/github.com/uber/cadence
+cd /path/to/shard-manager
 cp config/development_postgres.yaml config/development.yaml
 ./cadence-server start --services=frontend,matching,history,worker
 ```

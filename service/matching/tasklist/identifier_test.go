@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 func TestValidTaskListNames(t *testing.T) {

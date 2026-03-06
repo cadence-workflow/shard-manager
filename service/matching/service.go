@@ -24,16 +24,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/dynamicconfig"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/service/matching/config"
-	"github.com/uber/cadence/service/matching/handler"
-	"github.com/uber/cadence/service/matching/wrappers/grpc"
-	"github.com/uber/cadence/service/matching/wrappers/thrift"
-	"github.com/uber/cadence/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/service/matching/config"
+	"github.com/cadence-workflow/shard-manager/service/matching/handler"
+	"github.com/cadence-workflow/shard-manager/service/matching/wrappers/grpc"
+	"github.com/cadence-workflow/shard-manager/service/matching/wrappers/thrift"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 )
 
 // Service represents the cadence-matching service

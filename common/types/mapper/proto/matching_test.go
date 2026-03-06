@@ -25,9 +25,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	matchingv1 "github.com/uber/cadence/.gen/proto/matching/v1"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/testdata"
+	matchingv1 "github.com/cadence-workflow/shard-manager/.gen/proto/matching/v1"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestMatchingAddActivityTaskRequest(t *testing.T) {

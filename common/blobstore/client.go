@@ -24,7 +24,7 @@ package blobstore
 
 import "context"
 
-//go:generate mockgen -package=$GOPACKAGE -destination=client_mock.go -self_package=github.com/uber/cadence/common/blobstore github.com/uber/cadence/common/blobstore Client
+//go:generate mockgen -package=$GOPACKAGE -destination=client_mock.go -self_package=github.com/cadence-workflow/shard-manager/common/blobstore github.com/cadence-workflow/shard-manager/common/blobstore Client
 
 type (
 	// Client defines the interface to a blobstore client.

@@ -30,10 +30,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/sql/sqldriver"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqldriver"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
 )
 
 func TestInsertIntoDomainAuditLog(t *testing.T) {

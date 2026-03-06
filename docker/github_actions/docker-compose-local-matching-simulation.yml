@@ -54,7 +54,7 @@ services:
         -run ^TestMatchingSimulation.*$
         -count 1
         -v
-        github.com/uber/cadence/simulation/matching
+        github.com/cadence-workflow/shard-manager/simulation/matching
         | tee test.log
     environment:
       - "MATCHING_LOG_EVENTS=true"

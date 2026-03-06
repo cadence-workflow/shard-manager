@@ -27,14 +27,14 @@ import (
 	"math"
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (
@@ -464,7 +464,7 @@ func (t *nosqlTaskStore) CompleteTasksLessThan(
 
 		// NOTE: MinTaskID is supported in plugin interfaces but not exposed in dataInterfaces/persistenceInterfaces
 		// We may want to add it so that we can test it.
-		// https://github.com/uber/cadence/issues/4243
+		// https://github.com/cadence-workflow/shard-manager/issues/4243
 		MinTaskID: 0,
 
 		// NOTE: request.TaskID is also inclusive, even though the name is CompleteTasksLessThan

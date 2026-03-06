@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"hash/crc32"
 
-	"github.com/uber/cadence/common/codec"
+	"github.com/cadence-workflow/shard-manager/common/codec"
 )
 
 // GenerateCRC32 generates an IEEE crc32 checksum on the

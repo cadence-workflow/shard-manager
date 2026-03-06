@@ -35,14 +35,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/definition"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin/sqlite"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/environment"
-	"github.com/uber/cadence/host/esutils"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/sqlite"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/environment"
+	"github.com/cadence-workflow/shard-manager/host/esutils"
 )
 
 const (

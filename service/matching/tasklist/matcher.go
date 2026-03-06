@@ -27,15 +27,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/ctxutils"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/matching/config"
-	"github.com/uber/cadence/service/matching/event"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/ctxutils"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/matching/config"
+	"github.com/cadence-workflow/shard-manager/service/matching/event"
 )
 
 // taskMatcherImpl matches a task producer with a task consumer

@@ -29,11 +29,11 @@ import (
 	cql "github.com/gocql/gocql"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/checksum"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/checksum"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type mockUUID struct {

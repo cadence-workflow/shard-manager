@@ -7,8 +7,8 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/fx"
 
-	"github.com/uber/cadence/service/sharddistributor/config"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdclient"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
 )
 
 type ClientParams struct {

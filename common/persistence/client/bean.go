@@ -25,13 +25,13 @@ package client
 import (
 	"sync"
 
-	"github.com/uber/cadence/common/config"
-	es "github.com/uber/cadence/common/elasticsearch"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/pinot"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	es "github.com/cadence-workflow/shard-manager/common/elasticsearch"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/pinot"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 type (

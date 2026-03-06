@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cadence/service/matching/config"
+	"github.com/cadence-workflow/shard-manager/service/matching/config"
 )
 
 type taskGC struct {

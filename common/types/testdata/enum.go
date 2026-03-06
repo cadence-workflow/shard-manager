@@ -20,7 +20,7 @@
 
 package testdata
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 var (
 	ArchivalStatus                             = types.ArchivalStatusEnabled

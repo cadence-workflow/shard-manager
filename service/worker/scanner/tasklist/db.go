@@ -24,9 +24,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber/cadence/common/backoff"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var retryForeverPolicy = newRetryForeverPolicy()

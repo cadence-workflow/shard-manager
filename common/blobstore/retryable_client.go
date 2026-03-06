@@ -25,7 +25,7 @@ package blobstore
 import (
 	"context"
 
-	"github.com/uber/cadence/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
 )
 
 type (

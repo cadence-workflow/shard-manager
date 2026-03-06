@@ -9,10 +9,10 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	yarpc "go.uber.org/yarpc"
 
-	history "github.com/uber/cadence/.gen/go/history"
-	historyserviceclient "github.com/uber/cadence/.gen/go/history/historyserviceclient"
-	replicator "github.com/uber/cadence/.gen/go/replicator"
-	shared "github.com/uber/cadence/.gen/go/shared"
+	history "github.com/cadence-workflow/shard-manager/.gen/go/history"
+	historyserviceclient "github.com/cadence-workflow/shard-manager/.gen/go/history/historyserviceclient"
+	replicator "github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 // MockClient implements a gomock-compatible mock client for service

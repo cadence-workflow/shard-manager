@@ -25,7 +25,7 @@ package kafka
 import (
 	"fmt"
 
-	"github.com/uber/cadence/common/asyncworkflow/queue/provider"
+	"github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue/provider"
 )
 
 func init() {

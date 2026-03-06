@@ -37,12 +37,12 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/checksum"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/checksum"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

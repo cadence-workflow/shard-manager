@@ -25,7 +25,7 @@ package tasklist
 import (
 	"sync"
 
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 type taskListRegistryImpl struct {

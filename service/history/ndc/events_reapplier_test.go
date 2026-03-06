@@ -31,12 +31,12 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/definition"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 type (

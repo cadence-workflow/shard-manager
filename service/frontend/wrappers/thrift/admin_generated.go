@@ -7,10 +7,10 @@ package thrift
 import (
 	"context"
 
-	"github.com/uber/cadence/.gen/go/admin"
-	"github.com/uber/cadence/.gen/go/replicator"
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common/types/mapper/thrift"
+	"github.com/cadence-workflow/shard-manager/.gen/go/admin"
+	"github.com/cadence-workflow/shard-manager/.gen/go/replicator"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/thrift"
 )
 
 func (g AdminHandler) AddSearchAttribute(ctx context.Context, Request *admin.AddSearchAttributeRequest) (err error) {

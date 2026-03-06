@@ -30,9 +30,9 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestInternalWorkflowExecutionInfo(t *testing.T) {

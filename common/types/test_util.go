@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/testing/testdatagen"
+	"github.com/cadence-workflow/shard-manager/common/testing/testdatagen"
 )
 
 type byteSizer interface{ ByteSize() uint64 }

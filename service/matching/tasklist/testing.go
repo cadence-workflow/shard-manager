@@ -32,9 +32,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/emirpasic/gods/maps/treemap"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 var _ persistence.TaskManager = (*TestTaskManager)(nil) // Asserts that interface is indeed implemented

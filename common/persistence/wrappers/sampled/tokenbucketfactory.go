@@ -25,9 +25,9 @@ package sampled
 import (
 	"sync"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/tokenbucket"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/tokenbucket"
 )
 
 type RateLimiterFactoryFunc func(timeSource clock.TimeSource, numOfPriority int, qpsConfig dynamicproperties.IntPropertyFnWithDomainFilter) RateLimiterFactory

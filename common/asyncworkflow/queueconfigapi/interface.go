@@ -25,10 +25,10 @@ package queueconfigapi
 import (
 	"context"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination handler_mock.go -self_package github.com/uber/cadence/common/asyncworkflow/queueconfigapi
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination handler_mock.go -self_package github.com/cadence-workflow/shard-manager/common/asyncworkflow/queueconfigapi
 
 type Handler interface {
 	GetConfiguraton(context.Context, *types.GetDomainAsyncWorkflowConfiguratonRequest) (*types.GetDomainAsyncWorkflowConfiguratonResponse, error)

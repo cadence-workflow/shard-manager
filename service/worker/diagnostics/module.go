@@ -32,13 +32,13 @@ import (
 	"go.uber.org/cadence/worker"
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/client"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant"
+	"github.com/cadence-workflow/shard-manager/client"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant"
 )
 
 type DiagnosticsWorkflow interface {

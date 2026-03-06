@@ -25,10 +25,10 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/uber/cadence/client/frontend
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/cadence-workflow/shard-manager/client/frontend
 //go:generate gowrap gen -g -p . -i Client -t ../templates/retry.tmpl -o ../wrappers/retryable/frontend_generated.go -v client=Frontend
 //go:generate gowrap gen -g -p . -i Client -t ../templates/metered.tmpl -o ../wrappers/metered/frontend_generated.go -v client=Frontend
 //go:generate gowrap gen -g -p . -i Client -t ../templates/errorinjectors.tmpl -o ../wrappers/errorinjectors/frontend_generated.go -v client=Frontend

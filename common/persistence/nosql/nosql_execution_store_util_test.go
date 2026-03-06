@@ -31,15 +31,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/checksum"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
-	"github.com/uber/cadence/common/persistence/serialization"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/checksum"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/serialization"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var FixedTime = time.Date(2025, 1, 6, 15, 0, 0, 0, time.UTC)

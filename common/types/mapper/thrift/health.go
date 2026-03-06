@@ -21,8 +21,8 @@
 package thrift
 
 import (
-	"github.com/uber/cadence/.gen/go/health"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/.gen/go/health"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // FromHealthStatus converts internal HealthStatus type to thrift

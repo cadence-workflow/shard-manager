@@ -26,8 +26,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // ratelimitType differentiates between the three categories of ratelimiters

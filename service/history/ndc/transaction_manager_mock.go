@@ -16,8 +16,8 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	persistence "github.com/uber/cadence/common/persistence"
-	execution "github.com/uber/cadence/service/history/execution"
+	persistence "github.com/cadence-workflow/shard-manager/common/persistence"
+	execution "github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 // MocktransactionManager is a mock of transactionManager interface.

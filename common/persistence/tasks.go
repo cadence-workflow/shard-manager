@@ -28,8 +28,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // Task is the generic interface for workflow tasks

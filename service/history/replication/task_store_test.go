@@ -28,16 +28,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	hconfig "github.com/uber/cadence/service/history/config"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	hconfig "github.com/cadence-workflow/shard-manager/service/history/config"
 )
 
 func TestTaskStore(t *testing.T) {

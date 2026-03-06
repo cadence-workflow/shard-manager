@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 	gomock "go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 func TestMergeProgressWithSamePredicate(t *testing.T) {

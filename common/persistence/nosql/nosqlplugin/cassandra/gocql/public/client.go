@@ -27,7 +27,7 @@ import (
 
 	gogocql "github.com/gocql/gocql"
 
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
 )
 
 var _ gocql.Client = client{}

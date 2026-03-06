@@ -33,8 +33,8 @@ import (
 	"go.uber.org/yarpc/api/encoding"
 	"go.uber.org/yarpc/api/transport"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

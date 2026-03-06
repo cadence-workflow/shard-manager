@@ -25,11 +25,11 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/uber/cadence/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 )
 
 /**
-longer@~/gocode/src/github.com/uber/cadence/common/log:(log)$ go test -v -bench=. | egrep "(Bench)|(ns/op)"
+longer@~/gocode/src/github.com/cadence-workflow/shard-manager/common/log:(log)$ go test -v -bench=. | egrep "(Bench)|(ns/op)"
 BenchmarkZapLoggerWithFields-8      	{"level":"info","ts":1555094254.794006,"caller":"log/logger_bench_test.go:21","msg":"msg to print log, 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890","wf-schedule-id":0,"cluster-name":"this is a very long value: 1234567890 1234567890 1234567890 1234567890","wf-domain-name":"test-domain-name"}
   200000	      8609 ns/op
 BenchmarkLoggerWithFields-8         	{"level":"info","ts":1555094256.608516,"msg":"msg to print log, 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890","wf-schedule-id":0,"cluster-name":"this is a very long value: 1234567890 1234567890 1234567890 1234567890","wf-domain-name":"test-domain-name","logging-call-at":"logger_bench_test.go:36"}

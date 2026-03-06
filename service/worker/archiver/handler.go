@@ -26,12 +26,12 @@ import (
 	"go.uber.org/cadence"
 	"go.uber.org/cadence/workflow"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
-//go:generate mockgen -package=$GOPACKAGE -destination=handler_mock.go -self_package=github.com/uber/cadence/service/worker/archiver github.com/uber/cadence/service/worker/archiver Handler
+//go:generate mockgen -package=$GOPACKAGE -destination=handler_mock.go -self_package=github.com/cadence-workflow/shard-manager/service/worker/archiver github.com/cadence-workflow/shard-manager/service/worker/archiver Handler
 
 type (
 	// Handler is used to process archival requests

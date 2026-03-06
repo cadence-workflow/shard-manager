@@ -26,17 +26,17 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/config"
-	"github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/workflow"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/config"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/workflow"
 )
 
 const (

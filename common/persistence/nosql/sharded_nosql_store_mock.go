@@ -14,8 +14,8 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	log "github.com/uber/cadence/common/log"
-	metrics "github.com/uber/cadence/common/metrics"
+	log "github.com/cadence-workflow/shard-manager/common/log"
+	metrics "github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 // MockshardedNosqlStore is a mock of shardedNosqlStore interface.

@@ -9,14 +9,14 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/api"
-	frontendcfg "github.com/uber/cadence/service/frontend/config"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/api"
+	frontendcfg "github.com/cadence-workflow/shard-manager/service/frontend/config"
 )
 
 type (

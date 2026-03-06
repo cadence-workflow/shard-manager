@@ -23,7 +23,7 @@ package queue
 import (
 	"fmt"
 
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 type processingQueueStateImpl struct {

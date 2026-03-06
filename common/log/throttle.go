@@ -24,9 +24,9 @@ import (
 	"math/rand"
 	"sync/atomic"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
 )
 
 type throttledLogger struct {

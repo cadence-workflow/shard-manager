@@ -20,7 +20,7 @@
 
 package common
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination pprof_mock.go -package common github.com/uber/cadence/common PProfInitializer
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination pprof_mock.go -package common github.com/cadence-workflow/shard-manager/common PProfInitializer
 
 type (
 	// PProfInitializer initialize the pprof based on config

@@ -40,7 +40,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 type canaryRunner struct {

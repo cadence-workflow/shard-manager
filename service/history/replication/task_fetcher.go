@@ -26,21 +26,21 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/cadence/client"
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/config"
+	"github.com/cadence-workflow/shard-manager/client"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/config"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination task_fetcher_mock.go -self_package github.com/uber/cadence/service/history/replication
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination task_fetcher_mock.go -self_package github.com/cadence-workflow/shard-manager/service/history/replication
 
 // TODO: reuse the interface and implementation defined in history/task package
 const (

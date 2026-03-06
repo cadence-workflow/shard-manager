@@ -27,11 +27,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/uber/cadence/.gen/go/history"
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/.gen/go/sqlblobs"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/codec"
+	"github.com/cadence-workflow/shard-manager/.gen/go/history"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/.gen/go/sqlblobs"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/codec"
 )
 
 func TestThriftDecodeHelper(t *testing.T) {

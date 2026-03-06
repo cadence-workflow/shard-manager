@@ -10,12 +10,12 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/service/sharddistributor/config"
-	"github.com/uber/cadence/service/sharddistributor/leader/process"
-	"github.com/uber/cadence/service/sharddistributor/store"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/process"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
 //go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination=election_mock.go Factory,Elector

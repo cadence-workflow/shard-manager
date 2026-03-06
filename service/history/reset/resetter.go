@@ -26,19 +26,19 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/activecluster"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/collection"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/definition"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
-	persistenceutils "github.com/uber/cadence/common/persistence/persistence-utils"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/activecluster"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/collection"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	persistenceutils "github.com/cadence-workflow/shard-manager/common/persistence/persistence-utils"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
 )
 
 type (
@@ -228,7 +228,7 @@ func (r *workflowResetterImpl) prepareResetWorkflow(
 
 	// TODO right now only signals are eligible for reapply, so we can directly skip the whole reapply process
 	// for the sake of performance. In the future, if there are other events that need to be reapplied, remove this check
-	// For example, we may want to re-apply activity/timer results for https://github.com/uber/cadence/issues/2934
+	// For example, we may want to re-apply activity/timer results for https://github.com/cadence-workflow/shard-manager/issues/2934
 	if !skipSignalReapply {
 		if err := r.reapplyResetAndContinueAsNewWorkflowEvents(
 			ctx,

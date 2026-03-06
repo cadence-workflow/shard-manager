@@ -26,12 +26,12 @@ import (
 
 	"github.com/IBM/sarama"
 
-	"github.com/uber/cadence/.gen/go/indexer"
-	"github.com/uber/cadence/.gen/go/sqlblobs"
-	"github.com/uber/cadence/common/codec"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/messaging"
+	"github.com/cadence-workflow/shard-manager/.gen/go/indexer"
+	"github.com/cadence-workflow/shard-manager/.gen/go/sqlblobs"
+	"github.com/cadence-workflow/shard-manager/common/codec"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
 )
 
 type (

@@ -9,12 +9,12 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/service/sharddistributor/canary/pinger"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/pinger"
 )
 
-//go:generate mockgen -package $GOPACKAGE -destination canary_client_mock_test.go github.com/uber/cadence/.gen/proto/sharddistributor/v1 ShardDistributorExecutorCanaryAPIYARPCClient
+//go:generate mockgen -package $GOPACKAGE -destination canary_client_mock_test.go github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1 ShardDistributorExecutorCanaryAPIYARPCClient
 
 const (
 	shardCreationInterval = 1 * time.Second

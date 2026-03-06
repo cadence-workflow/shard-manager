@@ -31,11 +31,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/checksum"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/constants"
-	"github.com/uber/cadence/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/common/checksum"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/constants"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 func TestDescribeMutableState_Success(t *testing.T) {

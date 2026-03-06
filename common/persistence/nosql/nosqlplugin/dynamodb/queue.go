@@ -23,8 +23,8 @@ package dynamodb
 import (
 	"context"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 // Insert message into queue, return error if failed or already exists

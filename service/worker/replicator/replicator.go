@@ -25,14 +25,14 @@ package replicator
 import (
 	"time"
 
-	"github.com/uber/cadence/client"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/domain"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/client"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/domain"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 type (

@@ -37,12 +37,12 @@ import (
 	"go.uber.org/multierr"
 	"golang.org/x/exp/maps"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas/global/shared"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas/global/shared"
 )
 
 // just simplifies newForTest usage as most tests only care about rate

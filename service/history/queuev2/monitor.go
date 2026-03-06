@@ -1,11 +1,11 @@
-//go:generate mockgen -package $GOPACKAGE -destination monitor_mock.go github.com/uber/cadence/service/history/queuev2 Monitor
+//go:generate mockgen -package $GOPACKAGE -destination monitor_mock.go github.com/cadence-workflow/shard-manager/service/history/queuev2 Monitor
 package queuev2
 
 import (
 	"sync"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 type (

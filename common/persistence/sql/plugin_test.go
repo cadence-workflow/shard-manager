@@ -27,8 +27,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
 )
 
 type fakePlugin struct{}

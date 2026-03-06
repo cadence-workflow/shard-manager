@@ -23,10 +23,10 @@ package config
 import (
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/dynamicconfig"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 // Config represents configuration for cadence-history service
@@ -248,7 +248,7 @@ type Config struct {
 
 	// Decision settings
 	// StickyTTL is to expire a sticky tasklist if no update more than this duration
-	// TODO https://github.com/uber/cadence/issues/2357
+	// TODO https://github.com/cadence-workflow/shard-manager/issues/2357
 	StickyTTL dynamicproperties.DurationPropertyFnWithDomainFilter
 	// DecisionHeartbeatTimeout is to timeout behavior of: RespondDecisionTaskComplete with ForceCreateNewDecisionTask == true without any decisions
 	// So that decision will be scheduled to another worker(by clear stickyness)

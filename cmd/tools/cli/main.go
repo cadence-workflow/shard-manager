@@ -25,13 +25,13 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/tools/cli"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/tools/cli"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 
-	_ "github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra"              // needed to load cassandra plugin
-	_ "github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql/public" // needed to load the default gocql client
-	_ "github.com/uber/cadence/common/persistence/sql/sqlplugin/mysql"                      // needed to load mysql plugin
-	_ "github.com/uber/cadence/common/persistence/sql/sqlplugin/postgres"                   // needed to load postgres plugin
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra"              // needed to load cassandra plugin
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql/public" // needed to load the default gocql client
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/mysql"                      // needed to load mysql plugin
+	_ "github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/postgres"                   // needed to load postgres plugin
 )
 
 // Start using this CLI tool with command

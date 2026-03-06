@@ -1,4 +1,4 @@
-module github.com/uber/cadence
+module github.com/cadence-workflow/shard-manager
 
 go 1.23.0
 
@@ -76,6 +76,7 @@ require (
 	github.com/ncruces/go-sqlite3 v0.22.0
 	github.com/opensearch-project/opensearch-go/v4 v4.1.0
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/uber/cadence v1.4.0
 	go.etcd.io/etcd/api/v3 v3.5.5
 	go.uber.org/mock v0.5.0
 )
@@ -86,7 +87,6 @@ require (
 	github.com/ncruces/julianday v1.0.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
-	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/tetratelabs/wazero v1.8.2 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
@@ -135,7 +135,6 @@ require (
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-runewidth v0.0.7 // indirect
-	github.com/mattn/go-sqlite3 v1.11.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

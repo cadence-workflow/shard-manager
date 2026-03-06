@@ -26,7 +26,7 @@ import (
 
 	gogo "github.com/gogo/protobuf/types"
 
-	"github.com/uber/cadence/common"
+	"github.com/cadence-workflow/shard-manager/common"
 )
 
 func fromDoubleValue(v *float64) *gogo.DoubleValue {

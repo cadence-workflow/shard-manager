@@ -3,10 +3,10 @@ package sharddistributorclient
 import (
 	"go.uber.org/fx"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/client/sharddistributor"
-	"github.com/uber/cadence/client/wrappers/grpc"
-	timeoutwrapper "github.com/uber/cadence/client/wrappers/timeout"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/grpc"
+	timeoutwrapper "github.com/cadence-workflow/shard-manager/client/wrappers/timeout"
 )
 
 // Params contains the dependencies needed to create a shard distributor client

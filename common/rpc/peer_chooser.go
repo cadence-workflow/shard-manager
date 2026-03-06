@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination peer_chooser_mock.go -self_package github.com/uber/cadence/common/rpc
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination peer_chooser_mock.go -self_package github.com/cadence-workflow/shard-manager/common/rpc
 
 package rpc
 
@@ -30,10 +30,10 @@ import (
 	"go.uber.org/yarpc/api/transport"
 	"go.uber.org/yarpc/peer/roundrobin"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/membership"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 const defaultDNSRefreshInterval = time.Second * 10

@@ -37,8 +37,8 @@ import (
 	osapi "github.com/opensearch-project/opensearch-go/v4/opensearchapi"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 )
 
 type MockTransport struct{}

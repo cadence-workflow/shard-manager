@@ -31,15 +31,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/client"
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/diagnostics/analytics"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant/failure"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant/retry"
+	"github.com/cadence-workflow/shard-manager/client"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/analytics"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant/failure"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant/retry"
 )
 
 const (

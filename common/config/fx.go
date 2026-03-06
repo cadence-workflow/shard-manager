@@ -28,7 +28,7 @@ import (
 
 	"go.uber.org/fx"
 
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 // Module returns a config.Provider that could be used byother components.

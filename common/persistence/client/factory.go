@@ -26,28 +26,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/codec"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/constants"
-	es "github.com/uber/cadence/common/elasticsearch"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/metrics"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/elasticsearch"
-	"github.com/uber/cadence/common/persistence/nosql"
-	pinotVisibility "github.com/uber/cadence/common/persistence/pinot"
-	"github.com/uber/cadence/common/persistence/serialization"
-	"github.com/uber/cadence/common/persistence/sql"
-	"github.com/uber/cadence/common/persistence/wrappers/errorinjectors"
-	"github.com/uber/cadence/common/persistence/wrappers/metered"
-	"github.com/uber/cadence/common/persistence/wrappers/ratelimited"
-	"github.com/uber/cadence/common/persistence/wrappers/sampled"
-	pnt "github.com/uber/cadence/common/pinot"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/codec"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	es "github.com/cadence-workflow/shard-manager/common/elasticsearch"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/elasticsearch"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql"
+	pinotVisibility "github.com/cadence-workflow/shard-manager/common/persistence/pinot"
+	"github.com/cadence-workflow/shard-manager/common/persistence/serialization"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql"
+	"github.com/cadence-workflow/shard-manager/common/persistence/wrappers/errorinjectors"
+	"github.com/cadence-workflow/shard-manager/common/persistence/wrappers/metered"
+	"github.com/cadence-workflow/shard-manager/common/persistence/wrappers/ratelimited"
+	"github.com/cadence-workflow/shard-manager/common/persistence/wrappers/sampled"
+	pnt "github.com/cadence-workflow/shard-manager/common/pinot"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 type (
@@ -95,7 +95,7 @@ type (
 		NewExecutionStore(shardID int) (p.ExecutionStore, error)
 		// NewVisibilityStore returns a new visibility store,
 		// TODO We temporarily using sortByCloseTime to determine whether or not ListClosedWorkflowExecutions should
-		// be ordering by CloseTime. This will be removed when implementing https://github.com/uber/cadence/issues/3621
+		// be ordering by CloseTime. This will be removed when implementing https://github.com/cadence-workflow/shard-manager/issues/3621
 		NewVisibilityStore(sortByCloseTime bool) (p.VisibilityStore, error)
 		NewQueue(queueType p.QueueType) (p.QueueStore, error)
 		// NewConfigStore returns a new config store

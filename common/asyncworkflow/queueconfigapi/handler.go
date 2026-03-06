@@ -25,9 +25,9 @@ package queueconfigapi
 import (
 	"context"
 
-	"github.com/uber/cadence/common/domain"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/domain"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type handlerImpl struct {

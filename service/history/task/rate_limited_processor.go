@@ -26,7 +26,7 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/uber/cadence/common"
+	"github.com/cadence-workflow/shard-manager/common"
 )
 
 type rateLimitedProcessor struct {

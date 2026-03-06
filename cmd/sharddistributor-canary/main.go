@@ -14,17 +14,17 @@ import (
 	"go.uber.org/yarpc/transport/grpc"
 	"go.uber.org/zap"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/service/sharddistributor/canary"
-	canaryConfig "github.com/uber/cadence/service/sharddistributor/canary/config"
-	"github.com/uber/cadence/service/sharddistributor/canary/executors"
-	"github.com/uber/cadence/service/sharddistributor/client/clientcommon"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
-	"github.com/uber/cadence/service/sharddistributor/client/spectatorclient"
-	"github.com/uber/cadence/service/sharddistributor/config"
-	"github.com/uber/cadence/tools/common/commoncli"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary"
+	canaryConfig "github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/executors"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 const (

@@ -28,8 +28,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/uber-go/tally"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 func TestAddMessage(t *testing.T) {

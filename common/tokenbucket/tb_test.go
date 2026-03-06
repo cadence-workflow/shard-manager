@@ -26,8 +26,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 )
 
 func TestRpsEnforced(t *testing.T) {

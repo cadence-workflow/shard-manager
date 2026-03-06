@@ -1,10 +1,10 @@
 package workflows
 
 import (
-	"github.com/uber/cadence/simulation/replication/workflows/activityloop"
-	"github.com/uber/cadence/simulation/replication/workflows/childactivityloop"
-	"github.com/uber/cadence/simulation/replication/workflows/query"
-	"github.com/uber/cadence/simulation/replication/workflows/timeractivityloop"
+	"github.com/cadence-workflow/shard-manager/simulation/replication/workflows/activityloop"
+	"github.com/cadence-workflow/shard-manager/simulation/replication/workflows/childactivityloop"
+	"github.com/cadence-workflow/shard-manager/simulation/replication/workflows/query"
+	"github.com/cadence-workflow/shard-manager/simulation/replication/workflows/timeractivityloop"
 )
 
 // Add workflows and activities to this map to register them with the worker.

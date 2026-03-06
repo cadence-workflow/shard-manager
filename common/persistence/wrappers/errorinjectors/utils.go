@@ -28,10 +28,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uber/cadence/common/errors"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/errors"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // _randomStubFunc is a stub randomized function that could be overriden in tests.

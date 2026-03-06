@@ -24,9 +24,9 @@ package engineimpl
 import (
 	"context"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/workflow"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/workflow"
 )
 
 // RemoveSignalMutableState remove the signal request id in signal_requested for deduplicate

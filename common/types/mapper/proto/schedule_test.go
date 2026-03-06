@@ -27,9 +27,9 @@ import (
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/testutils"
-	"github.com/uber/cadence/common/types/testdata"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/testutils"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestScheduleSpec(t *testing.T) {

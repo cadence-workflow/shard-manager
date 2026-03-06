@@ -28,17 +28,17 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"github.com/uber/cadence/common/activecluster"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/reset"
-	"github.com/uber/cadence/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/common/activecluster"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/reset"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
 )
 
 // NOTE: terminology
@@ -327,7 +327,7 @@ func (r *transactionManagerImpl) backfillWorkflowEventsReapply(
 		resetRunID := uuid.New()
 		baseRebuildLastEventID := baseMutableState.GetPreviousStartedEventID()
 
-		// TODO when https://github.com/uber/cadence/issues/2420 is finished, remove this block,
+		// TODO when https://github.com/cadence-workflow/shard-manager/issues/2420 is finished, remove this block,
 		//  since cannot reapply event to a finished workflow which had no decisions started
 		if baseRebuildLastEventID == constants.EmptyEventID {
 			r.logger.Warn("cannot reapply event to a finished workflow",

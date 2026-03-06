@@ -8,7 +8,7 @@ along with all its dependencies (cassandra, prometheus, grafana). Exposes cadenc
 frontend on ports 7933 (tchannel) / 7833 (grpc), web on port 8088, and grafana on port 3000.
 
 ```
-cd $GOPATH/src/github.com/uber/cadence/docker
+cd /path/to/shard-manager/docker
 docker compose up
 ```
 > Note: Above command will run with `master-auto-setup` image, which is a changing image all the time.
@@ -83,7 +83,7 @@ Replace **YOUR_TAG** and **YOUR_CHECKOUT_BRANCH_OR_TAG** in the below command to
 You can checkout a [release tag](https://github.com/cadence-workflow/cadence/tags) (e.g. v0.21.3) or any branch you are interested.
 
 ```
-cd $GOPATH/src/github.com/uber/cadence
+cd /path/to/shard-manager
 git checkout YOUR_CHECKOUT_BRANCH_OR_TAG
 docker build . -t ubercadence/<imageName>:YOUR_TAG
 ```
@@ -96,7 +96,7 @@ There are three targets supported:
 
 For example of auto-setup images:
 ```
-cd $GOPATH/src/github.com/uber/cadence
+cd /path/to/shard-manager
 git checkout YOUR_CHECKOUT_BRANCH
 docker build . -t ubercadence/server:YOUR_TAG-auto-setup --build-arg TARGET=auto-setup
 ```

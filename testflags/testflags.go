@@ -31,7 +31,7 @@ import (
 // Pass these testflags in as environment variables in order to run tests marked as needing an
 // external dependency.
 // Tests can be marked as having an external dependency by calling the Require* functions below.
-// In order to start external dependencies, see documentation at https://github.com/uber/cadence
+// In order to start external dependencies, see documentation at https://github.com/cadence-workflow/shard-manager
 
 var (
 	cassandra = "CASSANDRA"

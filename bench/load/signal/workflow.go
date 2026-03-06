@@ -37,9 +37,9 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/bench/lib"
-	"github.com/uber/cadence/bench/load/common"
-	c "github.com/uber/cadence/common"
+	"github.com/cadence-workflow/shard-manager/bench/lib"
+	"github.com/cadence-workflow/shard-manager/bench/load/common"
+	c "github.com/cadence-workflow/shard-manager/common"
 )
 
 const (

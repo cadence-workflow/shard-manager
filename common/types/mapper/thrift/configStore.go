@@ -21,8 +21,8 @@
 package thrift
 
 import (
-	"github.com/uber/cadence/.gen/go/config"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/.gen/go/config"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // FromDynamicConfigBlob converts internal DynamicConfigBlob type to thrift

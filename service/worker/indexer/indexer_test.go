@@ -31,17 +31,17 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/.gen/go/indexer"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/definition"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/elasticsearch/bulk"
-	mocks2 "github.com/uber/cadence/common/elasticsearch/bulk/mocks"
-	esMocks "github.com/uber/cadence/common/elasticsearch/mocks"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/messaging"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/.gen/go/indexer"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/bulk"
+	mocks2 "github.com/cadence-workflow/shard-manager/common/elasticsearch/bulk/mocks"
+	esMocks "github.com/cadence-workflow/shard-manager/common/elasticsearch/mocks"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/messaging"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 func TestNewDualIndexer(t *testing.T) {

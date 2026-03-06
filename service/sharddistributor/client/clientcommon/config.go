@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uber/cadence/common/types"
-	sdconfig "github.com/uber/cadence/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	sdconfig "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 )
 
 // NamespaceConfig represents configuration for a single namespace

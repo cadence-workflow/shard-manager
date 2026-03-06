@@ -10,8 +10,8 @@ import (
 	adminv1 "github.com/uber/cadence-idl/go/proto/admin/v1"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/proto"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/proto"
 )
 
 func (g adminClient) AddSearchAttribute(ctx context.Context, ap1 *types.AddSearchAttributeRequest, p1 ...yarpc.CallOption) (err error) {

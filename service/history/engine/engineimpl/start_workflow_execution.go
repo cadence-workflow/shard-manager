@@ -29,16 +29,16 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/activecluster"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/events"
-	"github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/workflow"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/activecluster"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/events"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/workflow"
 )
 
 var errClusterAttributeNotFound = &types.BadRequestError{Message: "Cannot start workflow with a cluster attribute that is not found in the domain's metadata."}

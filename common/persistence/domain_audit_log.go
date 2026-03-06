@@ -3,8 +3,8 @@ package persistence
 import (
 	"sort"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // ToFailoverEvent maps a DomainAuditLog to a FailoverEvent

@@ -31,13 +31,13 @@ import (
 	"go.uber.org/cadence/workflow"
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (
@@ -225,7 +225,7 @@ func BatchActivity(ctx context.Context, batchParams BatchParams) (HeartBeatDetai
 	}
 
 	for {
-		// TODO https://github.com/uber/cadence/issues/2154
+		// TODO https://github.com/cadence-workflow/shard-manager/issues/2154
 		//  Need to improve scan concurrency because it will hold an ES resource until the workflow finishes.
 		//  And we can't use list API because terminate / reset will mutate the result.
 		resp, err := client.ScanWorkflowExecutions(ctx, &types.ListWorkflowExecutionsRequest{
@@ -439,7 +439,7 @@ func processTask(
 			return err
 		}
 
-		// TODO https://github.com/uber/cadence/issues/2159
+		// TODO https://github.com/cadence-workflow/shard-manager/issues/2159
 		// By default should use ChildPolicy, but it is totally broken in Cadence, we need to fix it before using
 		if applyOnChild != nil && *applyOnChild && len(resp.PendingChildren) > 0 {
 			getActivityLogger(ctx).Info("Found more child workflows to process", tag.Number(int64(len(resp.PendingChildren))))

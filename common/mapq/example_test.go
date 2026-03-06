@@ -28,10 +28,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/mapq/types"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/mapq/types"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 func TestExample(t *testing.T) {

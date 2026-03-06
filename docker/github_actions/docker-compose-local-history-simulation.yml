@@ -53,7 +53,7 @@ services:
         -run ^TestHistorySimulation.*$
         -count 1
         -v
-        github.com/uber/cadence/simulation/history
+        github.com/cadence-workflow/shard-manager/simulation/history
         | tee test.log
     environment:
       - "HISTORY_LOG_EVENTS=true"

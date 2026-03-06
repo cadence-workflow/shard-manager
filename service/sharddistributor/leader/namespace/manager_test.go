@@ -12,9 +12,9 @@ import (
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/service/sharddistributor/config"
-	"github.com/uber/cadence/service/sharddistributor/leader/election"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/election"
 )
 
 // mockElectorRun returns a DoAndReturn function that simulates an elector:

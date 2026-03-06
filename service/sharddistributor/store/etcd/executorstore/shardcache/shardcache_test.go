@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/testhelper"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/testhelper"
 )
 
 func TestNewShardToExecutorCache(t *testing.T) {

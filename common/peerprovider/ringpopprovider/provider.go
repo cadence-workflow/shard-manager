@@ -36,11 +36,11 @@ import (
 	tcg "github.com/uber/tchannel-go"
 	"go.uber.org/yarpc/transport/tchannel"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/membership"
-	ringpopproviderconfig "github.com/uber/cadence/common/peerprovider/ringpopprovider/config"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	ringpopproviderconfig "github.com/cadence-workflow/shard-manager/common/peerprovider/ringpopprovider/config"
 )
 
 type (

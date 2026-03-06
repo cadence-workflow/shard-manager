@@ -23,18 +23,18 @@ package replication
 import (
 	"context"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/ndc"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/engine"
-	"github.com/uber/cadence/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/ndc"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/engine"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination task_executor_mock.go -self_package github.com/uber/cadence/service/history/replication
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination task_executor_mock.go -self_package github.com/cadence-workflow/shard-manager/service/history/replication
 
 type (
 	// TaskExecutor is the executor for replication task

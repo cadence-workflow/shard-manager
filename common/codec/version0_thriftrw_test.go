@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/multierr"
 
-	workflow "github.com/uber/cadence/.gen/go/shared"
+	workflow "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 type (

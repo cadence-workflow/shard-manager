@@ -9,8 +9,8 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	yarpc "go.uber.org/yarpc"
 
-	health "github.com/uber/cadence/.gen/go/health"
-	metaclient "github.com/uber/cadence/.gen/go/health/metaclient"
+	health "github.com/cadence-workflow/shard-manager/.gen/go/health"
+	metaclient "github.com/cadence-workflow/shard-manager/.gen/go/health/metaclient"
 )
 
 // MockClient implements a gomock-compatible mock client for service

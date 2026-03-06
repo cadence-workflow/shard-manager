@@ -30,10 +30,10 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/batcher"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/batcher"
 )
 
 func TestStartBatchJob(t *testing.T) {

@@ -3,7 +3,7 @@ package tasklist
 import (
 	"time"
 
-	"github.com/uber/cadence/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/clock"
 )
 
 // ShardProcessorFactory is a generic factory for creating ShardProcessor instances.

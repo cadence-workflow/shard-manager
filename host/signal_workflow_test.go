@@ -33,12 +33,12 @@ import (
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/client"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/engine/engineimpl"
-	"github.com/uber/cadence/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/client"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/engine/engineimpl"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
 )
 
 func (s *IntegrationSuite) TestSignalWorkflow() {

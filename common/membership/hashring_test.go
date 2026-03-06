@@ -37,11 +37,11 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyz")

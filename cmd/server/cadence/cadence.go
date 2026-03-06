@@ -34,9 +34,9 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
 
-	"github.com/uber/cadence/common/client"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common/client"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/service"
 
 	_ "go.uber.org/automaxprocs" // defines automaxpocs for dockerized usage.
 )

@@ -20,7 +20,7 @@
 // THE SOFTWARE.
 
 // Generate rate limiter wrappers.
-//go:generate mockgen -package $GOPACKAGE -destination data_manager_interfaces_mock.go github.com/uber/cadence/common/persistence Task,ShardManager,ExecutionManager,ExecutionManagerFactory,TaskManager,HistoryManager,DomainManager,DomainAuditManager,QueueManager,ConfigStoreManager
+//go:generate mockgen -package $GOPACKAGE -destination data_manager_interfaces_mock.go github.com/cadence-workflow/shard-manager/common/persistence Task,ShardManager,ExecutionManager,ExecutionManagerFactory,TaskManager,HistoryManager,DomainManager,DomainAuditManager,QueueManager,ConfigStoreManager
 //go:generate gowrap gen -g -p . -i ConfigStoreManager -t ./wrappers/templates/ratelimited.tmpl -o wrappers/ratelimited/configstore_generated.go
 //go:generate gowrap gen -g -p . -i DomainManager -t ./wrappers/templates/ratelimited.tmpl -o wrappers/ratelimited/domain_generated.go
 //go:generate gowrap gen -g -p . -i HistoryManager -t ./wrappers/templates/ratelimited.tmpl -o wrappers/ratelimited/history_generated.go
@@ -60,11 +60,11 @@ import (
 
 	"github.com/pborman/uuid"
 
-	workflow "github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common/checksum"
-	"github.com/uber/cadence/common/codec"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/types"
+	workflow "github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common/checksum"
+	"github.com/cadence-workflow/shard-manager/common/codec"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const DBTimestampMinPrecision = time.Millisecond

@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-go/tally"
 
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 type domainMetricsCacheSuite struct {

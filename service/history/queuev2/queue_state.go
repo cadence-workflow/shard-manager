@@ -22,7 +22,7 @@
 
 package queuev2
 
-import "github.com/uber/cadence/common/persistence"
+import "github.com/cadence-workflow/shard-manager/common/persistence"
 
 type QueueState struct {
 	VirtualQueueStates    map[int64][]VirtualSliceState

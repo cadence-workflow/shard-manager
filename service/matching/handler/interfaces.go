@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go -package handler github.com/uber/cadence/service/matching/handler Handler
-//go:generate gowrap gen -g -p . -i Handler -t ../../templates/grpc.tmpl -o ../wrappers/grpc/grpc_handler_generated.go -v handler=GRPC -v package=matchingv1 -v path=github.com/uber/cadence/.gen/proto/matching/v1 -v prefix=Matching
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go -package handler github.com/cadence-workflow/shard-manager/service/matching/handler Handler
+//go:generate gowrap gen -g -p . -i Handler -t ../../templates/grpc.tmpl -o ../wrappers/grpc/grpc_handler_generated.go -v handler=GRPC -v package=matchingv1 -v path=github.com/cadence-workflow/shard-manager/.gen/proto/matching/v1 -v prefix=Matching
 //go:generate gowrap gen -g -p ../../../.gen/go/matching/matchingserviceserver -i Interface -t ../../templates/thrift.tmpl -o ../wrappers/thrift/thrift_handler_generated.go -v handler=Thrift -v prefix=Matching
 
 package handler
@@ -27,8 +27,8 @@ package handler
 import (
 	"context"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

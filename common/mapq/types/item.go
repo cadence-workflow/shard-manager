@@ -22,7 +22,7 @@
 
 package types
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination item_mock.go -package types github.com/uber/cadence/common/mapq/types Item
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination item_mock.go -package types github.com/cadence-workflow/shard-manager/common/mapq/types Item
 
 import "fmt"
 

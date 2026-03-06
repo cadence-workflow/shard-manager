@@ -20,14 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination mocks.go -self_package github.com/uber/cadence/common/reconciliation/store
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination mocks.go -self_package github.com/cadence-workflow/shard-manager/common/reconciliation/store
 
 package store
 
 import (
 	"time"
 
-	"github.com/uber/cadence/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
 )
 
 const (

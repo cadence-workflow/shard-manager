@@ -31,7 +31,7 @@ import (
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 
-	"github.com/uber/cadence/common/archiver"
+	"github.com/cadence-workflow/shard-manager/common/archiver"
 )
 
 var (
@@ -54,8 +54,8 @@ type (
 		Exist(ctx context.Context, URI archiver.URI, fileName string) (bool, error)
 	}
 
-	// Config structure used to parse from the storage-provider yaml nodes in [github.com/uber/cadence/common/config.HistoryArchiverProvider]
-	// and [github.com/uber/cadence/common/config.VisibilityArchiverProvider] and
+	// Config structure used to parse from the storage-provider yaml nodes in [github.com/cadence-workflow/shard-manager/common/config.HistoryArchiverProvider]
+	// and [github.com/cadence-workflow/shard-manager/common/config.VisibilityArchiverProvider] and
 	Config struct {
 		CredentialsPath string `yaml:"credentialsPath"`
 	}

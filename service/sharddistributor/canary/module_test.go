@@ -16,11 +16,11 @@ import (
 	"go.uber.org/yarpc/yarpctest"
 	"go.uber.org/zap/zaptest"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/service/sharddistributor/client/clientcommon"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 func TestModule(t *testing.T) {

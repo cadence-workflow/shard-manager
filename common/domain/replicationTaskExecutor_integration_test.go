@@ -29,13 +29,13 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/persistence"
-	persistencetests "github.com/uber/cadence/common/persistence/persistence-tests"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin/sqlite"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	persistencetests "github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin/sqlite"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

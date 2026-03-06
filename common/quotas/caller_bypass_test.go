@@ -26,8 +26,8 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestCallerBypass_AllowLimiter(t *testing.T) {

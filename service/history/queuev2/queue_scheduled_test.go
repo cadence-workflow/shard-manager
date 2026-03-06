@@ -10,17 +10,17 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	hcommon "github.com/uber/cadence/service/history/common"
-	"github.com/uber/cadence/service/history/shard"
-	"github.com/uber/cadence/service/history/task"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	hcommon "github.com/cadence-workflow/shard-manager/service/history/common"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/service/history/task"
 )
 
 func TestScheduledQueue_LifeCycle(t *testing.T) {

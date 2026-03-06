@@ -26,8 +26,8 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 
 	// DO NOT REMOVE THE LINE BELOW
 	_ "net/http/pprof"

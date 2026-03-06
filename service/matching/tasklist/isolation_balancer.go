@@ -28,10 +28,10 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/matching/config"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/matching/config"
 )
 
 type (

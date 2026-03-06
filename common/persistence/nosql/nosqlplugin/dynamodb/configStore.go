@@ -24,7 +24,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 func (db *ddb) InsertConfig(ctx context.Context, row *persistence.InternalConfigStoreEntry) error {

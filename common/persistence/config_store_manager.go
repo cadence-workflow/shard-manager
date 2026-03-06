@@ -23,9 +23,9 @@ package persistence
 import (
 	"context"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/log"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 type (

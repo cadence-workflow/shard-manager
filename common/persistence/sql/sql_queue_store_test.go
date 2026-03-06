@@ -33,8 +33,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
 )
 
 var fixedTime = time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)

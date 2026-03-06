@@ -23,9 +23,9 @@ package testdata
 import (
 	"github.com/pborman/uuid"
 
-	"github.com/uber/cadence/.gen/go/history"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/.gen/go/history"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var (

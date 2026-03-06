@@ -231,7 +231,7 @@ services:
         -run ^TestReplicationSimulation.*$
         -count 1
         -v
-        github.com/uber/cadence/simulation/replication
+        github.com/cadence-workflow/shard-manager/simulation/replication
         | tee test.log
     depends_on:
       cadence-cluster0:

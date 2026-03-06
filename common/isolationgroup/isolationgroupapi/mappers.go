@@ -26,7 +26,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func MapDynamicConfigResponse(in []interface{}) (out types.IsolationGroupConfiguration, err error) {

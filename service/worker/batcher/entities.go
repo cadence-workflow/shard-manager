@@ -25,13 +25,13 @@ package batcher
 import (
 	"time"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // TerminateParams is the parameters for terminating workflow
 type TerminateParams struct {
 	// this indicates whether to terminate children workflow. Default to true.
-	// TODO https://github.com/uber/cadence/issues/2159
+	// TODO https://github.com/cadence-workflow/shard-manager/issues/2159
 	// Ideally default should be childPolicy of the workflow. But it's currently totally broken.
 	TerminateChildren *bool
 }
@@ -39,7 +39,7 @@ type TerminateParams struct {
 // CancelParams is the parameters for canceling workflow
 type CancelParams struct {
 	// this indicates whether to cancel children workflow. Default to true.
-	// TODO https://github.com/uber/cadence/issues/2159
+	// TODO https://github.com/cadence-workflow/shard-manager/issues/2159
 	// Ideally default should be childPolicy of the workflow. But it's currently totally broken.
 	CancelChildren *bool
 }
@@ -77,7 +77,7 @@ type BatchParams struct {
 	// ReplicateParams is params only for BatchTypeReplicate
 	ReplicateParams ReplicateParams
 	// RPS of processing. Default to DefaultRPS
-	// TODO we will implement smarter way than this static rate limiter: https://github.com/uber/cadence/issues/2138
+	// TODO we will implement smarter way than this static rate limiter: https://github.com/cadence-workflow/shard-manager/issues/2138
 	RPS int
 	// Number of goroutines running in parallel to process
 	Concurrency int

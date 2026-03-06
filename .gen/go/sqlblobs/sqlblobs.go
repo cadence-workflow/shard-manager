@@ -18,7 +18,7 @@ import (
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
 
-	shared "github.com/uber/cadence/.gen/go/shared"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 type ActivityInfo struct {
@@ -18953,7 +18953,7 @@ func (v *WorkflowExecutionInfo) IsSetActiveClusterSelectionPolicyEncoding() bool
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "sqlblobs",
-	Package:  "github.com/uber/cadence/.gen/go/sqlblobs",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/sqlblobs",
 	FilePath: "sqlblobs.thrift",
 	SHA1:     "e0acaaba51b1c9d67169d1d432a3375a7f4678f0",
 	Includes: []*thriftreflect.ThriftModule{

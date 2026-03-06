@@ -31,9 +31,9 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestNewClient(t *testing.T) {

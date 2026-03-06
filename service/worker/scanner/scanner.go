@@ -33,15 +33,15 @@ import (
 	"go.uber.org/cadence/worker"
 	"go.uber.org/zap"
 
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/service/worker/scanner/shardscanner"
-	"github.com/uber/cadence/service/worker/scanner/tasklist"
-	"github.com/uber/cadence/service/worker/workercommon"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/shardscanner"
+	"github.com/cadence-workflow/shard-manager/service/worker/scanner/tasklist"
+	"github.com/cadence-workflow/shard-manager/service/worker/workercommon"
 )
 
 const (

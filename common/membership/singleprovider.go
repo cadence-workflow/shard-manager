@@ -22,7 +22,7 @@
 
 package membership
 
-import "github.com/uber/cadence/common"
+import "github.com/cadence-workflow/shard-manager/common"
 
 //go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination=singleprovider_mock.go SingleProvider
 

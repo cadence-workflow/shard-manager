@@ -31,12 +31,12 @@ import (
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/membership"
-	ringpopproviderconfig "github.com/uber/cadence/common/peerprovider/ringpopprovider/config"
-	"github.com/uber/cadence/common/rpc"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/membership"
+	ringpopproviderconfig "github.com/cadence-workflow/shard-manager/common/peerprovider/ringpopprovider/config"
+	"github.com/cadence-workflow/shard-manager/common/rpc"
 )
 
 func TestFxApp(t *testing.T) {

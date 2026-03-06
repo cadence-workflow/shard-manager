@@ -30,9 +30,9 @@ import (
 	uconfig "go.uber.org/config"
 	"gopkg.in/validator.v2"
 
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/service"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 func TestToString(t *testing.T) {

@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination factory_mock.go -self_package github.com/uber/cadence/tools/cli
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination factory_mock.go -self_package github.com/cadence-workflow/shard-manager/tools/cli
 
 package cli
 
@@ -43,17 +43,17 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/credentials"
 
-	serverAdmin "github.com/uber/cadence/.gen/go/admin/adminserviceclient"
-	serverFrontend "github.com/uber/cadence/.gen/go/cadence/workflowserviceclient"
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/client/frontend"
-	grpcClient "github.com/uber/cadence/client/wrappers/grpc"
-	"github.com/uber/cadence/client/wrappers/thrift"
-	"github.com/uber/cadence/common"
-	cc "github.com/uber/cadence/common/client"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/tools/common/commoncli"
+	serverAdmin "github.com/cadence-workflow/shard-manager/.gen/go/admin/adminserviceclient"
+	serverFrontend "github.com/cadence-workflow/shard-manager/.gen/go/cadence/workflowserviceclient"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	grpcClient "github.com/cadence-workflow/shard-manager/client/wrappers/grpc"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/thrift"
+	"github.com/cadence-workflow/shard-manager/common"
+	cc "github.com/cadence-workflow/shard-manager/common/client"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 const (

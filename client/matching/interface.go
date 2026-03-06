@@ -25,14 +25,14 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -package matching github.com/uber/cadence/client/matching Client
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -package matching github.com/cadence-workflow/shard-manager/client/matching Client
 //go:generate gowrap gen -g -p . -i Client -t ../templates/retry.tmpl -o ../wrappers/retryable/matching_generated.go -v client=Matching
 //go:generate gowrap gen -g -p . -i Client -t ../templates/metered.tmpl -o ../wrappers/metered/matching_generated.go -v client=Matching
 //go:generate gowrap gen -g -p . -i Client -t ../templates/errorinjectors.tmpl -o ../wrappers/errorinjectors/matching_generated.go -v client=Matching
-//go:generate gowrap gen -g -p . -i Client -t ../templates/grpc.tmpl -o ../wrappers/grpc/matching_generated.go -v client=Matching -v package=matchingv1 -v path=github.com/uber/cadence/.gen/proto/matching/v1 -v prefix=Matching
+//go:generate gowrap gen -g -p . -i Client -t ../templates/grpc.tmpl -o ../wrappers/grpc/matching_generated.go -v client=Matching -v package=matchingv1 -v path=github.com/cadence-workflow/shard-manager/.gen/proto/matching/v1 -v prefix=Matching
 //go:generate gowrap gen -g -p . -i Client -t ../templates/thrift.tmpl -o ../wrappers/thrift/matching_generated.go -v client=Matching -v prefix=Matching
 //go:generate gowrap gen -g -p . -i Client -t ../templates/timeout.tmpl -o ../wrappers/timeout/matching_generated.go -v client=Matching
 

@@ -8,8 +8,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // injectorDomainManager implements persistence.DomainManager interface instrumented with error injection.

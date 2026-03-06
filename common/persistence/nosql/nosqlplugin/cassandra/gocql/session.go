@@ -28,7 +28,7 @@ import (
 
 	"github.com/gocql/gocql"
 
-	"github.com/uber/cadence/common"
+	"github.com/cadence-workflow/shard-manager/common"
 )
 
 var _ Session = (*session)(nil)

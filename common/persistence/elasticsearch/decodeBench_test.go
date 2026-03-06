@@ -26,12 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/definition"
-	es "github.com/uber/cadence/common/elasticsearch"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types/mapper/thrift"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	es "github.com/cadence-workflow/shard-manager/common/elasticsearch"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/thrift"
 )
 
 var (

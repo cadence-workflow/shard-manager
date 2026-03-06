@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 )
 
 // workflowIDCountMetric holds the count of requests for a given second, for a domain/workflowID pair

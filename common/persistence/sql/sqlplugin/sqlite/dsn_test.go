@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 func Test_buildDSN(t *testing.T) {

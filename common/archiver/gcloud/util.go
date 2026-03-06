@@ -31,10 +31,10 @@ import (
 
 	"github.com/dgryski/go-farm"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/archiver"
-	"github.com/uber/cadence/common/archiver/gcloud/connector"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/archiver"
+	"github.com/cadence-workflow/shard-manager/common/archiver/gcloud/connector"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func encode(v interface{}) ([]byte, error) {

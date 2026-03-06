@@ -28,9 +28,9 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/service/matching/event"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/service/matching/event"
 )
 
 type (

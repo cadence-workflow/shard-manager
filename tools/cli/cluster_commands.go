@@ -26,7 +26,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 type (

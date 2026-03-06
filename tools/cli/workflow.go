@@ -26,7 +26,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/service/worker/batcher"
+	"github.com/cadence-workflow/shard-manager/service/worker/batcher"
 )
 
 func newWorkflowCommands() []*cli.Command {
@@ -302,7 +302,7 @@ func newWorkflowCommands() []*cli.Command {
 				},
 				&cli.BoolFlag{
 					Name: FlagSkipBaseIsNotCurrent,
-					// TODO https://github.com/uber/cadence/issues/2930
+					// TODO https://github.com/cadence-workflow/shard-manager/issues/2930
 					// The right way to prevent needs server side implementation .
 					// This client side is only best effort
 					Usage: "Skip if base run is not current run.",

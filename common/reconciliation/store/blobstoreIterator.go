@@ -27,9 +27,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/uber/cadence/common/blobstore"
-	"github.com/uber/cadence/common/pagination"
-	"github.com/uber/cadence/common/reconciliation/entity"
+	"github.com/cadence-workflow/shard-manager/common/blobstore"
+	"github.com/cadence-workflow/shard-manager/common/pagination"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/entity"
 )
 
 type (

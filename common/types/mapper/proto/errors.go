@@ -25,11 +25,11 @@ import (
 	"go.uber.org/yarpc/encoding/protobuf"
 	"go.uber.org/yarpc/yarpcerrors"
 
-	sharddistributorv1 "github.com/uber/cadence/.gen/proto/sharddistributor/v1"
-	sharedv1 "github.com/uber/cadence/.gen/proto/shared/v1"
-	cadence_errors "github.com/uber/cadence/common/errors"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/mapper/errorutils"
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
+	sharedv1 "github.com/cadence-workflow/shard-manager/.gen/proto/shared/v1"
+	cadence_errors "github.com/cadence-workflow/shard-manager/common/errors"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/mapper/errorutils"
 )
 
 func FromError(err error) error {

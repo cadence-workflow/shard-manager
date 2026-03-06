@@ -3,8 +3,8 @@ package etcd
 import (
 	"go.uber.org/fx"
 
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/executorstore"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/leaderstore"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/leaderstore"
 )
 
 var Module = fx.Module("etcd",

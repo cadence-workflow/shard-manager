@@ -30,13 +30,13 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/definition"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/client"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/definition"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/client"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (
@@ -93,7 +93,7 @@ func (s *DBVisibilityPersistenceSuite) SetupTest() {
 func (s *DBVisibilityPersistenceSuite) TearDownSuite() {
 	// TODO VisibilityMgr/Store is created with a separated code path, this is incorrect and may cause leaking connection
 	// And Postgres requires all connection to be closed before dropping a database
-	// https://github.com/uber/cadence/issues/2854
+	// https://github.com/cadence-workflow/shard-manager/issues/2854
 	// Remove the below line after the issue is fix
 	s.VisibilityMgr.Close()
 

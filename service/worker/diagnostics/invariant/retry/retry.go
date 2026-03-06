@@ -25,8 +25,8 @@ package retry
 import (
 	"context"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/diagnostics/invariant"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/diagnostics/invariant"
 )
 
 // Retry is an invariant that will be used to identify the issues regarding retries in the workflow execution history

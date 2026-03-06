@@ -25,12 +25,12 @@ package invariant
 import (
 	"context"
 
-	c "github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation/entity"
-	"github.com/uber/cadence/common/types"
+	c "github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/entity"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

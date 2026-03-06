@@ -8,7 +8,7 @@ import (
 	transport "go.uber.org/yarpc/api/transport"
 	thrift "go.uber.org/yarpc/encoding/thrift"
 
-	metaserver "github.com/uber/cadence/.gen/go/health/metaserver"
+	metaserver "github.com/cadence-workflow/shard-manager/.gen/go/health/metaserver"
 )
 
 // ServerParams defines the dependencies for the Meta server.

@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination clientBean_mock.go -self_package github.com/uber/cadence/client
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination clientBean_mock.go -self_package github.com/cadence-workflow/shard-manager/client
 
 package client
 
@@ -29,14 +29,14 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/client/history"
-	"github.com/uber/cadence/client/matching"
-	"github.com/uber/cadence/client/sharddistributor"
-	"github.com/uber/cadence/client/wrappers/timeout"
-	"github.com/uber/cadence/common/cluster"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/client/history"
+	"github.com/cadence-workflow/shard-manager/client/matching"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/timeout"
+	"github.com/cadence-workflow/shard-manager/common/cluster"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 type (

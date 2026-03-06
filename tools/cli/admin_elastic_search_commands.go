@@ -35,12 +35,12 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/.gen/go/indexer"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/elasticsearch"
-	es "github.com/uber/cadence/common/elasticsearch"
-	"github.com/uber/cadence/common/elasticsearch/esql"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/.gen/go/indexer"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch"
+	es "github.com/cadence-workflow/shard-manager/common/elasticsearch"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/esql"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 const (

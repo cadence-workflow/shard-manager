@@ -28,9 +28,9 @@ import (
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/yarpc/yarpctest"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/client"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/client"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestGetRequestedConsistencyLevelFromContext(t *testing.T) {

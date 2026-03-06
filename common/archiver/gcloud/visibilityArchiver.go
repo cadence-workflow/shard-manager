@@ -27,11 +27,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/uber/cadence/common/archiver"
-	"github.com/uber/cadence/common/archiver/gcloud/connector"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/archiver"
+	"github.com/cadence-workflow/shard-manager/common/archiver/gcloud/connector"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

@@ -13,11 +13,11 @@ import (
 	"go.uber.org/mock/gomock"
 	yarpc "go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/sharddistributorexecutor"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient/syncgeneric"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributorexecutor"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/syncgeneric"
 )
 
 // closeDrainObserver is a test helper that implements DrainSignalObserver

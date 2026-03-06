@@ -9,10 +9,10 @@ import (
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 )
 
 func TestModule(t *testing.T) {

@@ -20,14 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination registry_mock.go -self_package github.com/uber/cadence/service/history/query
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination registry_mock.go -self_package github.com/cadence-workflow/shard-manager/service/history/query
 
 package query
 
 import (
 	"sync"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 var (

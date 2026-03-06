@@ -20,22 +20,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination task_rate_limiter_mock.go github.com/uber/cadence/service/history/task RateLimiter
+//go:generate mockgen -package $GOPACKAGE -destination task_rate_limiter_mock.go github.com/cadence-workflow/shard-manager/service/history/task RateLimiter
 
 package task
 
 import (
 	"context"
 
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	dynamicquotas "github.com/uber/cadence/common/dynamicconfig/quotas"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/quotas"
-	"github.com/uber/cadence/service/history/config"
-	"github.com/uber/cadence/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	dynamicquotas "github.com/cadence-workflow/shard-manager/common/dynamicconfig/quotas"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
+	"github.com/cadence-workflow/shard-manager/service/history/config"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
 )
 
 type (

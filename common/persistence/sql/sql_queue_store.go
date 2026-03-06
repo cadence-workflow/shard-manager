@@ -25,10 +25,10 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

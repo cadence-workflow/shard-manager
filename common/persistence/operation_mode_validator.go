@@ -23,7 +23,7 @@ package persistence
 import (
 	"fmt"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // NOTE: when modifying this file, plz make each case clear,

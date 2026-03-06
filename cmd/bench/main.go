@@ -29,10 +29,10 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/bench"
-	"github.com/uber/cadence/bench/lib"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/bench"
+	"github.com/cadence-workflow/shard-manager/bench/lib"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
 )
 
 const (

@@ -8,9 +8,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // injectorExecutionManager implements persistence.ExecutionManager interface instrumented with error injection.

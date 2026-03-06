@@ -36,9 +36,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/api/iterator"
 
-	"github.com/uber/cadence/common/archiver"
-	"github.com/uber/cadence/common/archiver/gcloud/connector"
-	"github.com/uber/cadence/common/archiver/gcloud/connector/mocks"
+	"github.com/cadence-workflow/shard-manager/common/archiver"
+	"github.com/cadence-workflow/shard-manager/common/archiver/gcloud/connector"
+	"github.com/cadence-workflow/shard-manager/common/archiver/gcloud/connector/mocks"
 )
 
 func (s *clientSuite) SetupTest() {

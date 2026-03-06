@@ -29,10 +29,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cadence_errors "github.com/uber/cadence/common/errors"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
+	cadence_errors "github.com/cadence-workflow/shard-manager/common/errors"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestHandleErrNil(t *testing.T) {

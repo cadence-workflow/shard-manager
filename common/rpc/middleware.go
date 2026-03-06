@@ -29,11 +29,11 @@ import (
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/api/transport"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/isolationgroup"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/isolationgroup"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type authOutboundMiddleware struct {

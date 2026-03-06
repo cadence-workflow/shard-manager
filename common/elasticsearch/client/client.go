@@ -26,7 +26,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/uber/cadence/common/elasticsearch/bulk"
+	"github.com/cadence-workflow/shard-manager/common/elasticsearch/bulk"
 )
 
 // Client is a generic ES client implementation.

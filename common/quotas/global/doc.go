@@ -90,7 +90,7 @@ Currently:
 The actual contents of the requests and responses and how limits are decided is
 intentionally flexible to allow creating custom algorithms / data / etc externally without
 requiring internal RPC spec definitions.  To achieve this, we have a custom
-[github.com/uber/cadence/common/types.Any] type that can be used with either Thrift or Protobuf.
+[github.com/cadence-workflow/shard-manager/common/types.Any] type that can be used with either Thrift or Protobuf.
 This type is intentionally not google.protobuf.Any because there is no reason to require
 exchanging Protobuf data (particularly if using Thrift), and because that tends to bind to a
 specific code generator, but it serves essentially the same purpose.

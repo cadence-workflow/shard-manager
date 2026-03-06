@@ -20,12 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/uber/cadence/service/matching/tasklist Manager
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/uber/cadence/service/matching/tasklist TaskListRegistry
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/uber/cadence/service/matching/tasklist TaskMatcher
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/uber/cadence/service/matching/tasklist Forwarder
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/uber/cadence/service/matching/tasklist TaskCompleter
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/uber/cadence/service/matching/tasklist ShardProcessor
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/cadence-workflow/shard-manager/service/matching/tasklist Manager
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/cadence-workflow/shard-manager/service/matching/tasklist TaskListRegistry
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/cadence-workflow/shard-manager/service/matching/tasklist TaskMatcher
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/cadence-workflow/shard-manager/service/matching/tasklist Forwarder
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/cadence-workflow/shard-manager/service/matching/tasklist TaskCompleter
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interfaces_mock.go github.com/cadence-workflow/shard-manager/service/matching/tasklist ShardProcessor
 
 package tasklist
 
@@ -33,8 +33,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 type (

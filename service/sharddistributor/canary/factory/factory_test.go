@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/service/sharddistributor/canary/processor"
-	"github.com/uber/cadence/service/sharddistributor/client/executorclient"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 func TestNewShardProcessorFactory(t *testing.T) {

@@ -22,7 +22,7 @@
 
 package consumer
 
-import "github.com/uber/cadence/.gen/go/sqlblobs"
+import "github.com/cadence-workflow/shard-manager/.gen/go/sqlblobs"
 
 type UnsupportedRequestType struct {
 	Type sqlblobs.AsyncRequestType

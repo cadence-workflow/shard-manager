@@ -9,9 +9,9 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/client/history"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/history"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // historyClient implements history.Client interface instrumented with retries

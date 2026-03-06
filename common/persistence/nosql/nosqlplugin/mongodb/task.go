@@ -23,7 +23,7 @@ package mongodb
 import (
 	"context"
 
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 )
 
 // SelectTaskList returns a single tasklist row.

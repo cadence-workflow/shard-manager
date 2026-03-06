@@ -11,9 +11,9 @@ import (
 	"github.com/uber/ringpop-go/discovery/jsonfile"
 	"github.com/uber/ringpop-go/discovery/statichosts"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/peerprovider/ringpopprovider/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/peerprovider/ringpopprovider/config"
 )
 
 type dnsHostResolver interface {

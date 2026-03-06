@@ -24,10 +24,10 @@ package engineimpl
 import (
 	"context"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/history/execution"
-	"github.com/uber/cadence/service/history/workflow"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/history/execution"
+	"github.com/cadence-workflow/shard-manager/service/history/workflow"
 )
 
 // RequestCancelWorkflowExecution records request cancellation event for workflow execution

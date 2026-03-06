@@ -11,8 +11,8 @@ import (
 	"go.uber.org/yarpc/api/transport"
 	"go.uber.org/yarpc/transport/grpc"
 
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 )
 
 func TestSpectatorPeerChooser_Choose_MissingShardKey(t *testing.T) {

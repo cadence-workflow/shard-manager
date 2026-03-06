@@ -36,16 +36,16 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/urfave/cli/v2"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/client/frontend"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/domain"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/worker/domaindeprecation"
-	"github.com/uber/cadence/tools/common/commoncli"
-	"github.com/uber/cadence/tools/common/flag"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/client/frontend"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/domain"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/worker/domaindeprecation"
+	"github.com/cadence-workflow/shard-manager/tools/common/commoncli"
+	"github.com/cadence-workflow/shard-manager/tools/common/flag"
 )
 
 const (

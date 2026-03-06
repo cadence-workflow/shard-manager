@@ -8,8 +8,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 // injectorTaskManager implements persistence.TaskManager interface instrumented with error injection.

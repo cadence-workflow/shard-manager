@@ -32,15 +32,15 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/yarpc/yarpcerrors"
 
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/log/tag"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/frontend/api"
-	"github.com/uber/cadence/service/frontend/config"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/frontend/api"
+	"github.com/cadence-workflow/shard-manager/service/frontend/config"
 )
 
 func TestContextMetricsTags(t *testing.T) {

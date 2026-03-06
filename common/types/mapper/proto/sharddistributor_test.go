@@ -27,8 +27,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/common/types/testdata"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types/testdata"
 )
 
 func TestFromShardDistributorGetShardOwnerRequest(t *testing.T) {

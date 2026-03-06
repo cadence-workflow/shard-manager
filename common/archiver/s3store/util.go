@@ -35,9 +35,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"go.uber.org/multierr"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/archiver"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/archiver"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // encoding & decoding util

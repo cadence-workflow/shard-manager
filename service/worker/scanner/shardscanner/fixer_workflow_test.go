@@ -28,12 +28,12 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/blobstore"
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/reconciliation/invariant"
-	"github.com/uber/cadence/common/reconciliation/store"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/blobstore"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/invariant"
+	"github.com/cadence-workflow/shard-manager/common/reconciliation/store"
 )
 
 type fixerWorkflowSuite struct {

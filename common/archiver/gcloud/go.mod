@@ -1,4 +1,4 @@
-module github.com/uber/cadence/common/archiver/gcloud
+module github.com/cadence-workflow/shard-manager/common/archiver/gcloud
 
 go 1.23.0
 
@@ -9,7 +9,7 @@ toolchain go1.23.4
 // anyone outside this repo using this needs to ensure that both the "main" module and this module
 // are at the same SHA for consistency, but internally we can cheat by telling Go that it's at a
 // relative file path.
-replace github.com/uber/cadence => ../../..
+replace github.com/cadence-workflow/shard-manager => ../../..
 
 // ringpop-go and tchannel-go depends on older version of thrift, yarpc brings up newer version
 replace github.com/apache/thrift => github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7
@@ -50,7 +50,7 @@ require (
 
 require (
 	cloud.google.com/go/storage v1.30.1
-	github.com/uber/cadence v0.0.0-00010101000000-000000000000
+	github.com/cadence-workflow/shard-manager v0.0.0-00010101000000-000000000000
 	go.uber.org/mock v0.5.0
 	golang.org/x/oauth2 v0.11.0
 	google.golang.org/api v0.128.0

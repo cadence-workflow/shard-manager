@@ -30,7 +30,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/config"
+	"github.com/cadence-workflow/shard-manager/common/config"
 )
 
 func TestPlugin_CreateDB(t *testing.T) {

@@ -32,14 +32,14 @@ import (
 	yarpctls "go.uber.org/yarpc/api/transport/tls"
 	"gopkg.in/yaml.v2" // CAUTION: go.uber.org/config does not support yaml.v3
 
-	"github.com/uber/cadence/common/dynamicconfig"
-	c "github.com/uber/cadence/common/dynamicconfig/configstore/config"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/metrics"
-	ringpopprovider "github.com/uber/cadence/common/peerprovider/ringpopprovider/config"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/service/sharddistributor/client/clientcommon"
-	sdconfig "github.com/uber/cadence/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
+	c "github.com/cadence-workflow/shard-manager/common/dynamicconfig/configstore/config"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	ringpopprovider "github.com/cadence-workflow/shard-manager/common/peerprovider/ringpopprovider/config"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	sdconfig "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 )
 
 type (
@@ -470,7 +470,7 @@ type (
 		// Some documentation below because the tally library is missing it:
 		// In this configuration, default timerType is "histogram", alternatively "summary" is also supported.
 		// In some cases, summary is better. Choose it wisely.
-		// For histogram, default buckets are defined in https://github.com/uber/cadence/blob/master/common/metrics/tally/prometheus/buckets.go#L34
+		// For histogram, default buckets are defined in https://github.com/cadence-workflow/shard-manager/blob/master/common/metrics/tally/prometheus/buckets.go#L34
 		// For summary, default objectives are defined in https://github.com/uber-go/tally/blob/137973e539cd3589f904c23d0b3a28c579fd0ae4/prometheus/reporter.go#L70
 		// You can customize the buckets/objectives if the default is not good enough.
 		Prometheus *prometheus.Configuration `yaml:"prometheus"`
@@ -523,9 +523,9 @@ type (
 	// config for a plugin as it is initialized.
 	//
 	// Config keys and structures expected in the main default binary include:
-	//  - FilestoreConfig: [*FilestoreArchiver], used with provider scheme [github.com/uber/cadence/common/archiver/filestore.URIScheme]
-	//  - S3storeConfig: [*S3Archiver], used with provider scheme [github.com/uber/cadence/common/archiver/s3store.URIScheme]
-	//  - "gstorage" via [github.com/uber/cadence/common/archiver/gcloud.ConfigKey]: [github.com/uber/cadence/common/archiver/gcloud.Config], used with provider scheme "gs" [github.com/uber/cadence/common/archiver/gcloud.URIScheme]
+	//  - FilestoreConfig: [*FilestoreArchiver], used with provider scheme [github.com/cadence-workflow/shard-manager/common/archiver/filestore.URIScheme]
+	//  - S3storeConfig: [*S3Archiver], used with provider scheme [github.com/cadence-workflow/shard-manager/common/archiver/s3store.URIScheme]
+	//  - "gstorage" via [github.com/cadence-workflow/shard-manager/common/archiver/gcloud.ConfigKey]: [github.com/cadence-workflow/shard-manager/common/archiver/gcloud.Config], used with provider scheme "gs" [github.com/cadence-workflow/shard-manager/common/archiver/gcloud.URIScheme]
 	//
 	// For handling hardcoded config, see ToYamlNode.
 	HistoryArchiverProvider map[string]*YamlNode
@@ -547,9 +547,9 @@ type (
 	// config for a plugin as it is initialized.
 	//
 	// Config keys and structures expected in the main default binary include:
-	//  - FilestoreConfig: [*FilestoreArchiver], used with provider scheme [github.com/uber/cadence/common/archiver/filestore.URIScheme]
-	//  - S3storeConfig: [*S3Archiver], used with provider scheme [github.com/uber/cadence/common/archiver/s3store.URIScheme]
-	//  - "gstorage" via [github.com/uber/cadence/common/archiver/gcloud.ConfigKey]: [github.com/uber/cadence/common/archiver/gcloud.Config], used with provider scheme "gs" [github.com/uber/cadence/common/archiver/gcloud.URIScheme]
+	//  - FilestoreConfig: [*FilestoreArchiver], used with provider scheme [github.com/cadence-workflow/shard-manager/common/archiver/filestore.URIScheme]
+	//  - S3storeConfig: [*S3Archiver], used with provider scheme [github.com/cadence-workflow/shard-manager/common/archiver/s3store.URIScheme]
+	//  - "gstorage" via [github.com/cadence-workflow/shard-manager/common/archiver/gcloud.ConfigKey]: [github.com/cadence-workflow/shard-manager/common/archiver/gcloud.Config], used with provider scheme "gs" [github.com/cadence-workflow/shard-manager/common/archiver/gcloud.URIScheme]
 	//
 	// For handling hardcoded config, see ToYamlNode.
 	VisibilityArchiverProvider map[string]*YamlNode
@@ -627,7 +627,7 @@ type (
 	// Type is the implementation type of the queue provider.
 	// Config is the configuration for the queue provider.
 	// Config types and structures expected in the main default binary include:
-	// - type: "kafka", config: [*github.com/uber/cadence/common/asyncworkflow/queue/kafka.QueueConfig]]]
+	// - type: "kafka", config: [*github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue/kafka.QueueConfig]]]
 	AsyncWorkflowQueueProvider struct {
 		Type   string    `yaml:"type"`
 		Config *YamlNode `yaml:"config"`

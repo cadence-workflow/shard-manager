@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/uber/cadence/service/frontend/api
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/cadence-workflow/shard-manager/service/frontend/api
 //go:generate gowrap gen -g -p . -i Handler -t ../templates/accesscontrolled.tmpl -o ../wrappers/accesscontrolled/api_generated.go -v handler=API
 //go:generate gowrap gen -g -p . -i Handler -t ../templates/clusterredirection.tmpl -o ../wrappers/clusterredirection/api_generated.go
 //go:generate gowrap gen -g -p . -i Handler -t ../templates/versioncheck.tmpl -o ../wrappers/versioncheck/api_generated.go
@@ -32,7 +32,7 @@ package api
 import (
 	"context"
 
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

@@ -29,11 +29,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/persistence/persistence-tests/testcluster"
-	"github.com/uber/cadence/environment"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests/testcluster"
+	"github.com/cadence-workflow/shard-manager/environment"
 )
 
 // testCluster allows executing cassandra operations in testing.

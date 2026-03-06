@@ -28,8 +28,8 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
 )
 
 func BenchmarkGenerateCRC32(b *testing.B) {

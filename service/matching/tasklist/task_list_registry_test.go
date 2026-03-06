@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/metrics"
-	metricsmocks "github.com/uber/cadence/common/metrics/mocks"
-	"github.com/uber/cadence/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	metricsmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
 )
 
 func mustNewIdentifierForTest(t *testing.T, domainID, taskListName string) *Identifier {

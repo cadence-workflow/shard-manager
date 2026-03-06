@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -destination versionChecker_mock.go -self_package github.com/uber/cadence/common/client github.com/uber/cadence/common/client VersionChecker
+//go:generate mockgen -package $GOPACKAGE -destination versionChecker_mock.go -self_package github.com/cadence-workflow/shard-manager/common/client github.com/cadence-workflow/shard-manager/common/client VersionChecker
 
 package client
 
@@ -31,9 +31,9 @@ import (
 	apiv1 "github.com/uber/cadence-idl/go/proto/api/v1"
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/.gen/go/shared"
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/.gen/go/shared"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

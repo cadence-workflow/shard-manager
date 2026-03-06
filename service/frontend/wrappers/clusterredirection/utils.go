@@ -5,8 +5,8 @@ import (
 
 	"go.uber.org/yarpc"
 
-	"github.com/uber/cadence/common/client"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/client"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func getRequestedConsistencyLevelFromContext(ctx context.Context) types.QueryConsistencyLevel {

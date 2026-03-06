@@ -28,12 +28,12 @@ import (
 	"math"
 	"time"
 
-	"github.com/uber/cadence/common"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/serialization"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/serialization"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type sqlTaskStore struct {
@@ -585,7 +585,7 @@ func (m *sqlTaskStore) CompleteTasksLessThan(
 
 // GetOrphanTasks gets tasks from the tasks table that belong to a task_list no longer present
 // in the task_lists table.
-// TODO: Limit this query to a specific shard at a time. See https://github.com/uber/cadence/issues/4064
+// TODO: Limit this query to a specific shard at a time. See https://github.com/cadence-workflow/shard-manager/issues/4064
 func (m *sqlTaskStore) GetOrphanTasks(ctx context.Context, request *persistence.GetOrphanTasksRequest) (*persistence.GetOrphanTasksResponse, error) {
 	rows, err := m.db.GetOrphanTasks(ctx, &sqlplugin.OrphanTasksFilter{
 		Limit: &request.Limit,

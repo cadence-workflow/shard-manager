@@ -28,10 +28,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/serialization"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/serialization"
 )
 
 func TestNewFactory(t *testing.T) {

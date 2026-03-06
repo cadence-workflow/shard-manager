@@ -18,15 +18,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination clientInterface_mock.go -self_package github.com/uber/cadence/common/dynamicconfig
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination clientInterface_mock.go -self_package github.com/cadence-workflow/shard-manager/common/dynamicconfig
 
 package dynamicconfig
 
 import (
 	"time"
 
-	"github.com/uber/cadence/common/dynamicconfig/dynamicproperties"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (

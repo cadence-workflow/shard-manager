@@ -9,7 +9,7 @@ import (
 	"go.uber.org/fx/fxtest"
 	"gopkg.in/yaml.v2"
 
-	"github.com/uber/cadence/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 )
 
 func TestNewClient_WithProvidedClient(t *testing.T) {

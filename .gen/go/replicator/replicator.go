@@ -18,7 +18,7 @@ import (
 	wire "go.uber.org/thriftrw/wire"
 	zapcore "go.uber.org/zap/zapcore"
 
-	shared "github.com/uber/cadence/.gen/go/shared"
+	shared "github.com/cadence-workflow/shard-manager/.gen/go/shared"
 )
 
 type DLQType int32
@@ -10788,7 +10788,7 @@ func (v *SyncShardStatusTaskAttributes) IsSetTimestamp() bool {
 // ThriftModule represents the IDL file used to generate this package.
 var ThriftModule = &thriftreflect.ThriftModule{
 	Name:     "replicator",
-	Package:  "github.com/uber/cadence/.gen/go/replicator",
+	Package:  "github.com/cadence-workflow/shard-manager/.gen/go/replicator",
 	FilePath: "replicator.thrift",
 	SHA1:     "5511dc1dfc4b6025f16d77cac580134c62303bd6",
 	Includes: []*thriftreflect.ThriftModule{

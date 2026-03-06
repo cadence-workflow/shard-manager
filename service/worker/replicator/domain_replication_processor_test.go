@@ -32,14 +32,14 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/client/admin"
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/domain"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/resource"
-	"github.com/uber/cadence/common/service"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/client/admin"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/domain"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/resource"
+	"github.com/cadence-workflow/shard-manager/common/service"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type domainReplicationSuite struct {

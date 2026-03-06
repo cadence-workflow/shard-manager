@@ -15,15 +15,15 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/metrics"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/service/sharddistributor/store"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdclient"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdkeys"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/etcdtypes"
-	"github.com/uber/cadence/service/sharddistributor/store/etcd/testhelper"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/testhelper"
 )
 
 func TestNamespaceShardToExecutor_Lifecycle(t *testing.T) {

@@ -25,8 +25,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/service/history/queue"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/service/history/queue"
 )
 
 func (e *historyEngineImpl) ResetTransferQueue(

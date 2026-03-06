@@ -25,10 +25,10 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/mongodb"
-	persistencetests "github.com/uber/cadence/common/persistence/persistence-tests"
-	"github.com/uber/cadence/environment"
-	"github.com/uber/cadence/testflags"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/mongodb"
+	persistencetests "github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests"
+	"github.com/cadence-workflow/shard-manager/environment"
+	"github.com/cadence-workflow/shard-manager/testflags"
 )
 
 func TestMongoDBConfigStorePersistence(t *testing.T) {

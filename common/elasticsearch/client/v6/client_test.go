@@ -34,8 +34,8 @@ import (
 	"github.com/olivere/elastic"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 )
 
 func TestNewV6Client(t *testing.T) {

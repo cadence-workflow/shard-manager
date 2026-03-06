@@ -28,9 +28,9 @@ import (
 
 	"golang.org/x/exp/slices"
 
-	"github.com/uber/cadence/common/cache"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/cache"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // CreatePersistenceMutableState creates a persistence mutable state based on the its in-memory version

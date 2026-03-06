@@ -29,9 +29,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/uber/cadence/common/backoff"
-	"github.com/uber/cadence/common/blobstore"
-	"github.com/uber/cadence/common/pagination"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/blobstore"
+	"github.com/cadence-workflow/shard-manager/common/pagination"
 )
 
 const (

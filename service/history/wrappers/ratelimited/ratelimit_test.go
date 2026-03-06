@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/service/history/workflowcache"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/service/history/workflowcache"
 )
 
 func TestAllowWfID(t *testing.T) {

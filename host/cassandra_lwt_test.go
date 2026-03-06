@@ -81,13 +81,13 @@ import (
 	"github.com/pborman/uuid"
 	"go.uber.org/multierr"
 
-	"github.com/uber/cadence/common/checksum"
-	"github.com/uber/cadence/common/constants"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql/public"
-	persistencetests "github.com/uber/cadence/common/persistence/persistence-tests"
-	"github.com/uber/cadence/common/types"
-	"github.com/uber/cadence/testflags"
+	"github.com/cadence-workflow/shard-manager/common/checksum"
+	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql/public"
+	persistencetests "github.com/cadence-workflow/shard-manager/common/persistence/persistence-tests"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/testflags"
 )
 
 const (

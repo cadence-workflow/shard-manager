@@ -7,11 +7,11 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/fx"
 
-	"github.com/uber/cadence/client/sharddistributor"
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/log"
-	"github.com/uber/cadence/service/sharddistributor/client/clientcommon"
-	csync "github.com/uber/cadence/service/sharddistributor/client/spectatorclient/sync"
+	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	csync "github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient/sync"
 )
 
 //go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go . Spectator

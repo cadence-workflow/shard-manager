@@ -20,7 +20,7 @@
 
 package common
 
-import "github.com/uber/cadence/common/types"
+import "github.com/cadence-workflow/shard-manager/common/types"
 
 const (
 	// LibraryVersionHeaderName refers to the name of the

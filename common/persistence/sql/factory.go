@@ -24,11 +24,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log"
-	p "github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/serialization"
-	"github.com/uber/cadence/common/persistence/sql/sqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log"
+	p "github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/serialization"
+	"github.com/cadence-workflow/shard-manager/common/persistence/sql/sqlplugin"
 )
 
 type (
@@ -129,7 +129,7 @@ func (f *Factory) NewExecutionStore(shardID int) (p.ExecutionStore, error) {
 }
 
 // NewVisibilityStore returns a visibility store
-// TODO sortByCloseTime will be removed and implemented for https://github.com/uber/cadence/issues/3621
+// TODO sortByCloseTime will be removed and implemented for https://github.com/cadence-workflow/shard-manager/issues/3621
 func (f *Factory) NewVisibilityStore(sortByCloseTime bool) (p.VisibilityStore, error) {
 	return NewSQLVisibilityStore(f.cfg, f.logger)
 }

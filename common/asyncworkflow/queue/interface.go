@@ -20,13 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/uber/cadence/common/asyncworkflow/queue
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go -self_package github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue
 
 package queue
 
 import (
-	"github.com/uber/cadence/common/asyncworkflow/queue/provider"
-	"github.com/uber/cadence/common/types"
+	"github.com/cadence-workflow/shard-manager/common/asyncworkflow/queue/provider"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 type (

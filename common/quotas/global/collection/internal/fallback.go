@@ -31,12 +31,12 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/uber/cadence/common/clock"
-	"github.com/uber/cadence/common/quotas"
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/quotas"
 )
 
 type (
-	// FallbackLimiter wraps a "primary" [rate.Limiter] with a "fallback" Limiter (i.e. a [github.com/uber/cadence/common/quotas.Limiter])
+	// FallbackLimiter wraps a "primary" [rate.Limiter] with a "fallback" Limiter (i.e. a [github.com/cadence-workflow/shard-manager/common/quotas.Limiter])
 	// to use before the primary is fully ready, or after too many attempts to update the "primary" limit have failed.
 	//
 	// Intended use is:

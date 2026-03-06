@@ -29,12 +29,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/config"
-	"github.com/uber/cadence/common/log/testlogger"
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/gocql"
-	"github.com/uber/cadence/common/persistence/nosql/nosqlplugin/cassandra/testdata"
+	"github.com/cadence-workflow/shard-manager/common/config"
+	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/gocql"
+	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin/cassandra/testdata"
 )
 
 func TestInsertShard(t *testing.T) {

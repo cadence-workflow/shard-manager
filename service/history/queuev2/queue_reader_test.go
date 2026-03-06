@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/uber/cadence/common/persistence"
-	"github.com/uber/cadence/service/history/shard"
+	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/service/history/shard"
 )
 
 func TestQueueReader_GetTask(t *testing.T) {

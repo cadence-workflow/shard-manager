@@ -1,8 +1,0 @@
-{
-  "CurrVersion": "0.8",
-  "MinCompatibleVersion": "0.8",
-  "Description": "update type of workflow_id to text to remove length restriction",
-  "SchemaUpdateCqlFiles": [
-    "extend_workflow_id_length.sql"
-  ]
-}

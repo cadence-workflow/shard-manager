@@ -1,1 +1,0 @@
-ALTER TYPE child_execution_info ADD domain_id uuid;

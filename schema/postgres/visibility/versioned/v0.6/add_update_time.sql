@@ -1,1 +1,0 @@
-ALTER TABLE executions_visibility ADD update_time TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP;

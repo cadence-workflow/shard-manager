@@ -8,7 +8,6 @@ require (
 	github.com/MicahParks/keyfunc/v2 v2.1.0
 	github.com/aws/aws-sdk-go v1.54.12
 	github.com/cactus/go-statsd-client/statsd v0.0.0-20191106001114-12b4e2b38748
-	github.com/cch123/elasticsql v0.0.0-20190321073543-a1a440758eb9
 	github.com/dave/dst v0.26.2
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-farm v0.0.0-20240924180020-3414d57e47da
@@ -22,21 +21,16 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/m3db/prometheus_client_golang v0.8.1
-	github.com/olivere/elastic v6.2.37+incompatible
-	github.com/olivere/elastic/v7 v7.0.21
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pborman/uuid v0.0.0-20180906182336-adf5a7427709
 	github.com/sirupsen/logrus v1.9.0 // indirect
-	github.com/startreedata/pinot-client-go v0.2.0 // latest release supports pinot v0.12.0 which is also internal version
 	github.com/stretchr/testify v1.10.0
 	github.com/uber-go/tally v3.3.15+incompatible
 	github.com/uber/cadence-idl v0.0.0-20260226231252-039e65827dda
 	github.com/uber/ringpop-go v0.8.5
 	github.com/uber/tchannel-go v1.22.2
 	github.com/urfave/cli/v2 v2.27.4
-	github.com/valyala/fastjson v1.4.1
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
-	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	go.etcd.io/etcd/client/v3 v3.5.5
 	go.uber.org/atomic v1.10.0
 	go.uber.org/cadence v0.19.0
@@ -61,7 +55,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/google/gofuzz v1.0.0
 	github.com/mark3labs/mcp-go v0.18.0
-	github.com/opensearch-project/opensearch-go/v4 v4.1.0
 	github.com/robfig/cron/v3 v3.0.1
 	go.etcd.io/etcd/api/v3 v3.5.5
 	go.uber.org/mock v0.5.0
@@ -92,7 +85,6 @@ require (
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
-	github.com/go-zookeeper/zk v1.0.3 // indirect
 	github.com/gogo/googleapis v1.3.2 // indirect
 	github.com/gogo/status v1.1.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
@@ -105,12 +97,10 @@ require (
 	github.com/jcmturner/gofork v1.7.6 // indirect
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
-	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/m3db/prometheus_client_model v0.1.0 // indirect
 	github.com/m3db/prometheus_common v0.1.0 // indirect
 	github.com/m3db/prometheus_procfs v0.8.1 // indirect
-	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.9 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect

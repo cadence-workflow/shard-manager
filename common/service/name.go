@@ -25,23 +25,23 @@ import "strings"
 const (
 	_servicePrefix = "cadence-"
 
-	// Frontend is the name of the frontend service
+	// Frontend is the name of the frontend service (unused by shard-manager, kept for config compatibility)
 	Frontend = "cadence-frontend"
-	// History is the name of the history service
+	// History is the name of the history service (unused by shard-manager, kept for config compatibility)
 	History = "cadence-history"
-	// Matching is the name of the matching service
+	// Matching is the name of the matching service (unused by shard-manager, kept for config compatibility)
 	Matching = "cadence-matching"
-	// Worker is the name of the worker service
+	// Worker is the name of the worker service (unused by shard-manager, kept for config compatibility)
 	Worker = "cadence-worker"
 	// ShardDistributor is the name of the shard distributor service
 	ShardDistributor = "cadence-shard-distributor"
 )
 
-// ListWithRing contains the list of all cadence services that has a hash ring
-var ListWithRing = []string{Frontend, History, Matching, Worker}
+// List contains the list of all supported services for shard-manager
+var List = []string{ShardDistributor}
 
-// List contains the list of all cadence services
-var List = []string{Frontend, History, Matching, Worker, ShardDistributor}
+// ListWithRing contains services that use a hash ring (none for shard-manager)
+var ListWithRing = []string{}
 
 // ShortName returns cadence service name without "cadence-" prefix
 func ShortName(name string) string {

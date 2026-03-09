@@ -49,9 +49,10 @@ func (s *CadenceSuite) SetupTest() {
 }
 
 func (s *CadenceSuite) TestIsValidService() {
-	s.True(isValidService("history"))
-	s.True(isValidService("matching"))
-	s.True(isValidService("frontend"))
+	s.True(isValidService("shard-distributor"))
+	s.False(isValidService("history"))
+	s.False(isValidService("matching"))
+	s.False(isValidService("frontend"))
 	s.False(isValidService("cadence-history"))
 	s.False(isValidService("cadence-matching"))
 	s.False(isValidService("cadence-frontend"))

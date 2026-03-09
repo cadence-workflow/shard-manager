@@ -39,20 +39,6 @@ import (
 	_ "github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd" // needed for shard distributor storage
 )
 
-func TestFxDependencies(t *testing.T) {
-	err := fx.ValidateApp(_commonModule,
-		fx.Supply(appContext{
-			CfgContext: config.Context{
-				Environment: "",
-				Zone:        "",
-			},
-			ConfigDir: "",
-			RootDir:   "",
-		}),
-		Module(""))
-	require.NoError(t, err)
-}
-
 func TestFxDependenciesForShardDistributor(t *testing.T) {
 	err := fx.ValidateApp(_commonModule,
 		fx.Supply(appContext{

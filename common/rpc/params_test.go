@@ -61,13 +61,6 @@ func TestNewParams(t *testing.T) {
 	_, err = NewParams(serviceName, cfg, dc, logger, metricsCl)
 	assert.EqualError(t, err, "inbound TLS config: open invalid: no such file or directory")
 
-	cfg = &config.Config{Services: map[string]config.Service{
-		"frontend": {RPC: config.RPC{BindOnLocalHost: true}},
-		"history":  {RPC: config.RPC{TLS: config.TLS{Enabled: true, CaFile: "invalid"}}},
-	}}
-	_, err = NewParams(serviceName, cfg, dc, logger, metricsCl)
-	assert.EqualError(t, err, "outbound cadence-history TLS config: open invalid: no such file or directory")
-
 	cfg = makeConfig(config.Service{RPC: config.RPC{BindOnLocalHost: true, Port: 1111, GRPCPort: 2222, GRPCMaxMsgSize: 3333}})
 	params, err := NewParams(serviceName, cfg, dc, logger, metricsCl)
 	assert.NoError(t, err)

@@ -29,7 +29,6 @@ require (
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/olivere/elastic/v7 v7.0.21
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/otiai10/copy v1.1.1
 	github.com/pborman/uuid v0.0.0-20180906182336-adf5a7427709
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/startreedata/pinot-client-go v0.2.0 // latest release supports pinot v0.12.0 which is also internal version
@@ -56,7 +55,6 @@ require (
 	golang.org/x/sync v0.14.0
 	golang.org/x/time v0.5.0
 	golang.org/x/tools v0.22.0
-	gonum.org/v1/gonum v0.7.0
 	google.golang.org/grpc v1.59.0
 	gopkg.in/validator.v2 v2.0.0-20180514200540-135c24b11c19
 	gopkg.in/yaml.v2 v2.4.0

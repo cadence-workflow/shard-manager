@@ -34,7 +34,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/cache"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/persistence"
-	"github.com/cadence-workflow/shard-manager/service/history/constants"
+	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 type mockStaleChecker struct {

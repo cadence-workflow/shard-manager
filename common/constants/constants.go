@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/cadence-workflow/shard-manager/.gen/go/shadower"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 const (
@@ -322,3 +323,17 @@ func GetTaskPriority(
 
 // GRPCConnectionClosingError is the error message returned when a gRPC client connection is closing
 const GRPCConnectionClosingError = "grpc: the client connection is closing"
+
+// Error constants (moved from service/history/constants)
+var (
+	ErrDomainNotSet            = &types.BadRequestError{Message: "Domain not set on request."}
+	ErrWorkflowExecutionNotSet = &types.BadRequestError{Message: "WorkflowExecution not set on request."}
+	ErrTaskListNotSet          = &types.BadRequestError{Message: "Tasklist not set."}
+	ErrRunIDNotValid           = &types.BadRequestError{Message: "RunID is not valid UUID."}
+	ErrWorkflowIDNotSet        = &types.BadRequestError{Message: "WorkflowId is not set on request."}
+	ErrSourceClusterNotSet     = &types.BadRequestError{Message: "Source Cluster not set on request."}
+	ErrTimestampNotSet         = &types.BadRequestError{Message: "Timestamp not set on request."}
+	ErrInvalidTaskType         = &types.BadRequestError{Message: "Invalid task type"}
+	ErrHistoryHostThrottle     = &types.ServiceBusyError{Message: "History host rps exceeded"}
+	ErrShuttingDown            = &types.InternalServiceError{Message: "Shutting down"}
+)

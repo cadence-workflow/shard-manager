@@ -36,7 +36,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/mocks"
 	"github.com/cadence-workflow/shard-manager/common/persistence"
 	"github.com/cadence-workflow/shard-manager/common/types"
-	"github.com/cadence-workflow/shard-manager/service/history/constants"
+	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 type InactiveInactiveDomainExistsSuite struct {

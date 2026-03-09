@@ -40,7 +40,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 	"github.com/cadence-workflow/shard-manager/common/persistence/serialization"
 	"github.com/cadence-workflow/shard-manager/common/types"
-	"github.com/cadence-workflow/shard-manager/service/history/constants"
+	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 func TestCreateWorkflowExecution(t *testing.T) {

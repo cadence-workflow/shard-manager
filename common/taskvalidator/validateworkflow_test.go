@@ -34,7 +34,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/cache"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/persistence"
-	"github.com/cadence-workflow/shard-manager/common/constants"
+	"github.com/cadence-workflow/shard-manager/common/testconstants"
 )
 
 type mockStaleChecker struct {
@@ -74,7 +74,7 @@ func TestWorkflowCheckforValidation(t *testing.T) {
 			checker, err := NewWfChecker(mockLogger, mockMetricsClient, mockDomainCache, mockExecutionManager, mockHistoryManager)
 			assert.NoError(t, err, "Failed to create checker")
 
-			mockDomainCache.EXPECT().GetDomainByID(tc.domainID).Return(constants.TestGlobalDomainEntry, nil).AnyTimes()
+			mockDomainCache.EXPECT().GetDomainByID(tc.domainID).Return(testconstants.TestGlobalDomainEntry, nil).AnyTimes()
 			mockDomainCache.EXPECT().GetDomainName(tc.domainID).Return(tc.domainName, nil).AnyTimes()
 
 			if tc.isStale {
@@ -89,8 +89,8 @@ func TestWorkflowCheckforValidation(t *testing.T) {
 				return &persistence.GetWorkflowExecutionResponse{
 					State: &persistence.WorkflowMutableState{
 						ExecutionInfo: &persistence.WorkflowExecutionInfo{
-							DomainID:   constants.TestDomainID,
-							WorkflowID: constants.TestWorkflowID,
+							DomainID:   testconstants.TestDomainID,
+							WorkflowID: testconstants.TestWorkflowID,
 						},
 					},
 				}, nil

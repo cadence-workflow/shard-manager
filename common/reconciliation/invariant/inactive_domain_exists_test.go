@@ -35,8 +35,8 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/cache"
 	"github.com/cadence-workflow/shard-manager/common/mocks"
 	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/testconstants"
 	"github.com/cadence-workflow/shard-manager/common/types"
-	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 type InactiveInactiveDomainExistsSuite struct {
@@ -76,7 +76,7 @@ func (s *InactiveInactiveDomainExistsSuite) TestCheck() {
 		execManager := &mocks.ExecutionManager{}
 		execManager.On("GetWorkflowExecution", mock.Anything, mock.Anything).Return(tc.getExecResp, tc.getExecErr)
 		domainCache.EXPECT().GetDomainName(gomock.Any()).Return("test-domain-name", nil).AnyTimes()
-		domainCache.EXPECT().GetDomainByID(gomock.Any()).Return(constants.TestGlobalDomainEntry, nil).AnyTimes()
+		domainCache.EXPECT().GetDomainByID(gomock.Any()).Return(testconstants.TestGlobalDomainEntry, nil).AnyTimes()
 		i := NewInactiveDomainExists(persistence.NewPersistenceRetryer(execManager, nil, c2.CreatePersistenceRetryPolicy()), domainCache)
 		result := i.Check(context.Background(), getOpenConcreteExecution())
 		s.Equal(tc.expectedResult, result)

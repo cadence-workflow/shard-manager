@@ -39,8 +39,8 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/persistence"
 	"github.com/cadence-workflow/shard-manager/common/persistence/nosql/nosqlplugin"
 	"github.com/cadence-workflow/shard-manager/common/persistence/serialization"
+	"github.com/cadence-workflow/shard-manager/common/testconstants"
 	"github.com/cadence-workflow/shard-manager/common/types"
-	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 func TestCreateWorkflowExecution(t *testing.T) {
@@ -1203,10 +1203,10 @@ func newCreateWorkflowExecutionRequest() *persistence.InternalCreateWorkflowExec
 
 func newGetWorkflowExecutionRequest() *persistence.InternalGetWorkflowExecutionRequest {
 	return &persistence.InternalGetWorkflowExecutionRequest{
-		DomainID: constants.TestDomainID,
+		DomainID: testconstants.TestDomainID,
 		Execution: types.WorkflowExecution{
-			WorkflowID: constants.TestWorkflowID,
-			RunID:      constants.TestRunID,
+			WorkflowID: testconstants.TestWorkflowID,
+			RunID:      testconstants.TestRunID,
 		},
 	}
 }
@@ -1216,15 +1216,15 @@ func newUpdateWorkflowExecutionRequest() *persistence.InternalUpdateWorkflowExec
 		RangeID: 123,
 		UpdateWorkflowMutation: persistence.InternalWorkflowMutation{
 			ExecutionInfo: &persistence.InternalWorkflowExecutionInfo{
-				DomainID:    constants.TestDomainID,
-				WorkflowID:  constants.TestWorkflowID,
-				RunID:       constants.TestRunID,
+				DomainID:    testconstants.TestDomainID,
+				WorkflowID:  testconstants.TestWorkflowID,
+				RunID:       testconstants.TestRunID,
 				State:       persistence.WorkflowStateCreated,
 				CloseStatus: persistence.WorkflowCloseStatusNone,
 			},
 			WorkflowRequests: []*persistence.WorkflowRequest{
 				{
-					RequestID:   constants.TestRequestID,
+					RequestID:   testconstants.TestRequestID,
 					Version:     1,
 					RequestType: persistence.WorkflowRequestTypeStart,
 				},
@@ -1239,15 +1239,15 @@ func newUpdateWorkflowExecutionRequestForContinueAsNew() *persistence.InternalUp
 		Mode:    persistence.UpdateWorkflowModeUpdateCurrent,
 		UpdateWorkflowMutation: persistence.InternalWorkflowMutation{
 			ExecutionInfo: &persistence.InternalWorkflowExecutionInfo{
-				DomainID:    constants.TestDomainID,
-				WorkflowID:  constants.TestWorkflowID,
-				RunID:       constants.TestRunID,
+				DomainID:    testconstants.TestDomainID,
+				WorkflowID:  testconstants.TestWorkflowID,
+				RunID:       testconstants.TestRunID,
 				State:       persistence.WorkflowStateCompleted,
 				CloseStatus: persistence.WorkflowCloseStatusContinuedAsNew,
 			},
 			WorkflowRequests: []*persistence.WorkflowRequest{
 				{
-					RequestID:   constants.TestRequestID,
+					RequestID:   testconstants.TestRequestID,
 					Version:     1,
 					RequestType: persistence.WorkflowRequestTypeStart,
 				},
@@ -1256,9 +1256,9 @@ func newUpdateWorkflowExecutionRequestForContinueAsNew() *persistence.InternalUp
 		NewWorkflowSnapshot: &persistence.InternalWorkflowSnapshot{
 			VersionHistories: &persistence.DataBlob{},
 			ExecutionInfo: &persistence.InternalWorkflowExecutionInfo{
-				DomainID:   constants.TestDomainID,
-				WorkflowID: constants.TestWorkflowID,
-				RunID:      constants.TestRunID,
+				DomainID:   testconstants.TestDomainID,
+				WorkflowID: testconstants.TestWorkflowID,
+				RunID:      testconstants.TestRunID,
 				ActiveClusterSelectionPolicy: &persistence.DataBlob{
 					Encoding: "json",
 					Data:     []byte(`{"policy": "abc"}`),
@@ -1266,7 +1266,7 @@ func newUpdateWorkflowExecutionRequestForContinueAsNew() *persistence.InternalUp
 			},
 			WorkflowRequests: []*persistence.WorkflowRequest{
 				{
-					RequestID:   constants.TestRequestID,
+					RequestID:   testconstants.TestRequestID,
 					Version:     1,
 					RequestType: persistence.WorkflowRequestTypeStart,
 				},
@@ -1279,13 +1279,13 @@ func getNewWorkflowSnapshot() persistence.InternalWorkflowSnapshot {
 	return persistence.InternalWorkflowSnapshot{
 		VersionHistories: &persistence.DataBlob{},
 		ExecutionInfo: &persistence.InternalWorkflowExecutionInfo{
-			DomainID:   constants.TestDomainID,
-			WorkflowID: constants.TestWorkflowID,
-			RunID:      constants.TestRunID,
+			DomainID:   testconstants.TestDomainID,
+			WorkflowID: testconstants.TestWorkflowID,
+			RunID:      testconstants.TestRunID,
 		},
 		WorkflowRequests: []*persistence.WorkflowRequest{
 			{
-				RequestID:   constants.TestRequestID,
+				RequestID:   testconstants.TestRequestID,
 				Version:     1,
 				RequestType: persistence.WorkflowRequestTypeStart,
 			},

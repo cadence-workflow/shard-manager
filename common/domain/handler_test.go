@@ -46,8 +46,8 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/persistence"
+	"github.com/cadence-workflow/shard-manager/common/testconstants"
 	"github.com/cadence-workflow/shard-manager/common/types"
-	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
 // newTestHandler creates a new instance of the handler with mocked dependencies for testing.
@@ -1425,8 +1425,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 						AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 					},
 					Info: &persistence.DomainInfo{
-						Name:   constants.TestDomainName,
-						ID:     constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						ID:     testconstants.TestDomainID,
 						Status: persistence.DomainStatusRegistered,
 					},
 					IsGlobalDomain:  true,
@@ -1456,8 +1456,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 
 				expectedUpdateRequest := &persistence.UpdateDomainRequest{
 					Info: &persistence.DomainInfo{
-						Name:        constants.TestDomainName,
-						ID:          constants.TestDomainID,
+						Name:        testconstants.TestDomainName,
+						ID:          testconstants.TestDomainID,
 						Status:      persistence.DomainStatusRegistered,
 						Description: domainResponse.Info.Description,
 						OwnerEmail:  domainResponse.Info.OwnerEmail,
@@ -1493,7 +1493,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					).Return(nil).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:              constants.TestDomainName,
+				Name:              testconstants.TestDomainName,
 				ActiveClusterName: common.Ptr(cluster.TestAlternativeClusterName),
 			},
 			response: func(timeSource clock.MockedTimeSource) *types.UpdateDomainResponse {
@@ -1502,8 +1502,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					IsGlobalDomain:  true,
 					FailoverVersion: cluster.TestCurrentClusterInitialFailoverVersion/cluster.TestFailoverVersionIncrement*cluster.TestFailoverVersionIncrement + cluster.TestAlternativeClusterInitialFailoverVersion,
 					DomainInfo: &types.DomainInfo{
-						Name:   constants.TestDomainName,
-						UUID:   constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						UUID:   testconstants.TestDomainID,
 						Data:   map[string]string{commonconstants.DomainDataKeyForFailoverHistory: string(data)},
 						Status: common.Ptr(types.DomainStatusRegistered),
 					},
@@ -1544,8 +1544,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 						AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 					},
 					Info: &persistence.DomainInfo{
-						Name:   constants.TestDomainName,
-						ID:     constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						ID:     testconstants.TestDomainID,
 						Status: persistence.DomainStatusRegistered,
 					},
 					IsGlobalDomain:  true,
@@ -1570,8 +1570,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 
 				expectedUpdateRequest := &persistence.UpdateDomainRequest{
 					Info: &persistence.DomainInfo{
-						Name:        constants.TestDomainName,
-						ID:          constants.TestDomainID,
+						Name:        testconstants.TestDomainName,
+						ID:          testconstants.TestDomainID,
 						Status:      persistence.DomainStatusRegistered,
 						Description: domainResponse.Info.Description,
 						OwnerEmail:  domainResponse.Info.OwnerEmail,
@@ -1608,7 +1608,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					).Return(nil).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:                     constants.TestDomainName,
+				Name:                     testconstants.TestDomainName,
 				ActiveClusterName:        common.Ptr(cluster.TestCurrentClusterName),
 				FailoverTimeoutInSeconds: common.Int32Ptr(10),
 			},
@@ -1618,8 +1618,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					IsGlobalDomain:  true,
 					FailoverVersion: cluster.TestFailoverVersionIncrement,
 					DomainInfo: &types.DomainInfo{
-						Name:   constants.TestDomainName,
-						UUID:   constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						UUID:   testconstants.TestDomainID,
 						Data:   map[string]string{commonconstants.DomainDataKeyForFailoverHistory: string(data)},
 						Status: common.Ptr(types.DomainStatusRegistered),
 					},
@@ -1660,8 +1660,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 						AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 					},
 					Info: &persistence.DomainInfo{
-						Name:   constants.TestDomainName,
-						ID:     constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						ID:     testconstants.TestDomainID,
 						Status: persistence.DomainStatusRegistered,
 					},
 					IsGlobalDomain:  true,
@@ -1684,8 +1684,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 
 				expectedUpdateRequest := &persistence.UpdateDomainRequest{
 					Info: &persistence.DomainInfo{
-						Name:        constants.TestDomainName,
-						ID:          constants.TestDomainID,
+						Name:        testconstants.TestDomainName,
+						ID:          testconstants.TestDomainID,
 						Status:      persistence.DomainStatusRegistered,
 						Description: domainResponse.Info.Description,
 						OwnerEmail:  domainResponse.Info.OwnerEmail,
@@ -1722,7 +1722,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					).Return(nil).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:       constants.TestDomainName,
+				Name:       testconstants.TestDomainName,
 				EmitMetric: common.Ptr(false),
 			},
 			response: func(_ clock.MockedTimeSource) *types.UpdateDomainResponse {
@@ -1730,8 +1730,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					IsGlobalDomain:  true,
 					FailoverVersion: cluster.TestCurrentClusterInitialFailoverVersion,
 					DomainInfo: &types.DomainInfo{
-						Name:   constants.TestDomainName,
-						UUID:   constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						UUID:   testconstants.TestDomainID,
 						Status: common.Ptr(types.DomainStatusRegistered),
 					},
 					Configuration: &types.DomainConfiguration{
@@ -1789,8 +1789,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 						AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 					},
 					Info: &persistence.DomainInfo{
-						Name:   constants.TestDomainName,
-						ID:     constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						ID:     testconstants.TestDomainID,
 						Status: persistence.DomainStatusRegistered,
 					},
 					IsGlobalDomain:  true,
@@ -1814,8 +1814,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				var data map[string]string
 				expectedUpdateRequest := &persistence.UpdateDomainRequest{
 					Info: &persistence.DomainInfo{
-						Name:        constants.TestDomainName,
-						ID:          constants.TestDomainID,
+						Name:        testconstants.TestDomainName,
+						ID:          testconstants.TestDomainID,
 						Status:      persistence.DomainStatusRegistered,
 						Description: domainResponse.Info.Description,
 						OwnerEmail:  domainResponse.Info.OwnerEmail,
@@ -1868,7 +1868,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					).Return(nil).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name: constants.TestDomainName,
+				Name: testconstants.TestDomainName,
 				ActiveClusters: &types.ActiveClusters{
 					AttributeScopes: map[string]types.ClusterAttributeScope{
 						"region": {
@@ -1891,8 +1891,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					IsGlobalDomain:  true,
 					FailoverVersion: cluster.TestCurrentClusterInitialFailoverVersion + cluster.TestFailoverVersionIncrement,
 					DomainInfo: &types.DomainInfo{
-						Name:   constants.TestDomainName,
-						UUID:   constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						UUID:   testconstants.TestDomainID,
 						Status: common.Ptr(types.DomainStatusRegistered),
 					},
 					Configuration: &types.DomainConfiguration{
@@ -1951,8 +1951,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 						AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 					},
 					Info: &persistence.DomainInfo{
-						Name:   constants.TestDomainName,
-						ID:     constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						ID:     testconstants.TestDomainID,
 						Status: persistence.DomainStatusRegistered,
 					},
 					IsGlobalDomain:  true,
@@ -1977,8 +1977,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				var data map[string]string
 				expectedUpdateRequest := &persistence.UpdateDomainRequest{
 					Info: &persistence.DomainInfo{
-						Name:        constants.TestDomainName,
-						ID:          constants.TestDomainID,
+						Name:        testconstants.TestDomainName,
+						ID:          testconstants.TestDomainID,
 						Status:      persistence.DomainStatusRegistered,
 						Description: domainResponse.Info.Description,
 						OwnerEmail:  domainResponse.Info.OwnerEmail,
@@ -2029,7 +2029,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					).Return(nil).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name: constants.TestDomainName,
+				Name: testconstants.TestDomainName,
 				ActiveClusters: &types.ActiveClusters{
 					AttributeScopes: map[string]types.ClusterAttributeScope{
 						"region": {
@@ -2052,8 +2052,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					IsGlobalDomain:  true,
 					FailoverVersion: cluster.TestCurrentClusterInitialFailoverVersion + 3*cluster.TestFailoverVersionIncrement,
 					DomainInfo: &types.DomainInfo{
-						Name:   constants.TestDomainName,
-						UUID:   constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						UUID:   testconstants.TestDomainID,
 						Status: common.Ptr(types.DomainStatusRegistered),
 					},
 					Configuration: &types.DomainConfiguration{
@@ -2110,8 +2110,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 						AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 					},
 					Info: &persistence.DomainInfo{
-						Name:   constants.TestDomainName,
-						ID:     constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						ID:     testconstants.TestDomainID,
 						Status: persistence.DomainStatusRegistered,
 					},
 					IsGlobalDomain:  false,
@@ -2123,7 +2123,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					Return(domainResponse, nil).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:              constants.TestDomainName,
+				Name:              testconstants.TestDomainName,
 				ActiveClusterName: common.Ptr(cluster.TestCurrentClusterName),
 			},
 			response: func(_ clock.MockedTimeSource) *types.UpdateDomainResponse {
@@ -2131,8 +2131,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					IsGlobalDomain:  false,
 					FailoverVersion: cluster.TestCurrentClusterInitialFailoverVersion/cluster.TestFailoverVersionIncrement*cluster.TestFailoverVersionIncrement + cluster.TestCurrentClusterInitialFailoverVersion,
 					DomainInfo: &types.DomainInfo{
-						Name:   constants.TestDomainName,
-						UUID:   constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						UUID:   testconstants.TestDomainID,
 						Status: common.Ptr(types.DomainStatusRegistered),
 					},
 					Configuration: &types.DomainConfiguration{
@@ -2168,7 +2168,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				domainManager.EXPECT().GetDomain(ctx, &persistence.GetDomainRequest{Name: updateRequest.GetName()}).Return(nil, errors.New("get-domain-error")).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name: constants.TestDomainName,
+				Name: testconstants.TestDomainName,
 			},
 			err: errors.New("get-domain-error"),
 		},
@@ -2191,7 +2191,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				archivalMetadata.On("GetHistoryConfig").Return(archivalConfig).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name: constants.TestDomainName,
+				Name: testconstants.TestDomainName,
 			},
 			err: errInvalidEvent,
 		},
@@ -2222,7 +2222,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				archivalMetadata.On("GetVisibilityConfig").Return(archivalConfigVisibility).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name: constants.TestDomainName,
+				Name: testconstants.TestDomainName,
 			},
 			err: errInvalidEvent,
 		},
@@ -2247,7 +2247,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				archivalMetadata.On("GetVisibilityConfig").Return(archivalConfig).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name: constants.TestDomainName,
+				Name: testconstants.TestDomainName,
 				BadBinaries: &types.BadBinaries{Binaries: map[string]*types.BadBinaryInfo{
 					"bad-binary": {
 						Reason: "test-reason",
@@ -2281,7 +2281,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				archivalMetadata.On("GetVisibilityConfig").Return(archivalConfig).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:            constants.TestDomainName,
+				Name:            testconstants.TestDomainName,
 				DeleteBadBinary: common.Ptr("bad-binary"),
 			},
 			err: &types.BadRequestError{
@@ -2295,7 +2295,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				domainManager.EXPECT().GetDomain(ctx, &persistence.GetDomainRequest{Name: updateRequest.GetName()}).
 					Return(&persistence.GetDomainResponse{
 						Info: &persistence.DomainInfo{
-							Name: constants.TestDomainName,
+							Name: testconstants.TestDomainName,
 						},
 						ReplicationConfig: &persistence.DomainReplicationConfig{},
 						Config:            &persistence.DomainConfig{},
@@ -2312,7 +2312,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				archivalMetadata.On("GetVisibilityConfig").Return(archivalConfig).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:                     constants.TestDomainName,
+				Name:                     testconstants.TestDomainName,
 				FailoverTimeoutInSeconds: common.Int32Ptr(1),
 			},
 			err: errInvalidFailoverNoChangeDetected,
@@ -2327,7 +2327,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 						Config:            &persistence.DomainConfig{},
 						IsGlobalDomain:    true,
 						Info: &persistence.DomainInfo{
-							Name: constants.TestDomainName,
+							Name: testconstants.TestDomainName,
 						},
 					}, nil).Times(1)
 				archivalConfig := archiver.NewArchivalConfig(
@@ -2341,7 +2341,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				archivalMetadata.On("GetVisibilityConfig").Return(archivalConfig).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name: constants.TestDomainName,
+				Name: testconstants.TestDomainName,
 			},
 			err: errInvalidRetentionPeriod,
 		},
@@ -2358,7 +2358,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 							Retention: 1,
 						},
 						Info: &persistence.DomainInfo{
-							Name: constants.TestDomainName,
+							Name: testconstants.TestDomainName,
 						},
 						IsGlobalDomain: true,
 					}, nil).Times(1)
@@ -2373,7 +2373,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				archivalMetadata.On("GetVisibilityConfig").Return(archivalConfig).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name: constants.TestDomainName,
+				Name: testconstants.TestDomainName,
 			},
 			err: &types.BadRequestError{Message: fmt.Sprintf(
 				"Invalid cluster name: %v",
@@ -2394,7 +2394,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 							Retention: 1,
 						},
 						Info: &persistence.DomainInfo{
-							Name: constants.TestDomainName,
+							Name: testconstants.TestDomainName,
 						},
 						IsGlobalDomain:  true,
 						LastUpdatedTime: timeSource.Now().UnixNano(),
@@ -2411,7 +2411,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				timeSource.Advance(-time.Hour)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:              constants.TestDomainName,
+				Name:              testconstants.TestDomainName,
 				ActiveClusterName: common.Ptr(cluster.TestAlternativeClusterName),
 			},
 			err: errDomainUpdateTooFrequent,
@@ -2430,7 +2430,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 							Retention: 1,
 						},
 						Info: &persistence.DomainInfo{
-							Name: constants.TestDomainName,
+							Name: testconstants.TestDomainName,
 						},
 						IsGlobalDomain:  true,
 						LastUpdatedTime: timeSource.Now().UnixNano(),
@@ -2448,7 +2448,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				domainManager.EXPECT().UpdateDomain(ctx, gomock.Any()).Return(errors.New("update-domain-error")).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:              constants.TestDomainName,
+				Name:              testconstants.TestDomainName,
 				ActiveClusterName: common.Ptr(cluster.TestAlternativeClusterName),
 			},
 			err: errors.New("update-domain-error"),
@@ -2490,8 +2490,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 						AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 					},
 					Info: &persistence.DomainInfo{
-						Name:   constants.TestDomainName,
-						ID:     constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						ID:     testconstants.TestDomainID,
 						Status: persistence.DomainStatusRegistered,
 					},
 					IsGlobalDomain:  true,
@@ -2515,8 +2515,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 				var data map[string]string
 				expectedUpdateRequest := &persistence.UpdateDomainRequest{
 					Info: &persistence.DomainInfo{
-						Name:        constants.TestDomainName,
-						ID:          constants.TestDomainID,
+						Name:        testconstants.TestDomainName,
+						ID:          testconstants.TestDomainID,
 						Status:      persistence.DomainStatusRegistered,
 						Description: domainResponse.Info.Description,
 						OwnerEmail:  domainResponse.Info.OwnerEmail,
@@ -2567,7 +2567,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					).Return(nil).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:              constants.TestDomainName,
+				Name:              testconstants.TestDomainName,
 				ActiveClusterName: common.Ptr(cluster.TestAlternativeClusterName),
 			},
 			response: func(timeSource clock.MockedTimeSource) *types.UpdateDomainResponse {
@@ -2575,8 +2575,8 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					IsGlobalDomain:  true,
 					FailoverVersion: cluster.TestAlternativeClusterInitialFailoverVersion,
 					DomainInfo: &types.DomainInfo{
-						Name:   constants.TestDomainName,
-						UUID:   constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						UUID:   testconstants.TestDomainID,
 						Status: common.Ptr(types.DomainStatusRegistered),
 					},
 					Configuration: &types.DomainConfiguration{
@@ -2628,7 +2628,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 							Retention: 1,
 						},
 						Info: &persistence.DomainInfo{
-							Name: constants.TestDomainName,
+							Name: testconstants.TestDomainName,
 						},
 						IsGlobalDomain:  true,
 						LastUpdatedTime: timeSource.Now().UnixNano(),
@@ -2649,7 +2649,7 @@ func TestHandler_UpdateDomain(t *testing.T) {
 					Return(errors.New("handle-transmission-task-error")).Times(1)
 			},
 			request: &types.UpdateDomainRequest{
-				Name:              constants.TestDomainName,
+				Name:              testconstants.TestDomainName,
 				ActiveClusterName: common.Ptr(cluster.TestAlternativeClusterName),
 			},
 			err: errors.New("handle-transmission-task-error"),
@@ -2771,8 +2771,8 @@ func TestHandler_UpdateDomain_AuditLogFailureDoesNotPropagate(t *testing.T) {
 			AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 		},
 		Info: &persistence.DomainInfo{
-			Name:        constants.TestDomainName,
-			ID:          constants.TestDomainID,
+			Name:        testconstants.TestDomainName,
+			ID:          testconstants.TestDomainID,
 			Status:      persistence.DomainStatusRegistered,
 			Description: "original-description",
 		},
@@ -2783,7 +2783,7 @@ func TestHandler_UpdateDomain_AuditLogFailureDoesNotPropagate(t *testing.T) {
 
 	// Set up mocks
 	mockDomainManager.EXPECT().GetMetadata(ctx).Return(&persistence.GetMetadataResponse{}, nil).Times(1)
-	mockDomainManager.EXPECT().GetDomain(ctx, &persistence.GetDomainRequest{Name: constants.TestDomainName}).
+	mockDomainManager.EXPECT().GetDomain(ctx, &persistence.GetDomainRequest{Name: testconstants.TestDomainName}).
 		Return(domainResponse, nil).Times(1)
 
 	archivalConfig := archiver.NewArchivalConfig(
@@ -2812,7 +2812,7 @@ func TestHandler_UpdateDomain_AuditLogFailureDoesNotPropagate(t *testing.T) {
 
 	// Execute the update
 	updateRequest := &types.UpdateDomainRequest{
-		Name:        constants.TestDomainName,
+		Name:        testconstants.TestDomainName,
 		Description: common.Ptr("updated-description"),
 	}
 
@@ -2825,8 +2825,8 @@ func TestHandler_UpdateDomain_AuditLogFailureDoesNotPropagate(t *testing.T) {
 	// Verify the response contains the updated information
 	assert.Equal(t, true, response.IsGlobalDomain)
 	assert.Equal(t, cluster.TestCurrentClusterInitialFailoverVersion, response.FailoverVersion)
-	assert.Equal(t, constants.TestDomainName, response.DomainInfo.Name)
-	assert.Equal(t, constants.TestDomainID, response.DomainInfo.UUID)
+	assert.Equal(t, testconstants.TestDomainName, response.DomainInfo.Name)
+	assert.Equal(t, testconstants.TestDomainID, response.DomainInfo.UUID)
 	assert.Equal(t, "updated-description", response.DomainInfo.Description)
 	assert.Equal(t, types.DomainStatusRegistered, *response.DomainInfo.Status)
 }
@@ -2847,8 +2847,8 @@ func TestUpdateDomainInfo(t *testing.T) {
 			},
 			changed: true,
 			updatedDomainInfo: &persistence.DomainInfo{
-				ID:          constants.TestDomainID,
-				Name:        constants.TestDomainName,
+				ID:          testconstants.TestDomainID,
+				Name:        testconstants.TestDomainName,
 				Status:      persistence.DomainStatusRegistered,
 				Description: "new-description",
 				OwnerEmail:  "new-email",
@@ -2859,8 +2859,8 @@ func TestUpdateDomainInfo(t *testing.T) {
 			name:    "Success case - no new domain info in request",
 			request: &types.UpdateDomainRequest{},
 			updatedDomainInfo: &persistence.DomainInfo{
-				ID:          constants.TestDomainID,
-				Name:        constants.TestDomainName,
+				ID:          testconstants.TestDomainID,
+				Name:        testconstants.TestDomainName,
 				Status:      persistence.DomainStatusRegistered,
 				Description: "some-description",
 				OwnerEmail:  "some-email",
@@ -2874,8 +2874,8 @@ func TestUpdateDomainInfo(t *testing.T) {
 			controller := gomock.NewController(t)
 
 			domainInfo := &persistence.DomainInfo{
-				ID:          constants.TestDomainID,
-				Name:        constants.TestDomainName,
+				ID:          testconstants.TestDomainID,
+				Name:        testconstants.TestDomainName,
 				Status:      persistence.DomainStatusRegistered,
 				Description: "some-description",
 				OwnerEmail:  "some-email",
@@ -3022,7 +3022,7 @@ func TestUpdateDomainConfiguration(t *testing.T) {
 
 			now := handler.(*handlerImpl).timeSource.Now().UnixNano()
 
-			updatedDomainConfig, changed, err := (*handlerImpl).updateDomainConfiguration(handler.(*handlerImpl), constants.TestDomainName, cfg, tc.request)
+			updatedDomainConfig, changed, err := (*handlerImpl).updateDomainConfiguration(handler.(*handlerImpl), testconstants.TestDomainName, cfg, tc.request)
 
 			if tc.err != nil {
 				assert.Error(t, err)
@@ -3297,7 +3297,7 @@ func TestUpdateReplicationConfig(t *testing.T) {
 			handler := newTestHandler(t, controller, mockDomainMgr, true, mockReplicator).(*handlerImpl)
 
 			updatedReplicationConfig, clusterUpdated, activeClusterUpdated, err := handler.updateReplicationConfig(
-				constants.TestDomainName,
+				testconstants.TestDomainName,
 				tc.currentReplicationConfig,
 				tc.request,
 			)
@@ -3611,8 +3611,8 @@ func TestHandler_FailoverDomain(t *testing.T) {
 						AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 					},
 					Info: &persistence.DomainInfo{
-						Name:   constants.TestDomainName,
-						ID:     constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						ID:     testconstants.TestDomainID,
 						Status: persistence.DomainStatusRegistered,
 					},
 					IsGlobalDomain:  true,
@@ -3635,8 +3635,8 @@ func TestHandler_FailoverDomain(t *testing.T) {
 
 				updateExpectation := &persistence.UpdateDomainRequest{
 					Info: &persistence.DomainInfo{
-						ID:     constants.TestDomainID,
-						Name:   constants.TestDomainName,
+						ID:     testconstants.TestDomainID,
+						Name:   testconstants.TestDomainName,
 						Status: persistence.DomainStatusRegistered,
 						Data: map[string]string{
 							commonconstants.DomainDataKeyForFailoverHistory: string(failoverHistoryJSON),
@@ -3663,8 +3663,8 @@ func TestHandler_FailoverDomain(t *testing.T) {
 						ctx,
 						types.DomainOperationUpdate,
 						&persistence.DomainInfo{
-							Name:   constants.TestDomainName,
-							ID:     constants.TestDomainID,
+							Name:   testconstants.TestDomainName,
+							ID:     testconstants.TestDomainID,
 							Status: persistence.DomainStatusRegistered,
 							Data: map[string]string{
 								commonconstants.DomainDataKeyForFailoverHistory: string(failoverHistoryJSON),
@@ -3683,7 +3683,7 @@ func TestHandler_FailoverDomain(t *testing.T) {
 					).Return(nil).Times(1)
 			},
 			request: &types.FailoverDomainRequest{
-				DomainName:              constants.TestDomainName,
+				DomainName:              testconstants.TestDomainName,
 				DomainActiveClusterName: common.Ptr(clusterB),
 			},
 			response: func(timeSource clock.MockedTimeSource) *types.FailoverDomainResponse {
@@ -3697,8 +3697,8 @@ func TestHandler_FailoverDomain(t *testing.T) {
 					IsGlobalDomain:  true,
 					FailoverVersion: clusterBInitialFailoverVersion,
 					DomainInfo: &types.DomainInfo{
-						Name:   constants.TestDomainName,
-						UUID:   constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						UUID:   testconstants.TestDomainID,
 						Data:   map[string]string{commonconstants.DomainDataKeyForFailoverHistory: string(data)},
 						Status: common.Ptr(types.DomainStatusRegistered),
 					},
@@ -3728,7 +3728,7 @@ func TestHandler_FailoverDomain(t *testing.T) {
 					Return(nil, &types.EntityNotExistsError{Message: "Domain not found"}).Times(1)
 			},
 			request: &types.FailoverDomainRequest{
-				DomainName:              constants.TestDomainName,
+				DomainName:              testconstants.TestDomainName,
 				DomainActiveClusterName: common.Ptr(cluster.TestAlternativeClusterName),
 			},
 			err: &types.EntityNotExistsError{Message: "Domain not found"},
@@ -3752,8 +3752,8 @@ func TestHandler_FailoverDomain(t *testing.T) {
 						AsyncWorkflowConfig:      types.AsyncWorkflowConfiguration{Enabled: true},
 					},
 					Info: &persistence.DomainInfo{
-						Name:   constants.TestDomainName,
-						ID:     constants.TestDomainID,
+						Name:   testconstants.TestDomainName,
+						ID:     testconstants.TestDomainID,
 						Status: persistence.DomainStatusRegistered,
 					},
 					IsGlobalDomain:  true,
@@ -3765,7 +3765,7 @@ func TestHandler_FailoverDomain(t *testing.T) {
 					Return(domainResponse, nil).Times(1)
 			},
 			request: &types.FailoverDomainRequest{
-				DomainName:              constants.TestDomainName,
+				DomainName:              testconstants.TestDomainName,
 				DomainActiveClusterName: common.Ptr(cluster.TestCurrentClusterName),
 			},
 			err: errDomainUpdateTooFrequent,

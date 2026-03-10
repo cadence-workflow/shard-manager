@@ -91,7 +91,17 @@ jobs:
           cache: true
 
       - name: Start etcd
-        run: docker compose -f docker/github_actions/docker-compose.yml up -d etcd
+        run: |
+          docker compose -f docker/github_actions/docker-compose.yml up -d etcd
+          # Wait for etcd to be ready
+          for i in {1..30}; do
+            if docker compose -f docker/github_actions/docker-compose.yml exec -T etcd etcdctl endpoint health 2>/dev/null; then
+              echo "etcd is ready"
+              break
+            fi
+            echo "Waiting for etcd... ($i/30)"
+            sleep 1
+          done
 
       - name: Run integration test with etcd
         run: ETCD_ENDPOINTS=http://localhost:2379 make integration_tests_etcd

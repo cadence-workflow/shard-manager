@@ -34,14 +34,13 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.23.4'
+          cache: true
 
-      - name: Run unit test
-        uses: nick-fields/retry@v3
-        with:
-          max_attempts: 2
-          timeout_minutes: 30
-          command: |
-            docker compose -f docker/github_actions/docker-compose.yml run unit-test bash -c "make .just-build && make cover_profile && ./scripts/github_actions/gen_coverage_metadata.sh .build/coverage/metadata.txt"
+      - name: Run unit tests with coverage
+        run: make cover_profile
+
+      - name: Generate coverage metadata
+        run: ./scripts/github_actions/gen_coverage_metadata.sh .build/coverage/metadata.txt
 
       - name: Upload coverage artifacts
         if: always()
@@ -68,9 +67,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.23.4'
+          cache: true
 
       - name: Run golint
-        run: docker compose -f docker/github_actions/docker-compose.yml run coverage-report bash -c "./scripts/github_actions/golint.sh"
+        run: ./scripts/github_actions/golint.sh
 
 
   golang-integration-test-with-etcd:
@@ -88,11 +88,14 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.23.4'
+          cache: true
+
+      - name: Start etcd
+        run: docker compose -f docker/github_actions/docker-compose.yml up -d etcd
 
       - name: Run integration test with etcd
-        uses: nick-fields/retry@v3
-        with:
-          max_attempts: 2
-          timeout_minutes: 30
-          command: |
-            docker compose -f docker/github_actions/docker-compose.yml run integration-test-with-etcd bash -c "make .just-build && make integration_tests_etcd"
+        run: ETCD_ENDPOINTS=http://localhost:2379 make integration_tests_etcd
+
+      - name: Stop etcd
+        if: always()
+        run: docker compose -f docker/github_actions/docker-compose.yml down

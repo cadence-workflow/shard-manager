@@ -25,13 +25,11 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pborman/uuid v0.0.0-20180906182336-adf5a7427709 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/stretchr/testify v1.10.0
 	github.com/uber-go/tally v3.3.15+incompatible // indirect
 	github.com/uber/cadence-idl v0.0.0-20260226231252-039e65827dda // indirect
 	github.com/uber/ringpop-go v0.8.5 // indirect
 	github.com/uber/tchannel-go v1.22.2 // indirect
-	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/cadence v0.19.0 // indirect
 	go.uber.org/config v1.4.0 // indirect
@@ -73,7 +71,6 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.3.2 // indirect
-	github.com/MicahParks/keyfunc/v2 v2.1.0 // indirect
 	github.com/apache/thrift v0.17.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
@@ -98,13 +95,10 @@ require (
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/uber-common/bark v1.2.1 // indirect
 	github.com/uber-go/mapdecode v1.0.0 // indirect
 	github.com/urfave/cli/v2 v2.27.4
-	github.com/xdg/stringprep v1.0.0 // indirect
 	go.uber.org/dig v1.18.0 // indirect
 	go.uber.org/net/metrics v1.3.0 // indirect
-	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20220218215828-6cf2b201936e // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.18.0 // indirect

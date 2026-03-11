@@ -90,16 +90,11 @@ func New(p Params) (Result, error) {
 
 	cfg.fillDefaults()
 
-	svcCfg, err := cfg.GetServiceConfig(p.Service)
-	if err != nil {
-		return Result{}, fmt.Errorf("get service config: %w", err)
-	}
-
 	p.Lifecycle.Append(fx.StartHook(cfg.validate))
 
 	return Result{
 		Config:        cfg,
-		ServiceConfig: svcCfg,
+		ServiceConfig: cfg.ServiceConfig(),
 		Histograms:    cfg.Histograms,
 	}, nil
 }

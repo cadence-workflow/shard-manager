@@ -53,23 +53,20 @@ type params struct {
 }
 
 func buildDispatcher(p params) (*yarpc.Dispatcher, error) {
-	serviceConfig, err := p.Cfg.GetServiceConfig(p.ServiceFullName)
-	if err != nil {
-		return nil, fmt.Errorf("get service config: %w", err)
-	}
+	rpcCfg := p.Cfg.RPC
 
-	listenIP, err := rpc.GetListenIP(serviceConfig.RPC)
+	listenIP, err := rpc.GetListenIP(rpcCfg)
 	if err != nil {
 		return nil, fmt.Errorf("get listen IP: %w", err)
 	}
 
-	grpcAddress := net.JoinHostPort(listenIP.String(), strconv.Itoa(int(serviceConfig.RPC.GRPCPort)))
+	grpcAddress := net.JoinHostPort(listenIP.String(), strconv.Itoa(int(rpcCfg.GRPCPort)))
 
 	var transportOptions []grpc.TransportOption
-	if serviceConfig.RPC.GRPCMaxMsgSize > 0 {
+	if rpcCfg.GRPCMaxMsgSize > 0 {
 		transportOptions = append(transportOptions,
-			grpc.ServerMaxRecvMsgSize(serviceConfig.RPC.GRPCMaxMsgSize),
-			grpc.ClientMaxRecvMsgSize(serviceConfig.RPC.GRPCMaxMsgSize),
+			grpc.ServerMaxRecvMsgSize(rpcCfg.GRPCMaxMsgSize),
+			grpc.ClientMaxRecvMsgSize(rpcCfg.GRPCMaxMsgSize),
 		)
 	}
 	grpcTransport := grpc.NewTransport(transportOptions...)
@@ -80,7 +77,7 @@ func buildDispatcher(p params) (*yarpc.Dispatcher, error) {
 	}
 
 	var inboundOptions []grpc.InboundOption
-	inboundTLS, err := serviceConfig.RPC.TLS.ToTLSConfig()
+	inboundTLS, err := rpcCfg.TLS.ToTLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("inbound TLS config: %w", err)
 	}

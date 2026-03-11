@@ -20,66 +20,18 @@ ringpop:
   bootstrapHosts: [ "127.0.0.1:7933", "127.0.0.1:7934", "127.0.0.1:7935", "127.0.0.1:7940" ]
   maxJoinDuration: 30s
 
-services:
-  frontend:
-    rpc:
-      port: 7933
-      grpcPort: 7833
-      bindOnLocalHost: true
-    metrics:
-      statsd:
-        hostPort: "127.0.0.1:8125"
-        prefix: "cadence_cluster0"
-    pprof:
-      port: 7936
+rpc:
+  port: 7951
+  grpcPort: 7941
+  bindOnLocalHost: true
 
-  matching:
-    rpc:
-      port: 7935
-      grpcPort: 7835
-      bindOnLocalHost: true
-    metrics:
-      statsd:
-        hostPort: "127.0.0.1:8125"
-        prefix: "cadence_cluster0"
-    pprof:
-      port: 7938
+metrics:
+  statsd:
+    hostPort: "127.0.0.1:8125"
+    prefix: "cadence"
 
-  history:
-    rpc:
-      port: 7934
-      grpcPort: 7834
-      bindOnLocalHost: true
-    metrics:
-      statsd:
-        hostPort: "127.0.0.1:8125"
-        prefix: "cadence_cluster0"
-    pprof:
-      port: 7937
-
-  worker:
-    rpc:
-      port: 7940
-      bindOnLocalHost: true
-    metrics:
-      statsd:
-        hostPort: "127.0.0.1:8125"
-        prefix: "cadence_cluster0"
-    pprof:
-      port: 7941
-
-
-  shard-distributor:
-    rpc:
-      port: 7951
-      grpcPort: 7941
-      bindOnLocalHost: true
-    metrics:
-      statsd:
-        hostPort: "127.0.0.1:8125"
-        prefix: "cadence"
-    pprof:
-      port: 7952
+pprof:
+  port: 7952
 
 
 clusterGroupMetadata:

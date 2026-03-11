@@ -37,18 +37,18 @@ persistence:
         pluginName: "cassandra"
         hosts: "127.0.0.1"
         keyspace: "cadence_visibility"
-services:
-  shard-distributor:
-    rpc:
-      port: 7941
-      grpcPort: 7943
-      bindOnLocalHost: true
-    metrics:
-      statsd:
-        hostPort: "127.0.0.1:8125"
-        prefix: "cadence"
-    pprof:
-      port: 7942
+rpc:
+  port: 7941
+  grpcPort: 7943
+  bindOnLocalHost: true
+
+metrics:
+  statsd:
+    hostPort: "127.0.0.1:8125"
+    prefix: "cadence"
+
+pprof:
+  port: 7942
 
 ringpop:
   name: cadence

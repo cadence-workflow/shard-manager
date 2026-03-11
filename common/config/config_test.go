@@ -32,7 +32,6 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common/constants"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 func TestToString(t *testing.T) {
@@ -166,12 +165,8 @@ func TestInvalidMultipleDatabaseConfig_nonEmptySQLConnAddr(t *testing.T) {
 func TestConfigFallbacks(t *testing.T) {
 	metadata := validClusterGroupMetadata()
 	cfg := &Config{
-		Services: map[string]Service{
-			"frontend": {
-				RPC: RPC{
-					Port: 7900,
-				},
-			},
+		RPC: RPC{
+			Port: 7900,
 		},
 		ClusterGroupMetadata: metadata,
 		Persistence: Persistence{
@@ -222,15 +217,16 @@ func TestConfigErrorInAuthorizationConfig(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestGetServiceConfig(t *testing.T) {
-	cfg := Config{}
-	_, err := cfg.GetServiceConfig(service.Frontend)
-	assert.EqualError(t, err, "no config section for service: frontend")
-
-	cfg = Config{Services: map[string]Service{"frontend": {RPC: RPC{GRPCPort: 123}}}}
-	svc, err := cfg.GetServiceConfig(service.Frontend)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, svc)
+func TestServiceConfig(t *testing.T) {
+	cfg := Config{
+		RPC:     RPC{GRPCPort: 123},
+		Metrics: Metrics{Prefix: "test"},
+		PProf:   PProf{Port: 456},
+	}
+	svc := cfg.ServiceConfig()
+	assert.Equal(t, uint16(123), svc.RPC.GRPCPort)
+	assert.Equal(t, "test", svc.Metrics.Prefix)
+	assert.Equal(t, 456, svc.PProf.Port)
 }
 
 func getValidShardedNoSQLConfig() *Config {

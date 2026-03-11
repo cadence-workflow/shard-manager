@@ -1,35 +1,5 @@
-services:
-  frontend:
-    metrics:
-      statsd: ~
-      prometheus:
-        timerType: "histogram"
-        listenAddress: "127.0.0.1:8000"
-
-  matching:
-    metrics:
-      statsd: ~
-      prometheus:
-        timerType: "histogram"
-        listenAddress: "127.0.0.1:8001"
-
-  history:
-    metrics:
-      statsd: ~
-      prometheus:
-        timerType: "histogram"
-        listenAddress: "127.0.0.1:8002"
-
-  worker:
-    metrics:
-      statsd: ~
-      prometheus:
-        timerType: "histogram"
-        listenAddress: "127.0.0.1:8003"
-
-  shard-distributor:
-    metrics:
-      statsd: ~
-      prometheus:
-        timerType: "histogram"
-        listenAddress: "127.0.0.1:8004"
+metrics:
+  statsd: ~
+  prometheus:
+    timerType: "histogram"
+    listenAddress: "127.0.0.1:8004"

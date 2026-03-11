@@ -37,14 +37,19 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	ringpopprovider "github.com/cadence-workflow/shard-manager/common/peerprovider/ringpopprovider/config"
-	"github.com/cadence-workflow/shard-manager/common/service"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 	sdconfig "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 )
 
 type (
-	// Config contains the configuration for a set of cadence services
+	// Config contains the configuration for the shard-manager service
 	Config struct {
+		// RPC contains the RPC transport configuration
+		RPC RPC `yaml:"rpc"`
+		// Metrics is the metrics subsystem configuration
+		Metrics Metrics `yaml:"metrics"`
+		// PProf is the PProf configuration
+		PProf PProf `yaml:"pprof"`
 		// Ringpop is the ringpop related configuration
 		Ringpop ringpopprovider.Config `yaml:"ringpop"`
 		// Membership is used to configure peer provider plugin
@@ -59,8 +64,6 @@ type (
 		ClusterMetadata *ClusterGroupMetadata `yaml:"clusterMetadata"`
 		// Deprecated: please use ClusterRedirectionPolicy under ClusterGroupMetadata
 		DCRedirectionPolicy *ClusterRedirectionPolicy `yaml:"dcRedirectionPolicy"`
-		// Services is a map of service name to service config items
-		Services map[string]Service `yaml:"services"`
 		// Kafka is the config for connecting to kafka
 		Kafka KafkaConfig `yaml:"kafka"`
 		// Archival is the config for archival
@@ -124,14 +127,12 @@ type (
 		FileBased   dynamicconfig.FileBasedClientConfig `yaml:"filebased"`
 	}
 
-	// Service contains the service specific config items
+	// Service is a convenience struct grouping RPC, Metrics, and PProf config.
+	// Used internally by the config fx module to provide service-level config to consumers.
 	Service struct {
-		// TChannel is the tchannel configuration
-		RPC RPC `yaml:"rpc"`
-		// Metrics is the metrics subsystem configuration
-		Metrics Metrics `yaml:"metrics"`
-		// PProf is the PProf configuration
-		PProf PProf `yaml:"pprof"`
+		RPC     RPC
+		Metrics Metrics
+		PProf   PProf
 	}
 
 	// PProf contains the rpc config items
@@ -738,11 +739,11 @@ func (c *Config) String() string {
 	return string(out)
 }
 
-func (c *Config) GetServiceConfig(serviceName string) (Service, error) {
-	shortName := service.ShortName(serviceName)
-	serviceConfig, ok := c.Services[shortName]
-	if !ok {
-		return Service{}, fmt.Errorf("no config section for service: %s", shortName)
+// ServiceConfig returns service-level config (RPC, Metrics, PProf) from the top-level Config fields.
+func (c *Config) ServiceConfig() Service {
+	return Service{
+		RPC:     c.RPC,
+		Metrics: c.Metrics,
+		PProf:   c.PProf,
 	}
-	return serviceConfig, nil
 }

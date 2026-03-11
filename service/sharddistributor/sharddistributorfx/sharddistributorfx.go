@@ -24,7 +24,6 @@ package sharddistributorfx
 
 import (
 	"go.uber.org/fx"
-
 	"go.uber.org/yarpc"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"

@@ -51,7 +51,6 @@ require (
 )
 
 require (
-	github.com/IBM/sarama v1.45.2
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/google/gofuzz v1.0.0
 	github.com/mark3labs/mcp-go v0.18.0
@@ -63,14 +62,14 @@ require (
 require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
-	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
-	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.5 // indirect
 	google.golang.org/genproto v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231012201019-e917dd12ba7a // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
 
 require (
@@ -81,23 +80,11 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/cristalhq/jwt/v3 v3.1.0 // indirect
-	github.com/eapache/go-resiliency v1.7.0 // indirect
-	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
-	github.com/eapache/queue v1.1.0 // indirect
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/gogo/googleapis v1.3.2 // indirect
 	github.com/gogo/status v1.1.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4
-	github.com/hashicorp/errwrap v1.0.0 // indirect
-	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/hashicorp/go-uuid v1.0.3 // indirect
-	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
-	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
-	github.com/jcmturner/gofork v1.7.6 // indirect
-	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
-	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/m3db/prometheus_client_model v0.1.0 // indirect
 	github.com/m3db/prometheus_common v0.1.0 // indirect
 	github.com/m3db/prometheus_procfs v0.8.1 // indirect

@@ -1240,4 +1240,3 @@ func TestSyncShardStatus_GetTimestamp(t *testing.T) {
 	res = nilStruct.GetTimestamp()
 	assert.Equal(t, int64(0), res)
 }
-

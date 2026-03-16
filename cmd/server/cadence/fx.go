@@ -54,7 +54,6 @@ func Module(serviceName string) fx.Option {
 	}
 	return fx.Options(
 		fx.Supply(serviceContext{
-			Name:     serviceName,
 			FullName: service.FullName(serviceName),
 		}),
 		fx.Provide(func(cfg config.Config) shardDistributorCfg.ShardDistribution {
@@ -74,6 +73,5 @@ func Module(serviceName string) fx.Option {
 type serviceContext struct {
 	fx.Out
 
-	Name     string `name:"service"`
 	FullName string `name:"service-full-name"`
 }

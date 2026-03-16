@@ -10,18 +10,14 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/config"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	"github.com/cadence-workflow/shard-manager/common/service"
 )
 
 func TestModule(t *testing.T) {
 	fxApp := fxtest.New(t,
 		testlogger.Module(t),
-		fx.Provide(fx.Annotated{
-			Target: func() string { return service.Frontend },
-			Name:   "service-full-name"},
-			func() config.Service {
-				return config.Service{}
-			}),
+		fx.Provide(func() config.Service {
+			return config.Service{}
+		}),
 		fx.Provide(func() metrics.HistogramMigration { return metrics.HistogramMigration{} }),
 		Module,
 		fx.Invoke(func(mc metrics.Client) {}))
@@ -31,10 +27,7 @@ func TestModule(t *testing.T) {
 func TestModuleWithExternalScope(t *testing.T) {
 	fxApp := fxtest.New(t,
 		testlogger.Module(t),
-		fx.Provide(func() tally.Scope { return tally.NoopScope },
-			fx.Annotated{
-				Target: func() string { return service.Frontend },
-				Name:   "service-full-name"}),
+		fx.Provide(func() tally.Scope { return tally.NoopScope }),
 		fx.Provide(func() metrics.HistogramMigration { return metrics.HistogramMigration{} }),
 		ModuleForExternalScope,
 		fx.Invoke(func(mc metrics.Client) {}))

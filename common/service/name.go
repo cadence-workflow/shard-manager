@@ -34,7 +34,7 @@ const (
 	// Worker is the name of the worker service (unused by shard-manager, kept for config compatibility)
 	Worker = "cadence-worker"
 	// ShardDistributor is the name of the shard distributor service
-	ShardDistributor = "cadence-shard-distributor"
+	ShardDistributor = "shard-distributor"
 )
 
 // List contains the list of all supported services for shard-manager

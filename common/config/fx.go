@@ -45,8 +45,6 @@ type Context struct {
 type Params struct {
 	fx.In
 
-	Service string `name:"service"`
-
 	Context   Context
 	LookupEnv LookupEnvFunc `optional:"true"`
 

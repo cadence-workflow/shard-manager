@@ -22,20 +22,23 @@ package proto
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/yarpc/yarpcerrors"
 
-	"github.com/cadence-workflow/shard-manager/common/types/testdata"
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 func TestErrors(t *testing.T) {
-	for _, err := range testdata.Errors {
-		name := reflect.TypeOf(err).Elem().Name()
-		t.Run(name, func(t *testing.T) {
-			// Test that the mappings does not lose information
+	testCases := []error{
+		&types.InternalServiceError{Message: "internal error"},
+		&types.BadRequestError{Message: "bad request"},
+		&types.NamespaceNotFoundError{Namespace: "test-ns"},
+		&types.ShardNotFoundError{Namespace: "test-ns", ShardKey: "shard-1"},
+	}
+	for _, err := range testCases {
+		t.Run(err.Error(), func(t *testing.T) {
 			assert.Equal(t, err, ToError(FromError(err)))
 		})
 	}

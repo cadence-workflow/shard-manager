@@ -24,8 +24,10 @@ package cadence
 
 import (
 	"go.uber.org/fx"
+	"go.uber.org/yarpc"
 	"go.uber.org/zap"
 
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
 	"github.com/cadence-workflow/shard-manager/common/clock/clockfx"
 	"github.com/cadence-workflow/shard-manager/common/config"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicconfigfx"
@@ -67,7 +69,17 @@ func Module(serviceName string) fx.Option {
 		etcd.Module,
 
 		rpcfx.Module,
-		sharddistributorfx.Module)
+		sharddistributorfx.Module,
+		fx.Invoke(registerProcedures))
+}
+
+func registerProcedures(
+	dispatcher *yarpc.Dispatcher,
+	apiServer sharddistributorv1.ShardDistributorAPIYARPCServer,
+	executorServer sharddistributorv1.ShardDistributorExecutorAPIYARPCServer,
+) {
+	dispatcher.Register(sharddistributorv1.BuildShardDistributorAPIYARPCProcedures(apiServer))
+	dispatcher.Register(sharddistributorv1.BuildShardDistributorExecutorAPIYARPCProcedures(executorServer))
 }
 
 type serviceContext struct {

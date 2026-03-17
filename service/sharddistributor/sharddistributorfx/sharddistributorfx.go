@@ -24,8 +24,8 @@ package sharddistributorfx
 
 import (
 	"go.uber.org/fx"
-	"go.uber.org/yarpc"
 
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
@@ -40,6 +40,8 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/wrappers/metered"
 )
 
+// Module provides shard distributor YARPC server implementations.
+// The caller is responsible for registering procedures on the dispatcher.
 var Module = fx.Module("sharddistributor",
 	namespace.Module,
 	election.Module,
@@ -48,16 +50,16 @@ var Module = fx.Module("sharddistributor",
 	fx.Decorate(func(s store.Store, metricsClient metrics.Client, logger log.Logger, timeSource clock.TimeSource) store.Store {
 		return meteredStore.NewStore(s, metricsClient, logger, timeSource)
 	}),
-	fx.Invoke(registerHandlers))
+	fx.Provide(provideServers),
+)
 
-type registerHandlersParams struct {
+type serversParams struct {
 	fx.In
 
 	ShardDistributionCfg config.ShardDistribution
 
 	Logger        log.Logger
 	MetricsClient metrics.Client
-	Dispatcher    *yarpc.Dispatcher
 	Config        *config.Config
 
 	TimeSource clock.TimeSource
@@ -66,22 +68,24 @@ type registerHandlersParams struct {
 	Lifecycle fx.Lifecycle
 }
 
-func registerHandlers(params registerHandlersParams) error {
-	dispatcher := params.Dispatcher
+type ServersResult struct {
+	fx.Out
 
+	APIServer      sharddistributorv1.ShardDistributorAPIYARPCServer
+	ExecutorServer sharddistributorv1.ShardDistributorExecutorAPIYARPCServer
+}
+
+func provideServers(params serversParams) ServersResult {
 	rawHandler := handler.NewHandler(params.Logger, params.ShardDistributionCfg, params.Store)
 	wrappedHandler := metered.NewMetricsHandler(rawHandler, params.Logger, params.MetricsClient)
 
 	executorHandler := handler.NewExecutorHandler(params.Logger, params.Store, params.TimeSource, params.ShardDistributionCfg, params.Config, params.MetricsClient)
 	wrappedExecutor := metered.NewExecutorMetricsExecutor(executorHandler, params.Logger, params.MetricsClient)
 
-	grpcHandler := grpc.NewGRPCHandler(wrappedHandler)
-	grpcHandler.Register(dispatcher)
-
-	executorGRPCHander := grpc.NewExecutorGRPCExecutor(wrappedExecutor)
-	executorGRPCHander.Register(dispatcher)
-
 	params.Lifecycle.Append(fx.StartStopHook(rawHandler.Start, rawHandler.Stop))
 
-	return nil
+	return ServersResult{
+		APIServer:      grpc.NewGRPCHandler(wrappedHandler),
+		ExecutorServer: grpc.NewExecutorGRPCExecutor(wrappedExecutor),
+	}
 }

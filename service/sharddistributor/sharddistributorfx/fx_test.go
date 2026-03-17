@@ -10,6 +10,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/yarpc"
 
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
@@ -45,8 +46,16 @@ func TestFxServiceStartStop(t *testing.T) {
 				return clock.NewMockedTimeSource()
 			},
 		),
-		Module)
+		Module,
+		fx.Invoke(func(
+			dispatcher *yarpc.Dispatcher,
+			apiServer sharddistributorv1.ShardDistributorAPIYARPCServer,
+			executorServer sharddistributorv1.ShardDistributorExecutorAPIYARPCServer,
+		) {
+			dispatcher.Register(sharddistributorv1.BuildShardDistributorAPIYARPCProcedures(apiServer))
+			dispatcher.Register(sharddistributorv1.BuildShardDistributorExecutorAPIYARPCProcedures(executorServer))
+		}),
+	)
 	app.RequireStart().RequireStop()
-	// API should be registered inside dispatcher.
 	assert.True(t, len(testDispatcher.Introspect().Procedures) > 3)
 }

@@ -36,7 +36,7 @@ require (
 	go.uber.org/fx v1.23.0
 	go.uber.org/multierr v1.10.0
 	go.uber.org/thriftrw v1.29.2 // indirect
-	go.uber.org/yarpc v1.70.3 // indirect
+	go.uber.org/yarpc v1.70.3
 	go.uber.org/zap v1.26.0
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect

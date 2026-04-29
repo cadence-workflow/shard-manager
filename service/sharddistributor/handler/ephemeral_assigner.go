@@ -26,9 +26,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 
 	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/handler/loadbalance"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -42,20 +42,21 @@ import (
 // per shard) to fetch metadata for the response, since metadata is stored
 // separately in the shard cache and is not returned by GetState.
 //
-// Within the batch the least-loaded ACTIVE executor is chosen per shard, with
-// the in-batch running count updated after each pick so load is spread evenly.
+// Within the batch, each shard is assigned to an ACTIVE executor according to
+// the configured load balancing mode. The balancer updates its in-batch load
+// state after every pick so later picks account for earlier picks.
 func (h *handlerImpl) assignEphemeralBatch(ctx context.Context, namespace string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, error) {
 	state, err := h.storage.GetState(ctx, namespace)
 	if err != nil {
 		return nil, &types.InternalServiceError{Message: fmt.Sprintf("get namespace state: %v", err)}
 	}
 
-	assignedCounts, err := buildAssignedCounts(state)
+	balancer, err := loadbalance.New(h.cfg.GetLoadBalancingMode(namespace), state)
 	if err != nil {
-		return nil, err
+		return nil, &types.InternalServiceError{Message: err.Error()}
 	}
 
-	chosenExecutors, err := pickExecutors(namespace, shardKeys, assignedCounts)
+	chosenExecutors, err := pickExecutors(namespace, balancer, shardKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -79,41 +80,21 @@ func (h *handlerImpl) assignEphemeralBatch(ctx context.Context, namespace string
 	return buildResults(namespace, shardKeys, chosenExecutors, executorOwners), nil
 }
 
-// buildAssignedCounts returns a map of executorID -> current shard count for
-// all ACTIVE executors in the given namespace state.
-func buildAssignedCounts(state *store.NamespaceState) (map[string]int, error) {
-	counts := make(map[string]int, len(state.ShardAssignments))
-	for executorID, assignment := range state.ShardAssignments {
-		executorState, ok := state.Executors[executorID]
-		if !ok || executorState.Status != types.ExecutorStatusACTIVE {
-			continue
-		}
-		counts[executorID] = len(assignment.AssignedShards)
-	}
-	return counts, nil
-}
-
-// pickExecutors assigns each shard key to the least-loaded active executor,
-// updating the in-batch running count after every pick to spread load evenly.
-// It returns a map of shardKey -> chosen executorID.
-func pickExecutors(namespace string, shardKeys []string, assignedCounts map[string]int) (map[string]string, error) {
-	chosenExecutors := make(map[string]string, len(shardKeys))
+// pickExecutors asks the balancer to choose an executor for each shard key.
+// Returns a map of shardKey -> chosen executorID.
+func pickExecutors(namespace string, balancer loadbalance.Balancer, shardKeys []string) (map[string]string, error) {
+	chosen := make(map[string]string, len(shardKeys))
 	for _, shardKey := range shardKeys {
-		chosenExecutor := ""
-		minCount := math.MaxInt
-		for executorID, count := range assignedCounts {
-			if count < minCount {
-				minCount = count
-				chosenExecutor = executorID
+		executor, err := balancer.Pick()
+		if err != nil {
+			if errors.Is(err, loadbalance.ErrNoActiveExecutors) {
+				return nil, &types.InternalServiceError{Message: "no active executors available for namespace: " + namespace}
 			}
+			return nil, &types.InternalServiceError{Message: fmt.Sprintf("pick executor: %v", err)}
 		}
-		if chosenExecutor == "" {
-			return nil, &types.InternalServiceError{Message: "no active executors available for namespace: " + namespace}
-		}
-		chosenExecutors[shardKey] = chosenExecutor
-		assignedCounts[chosenExecutor]++
+		chosen[shardKey] = executor
 	}
-	return chosenExecutors, nil
+	return chosen, nil
 }
 
 // mergeAssignments folds the chosen shard→executor assignments back into state.

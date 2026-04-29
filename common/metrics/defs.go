@@ -2234,6 +2234,7 @@ const (
 	PersistenceFailures
 	PersistenceLatency
 	PersistenceLatencyHistogram
+	PersistenceLatencyNSHistogram
 	PersistenceErrShardExistsCounter
 	PersistenceErrShardOwnershipLostCounter
 	PersistenceErrConditionFailedCounter
@@ -2255,7 +2256,9 @@ const (
 	PersistenceRequestsPerShard
 	PersistenceFailuresPerDomain
 	PersistenceLatencyPerDomain
+	PersistenceLatencyPerDomainHistogram
 	PersistenceLatencyPerShard
+	PersistenceLatencyPerShardHistogram
 	PersistenceErrShardExistsCounterPerDomain
 	PersistenceErrShardOwnershipLostCounterPerDomain
 	PersistenceErrConditionFailedCounterPerDomain
@@ -2304,11 +2307,13 @@ const (
 	ElasticsearchRequests
 	ElasticsearchFailures
 	ElasticsearchLatency
+	ElasticsearchLatencyHistogram
 	ElasticsearchErrBadRequestCounter
 	ElasticsearchErrBusyCounter
 	ElasticsearchRequestsPerDomain
 	ElasticsearchFailuresPerDomain
 	ElasticsearchLatencyPerDomain
+	ElasticsearchLatencyPerDomainHistogram
 	ElasticsearchErrBadRequestCounterPerDomain
 	ElasticsearchErrBusyCounterPerDomain
 
@@ -2503,6 +2508,7 @@ const (
 	TaskQueueLatency
 	ExponentialTaskQueueLatency
 	ScheduleToStartHistoryQueueLatencyPerTaskList
+	ScheduleToStartHistoryQueueLatencyPerTaskListHistogram
 	TaskRequestsOldScheduler
 	TaskRequestsNewScheduler
 	PendingTaskGauge
@@ -2546,6 +2552,8 @@ const (
 
 	ProcessingQueueNumTimer
 	ProcessingQueueMaxLevelTimer
+	ProcessingQueueNumHistogram
+	ProcessingQueueMaxLevelHistogram
 	ProcessingQueuePendingTaskSplitCounter
 	ProcessingQueueStuckTaskSplitCounter
 	ProcessingQueueSelectedDomainSplitCounter
@@ -2576,6 +2584,7 @@ const (
 	ClusterMetadataResolvingMinFailoverVersionCounter
 
 	ActivityE2ELatency
+	ActivityE2ELatencyHistogram
 	ActivityLostCounter
 	AckLevelUpdateCounter
 	AckLevelUpdateFailedCounter
@@ -3081,6 +3090,7 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		PersistenceFailures:                                          {metricName: "persistence_errors", metricType: Counter},
 		PersistenceLatency:                                           {metricName: "persistence_latency", metricType: Timer},
 		PersistenceLatencyHistogram:                                  {metricName: "persistence_latency_histogram", metricType: Histogram, buckets: PersistenceLatencyBuckets},
+		PersistenceLatencyNSHistogram:                              {metricName: "persistence_latency_ns", metricType: Histogram, exponentialBuckets: Default1ms100s},
 		PersistenceErrShardExistsCounter:                             {metricName: "persistence_errors_shard_exists", metricType: Counter},
 		PersistenceErrShardOwnershipLostCounter:                      {metricName: "persistence_errors_shard_ownership_lost", metricType: Counter},
 		PersistenceErrConditionFailedCounter:                         {metricName: "persistence_errors_condition_failed", metricType: Counter},
@@ -3101,7 +3111,9 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		PersistenceRequestsPerShard:                                  {metricName: "persistence_requests_per_shard", metricType: Counter},
 		PersistenceFailuresPerDomain:                                 {metricName: "persistence_errors_per_domain", metricRollupName: "persistence_errors", metricType: Counter},
 		PersistenceLatencyPerDomain:                                  {metricName: "persistence_latency_per_domain", metricRollupName: "persistence_latency", metricType: Timer},
+		PersistenceLatencyPerDomainHistogram:                         {metricName: "persistence_latency_per_domain_ns", metricRollupName: "persistence_latency_ns", metricType: Histogram, exponentialBuckets: Default1ms100s},
 		PersistenceLatencyPerShard:                                   {metricName: "persistence_latency_per_shard", metricType: Timer},
+		PersistenceLatencyPerShardHistogram:                          {metricName: "persistence_latency_per_shard_ns", metricRollupName: "persistence_latency_ns", metricType: Histogram, exponentialBuckets: Default1ms100s},
 		PersistenceErrShardExistsCounterPerDomain:                    {metricName: "persistence_errors_shard_exists_per_domain", metricRollupName: "persistence_errors_shard_exists", metricType: Counter},
 		PersistenceErrShardOwnershipLostCounterPerDomain:             {metricName: "persistence_errors_shard_ownership_lost_per_domain", metricRollupName: "persistence_errors_shard_ownership_lost", metricType: Counter},
 		PersistenceErrConditionFailedCounterPerDomain:                {metricName: "persistence_errors_condition_failed_per_domain", metricRollupName: "persistence_errors_condition_failed", metricType: Counter},
@@ -3139,11 +3151,13 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ElasticsearchRequests:                                        {metricName: "elasticsearch_requests", metricType: Counter},
 		ElasticsearchFailures:                                        {metricName: "elasticsearch_errors", metricType: Counter},
 		ElasticsearchLatency:                                         {metricName: "elasticsearch_latency", metricType: Timer},
+		ElasticsearchLatencyHistogram:                                {metricName: "elasticsearch_latency_ns", metricType: Histogram, exponentialBuckets: Low1ms100s},
 		ElasticsearchErrBadRequestCounter:                            {metricName: "elasticsearch_errors_bad_request", metricType: Counter},
 		ElasticsearchErrBusyCounter:                                  {metricName: "elasticsearch_errors_busy", metricType: Counter},
 		ElasticsearchRequestsPerDomain:                               {metricName: "elasticsearch_requests_per_domain", metricRollupName: "elasticsearch_requests", metricType: Counter},
 		ElasticsearchFailuresPerDomain:                               {metricName: "elasticsearch_errors_per_domain", metricRollupName: "elasticsearch_errors", metricType: Counter},
 		ElasticsearchLatencyPerDomain:                                {metricName: "elasticsearch_latency_per_domain", metricRollupName: "elasticsearch_latency", metricType: Timer},
+		ElasticsearchLatencyPerDomainHistogram:                       {metricName: "elasticsearch_latency_per_domain_ns", metricRollupName: "elasticsearch_latency_ns", metricType: Histogram, exponentialBuckets: Mid1ms24h},
 		ElasticsearchErrBadRequestCounterPerDomain:                   {metricName: "elasticsearch_errors_bad_request_per_domain", metricRollupName: "elasticsearch_errors_bad_request", metricType: Counter},
 		ElasticsearchErrBusyCounterPerDomain:                         {metricName: "elasticsearch_errors_busy_per_domain", metricRollupName: "elasticsearch_errors_busy", metricType: Counter},
 		PinotRequests:                                                {metricName: "pinot_requests", metricType: Counter},
@@ -3358,6 +3372,7 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		TaskQueueLatency:                              {metricName: "task_latency_queue", metricType: Timer},
 		ExponentialTaskQueueLatency:                   {metricName: "task_latency_queue_ns", metricType: Histogram, exponentialBuckets: Mid1ms24h},
 		ScheduleToStartHistoryQueueLatencyPerTaskList: {metricName: "schedule_to_start_history_queue_latency_per_tl", metricType: Timer},
+		ScheduleToStartHistoryQueueLatencyPerTaskListHistogram: {metricName: "schedule_to_start_history_queue_latency_per_tl_ns", metricType: Histogram, exponentialBuckets: Mid1ms24h},
 		TaskRequestsOldScheduler:                      {metricName: "task_requests_old_scheduler", metricType: Counter},
 		TaskRequestsNewScheduler:                      {metricName: "task_requests_new_scheduler", metricType: Counter},
 		PendingTaskGauge:                              {metricName: "pending_task_gauge", metricType: Gauge},
@@ -3402,6 +3417,8 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		TransferTaskMissingEventCounter:                              {metricName: "transfer_task_missing_event_counter", metricType: Counter},
 		ProcessingQueueNumTimer:                                      {metricName: "processing_queue_num", metricType: Timer},
 		ProcessingQueueMaxLevelTimer:                                 {metricName: "processing_queue_max_level", metricType: Timer},
+		ProcessingQueueNumHistogram:                                  {metricName: "processing_queue_num_counts", metricType: Histogram, intExponentialBuckets: Mid1To16k},
+		ProcessingQueueMaxLevelHistogram:                             {metricName: "processing_queue_max_level_counts", metricType: Histogram, intExponentialBuckets: Mid1To16k},
 		ProcessingQueuePendingTaskSplitCounter:                       {metricName: "processing_queue_pending_task_split_counter", metricType: Counter},
 		ProcessingQueueStuckTaskSplitCounter:                         {metricName: "processing_queue_stuck_task_split_counter", metricType: Counter},
 		ProcessingQueueSelectedDomainSplitCounter:                    {metricName: "processing_queue_selected_domain_split_counter", metricType: Counter},
@@ -3428,6 +3445,7 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ClusterMetadataResolvingFailoverVersionCounter:               {metricName: "resolving_failover_version_counter", metricType: Counter},
 		ClusterMetadataResolvingMinFailoverVersionCounter:            {metricName: "resolving_min_failover_version_counter", metricType: Counter},
 		ActivityE2ELatency:                                           {metricName: "activity_end_to_end_latency", metricType: Timer},
+		ActivityE2ELatencyHistogram:                                  {metricName: "activity_end_to_end_latency_ns", metricType: Histogram, exponentialBuckets: Mid1ms24h},
 		ActivityLostCounter:                                          {metricName: "activity_lost", metricType: Counter},
 		AckLevelUpdateCounter:                                        {metricName: "ack_level_update", metricType: Counter},
 		AckLevelUpdateFailedCounter:                                  {metricName: "ack_level_update_failed", metricType: Counter},

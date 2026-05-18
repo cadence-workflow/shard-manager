@@ -25,12 +25,12 @@ package handler
 import (
 	"context"
 	"errors"
-	"github.com/cadence-workflow/shard-manager/common/clock"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"

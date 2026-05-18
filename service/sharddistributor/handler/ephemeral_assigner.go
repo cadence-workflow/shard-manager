@@ -61,7 +61,7 @@ func (h *handlerImpl) assignEphemeralBatch(ctx context.Context, namespace string
 		return nil, err
 	}
 
-	mergeAssignments(state, chosenExecutors)
+	h.mergeAssignments(state, chosenExecutors)
 
 	if err := h.storage.AssignShards(ctx, namespace, store.AssignShardsRequest{NewState: state}, store.NopGuard()); err != nil {
 		if errors.Is(err, store.ErrVersionConflict) {
@@ -100,7 +100,7 @@ func pickExecutors(namespace string, balancer loadbalance.Balancer, shardKeys []
 // mergeAssignments folds the chosen shard→executor assignments back into state.
 // The AssignedShards maps are copied to avoid mutating the object returned by
 // GetState.
-func mergeAssignments(state *store.NamespaceState, chosenExecutors map[string]string) {
+func (h *handlerImpl) mergeAssignments(state *store.NamespaceState, chosenExecutors map[string]string) {
 	for executorID, shardsForExecutor := range invertMap(chosenExecutors) {
 		existing := state.ShardAssignments[executorID]
 		newShards := make(map[string]*types.ShardAssignment, len(existing.AssignedShards)+len(shardsForExecutor))
@@ -111,6 +111,7 @@ func mergeAssignments(state *store.NamespaceState, chosenExecutors map[string]st
 			newShards[shardKey] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
 		}
 		existing.AssignedShards = newShards
+		existing.LastUpdated = h.timeSource.Now().UTC()
 		state.ShardAssignments[executorID] = existing
 	}
 }

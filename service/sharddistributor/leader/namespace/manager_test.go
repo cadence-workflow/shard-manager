@@ -93,9 +93,7 @@ type testElectionFactory struct {
 	managerStopped chan struct{}
 }
 
-func (f *testElectionFactory) CreateElector(ctx context.Context, namespaceCfg config.Namespace) (election.Elector, error) {
-	_ = ctx
-	_ = namespaceCfg
+func (f *testElectionFactory) CreateElector(_ context.Context, _ config.Namespace) (election.Elector, error) {
 	return &testElector{
 		managerStopped: f.managerStopped,
 	}, nil
@@ -475,9 +473,6 @@ func TestManagerStopsBeforeDispatcher(t *testing.T) {
 			},
 			func(lifecycle fx.Lifecycle) *yarpc.Dispatcher {
 				lifecycle.Append(fx.Hook{
-					OnStart: func(context.Context) error {
-						return nil
-					},
 					OnStop: func(context.Context) error {
 						select {
 						case <-managerStopped:

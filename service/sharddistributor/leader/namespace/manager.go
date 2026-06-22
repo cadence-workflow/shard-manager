@@ -58,9 +58,9 @@ type ManagerParams struct {
 	ElectionFactory election.Factory
 	// Dispatcher dependency enforces lifecycle ordering so manager.Stop runs
 	// before dispatcher.Stop during shutdown.
-	Dispatcher      *yarpc.Dispatcher
-	Lifecycle       fx.Lifecycle
-	DrainObserver   clientcommon.DrainSignalObserver `optional:"true"`
+	Dispatcher    *yarpc.Dispatcher
+	Lifecycle     fx.Lifecycle
+	DrainObserver clientcommon.DrainSignalObserver `optional:"true"`
 }
 
 // NewManager creates a new namespace manager

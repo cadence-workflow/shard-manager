@@ -56,6 +56,8 @@ type ManagerParams struct {
 	Logger          log.Logger
 	MetricsClient   metrics.Client
 	ElectionFactory election.Factory
+	// Dispatcher dependency enforces lifecycle ordering so manager.Stop runs
+	// before dispatcher.Stop during shutdown.
 	Dispatcher      *yarpc.Dispatcher
 	Lifecycle       fx.Lifecycle
 	DrainObserver   clientcommon.DrainSignalObserver `optional:"true"`

@@ -93,7 +93,9 @@ type testElectionFactory struct {
 	managerStopped chan struct{}
 }
 
-func (f *testElectionFactory) CreateElector(context.Context, config.Namespace) (election.Elector, error) {
+func (f *testElectionFactory) CreateElector(ctx context.Context, namespaceCfg config.Namespace) (election.Elector, error) {
+	_ = ctx
+	_ = namespaceCfg
 	return &testElector{
 		managerStopped: f.managerStopped,
 	}, nil

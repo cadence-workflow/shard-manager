@@ -104,22 +104,6 @@ func (h *handlerImpl) Stop() {
 	h.batcher.Stop()
 }
 
-func mergeContexts(serverCtx context.Context, stopCtx context.Context) (context.Context, context.CancelFunc) {
-	if stopCtx == nil {
-		return serverCtx, func() {}
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		select {
-		case <-serverCtx.Done():
-		case <-stopCtx.Done():
-		case <-ctx.Done():
-		}
-		cancel()
-	}()
-	return ctx, cancel
-}
-
 func (h *handlerImpl) Health(ctx context.Context) (*types.HealthStatus, error) {
 	h.startWG.Wait()
 	h.logger.Debug("Shard Distributor service health check endpoint reached.")
@@ -346,11 +330,15 @@ func (h *handlerImpl) ListNamespaces(_ context.Context, _ *types.ListNamespacesR
 func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequest, server WatchNamespaceStateServer) error {
 	h.startWG.Wait()
 
-	watchCtx, watchCtxCancel := mergeContexts(server.Context(), h.stopCtx)
-	defer watchCtxCancel()
+	var stopDone <-chan struct{}
+	subscribeCtx := server.Context()
+	if h.stopCtx != nil {
+		stopDone = h.stopCtx.Done()
+		subscribeCtx = h.stopCtx
+	}
 
 	// Subscribe to state changes from storage
-	assignmentChangesChan, unSubscribe, err := h.storage.SubscribeToAssignmentChanges(watchCtx, request.Namespace)
+	assignmentChangesChan, unSubscribe, err := h.storage.SubscribeToAssignmentChanges(subscribeCtx, request.Namespace)
 	defer unSubscribe()
 	if err != nil {
 		return &types.InternalServiceError{Message: fmt.Sprintf("failed to subscribe to namespace state: %v", err)}
@@ -359,8 +347,10 @@ func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequ
 	// Stream subsequent updates
 	for {
 		select {
-		case <-watchCtx.Done():
-			return watchCtx.Err()
+		case <-server.Context().Done():
+			return server.Context().Err()
+		case <-stopDone:
+			return h.stopCtx.Err()
 		case assignmentChanges, ok := <-assignmentChangesChan:
 			if !ok {
 				return fmt.Errorf("unexpected close of updates channel")

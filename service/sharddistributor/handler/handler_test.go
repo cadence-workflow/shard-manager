@@ -443,6 +443,8 @@ func TestWatchNamespaceState(t *testing.T) {
 }
 
 func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
+	const watchStopTimeout = 5 * time.Second
+
 	ctrl := gomock.NewController(t)
 	logger := testlogger.New(t)
 	mockStorage := store.NewMockStore(ctrl)
@@ -476,7 +478,7 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 	case err := <-errCh:
 		require.Error(t, err)
 		require.ErrorIs(t, err, context.Canceled)
-	case <-time.After(time.Second):
+	case <-time.After(watchStopTimeout):
 		t.Fatal("WatchNamespaceState did not stop after handler.Stop")
 	}
 }

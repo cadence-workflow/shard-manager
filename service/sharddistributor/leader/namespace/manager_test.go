@@ -9,9 +9,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/yarpc"
 
+	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
@@ -70,6 +73,30 @@ func (o *closeDrainObserver) SignalUndrain() {
 	defer o.mu.Unlock()
 	close(o.undrainCh)
 	o.drainCh = make(chan struct{})
+}
+
+type testElector struct {
+	managerStopped chan struct{}
+}
+
+func (e *testElector) Run(ctx context.Context) <-chan bool {
+	leaderCh := make(chan bool)
+	go func() {
+		<-ctx.Done()
+		close(e.managerStopped)
+		close(leaderCh)
+	}()
+	return leaderCh
+}
+
+type testElectionFactory struct {
+	managerStopped chan struct{}
+}
+
+func (f *testElectionFactory) CreateElector(context.Context, config.Namespace) (election.Elector, error) {
+	return &testElector{
+		managerStopped: f.managerStopped,
+	}, nil
 }
 
 func TestNewManager(t *testing.T) {
@@ -427,4 +454,42 @@ func TestDrainThenUndrain_ResumesElection(t *testing.T) {
 
 	err = manager.Stop(context.Background())
 	assert.NoError(t, err)
+}
+
+func TestManagerStopsBeforeDispatcher(t *testing.T) {
+	managerStopped := make(chan struct{})
+
+	app := fxtest.New(t,
+		fx.Provide(
+			func() config.ShardDistribution {
+				return config.ShardDistribution{
+					Namespaces: []config.Namespace{{Name: "test-namespace"}},
+				}
+			},
+			func() log.Logger { return testlogger.New(t) },
+			func() metrics.Client { return metrics.NewNoopMetricsClient() },
+			func() election.Factory {
+				return &testElectionFactory{managerStopped: managerStopped}
+			},
+			func(lifecycle fx.Lifecycle) *yarpc.Dispatcher {
+				lifecycle.Append(fx.Hook{
+					OnStart: func(context.Context) error {
+						return nil
+					},
+					OnStop: func(context.Context) error {
+						select {
+						case <-managerStopped:
+							return nil
+						case <-time.After(time.Second):
+							return errors.New("dispatcher stopped before manager")
+						}
+					},
+				})
+				return &yarpc.Dispatcher{}
+			},
+		),
+		Module,
+	)
+
+	app.RequireStart().RequireStop()
 }

@@ -75,11 +75,11 @@ func (o *closeDrainObserver) SignalUndrain() {
 	o.drainCh = make(chan struct{})
 }
 
-type testElector struct {
+type lifecycleTestElector struct {
 	managerStopped chan struct{}
 }
 
-func (e *testElector) Run(ctx context.Context) <-chan bool {
+func (e *lifecycleTestElector) Run(ctx context.Context) <-chan bool {
 	leaderCh := make(chan bool)
 	go func() {
 		<-ctx.Done()
@@ -89,12 +89,12 @@ func (e *testElector) Run(ctx context.Context) <-chan bool {
 	return leaderCh
 }
 
-type testElectionFactory struct {
+type lifecycleTestElectionFactory struct {
 	managerStopped chan struct{}
 }
 
-func (f *testElectionFactory) CreateElector(_ context.Context, _ config.Namespace) (election.Elector, error) {
-	return &testElector{
+func (f *lifecycleTestElectionFactory) CreateElector(_ context.Context, _ config.Namespace) (election.Elector, error) {
+	return &lifecycleTestElector{
 		managerStopped: f.managerStopped,
 	}, nil
 }
@@ -469,7 +469,7 @@ func TestManagerStopsBeforeDispatcher(t *testing.T) {
 			func() log.Logger { return testlogger.New(t) },
 			func() metrics.Client { return metrics.NewNoopMetricsClient() },
 			func() election.Factory {
-				return &testElectionFactory{managerStopped: managerStopped}
+				return &lifecycleTestElectionFactory{managerStopped: managerStopped}
 			},
 			func(lifecycle fx.Lifecycle) *yarpc.Dispatcher {
 				lifecycle.Append(fx.Hook{

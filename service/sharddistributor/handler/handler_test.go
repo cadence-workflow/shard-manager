@@ -442,6 +442,45 @@ func TestWatchNamespaceState(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	logger := testlogger.New(t)
+	mockStorage := store.NewMockStore(ctrl)
+	mockServer := NewMockWatchNamespaceStateServer(ctrl)
+
+	cfg := config.ShardDistribution{
+		Namespaces: []config.Namespace{
+			{Name: "test-ns", Type: config.NamespaceTypeFixed, ShardNum: 2},
+		},
+	}
+
+	rawHandler := NewHandler(logger, clock.NewRealTimeSource(), cfg, newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage)
+	handler := rawHandler.(*handlerImpl)
+	handler.Start()
+
+	updatesChan := make(chan map[*store.ShardOwner][]string)
+	unsubscribe := func() { close(updatesChan) }
+	serverCtx := context.Background()
+
+	mockServer.EXPECT().Context().Return(serverCtx).AnyTimes()
+	mockStorage.EXPECT().SubscribeToAssignmentChanges(gomock.Any(), "test-ns").Return(updatesChan, unsubscribe, nil)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- handler.WatchNamespaceState(&types.WatchNamespaceStateRequest{Namespace: "test-ns"}, mockServer)
+	}()
+
+	handler.Stop()
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("WatchNamespaceState did not stop after handler.Stop")
+	}
+}
+
 func TestGetNamespaceState(t *testing.T) {
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{

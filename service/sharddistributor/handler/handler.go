@@ -68,6 +68,7 @@ func NewHandler(
 		storage:              storage,
 		timeSource:           timeSource,
 	}
+	handler.stopCtx, handler.cancel = context.WithCancel(context.Background())
 
 	handler.batcher = newShardBatcher(timeSource, ephemeralBatchInterval, handler.assignEphemeralBatch)
 
@@ -80,6 +81,8 @@ type handlerImpl struct {
 	logger log.Logger
 
 	startWG sync.WaitGroup
+	stopCtx context.Context
+	cancel  context.CancelFunc
 
 	storage              store.Store
 	shardDistributionCfg config.ShardDistribution
@@ -95,7 +98,26 @@ func (h *handlerImpl) Start() {
 }
 
 func (h *handlerImpl) Stop() {
+	if h.cancel != nil {
+		h.cancel()
+	}
 	h.batcher.Stop()
+}
+
+func mergeContexts(serverCtx context.Context, stopCtx context.Context) (context.Context, context.CancelFunc) {
+	if stopCtx == nil {
+		return serverCtx, func() {}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-serverCtx.Done():
+		case <-stopCtx.Done():
+		case <-ctx.Done():
+		}
+		cancel()
+	}()
+	return ctx, cancel
 }
 
 func (h *handlerImpl) Health(ctx context.Context) (*types.HealthStatus, error) {
@@ -324,8 +346,11 @@ func (h *handlerImpl) ListNamespaces(_ context.Context, _ *types.ListNamespacesR
 func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequest, server WatchNamespaceStateServer) error {
 	h.startWG.Wait()
 
+	watchCtx, watchCtxCancel := mergeContexts(server.Context(), h.stopCtx)
+	defer watchCtxCancel()
+
 	// Subscribe to state changes from storage
-	assignmentChangesChan, unSubscribe, err := h.storage.SubscribeToAssignmentChanges(server.Context(), request.Namespace)
+	assignmentChangesChan, unSubscribe, err := h.storage.SubscribeToAssignmentChanges(watchCtx, request.Namespace)
 	defer unSubscribe()
 	if err != nil {
 		return &types.InternalServiceError{Message: fmt.Sprintf("failed to subscribe to namespace state: %v", err)}
@@ -334,8 +359,8 @@ func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequ
 	// Stream subsequent updates
 	for {
 		select {
-		case <-server.Context().Done():
-			return server.Context().Err()
+		case <-watchCtx.Done():
+			return watchCtx.Err()
 		case assignmentChanges, ok := <-assignmentChangesChan:
 			if !ok {
 				return fmt.Errorf("unexpected close of updates channel")

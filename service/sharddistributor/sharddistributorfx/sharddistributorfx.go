@@ -24,6 +24,7 @@ package sharddistributorfx
 
 import (
 	"go.uber.org/fx"
+	"go.uber.org/yarpc"
 
 	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
 	"github.com/cadence-workflow/shard-manager/common/authorization"
@@ -66,6 +67,9 @@ type serversParams struct {
 
 	TimeSource clock.TimeSource
 	Store      store.Store
+	// Dispatcher dependency enforces lifecycle ordering so handler.Stop runs
+	// before dispatcher.Stop during shutdown.
+	Dispatcher *yarpc.Dispatcher
 
 	Authorizer authorization.Authorizer `optional:"true"`
 

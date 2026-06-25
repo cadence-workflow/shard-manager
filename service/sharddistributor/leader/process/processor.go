@@ -422,6 +422,7 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 	activeExecutors := p.getActiveExecutors(namespaceState, staleExecutors)
 	if len(activeExecutors) == 0 {
 		p.logger.Debug("No active executors found. Cannot assign shards.")
+		metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopNoActiveExecutors, 1)
 
 		// Cleanup stale executors even if no active executors remain
 		if len(staleExecutors) > 0 {

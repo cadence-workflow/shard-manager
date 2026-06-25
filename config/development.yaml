@@ -117,6 +117,8 @@ shardDistribution:
       type: fixed
     - name: test-external-assignment
       type: ephemeral
+    - name: cadence-matching-dev
+      type: ephemeral
   leaderStore:
     storageParams:
       endpoints: [localhost:2379]

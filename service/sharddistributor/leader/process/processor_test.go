@@ -1038,6 +1038,53 @@ func TestAddHandoverStatsToExecutorAssignedState(t *testing.T) {
 	}
 }
 
+func TestGetNewAssignmentsState_OnlyChangedExecutors(t *testing.T) {
+	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+	now := mocks.timeSource.Now().UTC()
+	oldTime := now.Add(-time.Hour)
+
+	namespaceState := &store.NamespaceState{
+		ShardAssignments: map[string]store.AssignedState{
+			"exec-1": {
+				AssignedShards: map[string]*types.ShardAssignment{
+					"shard-1": {Status: types.AssignmentStatusREADY},
+					"shard-2": {Status: types.AssignmentStatusREADY},
+				},
+				LastUpdated: oldTime,
+				ModRevision: 10,
+			},
+			"exec-2": {
+				AssignedShards: map[string]*types.ShardAssignment{
+					"shard-3": {Status: types.AssignmentStatusREADY},
+				},
+				LastUpdated: oldTime,
+				ModRevision: 20,
+			},
+		},
+	}
+
+	currentAssignments := map[string][]string{
+		"exec-1": {"shard-1", "shard-2"}, // unchanged
+		"exec-2": {"shard-3", "shard-4"}, // changed (added shard-4)
+		"exec-3": {"shard-5"},            // new
+	}
+
+	mocks.store.EXPECT().GetShardOwner(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, store.ErrShardNotFound).AnyTimes()
+
+	newState, changedExecutors := processor.getNewAssignmentsState(namespaceState, currentAssignments)
+
+	assert.Len(t, newState, 3)
+	assert.Equal(t, map[string]struct{}{"exec-2": {}, "exec-3": {}}, changedExecutors)
+	assert.Equal(t, oldTime, newState["exec-1"].LastUpdated)
+	assert.Equal(t, now, newState["exec-2"].LastUpdated)
+	assert.Equal(t, int64(10), newState["exec-1"].ModRevision)
+	assert.Equal(t, int64(20), newState["exec-2"].ModRevision)
+	assert.Equal(t, int64(0), newState["exec-3"].ModRevision)
+}
+
 func TestEmitExecutorMetric(t *testing.T) {
 	tests := []struct {
 		name           string

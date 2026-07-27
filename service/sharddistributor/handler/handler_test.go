@@ -37,6 +37,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -45,21 +46,21 @@ const (
 	_testNamespaceEphemeral = "test-ephemeral"
 )
 
-// newTestHandler creates a handlerImpl wired with a real shardBatcher backed by
-// the provided store mock. The batcher is started and the handler is returned
+// newTestHandler creates a handlerImpl wired with a real ephemeral assigner backed
+// by the provided store mock. The assigner is started and the handler is returned
 // ready to use; callers should call Stop() when done.
 func newTestHandler(t *testing.T, cfg config.ShardDistribution, mockStore *store.MockStore) *handlerImpl {
 	t.Helper()
+	assigner := ephemeralassigner.New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStore)
 	handler := &handlerImpl{
 		logger:               testlogger.New(t),
 		shardDistributionCfg: cfg,
-		cfg:                  newTestShardDistributorConfig(config.LoadBalancingModeNAIVE),
 		storage:              mockStore,
 		timeSource:           clock.NewRealTimeSource(),
+		assigner:             assigner,
 	}
-	handler.batcher = newShardBatcher(clock.NewRealTimeSource(), 10*time.Millisecond, handler.assignEphemeralBatch)
-	handler.batcher.Start()
-	t.Cleanup(handler.batcher.Stop)
+	assigner.Start()
+	t.Cleanup(assigner.Stop)
 	return handler
 }
 

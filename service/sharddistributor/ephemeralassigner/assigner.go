@@ -21,9 +21,10 @@
 // SOFTWARE.
 
 // Package ephemeralassigner assigns ephemeral shards to executors on demand.
-// Cache-miss GetShardOwner calls for ephemeral namespaces are collected into
-// short time-window batches and each batch is planned and persisted with a
-// single pair of storage operations.
+// Cache-miss GetShardOwner calls for ephemeral namespaces are coalesced: the
+// first request triggers an immediate flush and subsequent requests that arrive
+// while the flush is in-flight are batched into the next flush. Each batch is
+// planned and persisted with a single pair of storage operations.
 package ephemeralassigner
 
 import (
@@ -42,9 +43,8 @@ import (
 )
 
 const (
-	// ephemeralBatchInterval is the time window over which GetShardOwner calls for
-	// ephemeral namespaces are collected before being processed as a single batch.
-	ephemeralBatchInterval = 100 * time.Millisecond
+	// ephemeralBatchTimeout is the context timeout for each coalesced batch flush.
+	ephemeralBatchTimeout = 100 * time.Millisecond
 
 	// versionConflictRetryInitialInterval is the starting backoff for retries
 	// triggered when a concurrent shard assignment causes a version conflict.
@@ -74,7 +74,7 @@ func New(timeSource clock.TimeSource, cfg *config.Config, storage store.Store) *
 		cfg:        cfg,
 		storage:    storage,
 	}
-	a.batcher = newShardBatcher(timeSource, ephemeralBatchInterval, a.assignEphemeralBatch)
+	a.batcher = newShardBatcher(ephemeralBatchTimeout, a.assignEphemeralBatch)
 	return a
 }
 

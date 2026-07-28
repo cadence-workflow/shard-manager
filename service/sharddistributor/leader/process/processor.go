@@ -474,7 +474,7 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 		return nil
 	}
 
-	newState := p.getNewAssignmentsState(namespaceState, currentAssignments)
+	newState, changedExecutors := p.getNewAssignmentsState(namespaceState, currentAssignments)
 
 	p.emitOldestExecutorHeartbeatLag(namespaceState, metricsLoopScope)
 
@@ -485,12 +485,14 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 	err = p.shardStore.AssignShards(ctx, p.namespaceCfg.Name, store.AssignShardsRequest{
 		NewState:          namespaceState,
 		ExecutorsToDelete: staleExecutors,
+		ChangedExecutors:  changedExecutors,
 	}, p.election.Guard())
 	if err != nil {
 		return fmt.Errorf("assign shards: %w", err)
 	}
 
 	p.emitActiveShardMetric(namespaceState.ShardAssignments, metricsLoopScope)
+	p.emitMaxOwnersPerShardMetric(namespaceState.ShardAssignments, metricsLoopScope)
 	return nil
 }
 
@@ -505,6 +507,37 @@ func (p *namespaceProcessor) emitActiveShardMetric(shardAssignments map[string]s
 func (p *namespaceProcessor) emitExecutorMetric(namespaceState *store.NamespaceState, metricsLoopScope metrics.Scope) {
 	for status, count := range namespaceState.CountExecutorsByStatus() {
 		metricsLoopScope.Tagged(metrics.ExecutorStatusTag(status.String())).UpdateGauge(metrics.ShardDistributorTotalExecutors, float64(count))
+	}
+}
+
+func (p *namespaceProcessor) emitMaxOwnersPerShardMetric(shardAssignments map[string]store.AssignedState, metricsLoopScope metrics.Scope) {
+	shardToExecutors := make(map[string][]string)
+	maxOwners := 0
+	errorShards := make([]string, 0)
+	for executorID, assignedState := range shardAssignments {
+		for shardID := range assignedState.AssignedShards {
+			shardToExecutors[shardID] = append(shardToExecutors[shardID], executorID)
+
+			count := len(shardToExecutors[shardID])
+			if count > maxOwners {
+				maxOwners = count
+			}
+			// Each multi-owned shard crosses count 2 exactly once.
+			if count == 2 {
+				errorShards = append(errorShards, shardID)
+			}
+		}
+	}
+
+	metricsLoopScope.UpdateGauge(metrics.ShardDistributorMaxExecutorsPerShard, float64(maxOwners))
+
+	for _, shardID := range errorShards {
+		executors := shardToExecutors[shardID]
+		sort.Strings(executors)
+		p.logger.Error("shard owned by multiple executors",
+			tag.ShardKey(shardID),
+			tag.ShardExecutors(executors),
+			tag.ShardNamespace(p.namespaceCfg.Name))
 	}
 }
 
@@ -610,8 +643,10 @@ func applyMoves(currentAssignments map[string][]string, moves []plan.Move) error
 	return nil
 }
 
-func (p *namespaceProcessor) getNewAssignmentsState(namespaceState *store.NamespaceState, currentAssignments map[string][]string) map[string]store.AssignedState {
+func (p *namespaceProcessor) getNewAssignmentsState(namespaceState *store.NamespaceState, currentAssignments map[string][]string) (map[string]store.AssignedState, map[string]struct{}) {
 	newState := make(map[string]store.AssignedState, len(currentAssignments))
+	changedExecutors := make(map[string]struct{})
+	now := p.timeSource.Now().UTC()
 
 	for executorID, shards := range currentAssignments {
 		assignedShardsMap := make(map[string]*types.ShardAssignment)
@@ -620,20 +655,42 @@ func (p *namespaceProcessor) getNewAssignmentsState(namespaceState *store.Namesp
 			assignedShardsMap[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
 		}
 
-		modRevision := int64(0) // Should be 0 if we have not seen it yet
-		if namespaceAssignments, ok := namespaceState.ShardAssignments[executorID]; ok {
-			modRevision = namespaceAssignments.ModRevision
+		modRevision := int64(0)
+		lastUpdated := now
+
+		oldState, existed := namespaceState.ShardAssignments[executorID]
+		if existed && shardSetsEqual(oldState.AssignedShards, assignedShardsMap) {
+			modRevision = oldState.ModRevision
+			lastUpdated = oldState.LastUpdated
+		} else {
+			changedExecutors[executorID] = struct{}{}
+			if existed {
+				modRevision = oldState.ModRevision
+			}
 		}
 
 		newState[executorID] = store.AssignedState{
 			AssignedShards:     assignedShardsMap,
-			LastUpdated:        p.timeSource.Now().UTC(),
+			LastUpdated:        lastUpdated,
 			ModRevision:        modRevision,
 			ShardHandoverStats: p.addHandoverStatsToExecutorAssignedState(namespaceState, executorID, shards),
 		}
 	}
 
-	return newState
+	return newState, changedExecutors
+}
+
+func shardSetsEqual(a map[string]*types.ShardAssignment, b map[string]*types.ShardAssignment) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, va := range a {
+		vb, ok := b[k]
+		if !ok || va.GetStatus() != vb.GetStatus() {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *namespaceProcessor) addHandoverStatsToExecutorAssignedState(

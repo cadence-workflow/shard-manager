@@ -513,6 +513,53 @@ func TestStopManagerProcessor_StopTimeout(t *testing.T) {
 	<-doneCh
 }
 
+func TestUpdateShardAssignment_ReAddAfterDeadlockedStop(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	// The old processor deadlocks in Stop until the test ends.
+	stopEntered := make(chan struct{})
+	unblockStop := make(chan struct{})
+	defer close(unblockStop)
+	oldProcessor := NewMockShardProcessor(ctrl)
+	oldProcessor.EXPECT().Stop().Do(func() {
+		close(stopEntered)
+		<-unblockStop
+	})
+
+	newStarted := make(chan struct{})
+	newProcessor := NewMockShardProcessor(ctrl)
+	newProcessor.EXPECT().Start(gomock.Any()).DoAndReturn(func(context.Context) error {
+		close(newStarted)
+		return nil
+	})
+
+	factory := NewMockShardProcessorFactory[*MockShardProcessor](ctrl)
+	factory.EXPECT().NewShardProcessor("test-shard-id1").Return(newProcessor, nil)
+
+	executor := newTestExecutor(nil, factory, nil)
+	executor.managedProcessors.Store("test-shard-id1", newManagedProcessor(oldProcessor, processorStateStarted))
+
+	// Unassign the shard: the processor must be unregistered even though Stop deadlocks.
+	executor.updateShardAssignment(context.Background(), nil)
+	<-stopEntered
+	_, ok := executor.managedProcessors.Load("test-shard-id1")
+	assert.False(t, ok)
+
+	// Re-assign the shard while the old Stop is still deadlocked: a fresh processor starts.
+	executor.updateShardAssignment(context.Background(), map[string]*types.ShardAssignment{
+		"test-shard-id1": {Status: types.AssignmentStatusREADY},
+	})
+
+	select {
+	case <-newStarted:
+	case <-time.After(time.Second):
+		t.Fatal("new processor was not started while the old Stop was deadlocked")
+	}
+	mp, ok := executor.managedProcessors.Load("test-shard-id1")
+	assert.True(t, ok)
+	assert.Equal(t, newProcessor, mp.processor)
+}
+
 func TestExecutorMetadata_SetAndGet(t *testing.T) {
 	metadata := &syncExecutorMetadata{
 		data: make(map[string]string),

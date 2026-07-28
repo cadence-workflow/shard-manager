@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package handler
+package ephemeralassigner
 
 import (
 	"context"
@@ -31,15 +31,24 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
-	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
+const _testNamespaceEphemeral = "test-ephemeral"
+
+func newTestShardDistributorConfig(mode string) *config.Config {
+	return &config.Config{
+		LoadBalancingMode: func(namespace string) string {
+			return mode
+		},
+	}
+}
+
 // Per-balancer placement logic (naive count, greedy smoothed-load, tiebreaks,
 // draining/no-active handling) is covered in the loadbalancer package tests.
-// These tests cover only handler-level concerns: storage orchestration, error
+// These tests cover only assigner-level concerns: storage orchestration, error
 // wrapping, and the happy-path response shape.
 func TestAssignEphemeralBatch(t *testing.T) {
 	tests := []struct {
@@ -88,7 +97,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 		},
 		{
 			// When two batches race and the first wins, the second gets
-			// ErrVersionConflict from AssignShards. The handler returns this
+			// ErrVersionConflict from AssignShards. The assigner returns this
 			// unwrapped so callers can detect it with errors.Is and retry.
 			name:      "VersionConflict",
 			shardKeys: []string{"CONCURRENT-SHARD"},
@@ -133,8 +142,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockStorage := store.NewMockStore(ctrl)
 
-			h := &handlerImpl{
-				logger:     testlogger.New(t),
+			a := &Assigner{
 				storage:    mockStorage,
 				cfg:        newTestShardDistributorConfig(config.LoadBalancingModeNAIVE),
 				timeSource: clock.NewRealTimeSource(),
@@ -142,7 +150,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 
 			tt.setupMocks(mockStorage)
 
-			results, err := h.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, tt.shardKeys)
+			results, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, tt.shardKeys)
 			if tt.expectedError {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedErrMsg)
@@ -161,14 +169,13 @@ func TestAssignEphemeralBatch(t *testing.T) {
 }
 
 // An unsupported load balancing mode bubbles up from the loadbalancer planner as an
-// InternalServiceError; the handler wraps it rather than panicking.
+// InternalServiceError; the assigner wraps it rather than panicking.
 func TestAssignEphemeralBatch_InvalidLoadBalancingMode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockStorage := store.NewMockStore(ctrl)
-	h := &handlerImpl{
-		logger:     testlogger.New(t),
+	a := &Assigner{
 		storage:    mockStorage,
 		cfg:        newTestShardDistributorConfig("not-a-valid-mode"),
 		timeSource: clock.NewRealTimeSource(),
@@ -179,7 +186,7 @@ func TestAssignEphemeralBatch_InvalidLoadBalancingMode(t *testing.T) {
 		ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
 	}, nil)
 
-	results, err := h.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, []string{"new-shard-1"})
+	results, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, []string{"new-shard-1"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported load balancing mode")
 	require.Nil(t, results)

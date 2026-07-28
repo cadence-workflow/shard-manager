@@ -28,30 +28,14 @@ import (
 	"fmt"
 	"slices"
 	"sync"
-	"time"
 
-	"github.com/cadence-workflow/shard-manager/common/backoff"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
-)
-
-const (
-	// ephemeralBatchInterval is the time window over which GetShardOwner calls for
-	// ephemeral namespaces are collected before being processed as a single batch.
-	ephemeralBatchInterval = 100 * time.Millisecond
-
-	// versionConflictRetryInitialInterval is the starting backoff for retries
-	// triggered when a concurrent shard assignment causes a version conflict.
-	versionConflictRetryInitialInterval = 50 * time.Millisecond
-	// versionConflictRetryMaxInterval caps the per-attempt sleep.
-	versionConflictRetryMaxInterval = 1 * time.Second
-	// versionConflictRetryMaxAttempts is the maximum number of retry attempts
-	// before the error is surfaced to the caller.
-	versionConflictRetryMaxAttempts = 3
 )
 
 func NewHandler(
@@ -64,13 +48,11 @@ func NewHandler(
 	handler := &handlerImpl{
 		logger:               logger,
 		shardDistributionCfg: shardDistributionCfg,
-		cfg:                  cfg,
 		storage:              storage,
 		timeSource:           timeSource,
+		assigner:             ephemeralassigner.New(timeSource, cfg, storage),
 	}
 	handler.stopCtx, handler.cancel = context.WithCancel(context.Background())
-
-	handler.batcher = newShardBatcher(timeSource, ephemeralBatchInterval, handler.assignEphemeralBatch)
 
 	// prevent us from trying to serve requests before shard distributor is started and ready
 	handler.startWG.Add(1)
@@ -86,14 +68,13 @@ type handlerImpl struct {
 
 	storage              store.Store
 	shardDistributionCfg config.ShardDistribution
-	cfg                  *config.Config
 	timeSource           clock.TimeSource
 
-	batcher *shardBatcher
+	assigner *ephemeralassigner.Assigner
 }
 
 func (h *handlerImpl) Start() {
-	h.batcher.Start()
+	h.assigner.Start()
 	h.startWG.Done()
 }
 
@@ -101,7 +82,7 @@ func (h *handlerImpl) Stop() {
 	if h.cancel != nil {
 		h.cancel()
 	}
-	h.batcher.Stop()
+	h.assigner.Stop()
 }
 
 func (h *handlerImpl) Health(ctx context.Context) (*types.HealthStatus, error) {
@@ -126,7 +107,7 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 	shardOwner, err := h.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
 	if errors.Is(err, store.ErrShardNotFound) {
 		if h.shardDistributionCfg.Namespaces[namespaceIdx].Type == config.NamespaceTypeEphemeral {
-			return h.getOrAssignEphemeralShard(ctx, request)
+			return h.assigner.GetOrAssign(ctx, request)
 		}
 
 		return nil, &types.ShardNotFoundError{
@@ -174,57 +155,6 @@ func (h *handlerImpl) InspectShard(ctx context.Context, request *types.GetShardO
 		Metadata:  shardOwner.Metadata,
 		Namespace: request.Namespace,
 	}, nil
-}
-
-// getOrAssignEphemeralShard assigns an ephemeral shard that does not yet exist
-// in storage. It submits the request to the batcher and, on a version conflict
-// (concurrent assignment by another goroutine), retries with exponential backoff.
-// Each retry re-reads storage first: if the concurrent writer already committed
-// the assignment we return it immediately without re-submitting to the batcher.
-func (h *handlerImpl) getOrAssignEphemeralShard(ctx context.Context, request *types.GetShardOwnerRequest) (*types.GetShardOwnerResponse, error) {
-	retryPolicy := backoff.NewExponentialRetryPolicy(versionConflictRetryInitialInterval)
-	retryPolicy.SetMaximumInterval(versionConflictRetryMaxInterval)
-	retryPolicy.SetMaximumAttempts(versionConflictRetryMaxAttempts)
-
-	throttleRetry := backoff.NewThrottleRetry(
-		backoff.WithRetryPolicy(retryPolicy),
-		backoff.WithRetryableError(func(err error) bool {
-			return errors.Is(err, store.ErrVersionConflict)
-		}),
-	)
-
-	var resp *types.GetShardOwnerResponse
-	isRetry := false
-	err := throttleRetry.Do(ctx, func(ctx context.Context) error {
-		if isRetry {
-			// A concurrent batch won the race. Re-read storage first: if the
-			// winner already committed our shard's assignment we can return
-			// immediately without re-submitting to the batcher.
-			owner, err := h.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
-			if err != nil && !errors.Is(err, store.ErrShardNotFound) {
-				return &types.InternalServiceError{Message: fmt.Sprintf("failed to get shard owner: %v", err)}
-			}
-			if err == nil {
-				resp = &types.GetShardOwnerResponse{
-					Owner:     owner.ExecutorID,
-					Metadata:  owner.Metadata,
-					Namespace: request.Namespace,
-				}
-				return nil
-			}
-		}
-		isRetry = true
-
-		// Submit to the batcher to assign the shard.
-		var err error
-		resp, err = h.batcher.Submit(ctx, request)
-		return err
-	})
-
-	if err != nil {
-		return nil, &types.InternalServiceError{Message: fmt.Sprintf("failed to assign ephemeral shard: %v", err)}
-	}
-	return resp, nil
 }
 
 func (h *handlerImpl) GetNamespaceState(ctx context.Context, request *types.GetNamespaceStateRequest) (resp *types.GetNamespaceStateResponse, retError error) {

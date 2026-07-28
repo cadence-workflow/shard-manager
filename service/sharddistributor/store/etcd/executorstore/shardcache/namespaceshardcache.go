@@ -45,6 +45,7 @@ type namespaceShardToExecutor struct {
 	shardOwners      map[string]*store.ShardOwner   // executorID -> shardOwner
 	executorState    map[*store.ShardOwner][]string // executor -> shardIDs
 	executorRevision map[string]int64
+	lastRevision     int64 // etcd store revision of the last applied snapshot
 	namespace        string
 	etcdPrefix       string
 	stopCh           chan struct{}
@@ -357,12 +358,14 @@ func (n *namespaceShardToExecutor) hasExecutorStateChanged(watchResp clientv3.Wa
 }
 
 func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
-	err := n.refreshExecutorState(ctx)
+	updated, err := n.refreshExecutorState(ctx)
 	if err != nil {
 		return fmt.Errorf("refresh executor state: %w", err)
 	}
 
-	n.pubSub.publish(n.getExecutorState())
+	if updated {
+		n.pubSub.publish(n.getExecutorState())
+	}
 	return nil
 }
 
@@ -378,24 +381,24 @@ func (n *namespaceShardToExecutor) getExecutorState() map[*store.ShardOwner][]st
 	return executorState
 }
 
-func (n *namespaceShardToExecutor) refreshExecutorState(ctx context.Context) error {
+func (n *namespaceShardToExecutor) refreshExecutorState(ctx context.Context) (bool, error) {
 	executorPrefix := etcdkeys.BuildExecutorsPrefix(n.etcdPrefix, n.namespace)
 
 	resp, err := n.client.Get(ctx, executorPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return fmt.Errorf("get executor prefix for namespace %s: %w", n.namespace, err)
+		return false, fmt.Errorf("get executor prefix for namespace %s: %w", n.namespace, err)
 	}
 
 	parsedData, err := common.ParseExecutorKVs(n.etcdPrefix, n.namespace, resp.Kvs)
 	if err != nil {
-		return fmt.Errorf("failed to parse executor data: %w", err)
+		return false, fmt.Errorf("failed to parse executor data: %w", err)
 	}
 
-	n.applyExecutorData(parsedData)
-	return nil
+	updated := n.applyExecutorData(resp.Header.Revision, parsedData)
+	return updated, nil
 }
 
-func (n *namespaceShardToExecutor) applyExecutorData(executors map[string]*etcdtypes.ParsedExecutorData) {
+func (n *namespaceShardToExecutor) applyExecutorData(storeRevision int64, executors map[string]*etcdtypes.ParsedExecutorData) bool {
 	shardToExecutor := make(map[string]*store.ShardOwner)
 	executorState := make(map[*store.ShardOwner][]string)
 	executorRevision := make(map[string]int64)
@@ -419,23 +422,35 @@ func (n *namespaceShardToExecutor) applyExecutorData(executors map[string]*etcdt
 		executorStatistics[executorID] = maps.Clone(executorData.Statistics)
 	}
 
-	n.replaceExecutorState(shardToExecutor, executorState, executorRevision, shardOwners)
+	updated := n.replaceExecutorState(storeRevision, shardToExecutor, executorState, executorRevision, shardOwners)
 	n.executorStatistics.replaceStatistics(executorStatistics)
+	return updated
 }
 
 func (n *namespaceShardToExecutor) replaceExecutorState(
+	storeRevision int64,
 	shardToExecutor map[string]*store.ShardOwner,
 	executorState map[*store.ShardOwner][]string,
 	executorRevision map[string]int64,
 	shardOwners map[string]*store.ShardOwner,
-) {
+) bool {
 	n.Lock()
 	defer n.Unlock()
 
+	if storeRevision <= n.lastRevision {
+		n.logger.Debug("skipping stale cache update",
+			tag.Dynamic("storeRevision", storeRevision),
+			tag.Dynamic("lastRevision", n.lastRevision),
+		)
+		return false
+	}
+
+	n.lastRevision = storeRevision
 	n.shardToExecutor = shardToExecutor
 	n.executorState = executorState
 	n.executorRevision = executorRevision
 	n.shardOwners = shardOwners
+	return true
 }
 
 // handleExecutorStatisticsEvent processes incoming watch events for executor shard statistics.

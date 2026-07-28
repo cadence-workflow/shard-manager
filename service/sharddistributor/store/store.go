@@ -56,6 +56,12 @@ type AssignShardsRequest struct {
 	// ExecutorsToDelete maps executor IDs to their expected ModRevision for deletion.
 	// The ModRevision is used to ensure the executor's assigned state hasn't changed since we decided to delete it.
 	ExecutorsToDelete map[string]int64
+	// ChangedExecutors is the set of executor IDs whose assigned state actually
+	// changed and need to be written. All executors in NewState.ShardAssignments
+	// are still included in the transactional ModRevision guard, but only those
+	// in ChangedExecutors get an OpPut. If nil, all executors are written
+	// (backwards-compatible default for callers that don't track deltas).
+	ChangedExecutors map[string]struct{}
 }
 
 type Store interface {

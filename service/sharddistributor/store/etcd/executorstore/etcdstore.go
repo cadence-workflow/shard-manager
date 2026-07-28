@@ -449,9 +449,21 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 
 	// 2. Prepare operations to update executor states and shard ownership,
 	// and comparisons to check for concurrent modifications.
+	// All executors get a ModRevision comparison (optimistic lock), but only
+	// changed executors get an OpPut. When ChangedExecutors is nil, all
+	// executors are written (backwards-compatible default).
 	for executorID, state := range request.NewState.ShardAssignments {
-		// Update the executor's assigned_state key.
 		executorStateKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorAssignedStateKey)
+
+		comparisons = append(comparisons, clientv3.Compare(clientv3.ModRevision(executorStateKey), "=", state.ModRevision))
+		comparisonMaps[executorStateKey] = state.ModRevision
+		opsElse = append(opsElse, clientv3.OpGet(executorStateKey))
+
+		_, isChanged := request.ChangedExecutors[executorID]
+		if request.ChangedExecutors != nil && !isChanged {
+			continue
+		}
+
 		value, err := json.Marshal(etcdtypes.FromAssignedState(&state))
 		if err != nil {
 			return fmt.Errorf("marshal assigned shards for executor %s: %w", executorID, err)
@@ -462,10 +474,6 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 			return fmt.Errorf("compress assigned shards for executor %s: %w", executorID, err)
 		}
 		ops = append(ops, clientv3.OpPut(executorStateKey, string(compressedValue)))
-
-		comparisons = append(comparisons, clientv3.Compare(clientv3.ModRevision(executorStateKey), "=", state.ModRevision))
-		comparisonMaps[executorStateKey] = state.ModRevision
-		opsElse = append(opsElse, clientv3.OpGet(executorStateKey))
 	}
 
 	if len(ops) == 0 {

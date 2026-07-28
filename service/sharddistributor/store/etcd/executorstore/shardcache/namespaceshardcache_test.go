@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/goleak"
@@ -356,7 +357,7 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_triggersRefresh(t *testin
 	tc.etcdClient.EXPECT().
 		Get(gomock.Any(), tc.executorPrefix, gomock.Any()).
 		Return(
-			&clientv3.GetResponse{Kvs: []*mvccpb.KeyValue{
+			&clientv3.GetResponse{Header: &etcdserverpb.ResponseHeader{Revision: 1}, Kvs: []*mvccpb.KeyValue{
 				{
 					Key:   []byte(key),
 					Value: []byte(metadataValue),
@@ -398,6 +399,63 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_triggersRefresh(t *testin
 	// Close stopCh to exit the loop
 	close(tc.stopCh)
 	wg.Wait()
+}
+
+func TestNamespaceShardToExecutor_replaceExecutorState_skipsStaleRevision(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	logger := testlogger.New(t)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	ctrl := gomock.NewController(t)
+
+	mockClient := etcdclient.NewMockClient(ctrl)
+
+	e, err := newNamespaceShardToExecutor("prefix", "ns", mockClient, stopCh, logger, clock.NewMockedTimeSource(), metrics.NewNoopMetricsClient())
+	require.NoError(t, err)
+
+	ownerA := &store.ShardOwner{ExecutorID: "exec-a", Metadata: map[string]string{}}
+	ownerB := &store.ShardOwner{ExecutorID: "exec-b", Metadata: map[string]string{}}
+
+	// Apply revision 10
+	e.replaceExecutorState(10,
+		map[string]*store.ShardOwner{"shard-1": ownerA},
+		map[*store.ShardOwner][]string{ownerA: {"shard-1"}},
+		map[string]int64{"exec-a": 10},
+		map[string]*store.ShardOwner{"exec-a": ownerA},
+	)
+
+	got := e.getExecutorState()
+	require.Len(t, got, 1)
+
+	// Apply revision 5 (stale) — should be ignored
+	e.replaceExecutorState(5,
+		map[string]*store.ShardOwner{"shard-2": ownerB},
+		map[*store.ShardOwner][]string{ownerB: {"shard-2"}},
+		map[string]int64{"exec-b": 5},
+		map[string]*store.ShardOwner{"exec-b": ownerB},
+	)
+
+	got = e.getExecutorState()
+	require.Len(t, got, 1)
+	for owner := range got {
+		assert.Equal(t, "exec-a", owner.ExecutorID)
+	}
+
+	// Apply revision 20 (newer) — should be accepted
+	e.replaceExecutorState(20,
+		map[string]*store.ShardOwner{"shard-2": ownerB},
+		map[*store.ShardOwner][]string{ownerB: {"shard-2"}},
+		map[string]int64{"exec-b": 20},
+		map[string]*store.ShardOwner{"exec-b": ownerB},
+	)
+
+	got = e.getExecutorState()
+	require.Len(t, got, 1)
+	for owner := range got {
+		assert.Equal(t, "exec-b", owner.ExecutorID)
+	}
 }
 
 func TestNamespaceShardToExecutor_namespaceRefreshLoop_watchError(t *testing.T) {
@@ -685,7 +743,7 @@ func TestNamespaceShardToExecutor_GetShardOwner_SingleFlightDedup(t *testing.T) 
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			}
-			return &clientv3.GetResponse{Kvs: []*mvccpb.KeyValue{
+			return &clientv3.GetResponse{Header: &etcdserverpb.ResponseHeader{Revision: 1}, Kvs: []*mvccpb.KeyValue{
 				{Key: []byte(executorAssignedStateKey), Value: assignedStateJSON},
 			}}, nil
 		}).
@@ -747,7 +805,7 @@ func TestNamespaceShardToExecutor_GetShardOwner_CallerCancelDoesNotPoisonFlight(
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			}
-			return &clientv3.GetResponse{Kvs: []*mvccpb.KeyValue{
+			return &clientv3.GetResponse{Header: &etcdserverpb.ResponseHeader{Revision: 1}, Kvs: []*mvccpb.KeyValue{
 				{Key: []byte(executorAssignedStateKey), Value: assignedStateJSON},
 			}}, nil
 		}).

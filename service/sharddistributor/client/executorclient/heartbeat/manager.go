@@ -90,7 +90,9 @@ func (m *Manager) DrainingHeartbeat() error {
 
 func (m *Manager) doHeartbeat(ctx context.Context) (map[string]*types.ShardAssignment, bool, error) {
 	result, err, shared := m.sf.Do("heartbeat", func() (any, error) {
-		return m.sendRPC(ctx, types.ExecutorStatusACTIVE)
+		// Detach from the winning caller's context so one caller's
+		// cancellation cannot abort the shared RPC for all piggybacking callers.
+		return m.sendRPC(context.WithoutCancel(ctx), types.ExecutorStatusACTIVE)
 	})
 	if err != nil {
 		return nil, shared, err

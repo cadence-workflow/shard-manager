@@ -93,6 +93,7 @@ type executorImpl[SP ShardProcessor] struct {
 	processorsToLastUse   syncgeneric.Map[string, time.Time]
 	timeSource            clock.TimeSource
 	processLoopWG         sync.WaitGroup
+	assignmentMutex       sync.Mutex
 	heartbeater           *heartbeat.Manager
 	metrics               tally.Scope
 	enabled               func() bool
@@ -235,6 +236,9 @@ func (e *executorImpl[SP]) heartbeatAndUpdateAssignment(ctx context.Context, sha
 }
 
 func (e *executorImpl[SP]) updateShardAssignmentMetered(ctx context.Context, shardAssignment map[string]*types.ShardAssignment) {
+	e.assignmentMutex.Lock()
+	defer e.assignmentMutex.Unlock()
+
 	startTime := e.timeSource.Now()
 	defer e.metrics.
 		Histogram(metricsconstants.ShardDistributorExecutorAssignLoopLatency, metricsconstants.ShardDistributorExecutorAssignLoopLatencyBuckets).

@@ -10,12 +10,12 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/zap"
 
-	"github.com/cadence-workflow/shard-manager/client/sharddistributorexecutor"
 	"github.com/cadence-workflow/shard-manager/common/backoff"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon/tag"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/heartbeat"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/metricsconstants"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/syncgeneric"
 )
@@ -29,8 +29,7 @@ const (
 )
 
 const (
-	heartbeatJitterCoeff           = 0.1 // 10% jitter
-	drainingHeartbeatTimeout       = 5 * time.Second
+	heartbeatJitterCoeff           = 0.1              // 10% jitter
 	processorAsyncOperationTimeout = 10 * time.Second //  maximum time allowed for a shard processor Start or Stop call.
 )
 
@@ -84,24 +83,21 @@ func newManagedProcessor[SP ShardProcessor](processor SP, state processorState) 
 }
 
 type executorImpl[SP ShardProcessor] struct {
-	logger                 *zap.Logger
-	shardDistributorClient sharddistributorexecutor.Client
-	shardProcessorFactory  ShardProcessorFactory[SP]
-	namespace              string
-	stopC                  chan struct{}
-	heartBeatInterval      time.Duration
-	ttlShard               time.Duration
-	managedProcessors      syncgeneric.Map[string, *managedProcessor[SP]]
-	processorsToLastUse    syncgeneric.Map[string, time.Time]
-	executorID             string
-	timeSource             clock.TimeSource
-	processLoopWG          sync.WaitGroup
-	assignmentMutex        sync.Mutex
-	metrics                tally.Scope
-	hostMetrics            tally.Scope
-	enabled                func() bool
-	metadata               syncExecutorMetadata
-	drainObserver          clientcommon.DrainSignalObserver
+	logger                *zap.Logger
+	shardProcessorFactory ShardProcessorFactory[SP]
+	namespace             string
+	stopC                 chan struct{}
+	heartBeatInterval     time.Duration
+	ttlShard              time.Duration
+	managedProcessors     syncgeneric.Map[string, *managedProcessor[SP]]
+	processorsToLastUse   syncgeneric.Map[string, time.Time]
+	timeSource            clock.TimeSource
+	processLoopWG         sync.WaitGroup
+	heartbeater           *heartbeat.Manager
+	metrics               tally.Scope
+	enabled               func() bool
+	metadata              syncExecutorMetadata
+	drainObserver         clientcommon.DrainSignalObserver
 }
 
 func (e *executorImpl[SP]) Start(ctx context.Context) {
@@ -136,7 +132,7 @@ func (e *executorImpl[SP]) GetShardProcess(ctx context.Context, shardID string) 
 		}
 
 		// Do a heartbeat and check again
-		err := e.heartbeatAndUpdateAssignment(ctx)
+		err := e.heartbeatAndUpdateAssignment(ctx, shardID)
 		if err != nil {
 			var zero SP
 			return zero, fmt.Errorf("heartbeat and assign shards: %w", err)
@@ -199,7 +195,7 @@ func (e *executorImpl[SP]) heartbeatloop(ctx context.Context) {
 			if !e.enabled() {
 				continue
 			}
-			err := e.heartbeatAndUpdateAssignment(ctx)
+			err := e.heartbeatAndUpdateAssignment(ctx, "")
 			if err != nil {
 				e.logger.Error("failed to heartbeat and assign shards", zap.Error(err))
 				continue
@@ -227,20 +223,13 @@ func (e *executorImpl[SP]) waitForUndrain(ctx context.Context) bool {
 	}
 }
 
-func (e *executorImpl[SP]) heartbeatAndUpdateAssignment(ctx context.Context) error {
-	if !e.assignmentMutex.TryLock() {
-		e.logger.Error("still doing assignment, skipping heartbeat")
-		e.metrics.Counter(metricsconstants.ShardDistributorExecutorHeartbeatSkipped).Inc(1)
-		return nil
-	}
-	defer e.assignmentMutex.Unlock()
-	shardAssignment, err := e.heartbeat(ctx)
+func (e *executorImpl[SP]) heartbeatAndUpdateAssignment(ctx context.Context, shardID string) error {
+	assignments, err := e.heartbeater.Heartbeat(ctx, shardID)
 	if err != nil {
-		// TODO: should we stop the executor, and drop all the shards?
-		return fmt.Errorf("failed to heartbeat: %w", err)
+		return err
 	}
-	if shardAssignment != nil {
-		e.updateShardAssignmentMetered(ctx, shardAssignment)
+	if assignments != nil {
+		e.updateShardAssignmentMetered(ctx, assignments)
 	}
 	return nil
 }
@@ -254,54 +243,26 @@ func (e *executorImpl[SP]) updateShardAssignmentMetered(ctx context.Context, sha
 	e.updateShardAssignment(ctx, shardAssignment)
 }
 
-func (e *executorImpl[SP]) heartbeat(ctx context.Context) (shardAssignments map[string]*types.ShardAssignment, err error) {
-	return e.sendHeartbeat(ctx, types.ExecutorStatusACTIVE)
-}
-
-func (e *executorImpl[SP]) sendHeartbeat(ctx context.Context, status types.ExecutorStatus) (map[string]*types.ShardAssignment, error) {
-	// Fill in the shard status reports
-	shardStatusReports := make(map[string]*types.ShardStatusReport)
+func (e *executorImpl[SP]) GetShardStatusReports() map[string]*types.ShardStatusReport {
+	reports := make(map[string]*types.ShardStatusReport)
 	e.managedProcessors.Range(func(shardID string, managedProcessor *managedProcessor[SP]) bool {
 		if managedProcessor.getState() == processorStateStarted {
 			shardStatus := managedProcessor.processor.GetShardReport()
-
-			shardStatusReports[shardID] = &types.ShardStatusReport{
+			reports[shardID] = &types.ShardStatusReport{
 				ShardLoad: shardStatus.ShardLoad,
 				Status:    shardStatus.Status,
 			}
 		}
 		return true
 	})
-
-	e.hostMetrics.Gauge(metricsconstants.ShardDistributorExecutorOwnedShards).Update(float64(len(shardStatusReports)))
-
-	// Create the request
-	request := &types.ExecutorHeartbeatRequest{
-		Namespace:          e.namespace,
-		ExecutorID:         e.executorID,
-		Status:             status,
-		ShardStatusReports: shardStatusReports,
-		Metadata:           e.metadata.Get(),
-	}
-
-	// Send the request
-	response, err := e.shardDistributorClient.Heartbeat(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("send heartbeat: %w", err)
-	}
-
-	return response.ShardAssignments, nil
+	return reports
 }
 
 func (e *executorImpl[SP]) sendDrainingHeartbeat() {
 	if !e.enabled() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), drainingHeartbeatTimeout)
-	defer cancel()
-
-	_, err := e.sendHeartbeat(ctx, types.ExecutorStatusDRAINING)
-	if err != nil {
+	if err := e.heartbeater.DrainingHeartbeat(); err != nil {
 		e.logger.Error("failed to send draining heartbeat", zap.Error(err))
 	}
 }

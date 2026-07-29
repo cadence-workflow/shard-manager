@@ -84,3 +84,18 @@ func (ns *NamespaceState) CountExecutorsByStatus() map[types.ExecutorStatus]int 
 	}
 	return counts
 }
+
+// ActiveShardOwners flattens the per-executor assignments into a shardID -> executorID
+// lookup, keeping only shards held by ACTIVE executors
+func (ns *NamespaceState) ActiveShardOwners() map[string]string {
+	owners := make(map[string]string)
+	for executorID, assigned := range ns.ShardAssignments {
+		if ns.Executors[executorID].Status != types.ExecutorStatusACTIVE {
+			continue
+		}
+		for shardID := range assigned.AssignedShards {
+			owners[shardID] = executorID
+		}
+	}
+	return owners
+}

@@ -139,12 +139,15 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 	return resp, nil
 }
 
-// assignEphemeralBatch maps every shard key in the batch to its owning executor.
+// assignEphemeralBatch is the ephemeralAssignmentBatchFn wired into the shardBatcher.
+// It processes a whole batch of unassigned shard keys for a single ephemeral
+// namespace using two storage operations:
+//  1. GetState — read current namespace state once for the whole batch.
+//  2. AssignShards — write all new assignments atomically in one operation.
 //
 // Shards already assigned to an ACTIVE executor keep that owner. The rest are placed by
 // the load balancer and saved in a single AssignShards call, which is skipped when
-// nothing new needs placing. Each owner's metadata is then read with GetExecutor,
-// because GetState does not return it.
+// nothing new needs placing.
 func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, error) {
 	state, err := a.storage.GetState(ctx, namespace)
 	if err != nil {

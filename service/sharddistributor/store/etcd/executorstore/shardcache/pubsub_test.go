@@ -2,6 +2,7 @@ package shardcache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -70,20 +71,28 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 		wg.Wait()
 	})
 
-	t.Run("non-blocking publish to slow consumer", func(t *testing.T) {
+	t.Run("slow consumer receives latest state", func(t *testing.T) {
 		pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
 
-		// We create a subscriber that doesn't read from the channel, this should still not block
-		_, slowUnsub := pubsub.subscribe(context.Background())
-		defer slowUnsub()
+		// Create slow subscriber
+		ch, unsub := pubsub.subscribe(context.Background())
+		defer unsub()
 
-		testState := map[*store.ShardOwner][]string{
-			{ExecutorID: "exec-1", Metadata: map[string]string{}}: {"shard-1"},
+		// Four states will be published
+		for i := range 4 {
+			state := map[*store.ShardOwner][]string{
+				{ExecutorID: fmt.Sprintf("exec-%d", i), Metadata: map[string]string{}}: {"shard-1"},
+			}
+			pubsub.publish(state)
 		}
+		// Last state should be the latest
+		lastState := map[*store.ShardOwner][]string{
+			{ExecutorID: "LAST_STATE_EXECUTOR", Metadata: map[string]string{}}: {"LAST_STATE_SHARD"},
+		}
+		pubsub.publish(lastState)
 
-		// We do not read from the slow channel, this should still not block
-		for range 10 {
-			pubsub.publish(testState)
-		}
+		// The subscriber receives the latest state
+		got := <-ch
+		assert.Equal(t, lastState, got)
 	})
 }

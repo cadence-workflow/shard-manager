@@ -39,6 +39,7 @@ func NewNoopExecutor[SP ShardProcessor]() Executor[SP] {
 func (e *noopExecutor[SP]) Start(_ context.Context)         {}
 func (e *noopExecutor[SP]) Stop()                           {}
 func (e *noopExecutor[SP]) GetNamespace() string            { return "" }
+func (e *noopExecutor[SP]) GetExecutorID() string           { return "" }
 func (e *noopExecutor[SP]) SetMetadata(_ map[string]string) {}
 func (e *noopExecutor[SP]) GetMetadata() map[string]string  { return nil }
 

@@ -91,6 +91,24 @@ func NewExecutorsModule(params ExecutorsParams) {
 	}
 }
 
+type FixedExecutorsParams struct {
+	fx.In
+	Executors []executorclient.Executor[*processor.ShardProcessor] `group:"executor-fixed-proc"`
+}
+
+type EphemeralExecutorsParams struct {
+	fx.In
+	Executors []executorclient.Executor[*processorephemeral.ShardProcessor] `group:"executor-ephemeral-proc"`
+}
+
+func NewFixedExecutorInfos(params FixedExecutorsParams) executorclient.ExecutorInfosResult {
+	return executorclient.AsExecutorInfos(params.Executors)
+}
+
+func NewEphemeralExecutorInfos(params EphemeralExecutorsParams) executorclient.ExecutorInfosResult {
+	return executorclient.AsExecutorInfos(params.Executors)
+}
+
 func Module(fixedNamespace, ephemeralNamespace string) fx.Option {
 	return fx.Module("Executors",
 		// Executor that is used for testing a namespace with fixed shards
@@ -102,6 +120,11 @@ func Module(fixedNamespace, ephemeralNamespace string) fx.Option {
 		fx.Provide(func(cfg config.Config, params executorclient.Params[*processorephemeral.ShardProcessor]) (ExecutorsEphemeralResult, error) {
 			return NewExecutorsWithEphemeralNamespace(params, ephemeralNamespace, cfg.Canary.NumEphemeralExecutors)
 		}),
+
+		// Register both executor sets into the shared executor value group so
+		// introspection can enumerate them regardless of processor type
+		fx.Provide(NewFixedExecutorInfos),
+		fx.Provide(NewEphemeralExecutorInfos),
 
 		fx.Invoke(NewExecutorsModule),
 	)

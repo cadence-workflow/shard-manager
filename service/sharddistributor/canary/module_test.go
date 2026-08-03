@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -54,6 +56,8 @@ func TestModule(t *testing.T) {
 		},
 	}
 
+	var infos []executorclient.ExecutorInfo
+
 	// Create a mock dispatcher with the required outbound
 	dispatcher := yarpc.NewDispatcher(yarpc.Config{
 		Name: "test-canary",
@@ -85,5 +89,18 @@ func TestModule(t *testing.T) {
 			EphemeralNamespace:          "shard-distributor-canary-ephemeral",
 			SharddistributorServiceName: "shard-distributor",
 		}),
+		fx.Invoke(func(collected executorclient.ExecutorInfos) {
+			infos = collected.Infos
+		}),
 	).RequireStart().RequireStop()
+
+	// One fixed and one ephemeral executor, both reachable through the shared
+	// value group despite having different shard processor types
+	require.Len(t, infos, 2)
+	namespaces := make([]string, 0, len(infos))
+	for _, info := range infos {
+		namespaces = append(namespaces, info.GetNamespace())
+		assert.NotEmpty(t, info.GetExecutorID())
+	}
+	assert.ElementsMatch(t, []string{"shard-distributor-canary", "shard-distributor-canary-ephemeral"}, namespaces)
 }

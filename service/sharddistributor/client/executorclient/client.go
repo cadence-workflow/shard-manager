@@ -20,7 +20,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/metricsconstants"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go . ShardProcessorFactory,ShardProcessor,Executor,Client
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go . ShardProcessorFactory,ShardProcessor,ExecutorInfo,Executor,Client
 
 // ErrShardProcessNotFound is returned by GetShardProcess when this host is not
 // assigned the requested shard. Callers that interpret shard ownership should
@@ -49,19 +49,31 @@ type ShardProcessorFactory[SP ShardProcessor] interface {
 	NewShardProcessor(shardID string) (SP, error)
 }
 
+// ExecutorInfo identifies a running executor without reference to its shard
+// processor type, so executors of different types can be handled together.
+type ExecutorInfo interface {
+	// Get the namespace this executor is responsible for
+	GetNamespace() string
+
+	// GetExecutorID returns the ID this executor identifies itself with when it
+	// heartbeats. It is generated per executor instance, so it changes whenever
+	// the process restarts.
+	GetExecutorID() string
+
+	// Get the current metadata of the executor
+	GetMetadata() map[string]string
+}
+
 type Executor[SP ShardProcessor] interface {
+	ExecutorInfo
+
 	Start(ctx context.Context)
 	Stop()
 
 	GetShardProcess(ctx context.Context, shardID string) (SP, error)
 
-	// Get the namespace this executor is responsible for
-	GetNamespace() string
-
 	// Set metadata for the executor
 	SetMetadata(metadata map[string]string)
-	// Get the current metadata of the executor
-	GetMetadata() map[string]string
 }
 
 type Params[SP ShardProcessor] struct {
@@ -178,9 +190,49 @@ func createShardDistributorExecutorClient(client Client, metricsScope tally.Scop
 	return shardDistributorExecutorClient, nil
 }
 
+// ExecutorInfoResult registers a single executor into the executor value group.
+type ExecutorInfoResult struct {
+	fx.Out
+
+	Info ExecutorInfo `group:"shard-distributor-executor-infos"`
+}
+
+// ExecutorInfosResult registers several executors into the executor value group.
+type ExecutorInfosResult struct {
+	fx.Out
+
+	Infos []ExecutorInfo `group:"shard-distributor-executor-infos,flatten"`
+}
+
+// ExecutorInfos collects every executor registered in the process, across all
+// namespaces and shard processor types. Depend on it instead of spelling out
+// the value group tag.
+type ExecutorInfos struct {
+	fx.In
+
+	Infos []ExecutorInfo `group:"shard-distributor-executor-infos"`
+}
+
+// AsExecutorInfo registers an executor into the executor value group. Use it as
+// an fx constructor, e.g. fx.Provide(AsExecutorInfo[*MyShardProcessor]).
+func AsExecutorInfo[SP ShardProcessor](executor Executor[SP]) ExecutorInfoResult {
+	return ExecutorInfoResult{Info: executor}
+}
+
+// AsExecutorInfos registers a set of executors into the executor value group,
+// for callers that build more than one executor of the same type.
+func AsExecutorInfos[SP ShardProcessor](executors []Executor[SP]) ExecutorInfosResult {
+	infos := make([]ExecutorInfo, 0, len(executors))
+	for _, executor := range executors {
+		infos = append(infos, executor)
+	}
+	return ExecutorInfosResult{Infos: infos}
+}
+
 func Module[SP ShardProcessor]() fx.Option {
 	return fx.Module("shard-distributor-executor-client",
 		fx.Provide(NewExecutor[SP]),
+		fx.Provide(AsExecutorInfo[SP]),
 		fx.Invoke(func(executor Executor[SP], lc fx.Lifecycle) {
 			lc.Append(fx.StartStopHook(executor.Start, executor.Stop))
 		}),
@@ -193,6 +245,7 @@ func ModuleWithNamespace[SP ShardProcessor](namespace string) fx.Option {
 		fx.Provide(func(params Params[SP]) (Executor[SP], error) {
 			return NewExecutorWithNamespace(params, namespace)
 		}),
+		fx.Provide(AsExecutorInfo[SP]),
 		fx.Invoke(func(executor Executor[SP], lc fx.Lifecycle) {
 			lc.Append(fx.StartStopHook(executor.Start, executor.Stop))
 		}),

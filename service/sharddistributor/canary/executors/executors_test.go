@@ -176,6 +176,27 @@ func TestNewExecutorsModule(t *testing.T) {
 	}
 }
 
+func TestNewExecutorInfos(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	fixed := executorclient.NewMockExecutor[*processor.ShardProcessor](ctrl)
+	fixed.EXPECT().GetExecutorID().Return("fixed-executor").AnyTimes()
+	ephemeral := executorclient.NewMockExecutor[*processorephemeral.ShardProcessor](ctrl)
+	ephemeral.EXPECT().GetExecutorID().Return("ephemeral-executor").AnyTimes()
+
+	fixedInfos := NewFixedExecutorInfos(FixedExecutorsParams{
+		Executors: []executorclient.Executor[*processor.ShardProcessor]{fixed},
+	})
+	ephemeralInfos := NewEphemeralExecutorInfos(EphemeralExecutorsParams{
+		Executors: []executorclient.Executor[*processorephemeral.ShardProcessor]{ephemeral},
+	})
+
+	require.Len(t, fixedInfos.Infos, 1)
+	require.Len(t, ephemeralInfos.Infos, 1)
+	assert.Equal(t, "fixed-executor", fixedInfos.Infos[0].GetExecutorID())
+	assert.Equal(t, "ephemeral-executor", ephemeralInfos.Infos[0].GetExecutorID())
+}
+
 // Helper functions to create mock parameters
 func createMockParams[SP executorclient.ShardProcessor](
 	ctrl *gomock.Controller,

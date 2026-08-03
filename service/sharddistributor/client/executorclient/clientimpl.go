@@ -469,6 +469,10 @@ func (e *executorImpl[SP]) GetNamespace() string {
 	return e.namespace
 }
 
+func (e *executorImpl[SP]) GetExecutorID() string {
+	return e.executorID
+}
+
 func (e *executorImpl[SP]) SetMetadata(metadata map[string]string) {
 	e.metadata.Set(metadata)
 }

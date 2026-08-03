@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
@@ -47,6 +49,34 @@ func TestModule(t *testing.T) {
 		),
 		Module[*MockShardProcessor](),
 	).RequireStart().RequireStop()
+}
+
+func TestNewExecutor_ExecutorID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	params := Params[*MockShardProcessor]{
+		ExecutorClient:        NewMockClient(ctrl),
+		MetricsScope:          tally.NoopScope,
+		Logger:                zap.NewNop(),
+		ShardProcessorFactory: NewMockShardProcessorFactory[*MockShardProcessor](ctrl),
+		TimeSource:            clock.NewMockedTimeSource(),
+		Config: clientcommon.Config{
+			Namespaces: []clientcommon.NamespaceConfig{
+				{
+					Namespace:         "test-namespace",
+					HeartBeatInterval: 5 * time.Second,
+				},
+			},
+		},
+	}
+
+	first, err := NewExecutor(params)
+	require.NoError(t, err)
+	second, err := NewExecutor(params)
+	require.NoError(t, err)
+
+	assert.NotEmpty(t, first.GetExecutorID())
+	assert.Equal(t, first.GetExecutorID(), first.GetExecutorID(), "executor ID should be stable across calls")
+	assert.NotEqual(t, first.GetExecutorID(), second.GetExecutorID(), "each executor should heartbeat under its own ID")
 }
 
 // Create distinct mock processor types for testing multiple namespaces

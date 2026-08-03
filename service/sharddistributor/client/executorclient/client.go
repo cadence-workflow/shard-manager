@@ -58,6 +58,11 @@ type Executor[SP ShardProcessor] interface {
 	// Get the namespace this executor is responsible for
 	GetNamespace() string
 
+	// GetExecutorID returns the ID this executor identifies itself with when it
+	// heartbeats. It is generated per executor instance, so it changes whenever
+	// the process restarts.
+	GetExecutorID() string
+
 	// Set metadata for the executor
 	SetMetadata(metadata map[string]string)
 	// Get the current metadata of the executor

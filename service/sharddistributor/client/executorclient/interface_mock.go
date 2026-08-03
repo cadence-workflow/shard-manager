@@ -202,6 +202,20 @@ func (m *MockExecutor[SP]) EXPECT() *MockExecutorMockRecorder[SP] {
 	return m.recorder
 }
 
+// GetExecutorID mocks base method.
+func (m *MockExecutor[SP]) GetExecutorID() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetExecutorID")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetExecutorID indicates an expected call of GetExecutorID.
+func (mr *MockExecutorMockRecorder[SP]) GetExecutorID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutorID", reflect.TypeOf((*MockExecutor[SP])(nil).GetExecutorID))
+}
+
 // GetMetadata mocks base method.
 func (m *MockExecutor[SP]) GetMetadata() map[string]string {
 	m.ctrl.T.Helper()

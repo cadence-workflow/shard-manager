@@ -40,6 +40,10 @@ func TestNoopExecutor(t *testing.T) {
 		assert.Equal(t, "", exec.GetNamespace())
 	})
 
+	t.Run("GetExecutorID returns empty string", func(t *testing.T) {
+		assert.Equal(t, "", exec.GetExecutorID())
+	})
+
 	t.Run("SetMetadata and GetMetadata are no-ops", func(t *testing.T) {
 		exec.SetMetadata(map[string]string{"key": "value"})
 		assert.Nil(t, exec.GetMetadata())

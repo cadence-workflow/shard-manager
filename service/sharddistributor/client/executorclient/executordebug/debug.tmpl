@@ -1,0 +1,18 @@
+# Shard Distributor Executors
+{{ if not .Executors }}
+No shard distributor executors are registered in this process.
+{{ end }}
+{{- range .Executors }}
+## {{ .Namespace }}
+
+Executor ID: `{{ .ExecutorID }}`
+{{ if .Metadata }}
+| Metadata | Value |
+| :---     |  ---: |
+{{- range $key, $value := .Metadata }}
+| {{ $key }} | {{ $value }} |
+{{- end }}
+{{ else }}
+This executor reports no metadata.
+{{ end }}
+{{- end -}}

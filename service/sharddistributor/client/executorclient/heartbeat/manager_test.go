@@ -39,6 +39,7 @@ func newTestManager(t *testing.T, handler func(ctx context.Context, req *types.E
 		"test-executor",
 		mockState,
 		tally.NoopScope,
+		time.Second,
 	)
 }
 

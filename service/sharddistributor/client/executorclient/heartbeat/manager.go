@@ -17,12 +17,10 @@ import (
 
 const drainingHeartbeatTimeout = 5 * time.Second
 
-// activeHeartbeatTimeout bounds a coalesced active heartbeat RPC. The RPC is
-// detached from the winning caller's context, so it needs its own deadline
-//
-// It is kept at roughly one heartbeat interval so a hung server costs a single
-// tick.
-const activeHeartbeatTimeout = 1 * time.Second
+// minActiveHeartbeatTimeout floors the bound on a coalesced heartbeat RPC, so a
+// very short configured interval cannot cut off heartbeats that would otherwise
+// have succeeded.
+const minActiveHeartbeatTimeout = 1 * time.Second
 
 // StateProvider allows the heartbeat manager to pull dynamic state from the
 // executor without knowing how the executor is implemented.
@@ -41,6 +39,10 @@ type Manager struct {
 	state       StateProvider
 	hostMetrics tally.Scope
 	sf          singleflight.Group
+	// activeHeartbeatTimeout bounds a coalesced active heartbeat RPC. The RPC
+	// is detached from the winning caller's context, so it needs its own
+	// deadline.
+	activeHeartbeatTimeout time.Duration
 }
 
 func NewManager(
@@ -49,13 +51,15 @@ func NewManager(
 	executorID string,
 	state StateProvider,
 	hostMetrics tally.Scope,
+	heartbeatInterval time.Duration,
 ) *Manager {
 	return &Manager{
-		client:      client,
-		namespace:   namespace,
-		executorID:  executorID,
-		state:       state,
-		hostMetrics: hostMetrics,
+		client:                 client,
+		namespace:              namespace,
+		executorID:             executorID,
+		state:                  state,
+		hostMetrics:            hostMetrics,
+		activeHeartbeatTimeout: max(heartbeatInterval, minActiveHeartbeatTimeout),
 	}
 }
 
@@ -101,7 +105,7 @@ func (m *Manager) doHeartbeat(ctx context.Context) (map[string]*types.ShardAssig
 		// cancellation cannot abort the shared RPC for all piggybacking
 		// callers, but give it a deadline of its own so a hung server cannot
 		// wedge the singleflight indefinitely.
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), activeHeartbeatTimeout)
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), m.activeHeartbeatTimeout)
 		defer cancel()
 
 		return m.sendRPC(ctx, types.ExecutorStatusACTIVE)

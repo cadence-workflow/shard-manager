@@ -96,6 +96,7 @@ func newTestExecutor(
 		"test-executor-id",
 		executor,
 		tally.NoopScope,
+		executor.heartBeatInterval,
 	)
 	return executor
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/client/sharddistributorexecutor"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/heartbeat"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/syncgeneric"
 )
 
@@ -78,20 +79,26 @@ func newTestExecutor(
 	if timeSource == nil {
 		timeSource = clock.NewMockedTimeSource()
 	}
-	return &executorImpl[*MockShardProcessor]{
-		logger:                 zap.NewNop(),
-		metrics:                tally.NoopScope,
-		hostMetrics:            tally.NoopScope,
-		shardDistributorClient: client,
-		shardProcessorFactory:  factory,
-		namespace:              "test-namespace",
-		stopC:                  make(chan struct{}),
-		heartBeatInterval:      10 * time.Second,
-		managedProcessors:      syncgeneric.Map[string, *managedProcessor[*MockShardProcessor]]{},
-		executorID:             "test-executor-id",
-		timeSource:             timeSource,
-		enabled:                func() bool { return true },
+	executor := &executorImpl[*MockShardProcessor]{
+		logger:                zap.NewNop(),
+		metrics:               tally.NoopScope,
+		shardProcessorFactory: factory,
+		namespace:             "test-namespace",
+		stopC:                 make(chan struct{}),
+		heartBeatInterval:     10 * time.Second,
+		managedProcessors:     syncgeneric.Map[string, *managedProcessor[*MockShardProcessor]]{},
+		timeSource:            timeSource,
+		enabled:               func() bool { return true },
 	}
+	executor.heartbeater = heartbeat.NewManager(
+		client,
+		"test-namespace",
+		"test-executor-id",
+		executor,
+		tally.NoopScope,
+		executor.heartBeatInterval,
+	)
+	return executor
 }
 
 func TestHeartBeatLoop(t *testing.T) {
@@ -201,7 +208,7 @@ func TestHeartbeat(t *testing.T) {
 	executor.managedProcessors.Store("test-shard-id2", newManagedProcessor(shardProcessorMock2, processorStateStarted))
 
 	// Do the call to heartbeat
-	shardAssignments, err := executor.heartbeat(context.Background())
+	shardAssignments, err := executor.heartbeater.Heartbeat(context.Background(), "")
 
 	// Assert that we now have 3 shards in the assignment
 	assert.NoError(t, err)

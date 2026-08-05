@@ -17,6 +17,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/heartbeat"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/metricsconstants"
 )
 
@@ -146,23 +147,29 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 	}
 
 	executor := &executorImpl[SP]{
-		logger:                 params.Logger,
-		shardDistributorClient: shardDistributorClient,
-		shardProcessorFactory:  params.ShardProcessorFactory,
-		heartBeatInterval:      namespaceConfig.HeartBeatInterval,
-		ttlShard:               namespaceConfig.TTLShard,
-		namespace:              namespaceConfig.Namespace,
-		executorID:             executorID,
-		timeSource:             params.TimeSource,
-		stopC:                  make(chan struct{}),
-		metrics:                metricsScope,
-		hostMetrics:            hostMetricsScope,
+		logger:                params.Logger,
+		shardProcessorFactory: params.ShardProcessorFactory,
+		heartBeatInterval:     namespaceConfig.HeartBeatInterval,
+		ttlShard:              namespaceConfig.TTLShard,
+		namespace:             namespaceConfig.Namespace,
+		timeSource:            params.TimeSource,
+		stopC:                 make(chan struct{}),
+		metrics:               metricsScope,
 		metadata: syncExecutorMetadata{
 			data: params.Metadata,
 		},
 		drainObserver: params.DrainObserver,
 		enabled:       enabled,
 	}
+
+	executor.heartbeater = heartbeat.NewManager(
+		shardDistributorClient,
+		namespaceConfig.Namespace,
+		executorID,
+		executor,
+		hostMetricsScope,
+		namespaceConfig.HeartBeatInterval,
+	)
 
 	return executor, nil
 }

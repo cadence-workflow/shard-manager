@@ -67,7 +67,7 @@ func TestNamespaceState_CountExecutorsByStatus(t *testing.T) {
 	}
 }
 
-func TestNamespaceState_ActiveShardOwners(t *testing.T) {
+func TestNamespaceState_ShardOwners(t *testing.T) {
 	ready := func(shards ...string) AssignedState {
 		assigned := make(map[string]*types.ShardAssignment, len(shards))
 		for _, shard := range shards {
@@ -87,7 +87,7 @@ func TestNamespaceState_ActiveShardOwners(t *testing.T) {
 			expected: map[string]string{},
 		},
 		{
-			name: "all shards of an active executor are included",
+			name: "all assignments are flattened",
 			executors: map[string]HeartbeatState{
 				"exec-1": {Status: types.ExecutorStatusACTIVE},
 				"exec-2": {Status: types.ExecutorStatusACTIVE},
@@ -103,7 +103,7 @@ func TestNamespaceState_ActiveShardOwners(t *testing.T) {
 			},
 		},
 		{
-			name: "shards of draining and drained executors are omitted",
+			name: "shards of draining and drained executors are included",
 			executors: map[string]HeartbeatState{
 				"exec-active":   {Status: types.ExecutorStatusACTIVE},
 				"exec-draining": {Status: types.ExecutorStatusDRAINING},
@@ -114,18 +114,11 @@ func TestNamespaceState_ActiveShardOwners(t *testing.T) {
 				"exec-draining": ready("shard-2"),
 				"exec-drained":  ready("shard-3"),
 			},
-			expected: map[string]string{"shard-1": "exec-active"},
-		},
-		{
-			name: "assignments for an executor missing from Executors are omitted",
-			executors: map[string]HeartbeatState{
-				"exec-1": {Status: types.ExecutorStatusACTIVE},
+			expected: map[string]string{
+				"shard-1": "exec-active",
+				"shard-2": "exec-draining",
+				"shard-3": "exec-drained",
 			},
-			shardAssignments: map[string]AssignedState{
-				"exec-1":    ready("shard-1"),
-				"exec-gone": ready("shard-2"),
-			},
-			expected: map[string]string{"shard-1": "exec-1"},
 		},
 	}
 
@@ -135,7 +128,7 @@ func TestNamespaceState_ActiveShardOwners(t *testing.T) {
 				Executors:        tt.executors,
 				ShardAssignments: tt.shardAssignments,
 			}
-			assert.Equal(t, tt.expected, ns.ActiveShardOwners())
+			assert.Equal(t, tt.expected, ns.ShardOwners())
 		})
 	}
 }

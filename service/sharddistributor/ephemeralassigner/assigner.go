@@ -145,9 +145,8 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 //  1. GetState — read current namespace state once for the whole batch.
 //  2. AssignShards — write all new assignments atomically in one operation.
 //
-// Shards already assigned to an ACTIVE executor keep that owner. The rest are placed by
-// the load balancer and saved in a single AssignShards call, which is skipped when
-// nothing new needs placing.
+// Shards that already have an owner are skipped from placement,
+// the rest are placed by the load balancer and saved in a single AssignShards call
 func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, error) {
 	state, err := a.storage.GetState(ctx, namespace)
 	if err != nil {
@@ -187,9 +186,9 @@ func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, s
 }
 
 // resolveOwners splits the requested shards into those already assigned to an
-// active executor, mapped to that current owner, and those still needing placement
+// executor, mapped to that current owner, and those still needing placement
 func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByShard map[string]string, toPlace []string) {
-	owners := state.ActiveShardOwners()
+	owners := state.ShardOwners()
 	executorByShard = make(map[string]string, len(shardKeys))
 	for _, shardKey := range shardKeys {
 		if executorID, ok := owners[shardKey]; ok {

@@ -86,6 +86,7 @@ type executorImpl[SP ShardProcessor] struct {
 	logger                *zap.Logger
 	shardProcessorFactory ShardProcessorFactory[SP]
 	namespace             string
+	executorID            string
 	stopC                 chan struct{}
 	heartBeatInterval     time.Duration
 	ttlShard              time.Duration

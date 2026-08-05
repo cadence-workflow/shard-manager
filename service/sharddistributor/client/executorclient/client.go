@@ -157,6 +157,7 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 		heartBeatInterval:     namespaceConfig.HeartBeatInterval,
 		ttlShard:              namespaceConfig.TTLShard,
 		namespace:             namespaceConfig.Namespace,
+		executorID:            executorID,
 		timeSource:            params.TimeSource,
 		stopC:                 make(chan struct{}),
 		metrics:               metricsScope,

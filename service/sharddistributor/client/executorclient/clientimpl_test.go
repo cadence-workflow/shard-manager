@@ -84,6 +84,7 @@ func newTestExecutor(
 		metrics:               tally.NoopScope,
 		shardProcessorFactory: factory,
 		namespace:             "test-namespace",
+		executorID:            "test-executor-id",
 		stopC:                 make(chan struct{}),
 		heartBeatInterval:     10 * time.Second,
 		managedProcessors:     syncgeneric.Map[string, *managedProcessor[*MockShardProcessor]]{},

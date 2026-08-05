@@ -17,6 +17,13 @@ import (
 
 const drainingHeartbeatTimeout = 5 * time.Second
 
+// activeHeartbeatTimeout bounds a coalesced active heartbeat RPC. The RPC is
+// detached from the winning caller's context, so it needs its own deadline
+//
+// It is kept at roughly one heartbeat interval so a hung server costs a single
+// tick.
+const activeHeartbeatTimeout = 1 * time.Second
+
 // StateProvider allows the heartbeat manager to pull dynamic state from the
 // executor without knowing how the executor is implemented.
 type StateProvider interface {
@@ -91,8 +98,13 @@ func (m *Manager) DrainingHeartbeat() error {
 func (m *Manager) doHeartbeat(ctx context.Context) (map[string]*types.ShardAssignment, bool, error) {
 	result, err, shared := m.sf.Do("heartbeat", func() (any, error) {
 		// Detach from the winning caller's context so one caller's
-		// cancellation cannot abort the shared RPC for all piggybacking callers.
-		return m.sendRPC(context.WithoutCancel(ctx), types.ExecutorStatusACTIVE)
+		// cancellation cannot abort the shared RPC for all piggybacking
+		// callers, but give it a deadline of its own so a hung server cannot
+		// wedge the singleflight indefinitely.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), activeHeartbeatTimeout)
+		defer cancel()
+
+		return m.sendRPC(ctx, types.ExecutorStatusACTIVE)
 	})
 	if err != nil {
 		return nil, shared, err

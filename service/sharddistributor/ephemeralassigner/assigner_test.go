@@ -135,6 +135,87 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			expectedError:  true,
 			expectedErrMsg: "plan initial placement: no active executors available",
 		},
+		{
+			// A shard that already has an owner must not be re-assigned:
+			// the existing owner is returned, and AssignShards is never called.
+			// This is the cross-batch / cross-replica duplicate-ownership guard.
+			name:      "AlreadyAssignedShardReturnsExistingOwnerWithoutWrite",
+			shardKeys: []string{"shard1"},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					Executors: map[string]store.HeartbeatState{
+						"owner1": {Status: types.ExecutorStatusACTIVE},
+						"owner2": {Status: types.ExecutorStatusACTIVE},
+					},
+					ShardAssignments: map[string]store.AssignedState{
+						"owner2": {AssignedShards: map[string]*types.ShardAssignment{
+							"shard1": {Status: types.AssignmentStatusREADY},
+						}},
+					},
+				}, nil)
+				// No AssignShards expectation: re-assigning an already-owned shard
+				// would be the duplicate-ownership bug.
+				mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner2").Return(&store.ShardOwner{
+					ExecutorID: "owner2",
+					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
+				}, nil)
+			},
+			expectedOwners: map[string]string{"shard1": "owner2"},
+		},
+		{
+			// A repeated key that is already owned resolves to the existing owner
+			// exactly once, with no write. Collapsing repeated keys that are *not*
+			// yet owned is the load balancer's job and is covered by its own tests.
+			name:      "RepeatedAlreadyAssignedShardKeyResolvesToOneOwner",
+			shardKeys: []string{"shard1", "shard1", "shard1"},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					Executors: map[string]store.HeartbeatState{
+						"owner1": {Status: types.ExecutorStatusACTIVE},
+						"owner2": {Status: types.ExecutorStatusACTIVE},
+					},
+					ShardAssignments: map[string]store.AssignedState{
+						"owner1": {AssignedShards: map[string]*types.ShardAssignment{
+							"shard1": {Status: types.AssignmentStatusREADY},
+						}},
+					},
+				}, nil)
+				// GetExecutor is expected exactly once even though the key repeats,
+				// because metadata is fetched per unique executor, not per shard key.
+				mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
+					ExecutorID: "owner1",
+					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
+				}, nil)
+			},
+			expectedOwners: map[string]string{"shard1": "owner1"},
+		},
+		{
+			// A shard recorded under a DRAINING executor keeps that owner: the
+			// assigner never re-places owned shards, since re-placement would
+			// record the shard under two executors (mergePlacements is additive).
+			// Migrating shards off draining executors is the leader's job.
+			name:      "ShardOwnedByDrainingExecutorKeepsOwnerWithoutWrite",
+			shardKeys: []string{"shard1"},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					Executors: map[string]store.HeartbeatState{
+						"draining-owner": {Status: types.ExecutorStatusDRAINING},
+						"live-executor":  {Status: types.ExecutorStatusACTIVE},
+					},
+					ShardAssignments: map[string]store.AssignedState{
+						"draining-owner": {AssignedShards: map[string]*types.ShardAssignment{
+							"shard1": {Status: types.AssignmentStatusREADY},
+						}},
+					},
+				}, nil)
+				// No AssignShards expectation: the owned shard must not be re-placed.
+				mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "draining-owner").Return(&store.ShardOwner{
+					ExecutorID: "draining-owner",
+					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
+				}, nil)
+			},
+			expectedOwners: map[string]string{"shard1": "draining-owner"},
+		},
 	}
 
 	for _, tt := range tests {

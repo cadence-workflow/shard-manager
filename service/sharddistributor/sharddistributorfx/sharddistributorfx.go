@@ -67,9 +67,10 @@ type serversParams struct {
 
 	TimeSource clock.TimeSource
 	Store      store.Store
-	// Dispatcher dependency enforces lifecycle ordering so handler.Stop runs
-	// before dispatcher.Stop during shutdown.
-	Dispatcher *yarpc.Dispatcher
+	// DispatcherOrdering enforces lifecycle ordering so handler.Stop runs before
+	// dispatcher.Stop. Typed as ClientConfig so yarpcfx-style apps, which expose
+	// their dispatcher only as one, can satisfy it.
+	DispatcherOrdering yarpc.ClientConfig
 
 	Authorizer authorization.Authorizer `optional:"true"`
 

@@ -56,11 +56,12 @@ type ManagerParams struct {
 	Logger          log.Logger
 	MetricsClient   metrics.Client
 	ElectionFactory election.Factory
-	// Dispatcher dependency enforces lifecycle ordering so manager.Stop runs
-	// before dispatcher.Stop during shutdown.
-	Dispatcher    *yarpc.Dispatcher
-	Lifecycle     fx.Lifecycle
-	DrainObserver clientcommon.DrainSignalObserver `optional:"true"`
+	// DispatcherOrdering enforces lifecycle ordering so manager.Stop runs before
+	// dispatcher.Stop. Typed as ClientConfig so yarpcfx-style apps, which expose
+	// their dispatcher only as one, can satisfy it.
+	DispatcherOrdering yarpc.ClientConfig
+	Lifecycle          fx.Lifecycle
+	DrainObserver      clientcommon.DrainSignalObserver `optional:"true"`
 }
 
 // NewManager creates a new namespace manager

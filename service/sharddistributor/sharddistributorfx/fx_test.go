@@ -29,6 +29,7 @@ func TestFxServiceStartStop(t *testing.T) {
 		fx.Provide(
 			func() metrics.Client { return metrics.NewNoopMetricsClient() },
 			func() *yarpc.Dispatcher { return testDispatcher },
+			func(d *yarpc.Dispatcher) yarpc.ClientConfig { return d },
 			func() *dynamicconfig.Collection {
 				return dynamicconfig.NewNopCollection()
 			},

@@ -40,7 +40,12 @@ import (
 
 // Module provides a *yarpc.Dispatcher for the fx application.
 var Module = fx.Module("rpcfx",
-	fx.Provide(buildDispatcher),
+	fx.Provide(
+		buildDispatcher,
+		// Components needing the dispatcher only for client access or shutdown
+		// ordering depend on the interface, so they also work under yarpcfx.
+		func(d *yarpc.Dispatcher) yarpc.ClientConfig { return d },
+	),
 )
 
 type params struct {

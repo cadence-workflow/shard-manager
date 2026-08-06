@@ -458,6 +458,7 @@ func TestDrainThenUndrain_ResumesElection(t *testing.T) {
 
 func TestManagerStopsBeforeDispatcher(t *testing.T) {
 	managerStopped := make(chan struct{})
+	dispatcherConstructed := false
 
 	app := fxtest.New(t,
 		fx.Provide(
@@ -471,7 +472,8 @@ func TestManagerStopsBeforeDispatcher(t *testing.T) {
 			func() election.Factory {
 				return &lifecycleTestElectionFactory{managerStopped: managerStopped}
 			},
-			func(lifecycle fx.Lifecycle) *yarpc.Dispatcher {
+			func(lifecycle fx.Lifecycle) yarpc.ClientConfig {
+				dispatcherConstructed = true
 				lifecycle.Append(fx.Hook{
 					OnStop: func(context.Context) error {
 						select {
@@ -489,4 +491,8 @@ func TestManagerStopsBeforeDispatcher(t *testing.T) {
 	)
 
 	app.RequireStart().RequireStop()
+
+	// fx skips constructors nothing depends on, so without this the test would
+	// pass vacuously if ManagerParams ever dropped the dispatcher dependency.
+	require.True(t, dispatcherConstructed, "manager must depend on the dispatcher to order its shutdown against it")
 }

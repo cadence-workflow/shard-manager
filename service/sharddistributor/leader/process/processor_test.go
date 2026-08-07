@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 	"errors"
+	"maps"
 	"slices"
 	"strconv"
 	"sync"
@@ -467,6 +468,140 @@ func TestRebalanceShards_NoShardsToReassign(t *testing.T) {
 
 	err := processor.rebalanceShards(context.Background())
 	require.NoError(t, err)
+}
+
+func TestFindDrainedAssignedShards(t *testing.T) {
+	active := []string{"exec-1", "exec-2"}
+
+	tests := []struct {
+		name       string
+		state      *store.NamespaceState
+		activeExec []string
+		want       []string
+	}{
+		{
+			name:       "nothing drained",
+			state:      &store.NamespaceState{ShardAssignments: assignmentsFor("exec-1", "0", "1")},
+			activeExec: active,
+			want:       nil,
+		},
+		{
+			name: "drained shard assigned to an active executor",
+			state: &store.NamespaceState{
+				ShardAssignments: assignmentsFor("exec-1", "0", "1"),
+				DrainedShards:    map[string]struct{}{"1": {}},
+			},
+			activeExec: active,
+			want:       []string{"1"},
+		},
+		{
+			name: "drained shard that is not assigned anywhere",
+			state: &store.NamespaceState{
+				ShardAssignments: assignmentsFor("exec-1", "0"),
+				DrainedShards:    map[string]struct{}{"1": {}},
+			},
+			activeExec: active,
+			want:       []string{},
+		},
+		{
+			// The write only rewrites active executors, so flagging this would mean
+			// writing on every pass forever without ever removing the shard.
+			name: "drained shard on an executor that is not active",
+			state: &store.NamespaceState{
+				ShardAssignments: assignmentsFor("exec-gone", "1"),
+				DrainedShards:    map[string]struct{}{"1": {}},
+			},
+			activeExec: active,
+			want:       []string{},
+		},
+		{
+			name: "every drained shard assigned is reported",
+			state: &store.NamespaceState{
+				ShardAssignments: assignmentsFor("exec-1", "0", "1", "2"),
+				DrainedShards:    map[string]struct{}{"2": {}, "0": {}, "1": {}},
+			},
+			activeExec: active,
+			want:       []string{"0", "1", "2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Order is irrelevant: callers only look at the length and log the IDs.
+			assert.ElementsMatch(t, tt.want, findDrainedAssignedShards(tt.state, tt.activeExec))
+		})
+	}
+}
+
+func assignmentsFor(executorID string, shardIDs ...string) map[string]store.AssignedState {
+	assigned := make(map[string]*types.ShardAssignment, len(shardIDs))
+	for _, shardID := range shardIDs {
+		assigned[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
+	}
+	return map[string]store.AssignedState{executorID: {AssignedShards: assigned}}
+}
+
+// Draining a shard has to actually take it away from the executor that owns it, since
+// that is what makes the executor client stop processing it. Fixed and ephemeral
+// namespaces build their shard universe differently, so both are covered.
+func TestRebalanceShards_DrainedShardIsTakenFromItsExecutor(t *testing.T) {
+	for _, namespaceType := range []string{config.NamespaceTypeFixed, config.NamespaceTypeEphemeral} {
+		t.Run(namespaceType, func(t *testing.T) {
+			mocks := setupProcessorTest(t, namespaceType)
+			defer mocks.ctrl.Finish()
+			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+			now := mocks.timeSource.Now()
+			mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+				Executors: map[string]store.HeartbeatState{
+					"exec-1": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+				},
+				ShardAssignments: assignmentsFor("exec-1", "0", "1"),
+				DrainedShards:    map[string]struct{}{"1": {}},
+			}, nil)
+
+			// Only the surviving shard is looked up for handover stats.
+			mocks.store.EXPECT().GetShardOwner(gomock.Any(), mocks.cfg.Name, "0").Return(nil, nil)
+			mocks.election.EXPECT().Guard().Return(store.NopGuard())
+
+			var request store.AssignShardsRequest
+			mocks.store.EXPECT().AssignShards(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ string, req store.AssignShardsRequest, _ store.GuardFunc) error {
+					request = req
+					return nil
+				})
+
+			require.NoError(t, processor.rebalanceShards(context.Background()))
+
+			assigned := request.NewState.ShardAssignments["exec-1"].AssignedShards
+			assert.Equal(t, []string{"0"}, slices.Sorted(maps.Keys(assigned)), "the drained shard must be gone")
+			assert.Contains(t, request.ChangedExecutors, "exec-1", "exec-1 must be written for the drop to reach etcd")
+		})
+	}
+}
+
+// The pass after the drop must write nothing. If dropping a drained shard kept flagging
+// a change, the leader would rewrite the same assignment on every pass forever.
+func TestRebalanceShards_DrainedShardConvergesWithoutChurn(t *testing.T) {
+	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+	defer mocks.ctrl.Finish()
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+	now := mocks.timeSource.Now()
+	// Shard "1" is drained and already unassigned, which is the steady state.
+	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+		Executors: map[string]store.HeartbeatState{
+			"exec-1": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+		},
+		ShardAssignments: assignmentsFor("exec-1", "0"),
+		DrainedShards:    map[string]struct{}{"1": {}},
+	}, nil)
+
+	// No AssignShards expectation: a drained shard must not be handed back out, and
+	// nothing else about the distribution changed.
+	require.NoError(t, processor.rebalanceShards(context.Background()))
+
+	assert.NotEmpty(t, mocks.observedLogs.FilterMessage("No changes to distribution detected. Skipping rebalance.").All())
 }
 
 func TestRebalanceShards_WithUnassignedShards(t *testing.T) {

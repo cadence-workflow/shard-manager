@@ -89,6 +89,26 @@ func (c *meteredStore) DeleteShardStats(ctx context.Context, namespace string, s
 	return
 }
 
+func (c *meteredStore) DrainShards(ctx context.Context, namespace string, shardIDs []string) (sa1 []string, err error) {
+	op := func() error {
+		sa1, err = c.wrapped.DrainShards(ctx, namespace, shardIDs)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreDrainShardsScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
+func (c *meteredStore) GetDrainedShards(ctx context.Context, namespace string) (sa1 []string, err error) {
+	op := func() error {
+		sa1, err = c.wrapped.GetDrainedShards(ctx, namespace)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreGetDrainedShardsScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
 func (c *meteredStore) GetExecutor(ctx context.Context, namespace string, executorID string) (sp1 *store.ShardOwner, err error) {
 	op := func() error {
 		sp1, err = c.wrapped.GetExecutor(ctx, namespace, executorID)
@@ -166,5 +186,15 @@ func (c *meteredStore) SubscribeToExecutorStatusChanges(ctx context.Context, nam
 	}
 
 	err = c.call(metrics.ShardDistributorStoreSubscribeToExecutorStatusChangesScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
+func (c *meteredStore) UndrainShards(ctx context.Context, namespace string, shardIDs []string) (sa1 []string, err error) {
+	op := func() error {
+		sa1, err = c.wrapped.UndrainShards(ctx, namespace, shardIDs)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreUndrainShardsScope, op, metrics.NamespaceTag(namespace))
 	return
 }

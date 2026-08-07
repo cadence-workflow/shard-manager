@@ -1168,6 +1168,178 @@ func TestResetNamespace(t *testing.T) {
 	})
 }
 
+// TestDrainShardsLifecycle walks the drain/undrain lifecycle through the etcd-backed
+// store: reading an empty set, draining, reading back via both GetDrainedShards and
+// GetState, draining idempotently, and undraining.
+func TestDrainShardsLifecycle(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Empty(t, drained, "no shards are drained before the first DrainShards call")
+
+	drained, err = executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-B", "shard-A"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-A", "shard-B"}, drained, "result is the full drained set, sorted")
+
+	// Draining an already-drained shard alongside a new one is idempotent and
+	// returns the union rather than just the newly added shard.
+	drained, err = executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-C"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-A", "shard-B", "shard-C"}, drained)
+
+	drained, err = executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-A", "shard-B", "shard-C"}, drained)
+
+	state, err := executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]struct{}{
+		"shard-A": {},
+		"shard-B": {},
+		"shard-C": {},
+	}, state.DrainedShards, "GetState exposes the same set to the rebalance loop")
+
+	removed, err := executorStore.UndrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-B"})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"shard-A", "shard-B"}, removed)
+
+	drained, err = executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-C"}, drained)
+}
+
+// UndrainShards reports only the shards it actually removed. A shard that was never
+// drained, or that a previous call already removed, is excluded — that is what makes
+// the result meaningful to an operator rather than an echo of the request.
+func TestUndrainShardsReportsOnlyActualRemovals(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"})
+	require.NoError(t, err)
+
+	removed, err := executorStore.UndrainShards(ctx, tc.Namespace, []string{"shard-A", "never-drained"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-A"}, removed, "never-drained was absent, so it is not reported")
+
+	removed, err = executorStore.UndrainShards(ctx, tc.Namespace, []string{"shard-A", "never-drained"})
+	require.NoError(t, err)
+	assert.Empty(t, removed, "repeating the same undrain removes nothing further")
+}
+
+// Draining must not leak across namespaces: the drained keyspace is per-namespace and
+// a prefix scan for one namespace must not observe another's keys.
+func TestDrainShardsIsolatedPerNamespace(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	otherNamespace := tc.Namespace + "-other"
+
+	_, err := executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"})
+	require.NoError(t, err)
+	_, err = executorStore.DrainShards(ctx, otherNamespace, []string{"shard-Z"})
+	require.NoError(t, err)
+
+	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-A"}, drained)
+
+	drained, err = executorStore.GetDrainedShards(ctx, otherNamespace)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-Z"}, drained)
+}
+
+// Draining more shards than MaxEtcdTxnOps must transparently chunk the transactions
+// rather than fail with "etcdserver: too many operations in txn request". Undrain has
+// to map per-op delete counts back to inputs correctly across those chunk boundaries.
+func TestDrainShardsChunksOverTxnLimit(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	const numShards = 300 // more than 2x the configured MaxEtcdTxnOps of 128
+	shardIDs := make([]string, 0, numShards)
+	for i := 0; i < numShards; i++ {
+		shardIDs = append(shardIDs, fmt.Sprintf("bulk-shard-%04d", i))
+	}
+
+	drained, err := executorStore.DrainShards(ctx, tc.Namespace, shardIDs)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, shardIDs, drained)
+
+	removed, err := executorStore.UndrainShards(ctx, tc.Namespace, shardIDs)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, shardIDs, removed, "every shard is attributed to the right op across chunks")
+
+	drained, err = executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Empty(t, drained)
+}
+
+func TestDrainShardsEmptyInput(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	drained, err := executorStore.DrainShards(ctx, tc.Namespace, nil)
+	require.NoError(t, err)
+	assert.Empty(t, drained)
+
+	removed, err := executorStore.UndrainShards(ctx, tc.Namespace, nil)
+	require.NoError(t, err)
+	assert.Empty(t, removed)
+}
+
+// ResetNamespace wipes the whole namespace prefix, so drained-shard keys must go with
+// it. Otherwise a reset namespace would come back with stale shards still blocked.
+func TestResetNamespaceClearsDrainedShards(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-B"})
+	require.NoError(t, err)
+
+	_, err = executorStore.ResetNamespace(ctx, tc.Namespace)
+	require.NoError(t, err)
+
+	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Empty(t, drained)
+}
+
+// A key that does not parse as a drained-shard key is skipped rather than failing the
+// read, so one malformed key cannot stall GetState and with it the rebalance loop.
+func TestLoadDrainedShardSetSkipsMalformedKeys(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"})
+	require.NoError(t, err)
+
+	// Nested key: within the drained prefix but not a valid single-segment shard ID.
+	malformed := etcdkeys.BuildDrainedShardKey(tc.EtcdPrefix, tc.Namespace, "shard-B") + "/nested"
+	_, err = tc.Client.Put(ctx, malformed, "")
+	require.NoError(t, err)
+
+	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-A"}, drained)
+}
+
 func createStore(t *testing.T, tc *testhelper.StoreTestCluster) store.Store {
 	t.Helper()
 

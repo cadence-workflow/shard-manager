@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -324,11 +325,43 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 		}
 	}
 
+	drainedShards, err := s.loadDrainedShardSet(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("get drained shards: %w", err)
+	}
+
 	return &store.NamespaceState{
 		Executors:        heartbeatStates,
 		ShardStats:       shardStats,
 		ShardAssignments: assignedStates,
+		DrainedShards:    drainedShards,
 	}, nil
+}
+
+// loadDrainedShardSet reads every drained-shard key for the namespace and returns
+// them as a set.
+// Malformed key format is skipped to not stall the rebalance loop
+func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace string) (map[string]struct{}, error) {
+	drainedPrefix := etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace)
+	resp, err := s.client.Get(ctx, drainedPrefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("get drained shards prefix: %w", err)
+	}
+
+	drained := make(map[string]struct{}, len(resp.Kvs))
+	for _, kv := range resp.Kvs {
+		shardID, err := etcdkeys.ParseDrainedShardKey(s.prefix, namespace, string(kv.Key))
+		if err != nil {
+			s.logger.Warn("skipping malformed drained shard key",
+				tag.ShardNamespace(namespace),
+				tag.Key(string(kv.Key)),
+				tag.Error(err),
+			)
+			continue
+		}
+		drained[shardID] = struct{}{}
+	}
+	return drained, nil
 }
 
 func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan map[*store.ShardOwner][]string, func(), error) {
@@ -872,6 +905,117 @@ func (s *executorStoreImpl) ResetNamespace(ctx context.Context, namespace string
 
 func (s *executorStoreImpl) GetExecutor(ctx context.Context, namespace string, executorID string) (*store.ShardOwner, error) {
 	return s.shardCache.GetExecutor(ctx, namespace, executorID)
+}
+
+// DrainShards writes one empty-valued key per shard under the namespace's drained
+// prefix.
+// Draining is deliberately not guarded by leadership: it is an operator
+// action that must work regardless of which host is currently the leader, and the
+// leader picks the change up on its next rebalance.
+func (s *executorStoreImpl) DrainShards(ctx context.Context, namespace string, shardIDs []string) ([]string, error) {
+	if len(shardIDs) > 0 {
+		ops := make([]clientv3.Op, 0, len(shardIDs))
+		for _, shardID := range shardIDs {
+			ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID), ""))
+		}
+		if _, err := s.commitOpsInBatches(ctx, ops); err != nil {
+			return nil, fmt.Errorf("drain shards: %w", err)
+		}
+	}
+
+	drained, err := s.loadDrainedShardSet(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("read drained shards after drain: %w", err)
+	}
+	return sortedKeys(drained), nil
+}
+
+// UndrainShards deletes the given drained-shard keys and reports which ones it
+// actually removed.
+//
+// Every input key is deleted unconditionally, and the per-op DeleteRange count is
+// inspected afterward: a count of 1 means this call performed the removal, 0 means
+// the key was already gone (never drained, or already removed)
+func (s *executorStoreImpl) UndrainShards(ctx context.Context, namespace string, shardIDs []string) ([]string, error) {
+	if len(shardIDs) == 0 {
+		return nil, nil
+	}
+
+	ops := make([]clientv3.Op, 0, len(shardIDs))
+	for _, shardID := range shardIDs {
+		ops = append(ops, clientv3.OpDelete(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID)))
+	}
+
+	responses, err := s.commitOpsInBatches(ctx, ops)
+	if err != nil {
+		return nil, fmt.Errorf("undrain shards: %w", err)
+	}
+
+	// Responses arrive in the same order the ops were submitted, so a flat counter
+	// across batches maps each op response back to its input shard ID.
+	removed := make([]string, 0, len(shardIDs))
+	opIdx := 0
+	for _, resp := range responses {
+		for _, opResp := range resp.Responses {
+			if opIdx >= len(shardIDs) {
+				return nil, fmt.Errorf("undrain shards: got more op responses than the %d ops submitted", len(shardIDs))
+			}
+			if del := opResp.GetResponseDeleteRange(); del != nil && del.Deleted > 0 {
+				removed = append(removed, shardIDs[opIdx])
+			}
+			opIdx++
+		}
+	}
+	return removed, nil
+}
+
+// GetDrainedShards returns the shards currently drained for the namespace.
+func (s *executorStoreImpl) GetDrainedShards(ctx context.Context, namespace string) ([]string, error) {
+	drained, err := s.loadDrainedShardSet(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("get drained shards: %w", err)
+	}
+	return sortedKeys(drained), nil
+}
+
+// commitOpsInBatches commits unguarded ops in chunks that respect etcd's
+// per-transaction op limit, returning each chunk's response in submission order so
+// callers can inspect per-op outcomes.
+//
+// Chunks are independent transactions, so a failure in a later chunk leaves earlier
+// chunks committed. That is only acceptable because the drain and undrain ops are
+// idempotent: retrying the same input converges on the same state.
+func (s *executorStoreImpl) commitOpsInBatches(ctx context.Context, ops []clientv3.Op) ([]*clientv3.TxnResponse, error) {
+	if len(ops) == 0 {
+		return nil, nil
+	}
+	batchSize := s.cfg.MaxEtcdTxnOps()
+	if batchSize < 1 {
+		batchSize = 1
+	}
+
+	responses := make([]*clientv3.TxnResponse, 0, (len(ops)+batchSize-1)/batchSize)
+	for i := 0; i < len(ops); i += batchSize {
+		end := min(i+batchSize, len(ops))
+
+		resp, err := s.client.Txn(ctx).Then(ops[i:end]...).Commit()
+		if err != nil {
+			return nil, fmt.Errorf("commit batch: %w", err)
+		}
+		responses = append(responses, resp)
+	}
+	return responses, nil
+}
+
+// sortedKeys returns the set's keys in a stable order so callers and tests see
+// deterministic output from what is otherwise an unordered map.
+func sortedKeys(set map[string]struct{}) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // prepareShardStatisticsUpdates calculates the necessary changes to shard statistics based on a new shard assignment plan.

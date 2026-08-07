@@ -1521,6 +1521,9 @@ const (
 	ShardDistributorStoreSubscribeToAssignmentChangesScope
 	ShardDistributorStoreDeleteAssignedStatesScope
 	ShardDistributorStoreResetNamespaceScope
+	ShardDistributorStoreDrainShardsScope
+	ShardDistributorStoreUndrainShardsScope
+	ShardDistributorStoreGetDrainedShardsScope
 
 	// The scope for the shard distributor executor
 	ShardDistributorExecutorScope
@@ -2240,6 +2243,9 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorStoreSubscribeToAssignmentChangesScope:     {operation: "StoreSubscribeToAssignmentChanges"},
 		ShardDistributorStoreDeleteAssignedStatesScope:             {operation: "StoreDeleteAssignedStates"},
 		ShardDistributorStoreResetNamespaceScope:                   {operation: "StoreResetNamespace"},
+		ShardDistributorStoreDrainShardsScope:                      {operation: "StoreDrainShards"},
+		ShardDistributorStoreUndrainShardsScope:                    {operation: "StoreUndrainShards"},
+		ShardDistributorStoreGetDrainedShardsScope:                 {operation: "StoreGetDrainedShards"},
 		ShardDistributorWatchScope:                                 {operation: "Watch"},
 		ShardDistributorLeaderScope:                                {operation: "Leader"},
 		ShardDistributorInspectShardScope:                          {operation: "InspectShard"},

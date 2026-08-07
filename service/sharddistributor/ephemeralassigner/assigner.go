@@ -106,6 +106,7 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 	)
 
 	var resp *types.GetShardOwnerResponse
+	var drained bool
 	isRetry := false
 	err := throttleRetry.Do(ctx, func(ctx context.Context) error {
 		if isRetry {
@@ -113,6 +114,11 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 			// winner already committed our shard's assignment we can return
 			// immediately without re-submitting to the batcher.
 			owner, err := a.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
+			// Drained while retrying: stop instead of re-submitting a drained shard
+			if errors.Is(err, store.ErrShardDrained) {
+				drained = true
+				return err
+			}
 			if err != nil && !errors.Is(err, store.ErrShardNotFound) {
 				return &types.InternalServiceError{Message: fmt.Sprintf("failed to get shard owner: %v", err)}
 			}
@@ -133,6 +139,12 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 		return err
 	})
 
+	if drained {
+		return nil, &types.ShardDrainedError{
+			Namespace: request.Namespace,
+			ShardKey:  request.ShardKey,
+		}
+	}
 	if err != nil {
 		return nil, &types.InternalServiceError{Message: fmt.Sprintf("failed to assign ephemeral shard: %v", err)}
 	}
@@ -186,11 +198,18 @@ func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, s
 }
 
 // resolveOwners splits the requested shards into those already assigned to an
-// executor, mapped to that current owner, and those still needing placement
+// executor, mapped to that current owner, and those still needing placement.
+//
+// Drained shards are dropped from both groups. The read path already rejects them
+// before they reach the batcher, so this only catches a drain committed while the
+// batch was waiting to flush
 func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByShard map[string]string, toPlace []string) {
 	owners := state.ShardOwners()
 	executorByShard = make(map[string]string, len(shardKeys))
 	for _, shardKey := range shardKeys {
+		if _, drained := state.DrainedShards[shardKey]; drained {
+			continue
+		}
 		if executorID, ok := owners[shardKey]; ok {
 			executorByShard[shardKey] = executorID
 			continue
@@ -242,10 +261,14 @@ func (a *Assigner) fetchExecutorMetadata(ctx context.Context, namespace string, 
 
 // buildResults constructs the shardKey -> GetShardOwnerResponse map from the
 // resolved owners and their fetched metadata.
+// Shards that resolveOwners dropped for being drained have no owner and are skipped.
 func buildResults(namespace string, shardKeys []string, executorByShard map[string]string, executorOwners map[string]*store.ShardOwner) map[string]*types.GetShardOwnerResponse {
 	results := make(map[string]*types.GetShardOwnerResponse, len(shardKeys))
 	for _, shardKey := range shardKeys {
-		executorID := executorByShard[shardKey]
+		executorID, ok := executorByShard[shardKey]
+		if !ok {
+			continue
+		}
 		owner := executorOwners[executorID]
 		results[shardKey] = &types.GetShardOwnerResponse{
 			Owner:     owner.ExecutorID,

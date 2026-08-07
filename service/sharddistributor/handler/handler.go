@@ -106,6 +106,13 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 	}
 
 	shardOwner, err := h.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
+
+	if errors.Is(err, store.ErrShardDrained) {
+		return nil, &types.ShardDrainedError{
+			Namespace: request.Namespace,
+			ShardKey:  request.ShardKey,
+		}
+	}
 	if errors.Is(err, store.ErrShardNotFound) {
 		if h.shardDistributionCfg.Namespaces[namespaceIdx].Type == config.NamespaceTypeEphemeral {
 			return h.assigner.GetOrAssign(ctx, request)
@@ -141,6 +148,12 @@ func (h *handlerImpl) InspectShard(ctx context.Context, request *types.GetShardO
 	}
 
 	shardOwner, err := h.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
+	if errors.Is(err, store.ErrShardDrained) {
+		return nil, &types.ShardDrainedError{
+			Namespace: request.Namespace,
+			ShardKey:  request.ShardKey,
+		}
+	}
 	if errors.Is(err, store.ErrShardNotFound) {
 		return nil, &types.ShardNotFoundError{
 			Namespace: request.Namespace,

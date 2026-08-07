@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/cadence-workflow/shard-manager/common"
 	"github.com/cadence-workflow/shard-manager/common/clock"
@@ -28,13 +29,14 @@ import (
 )
 
 type testDependencies struct {
-	ctrl       *gomock.Controller
-	store      *store.MockStore
-	election   *store.MockElection
-	timeSource clock.MockedTimeSource
-	factory    Factory
-	cfg        config.Namespace
-	sdConfig   *config.Config
+	ctrl         *gomock.Controller
+	store        *store.MockStore
+	election     *store.MockElection
+	timeSource   clock.MockedTimeSource
+	factory      Factory
+	cfg          config.Namespace
+	sdConfig     *config.Config
+	observedLogs *observer.ObservedLogs
 }
 
 func setupProcessorTest(t *testing.T, namespaceType string) *testDependencies {
@@ -58,8 +60,11 @@ func setupProcessorTest(t *testing.T, namespaceType string) *testDependencies {
 		},
 	}
 
+	logger, observedLogs := testlogger.NewObserved(t)
+	deps.observedLogs = observedLogs
+
 	deps.factory = NewProcessorFactory(
-		testlogger.New(t),
+		logger,
 		metrics.NewNoopMetricsClient(),
 		mockedClock,
 		config.ShardDistribution{
@@ -865,6 +870,13 @@ func TestNewHandoverStats(t *testing.T) {
 			expectShardStats: nil,
 		},
 		{
+			name:             "ErrShardDrained -> stat without handover",
+			getOwner:         nil,
+			getOwnerErr:      store.ErrShardDrained,
+			executors:        map[string]store.HeartbeatState{},
+			expectShardStats: nil,
+		},
+		{
 			name:        "same executor as previous -> nil",
 			getOwner:    &store.ShardOwner{ExecutorID: newExecutorID},
 			getOwnerErr: nil,
@@ -942,6 +954,43 @@ func TestNewHandoverStats(t *testing.T) {
 		})
 	}
 }
+
+// A drain is an expected condition, not a lookup failure. Warning on it would spam
+// once per drained shard on every rebalance.
+func TestNewHandoverStats_DrainedShardDoesNotWarn(t *testing.T) {
+	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+	defer mocks.ctrl.Finish()
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+	mocks.store.EXPECT().GetShardOwner(gomock.Any(), mocks.cfg.Name, "shard-1").Return(nil, store.ErrShardDrained)
+
+	stat := processor.newHandoverStats(&store.NamespaceState{Executors: map[string]store.HeartbeatState{}}, "shard-1", "exec-new")
+	require.Nil(t, stat, "a drained shard has no previous owner to build handover stats from")
+
+	assert.Empty(t,
+		mocks.observedLogs.FilterMessage("failed to get shard owner for shard statistic").All(),
+		"a drained shard is an expected condition, not a lookup failure",
+	)
+}
+
+// A genuine lookup failure must still be reported, so the drain exemption cannot be
+// written as a blanket "ignore all errors".
+func TestNewHandoverStats_LookupFailureStillWarns(t *testing.T) {
+	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+	defer mocks.ctrl.Finish()
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+	mocks.store.EXPECT().GetShardOwner(gomock.Any(), mocks.cfg.Name, "shard-1").Return(nil, errors.New("etcd unavailable"))
+
+	stat := processor.newHandoverStats(&store.NamespaceState{Executors: map[string]store.HeartbeatState{}}, "shard-1", "exec-new")
+	require.Nil(t, stat)
+
+	assert.Len(t,
+		mocks.observedLogs.FilterMessage("failed to get shard owner for shard statistic").All(), 1,
+		"an unexpected store error must still be surfaced",
+	)
+}
+
 func TestAddHandoverStatsToExecutorAssignedState(t *testing.T) {
 
 	now := time.Now().UTC()

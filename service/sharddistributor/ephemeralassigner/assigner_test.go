@@ -216,6 +216,50 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			},
 			expectedOwners: map[string]string{"shard1": "draining-owner"},
 		},
+		{
+			// A drain that lands while the batch is waiting to flush must not
+			// produce an assignment
+			name:      "DrainedShardIsOmittedFromResults",
+			shardKeys: []string{"drained-shard", "new-shard"},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					Executors: map[string]store.HeartbeatState{
+						"owner1": {Status: types.ExecutorStatusACTIVE},
+					},
+					ShardAssignments: map[string]store.AssignedState{
+						"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
+					},
+					DrainedShards: map[string]struct{}{"drained-shard": {}},
+				}, nil)
+				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(nil)
+				mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
+					ExecutorID: "owner1",
+					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
+				}, nil)
+			},
+			expectedOwners: map[string]string{"new-shard": "owner1"},
+		},
+		{
+			// A drained shard that still has an owner is not handed back: the read
+			// path serves owners, and it rejects drained shards.
+			name:      "DrainedShardWithExistingOwnerIsOmitted",
+			shardKeys: []string{"shard1"},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					Executors: map[string]store.HeartbeatState{
+						"owner1": {Status: types.ExecutorStatusACTIVE},
+					},
+					ShardAssignments: map[string]store.AssignedState{
+						"owner1": {AssignedShards: map[string]*types.ShardAssignment{
+							"shard1": {Status: types.AssignmentStatusREADY},
+						}},
+					},
+					DrainedShards: map[string]struct{}{"shard1": {}},
+				}, nil)
+				// No AssignShards or GetExecutor: nothing to place, no owner to report.
+			},
+			expectedOwners: nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -247,6 +291,35 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The drained set must be applied before placement, so a drained shard never reaches
+// the plan that gets persisted.
+func TestAssignEphemeralBatch_DrainedShardIsNeverPlaced(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockStorage := store.NewMockStore(ctrl)
+	a := &Assigner{
+		storage:    mockStorage,
+		cfg:        newTestShardDistributorConfig(config.LoadBalancingModeNAIVE),
+		timeSource: clock.NewRealTimeSource(),
+	}
+
+	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+		Executors: map[string]store.HeartbeatState{
+			"owner1": {Status: types.ExecutorStatusACTIVE},
+		},
+		ShardAssignments: map[string]store.AssignedState{
+			"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
+		},
+		DrainedShards: map[string]struct{}{"drained-shard": {}},
+	}, nil)
+
+	// No AssignShards expectation: writing a plan at all would mean the shard was placed.
+	results, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, []string{"drained-shard"})
+	require.NoError(t, err)
+	require.Empty(t, results)
 }
 
 // An unsupported load balancing mode bubbles up from the loadbalancer planner as an

@@ -174,7 +174,7 @@ func TestNamespaceShardToExecutor_watch_watchChanErrors(t *testing.T) {
 			}
 		}()
 
-		err = e.watch(triggerChan)
+		err = e.watch(e.executorsWatchTarget(), triggerChan)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "etcdserver: mvcc: required revision has been compacted")
 	}
@@ -183,7 +183,7 @@ func TestNamespaceShardToExecutor_watch_watchChanErrors(t *testing.T) {
 	// Test closed watch channel
 	{
 		close(watchChan)
-		err = e.watch(triggerChan)
+		err = e.watch(e.executorsWatchTarget(), triggerChan)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "watch channel closed")
 	}
@@ -202,7 +202,7 @@ func TestNamespaceShardToExecutor_watch_triggerChBlocking(t *testing.T) {
 	// Start watch in a goroutine
 	watchDone := make(chan error, 1)
 	go func() {
-		watchDone <- tc.e.watch(triggerChan)
+		watchDone <- tc.e.watch(tc.e.executorsWatchTarget(), triggerChan)
 	}()
 
 	// Send many events - the loop should not block even though triggerCh is full
@@ -471,25 +471,35 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_watchError(t *testing.T) 
 	testPrefix := "/test-prefix"
 	testNamespace := "test-namespace"
 
+	executorPrefix := etcdkeys.BuildExecutorsPrefix(testPrefix, testNamespace)
+	drainedPrefix := etcdkeys.BuildDrainedShardsPrefix(testPrefix, testNamespace)
+
 	// mock for first watch call that receives error
 	watchChanRcvErr := make(chan clientv3.WatchResponse)
 	mockClient.EXPECT().
-		Watch(gomock.Any(), gomock.Any(), gomock.Any()).
+		Watch(gomock.Any(), executorPrefix, gomock.Any()).
 		Return(watchChanRcvErr)
 
 	// mock for second watch call that receives closed channel
 	watchChanClosed := make(chan clientv3.WatchResponse)
 	mockClient.EXPECT().
-		Watch(gomock.Any(), gomock.Any(), gomock.Any()).
+		Watch(gomock.Any(), executorPrefix, gomock.Any()).
 		Return(watchChanClosed)
 
 	// mock for third watch call that will be used when stopCh is closed
 	// maybe called or not if stopCh is closed before retry interval
 	mockClient.EXPECT().
-		Watch(gomock.Any(), gomock.Any(), gomock.Any()).
+		Watch(gomock.Any(), executorPrefix, gomock.Any()).
 		Return(make(chan clientv3.WatchResponse)).
 		MinTimes(0).
 		MaxTimes(1)
+
+	// The drained-shards watcher stays idle for the whole test; only the executor
+	// watcher is driven into the retry path.
+	mockClient.EXPECT().
+		Watch(gomock.Any(), drainedPrefix, gomock.Any()).
+		Return(make(chan clientv3.WatchResponse)).
+		AnyTimes()
 
 	e, err := newNamespaceShardToExecutor(testPrefix, testNamespace, mockClient, stopCh, logger, timeSource, metrics.NewNoopMetricsClient())
 	require.NoError(t, err)
@@ -678,14 +688,62 @@ type namespaceShardToExecutorTestCase struct {
 	etcdClient *etcdclient.MockClient
 	timeSource clock.TimeSource
 
-	watchChan chan clientv3.WatchResponse
-	stopCh    chan struct{}
+	watchChan        chan clientv3.WatchResponse
+	drainedWatchChan chan clientv3.WatchResponse
+	stopCh           chan struct{}
 
 	executorID string
 	prefix     string
 	namespace  string
 
 	executorPrefix string
+	drainedPrefix  string
+
+	// drainedMu guards the mocked drained-prefix response, which background
+	// refreshes read concurrently with the test goroutine.
+	drainedMu       sync.Mutex
+	drainedShardIDs []string
+	drainedRevision int64
+	drainedGetCalls atomic.Int32
+
+	// malformedDrainedKey, when set, is returned by the mocked drained-prefix Get
+	// alongside the well-formed keys.
+	malformedDrainedKey string
+}
+
+// setDrainedShards changes what the mocked drained-prefix Get returns. Each call
+// bumps the store revision so the cache accepts the new snapshot as newer.
+func (tc *namespaceShardToExecutorTestCase) setDrainedShards(shardIDs ...string) {
+	tc.drainedMu.Lock()
+	defer tc.drainedMu.Unlock()
+
+	tc.drainedShardIDs = shardIDs
+	tc.drainedRevision++
+}
+
+func (tc *namespaceShardToExecutorTestCase) drainedResponse() *clientv3.GetResponse {
+	tc.drainedMu.Lock()
+	defer tc.drainedMu.Unlock()
+
+	resp := &clientv3.GetResponse{Header: &etcdserverpb.ResponseHeader{Revision: tc.drainedRevision}}
+	if tc.malformedDrainedKey != "" {
+		resp.Kvs = append(resp.Kvs, &mvccpb.KeyValue{Key: []byte(tc.malformedDrainedKey)})
+	}
+	for _, shardID := range tc.drainedShardIDs {
+		resp.Kvs = append(resp.Kvs, &mvccpb.KeyValue{
+			Key: []byte(etcdkeys.BuildDrainedShardKey(tc.prefix, tc.namespace, shardID)),
+		})
+	}
+	return resp
+}
+
+// expectEmptyExecutorState lets a refresh succeed without any executors, for tests
+// that only care about the drained set.
+func (tc *namespaceShardToExecutorTestCase) expectEmptyExecutorState() {
+	tc.etcdClient.EXPECT().
+		Get(gomock.Any(), tc.executorPrefix, gomock.Any()).
+		Return(&clientv3.GetResponse{Header: &etcdserverpb.ResponseHeader{Revision: 1}}, nil).
+		AnyTimes()
 }
 
 func setupNamespaceShardToExecutorTestCase(t *testing.T) *namespaceShardToExecutorTestCase {
@@ -700,12 +758,30 @@ func setupNamespaceShardToExecutorTestCase(t *testing.T) *namespaceShardToExecut
 	tc.namespace = "test-namespace"
 	tc.executorID = "executor-1"
 	tc.executorPrefix = etcdkeys.BuildExecutorsPrefix(tc.prefix, tc.namespace)
+	tc.drainedPrefix = etcdkeys.BuildDrainedShardsPrefix(tc.prefix, tc.namespace)
 
-	// Mock the Watch call to return our watch channel
+	// Each watched prefix gets its own channel so a test can target one watcher
+	// without the other one also seeing the event.
 	tc.watchChan = make(chan clientv3.WatchResponse)
+	tc.drainedWatchChan = make(chan clientv3.WatchResponse)
 	tc.etcdClient.EXPECT().
-		Watch(gomock.Any(), gomock.Any(), gomock.Any()).
+		Watch(gomock.Any(), tc.executorPrefix, gomock.Any()).
 		Return(tc.watchChan).
+		AnyTimes()
+	tc.etcdClient.EXPECT().
+		Watch(gomock.Any(), tc.drainedPrefix, gomock.Any()).
+		Return(tc.drainedWatchChan).
+		AnyTimes()
+
+	// Every refresh reloads the drained set. The response is served from tc so a
+	// test can change the drained set mid-flight with setDrainedShards.
+	tc.drainedRevision = 1
+	tc.etcdClient.EXPECT().
+		Get(gomock.Any(), tc.drainedPrefix, gomock.Any()).
+		DoAndReturn(func(context.Context, string, ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+			tc.drainedGetCalls.Add(1)
+			return tc.drainedResponse(), nil
+		}).
 		AnyTimes()
 
 	e, err := newNamespaceShardToExecutor(tc.prefix, tc.namespace, tc.etcdClient, tc.stopCh, logger, clock.NewRealTimeSource(), metrics.NewNoopMetricsClient())

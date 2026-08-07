@@ -54,6 +54,12 @@ type NamespaceState struct {
 	// ShardAssignments holds the assignment states of all shards in the namespace.
 	// Key: ExecutorID
 	ShardAssignments map[string]AssignedState
+
+	// DrainedShards holds the shards that are drained for this namespace.
+	// A drained shard is not eligible for assignment until it is
+	// explicitly undrained.
+	// Key: ShardID
+	DrainedShards map[string]struct{}
 }
 
 type ShardState struct {

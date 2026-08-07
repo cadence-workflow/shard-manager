@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
@@ -271,11 +272,8 @@ func (h *handlerImpl) ForceResetNamespace(ctx context.Context, request *types.Fo
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	namespaceIdx := slices.IndexFunc(h.shardDistributionCfg.Namespaces, func(n config.Namespace) bool {
-		return n.Name == namespace
-	})
-	if namespaceIdx == -1 {
-		return nil, &types.NamespaceNotFoundError{Namespace: namespace}
+	if err := h.validateNamespace(namespace); err != nil {
+		return nil, err
 	}
 
 	deleted, err := h.storage.ResetNamespace(ctx, namespace)
@@ -365,17 +363,112 @@ func WrapShards(shardIDs []string) []*types.Shard {
 	return shards
 }
 
+// DrainShards marks the requested shards as drained for the namespace.
+// A drained shard is left unassigned until it is undrained.
+// The call is idempotent, so shards that are already drained stay drained, and the
+// response returns every shard drained for the namespace
 func (h *handlerImpl) DrainShards(ctx context.Context, request *types.DrainShardsRequest) (resp *types.DrainShardsResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
-	return nil, &types.InternalServiceError{Message: "DrainShards is not yet implemented"}
+
+	h.startWG.Wait()
+
+	namespace := request.GetNamespace()
+	if err := h.validateNamespace(namespace); err != nil {
+		return nil, err
+	}
+	shardKeys := request.GetShardKeys()
+	if err := validateShardKeys(shardKeys); err != nil {
+		return nil, err
+	}
+
+	drained, err := h.storage.DrainShards(ctx, namespace, shardKeys)
+	if err != nil {
+		return nil, &types.InternalServiceError{Message: fmt.Sprintf("failed to drain shards: %v", err)}
+	}
+
+	h.logger.Info("Drained shards",
+		tag.ShardNamespace(namespace),
+		tag.Dynamic("requested_shards_to_drain", shardKeys),
+		tag.Dynamic("drained_shards", drained),
+	)
+
+	return &types.DrainShardsResponse{DrainedShardKeys: drained}, nil
 }
 
+// UndrainShards removes the requested shards from the namespace's drained set
+// The call is idempotent, and the response returns only the shards this call removed
 func (h *handlerImpl) UndrainShards(ctx context.Context, request *types.UndrainShardsRequest) (resp *types.UndrainShardsResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
-	return nil, &types.InternalServiceError{Message: "UndrainShards is not yet implemented"}
+
+	h.startWG.Wait()
+
+	namespace := request.GetNamespace()
+	if err := h.validateNamespace(namespace); err != nil {
+		return nil, err
+	}
+	shardKeys := request.GetShardKeys()
+	if err := validateShardKeys(shardKeys); err != nil {
+		return nil, err
+	}
+
+	undrained, err := h.storage.UndrainShards(ctx, namespace, shardKeys)
+	if err != nil {
+		return nil, &types.InternalServiceError{Message: fmt.Sprintf("failed to undrain shards: %v", err)}
+	}
+
+	h.logger.Info("Undrained shards",
+		tag.ShardNamespace(namespace),
+		tag.Dynamic("requested_shards_to_undrain", shardKeys),
+		tag.Dynamic("undrained_shards", undrained),
+	)
+
+	return &types.UndrainShardsResponse{UndrainedShardKeys: undrained}, nil
 }
 
+// GetDrainedShards returns the shards currently drained for the namespace.
 func (h *handlerImpl) GetDrainedShards(ctx context.Context, request *types.GetDrainedShardsRequest) (resp *types.GetDrainedShardsResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
-	return nil, &types.InternalServiceError{Message: "GetDrainedShards is not yet implemented"}
+
+	h.startWG.Wait()
+
+	namespace := request.GetNamespace()
+	if err := h.validateNamespace(namespace); err != nil {
+		return nil, err
+	}
+
+	shardKeys, err := h.storage.GetDrainedShards(ctx, namespace)
+	if err != nil {
+		return nil, &types.InternalServiceError{Message: fmt.Sprintf("failed to get drained shards: %v", err)}
+	}
+
+	return &types.GetDrainedShardsResponse{
+		Namespace: namespace,
+		ShardKeys: shardKeys,
+	}, nil
+}
+
+// validateNamespace rejects namespaces that are absent from the static service config
+func (h *handlerImpl) validateNamespace(namespace string) error {
+	found := slices.ContainsFunc(h.shardDistributionCfg.Namespaces, func(n config.Namespace) bool {
+		return n.Name == namespace
+	})
+	if !found {
+		return &types.NamespaceNotFoundError{Namespace: namespace}
+	}
+	return nil
+}
+
+// validateShardKeys rejects drain and undrain requests that storage cannot represent
+func validateShardKeys(shardKeys []string) error {
+	if len(shardKeys) == 0 {
+		return &types.BadRequestError{Message: "shard keys must not be empty"}
+	}
+	for _, shardKey := range shardKeys {
+		if shardKey == "" || strings.Contains(shardKey, "/") {
+			return &types.BadRequestError{
+				Message: fmt.Sprintf("invalid shard key %q: must be non-empty and must not contain '/'", shardKey),
+			}
+		}
+	}
+	return nil
 }

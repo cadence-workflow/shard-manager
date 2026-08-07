@@ -15,6 +15,10 @@ var (
 	// ErrShardNotFound is an error that is returned when a shard does not exist.
 	ErrShardNotFound = fmt.Errorf("shard not found")
 
+	// ErrShardDrained is returned for a shard that is drained.
+	// Unlike ErrShardNotFound it must never lead to an assignment.
+	ErrShardDrained = fmt.Errorf("shard drained")
+
 	// ErrVersionConflict is an error that is returned if during operations some precondition failed.
 	ErrVersionConflict = fmt.Errorf("version conflict")
 

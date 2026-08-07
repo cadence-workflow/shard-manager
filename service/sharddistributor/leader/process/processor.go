@@ -726,7 +726,9 @@ func (p *namespaceProcessor) newHandoverStats(
 
 	// Fetch previous shard owners from cache
 	prevExecutor, err := p.shardStore.GetShardOwner(context.Background(), p.namespaceCfg.Name, shardID)
-	if err != nil && !errors.Is(err, store.ErrShardNotFound) {
+	// The read path refuses drained shards, so no previous owner is available.
+	// Treated like a first assignment, otherwise every rebalance warns of every drained shard.
+	if err != nil && !errors.Is(err, store.ErrShardNotFound) && !errors.Is(err, store.ErrShardDrained) {
 		logger.Warn("failed to get shard owner for shard statistic", tag.Error(err))
 		return nil
 	}

@@ -159,6 +159,32 @@ func TestGetShardOwner(t *testing.T) {
 			expectedError: false,
 		},
 		{
+			name: "Drained_Fixed",
+			request: &types.GetShardOwnerRequest{
+				Namespace: _testNamespaceFixed,
+				ShardKey:  "1",
+			},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, store.ErrShardDrained)
+			},
+			expectedError:  true,
+			expectedErrMsg: "shard drained",
+		},
+		{
+			// A drained shard in an ephemeral namespace must not reach the batcher: the
+			// mock has no assignment expectations, so any call into the assigner fails.
+			name: "Drained_Ephemeral_IsNotAssigned",
+			request: &types.GetShardOwnerRequest{
+				Namespace: _testNamespaceEphemeral,
+				ShardKey:  "1",
+			},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "1").Return(nil, store.ErrShardDrained)
+			},
+			expectedError:  true,
+			expectedErrMsg: "shard drained",
+		},
+		{
 			// ShardNotFound for an ephemeral namespace routes to the batcher, which
 			// calls assignEphemeralBatch. This case validates the routing only;
 			// detailed assignment behaviour is covered in TestAssignEphemeralBatch.
@@ -367,6 +393,18 @@ func TestInspectShard(t *testing.T) {
 			expectedError:  true,
 			expectedErrMsg: "shard not found",
 		},
+		{
+			name: "Drained",
+			request: &types.GetShardOwnerRequest{
+				Namespace: _testNamespaceFixed,
+				ShardKey:  "1",
+			},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, store.ErrShardDrained)
+			},
+			expectedError:  true,
+			expectedErrMsg: "shard drained",
+		},
 	}
 
 	for _, tt := range tests {
@@ -393,6 +431,102 @@ func TestInspectShard(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ShardDrainedError is what maps to FailedPrecondition on the wire, which tells
+// callers not to retry.
+func TestDrainedShardReadsReturnShardDrainedError(t *testing.T) {
+	cfg := config.ShardDistribution{
+		Namespaces: []config.Namespace{
+			{Name: _testNamespaceFixed, Type: config.NamespaceTypeFixed, ShardNum: 32},
+			{Name: _testNamespaceEphemeral, Type: config.NamespaceTypeEphemeral},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		namespace string
+		call      func(*handlerImpl, *types.GetShardOwnerRequest) (*types.GetShardOwnerResponse, error)
+	}{
+		{
+			name:      "GetShardOwner fixed",
+			namespace: _testNamespaceFixed,
+			call: func(h *handlerImpl, req *types.GetShardOwnerRequest) (*types.GetShardOwnerResponse, error) {
+				return h.GetShardOwner(context.Background(), req)
+			},
+		},
+		{
+			name:      "GetShardOwner ephemeral",
+			namespace: _testNamespaceEphemeral,
+			call: func(h *handlerImpl, req *types.GetShardOwnerRequest) (*types.GetShardOwnerResponse, error) {
+				return h.GetShardOwner(context.Background(), req)
+			},
+		},
+		{
+			name:      "InspectShard",
+			namespace: _testNamespaceFixed,
+			call: func(h *handlerImpl, req *types.GetShardOwnerRequest) (*types.GetShardOwnerResponse, error) {
+				return h.InspectShard(context.Background(), req)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockStorage := store.NewMockStore(ctrl)
+			mockStorage.EXPECT().
+				GetShardOwner(gomock.Any(), tt.namespace, "shard-1").
+				Return(nil, store.ErrShardDrained)
+
+			h := newTestHandler(t, cfg, mockStorage)
+			resp, err := tt.call(h, &types.GetShardOwnerRequest{Namespace: tt.namespace, ShardKey: "shard-1"})
+
+			require.Nil(t, resp)
+			require.Equal(t, &types.ShardDrainedError{Namespace: tt.namespace, ShardKey: "shard-1"}, err)
+		})
+	}
+}
+
+// A shard drained while the assigner retries a version conflict must come back as
+// ShardDrainedError, not as an internal failure or a fresh assignment.
+func TestGetShardOwnerDrainedDuringAssignmentRetry(t *testing.T) {
+	cfg := config.ShardDistribution{
+		Namespaces: []config.Namespace{
+			{Name: _testNamespaceEphemeral, Type: config.NamespaceTypeEphemeral},
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	mockStorage := store.NewMockStore(ctrl)
+
+	// Initial lookup: not drained and unassigned, so the handler routes to the assigner.
+	mockStorage.EXPECT().
+		GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "shard-1").
+		Return(nil, store.ErrShardNotFound)
+
+	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+		Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
+		ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+	}, nil)
+	mockStorage.EXPECT().
+		AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).
+		Return(store.ErrVersionConflict)
+
+	// The drain lands before the retry re-reads.
+	mockStorage.EXPECT().
+		GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "shard-1").
+		Return(nil, store.ErrShardDrained)
+
+	h := newTestHandler(t, cfg, mockStorage)
+	resp, err := h.GetShardOwner(context.Background(), &types.GetShardOwnerRequest{
+		Namespace: _testNamespaceEphemeral,
+		ShardKey:  "shard-1",
+	})
+
+	require.Nil(t, resp)
+	require.Equal(t, &types.ShardDrainedError{Namespace: _testNamespaceEphemeral, ShardKey: "shard-1"}, err,
+		"the drain must survive the assigner's error wrapping instead of becoming an internal error")
 }
 
 func TestWatchNamespaceState(t *testing.T) {

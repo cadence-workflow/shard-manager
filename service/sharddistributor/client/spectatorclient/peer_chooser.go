@@ -2,6 +2,7 @@ package spectatorclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon/tag"
 )
@@ -144,6 +146,12 @@ func (c *SpectatorPeerChooser) Choose(ctx context.Context, req *transport.Reques
 	// Query spectator for shard owner
 	owner, err := spectator.GetShardOwner(ctx, req.ShardKey)
 	if err != nil {
+		// A drained shard has no peer to route to and retrying will not produce one,
+		// so it must not be reported as Unavailable, which callers retry.
+		var drainedErr *types.ShardDrainedError
+		if errors.As(err, &drainedErr) {
+			return nil, nil, yarpcerrors.FailedPreconditionErrorf("shard %s is drained in namespace %s", req.ShardKey, namespace)
+		}
 		return nil, nil, yarpcerrors.UnavailableErrorf("get shard owner for key %s: %v", req.ShardKey, err)
 	}
 

@@ -508,11 +508,22 @@ func (v *WatchNamespaceStateRequest) GetNamespace() (o string) {
 
 type WatchNamespaceStateResponse struct {
 	Executors []*ExecutorShardAssignment
+	// DrainedShardKeys are the shards drained for this namespace. They are streamed
+	// alongside the assignments so a watcher can refuse a drained shard locally
+	// rather than asking the shard distributor for an owner it will not get.
+	DrainedShardKeys []string
 }
 
 func (v *WatchNamespaceStateResponse) GetExecutors() (o []*ExecutorShardAssignment) {
 	if v != nil {
 		return v.Executors
+	}
+	return
+}
+
+func (v *WatchNamespaceStateResponse) GetDrainedShardKeys() (o []string) {
+	if v != nil {
+		return v.DrainedShardKeys
 	}
 	return
 }

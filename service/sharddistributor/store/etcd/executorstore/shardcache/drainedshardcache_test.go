@@ -141,7 +141,8 @@ func TestNamespaceShardToExecutor_RefreshDrainedShardsSkipsMalformedKeys(t *test
 	tc.malformedDrainedKey = etcdkeys.BuildDrainedShardsPrefix(tc.prefix, tc.namespace)
 	tc.setDrainedShards("shard-1")
 
-	require.NoError(t, tc.e.refreshDrainedShards(context.Background()))
+	_, err := tc.e.refreshDrainedShards(context.Background())
+	require.NoError(t, err)
 
 	drained, err := tc.e.IsShardDrained(context.Background(), "shard-1")
 	require.NoError(t, err)
@@ -176,6 +177,81 @@ func TestNamespaceShardToExecutor_ReplaceDrainedShards_IgnoresStaleRevision(t *t
 	assert.False(t, drained)
 	drained, _ = tc.e.lookupDrained("shard-2")
 	assert.True(t, drained)
+}
+
+// A drain changes nothing about executor assignments, so it only reaches subscribers
+// if the drained set itself is enough to trigger a publish.
+func TestNamespaceShardToExecutor_DrainPublishesSnapshot(t *testing.T) {
+	tc := setupNamespaceShardToExecutorTestCase(t)
+	defer tc.ctrl.Finish()
+	defer close(tc.stopCh)
+
+	tc.expectEmptyExecutorState()
+
+	subCh, unSub := tc.e.Subscribe(context.Background())
+	defer unSub()
+
+	// Drain the initial snapshot so the next receive is the one caused by the drain.
+	initial := <-subCh
+	assert.Empty(t, initial.DrainedShards)
+
+	tc.setDrainedShards("shard-1")
+	require.NoError(t, tc.e.refresh(context.Background()))
+
+	select {
+	case snapshot := <-subCh:
+		assert.Equal(t, map[string]struct{}{"shard-1": {}}, snapshot.DrainedShards)
+	case <-time.After(5 * time.Second):
+		t.Fatal("drain should be published to subscribers")
+	}
+}
+
+// Refreshes are triggered by any event on the watched prefixes, so most of them re-read
+// an identical drained set. Those must not be published as changes.
+func TestNamespaceShardToExecutor_UnchangedDrainedSetDoesNotPublish(t *testing.T) {
+	tc := setupNamespaceShardToExecutorTestCase(t)
+	defer tc.ctrl.Finish()
+	defer close(tc.stopCh)
+
+	tc.expectEmptyExecutorState()
+	tc.setDrainedShards("shard-1")
+
+	require.NoError(t, tc.e.refresh(context.Background()))
+
+	subCh, unSub := tc.e.Subscribe(context.Background())
+	defer unSub()
+	<-subCh
+
+	// Same drained set, later revision.
+	require.NoError(t, tc.e.refresh(context.Background()))
+
+	select {
+	case snapshot := <-subCh:
+		t.Fatalf("unchanged state should not be published, got %v", snapshot.DrainedShards)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+// Subscribers must not be able to mutate the cache through the snapshot they receive.
+func TestNamespaceShardToExecutor_SnapshotCopiesDrainedShards(t *testing.T) {
+	tc := setupNamespaceShardToExecutorTestCase(t)
+	defer tc.ctrl.Finish()
+	defer close(tc.stopCh)
+
+	tc.expectEmptyExecutorState()
+	tc.setDrainedShards("shard-1")
+	require.NoError(t, tc.e.refresh(context.Background()))
+
+	snapshot := tc.e.getAssignmentSnapshot()
+	require.Equal(t, map[string]struct{}{"shard-1": {}}, snapshot.DrainedShards)
+
+	delete(snapshot.DrainedShards, "shard-1")
+	snapshot.DrainedShards["shard-2"] = struct{}{}
+
+	drained, _ := tc.e.lookupDrained("shard-1")
+	assert.True(t, drained, "cache should be unaffected by changes to a published snapshot")
+	drained, _ = tc.e.lookupDrained("shard-2")
+	assert.False(t, drained)
 }
 
 func TestNamespaceShardToExecutor_hasDrainedShardsChanged(t *testing.T) {

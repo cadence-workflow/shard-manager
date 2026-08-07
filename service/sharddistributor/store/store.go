@@ -91,7 +91,9 @@ type Store interface {
 	// GetShardOwner retrieves the owner of a specific shard within a namespace.
 	// It returns ErrShardNotFound if the shard does not exist.
 	GetShardOwner(ctx context.Context, namespace, shardID string) (*ShardOwner, error)
-	SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan map[*ShardOwner][]string, func(), error)
+	// SubscribeToAssignmentChanges streams a full snapshot of the namespace's
+	// assignments and drained shards, starting with the current state.
+	SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan AssignmentSnapshot, func(), error)
 
 	// GetExecutor retrieves an executor within a namespace.
 	GetExecutor(ctx context.Context, namespace string, executorID string) (*ShardOwner, error)

@@ -53,6 +53,10 @@ type spectatorImpl struct {
 	// Map from shard ID to shard owner (executor ID + metadata)
 	stateMu      sync.RWMutex
 	shardToOwner map[string]*ShardOwner
+	// drainedShards lets a lookup for a drained shard fail locally. Without it a
+	// drained shard is just absent from shardToOwner, which is indistinguishable from
+	// unknown and would send every request to the shard distributor.
+	drainedShards map[string]struct{}
 
 	// Signal to notify when first state is received
 	firstStateSignal *csync.ResettableSignal
@@ -196,8 +200,14 @@ func (s *spectatorImpl) handleResponse(response *types.WatchNamespaceStateRespon
 		}
 	}
 
+	drainedShards := make(map[string]struct{}, len(response.DrainedShardKeys))
+	for _, shardKey := range response.DrainedShardKeys {
+		drainedShards[shardKey] = struct{}{}
+	}
+
 	s.stateMu.Lock()
 	s.shardToOwner = shardToOwner
+	s.drainedShards = drainedShards
 	s.stateMu.Unlock()
 
 	// Signal that first state has been received - this function is free to call
@@ -212,6 +222,10 @@ func (s *spectatorImpl) handleResponse(response *types.WatchNamespaceStateRespon
 // GetShardOwner returns the full owner information including metadata for a given shard.
 // It first waits for the initial state to be received, then checks the cache.
 // If not found in cache, it falls back to querying the shard distributor directly.
+//
+// A drained shard is refused from the local state without an RPC. Drain is checked
+// before ownership so the answer matches the shard distributor, which also refuses a
+// drained shard while it still has an owner.
 func (s *spectatorImpl) GetShardOwner(ctx context.Context, shardKey string) (*ShardOwner, error) {
 	// Wait for first state to be received to avoid flooding shard distributor on startup
 	if err := s.firstStateSignal.Wait(ctx); err != nil {
@@ -220,8 +234,16 @@ func (s *spectatorImpl) GetShardOwner(ctx context.Context, shardKey string) (*Sh
 
 	// Check cache first
 	s.stateMu.RLock()
+	_, drained := s.drainedShards[shardKey]
 	owner := s.shardToOwner[shardKey]
 	s.stateMu.RUnlock()
+
+	if drained {
+		return nil, &types.ShardDrainedError{
+			Namespace: s.namespace,
+			ShardKey:  shardKey,
+		}
+	}
 
 	if owner != nil {
 		return owner, nil

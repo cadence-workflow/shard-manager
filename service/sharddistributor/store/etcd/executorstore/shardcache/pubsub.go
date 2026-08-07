@@ -11,7 +11,8 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
-// executorStatePubSub manages subscriptions to executor state changes.
+// executorStatePubSub manages subscriptions to assignment snapshots, which carry
+// both executor state and the drained set.
 //
 // Each subscriber has a buffered (size 1) channel. When a subscriber can't
 // keep up, publish drains the stale pending message and replaces it with
@@ -19,22 +20,22 @@ import (
 // state rather than being stuck on a stale intermediate state.
 type executorStatePubSub struct {
 	mu          sync.Mutex
-	subscribers map[string]chan map[*store.ShardOwner][]string
+	subscribers map[string]chan store.AssignmentSnapshot
 	logger      log.Logger
 	namespace   string
 }
 
 func newExecutorStatePubSub(logger log.Logger, namespace string) *executorStatePubSub {
 	return &executorStatePubSub{
-		subscribers: make(map[string]chan map[*store.ShardOwner][]string),
+		subscribers: make(map[string]chan store.AssignmentSnapshot),
 		logger:      logger,
 		namespace:   namespace,
 	}
 }
 
 // Subscribe returns a channel that receives executor state updates.
-func (p *executorStatePubSub) subscribe(ctx context.Context) (chan map[*store.ShardOwner][]string, func()) {
-	ch := make(chan map[*store.ShardOwner][]string, 1)
+func (p *executorStatePubSub) subscribe(ctx context.Context) (chan store.AssignmentSnapshot, func()) {
+	ch := make(chan store.AssignmentSnapshot, 1)
 	uniqueID := uuid.New().String()
 
 	p.mu.Lock()
@@ -57,7 +58,7 @@ func (p *executorStatePubSub) unSubscribe(uniqueID string) {
 // Publish sends the state to all subscribers (non-blocking).
 // If a subscriber already has a pending message, it is drained and replaced
 // with the new state so the subscriber always sees the latest.
-func (p *executorStatePubSub) publish(state map[*store.ShardOwner][]string) {
+func (p *executorStatePubSub) publish(state store.AssignmentSnapshot) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

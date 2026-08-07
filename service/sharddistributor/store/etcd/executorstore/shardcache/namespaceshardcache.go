@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -247,12 +248,12 @@ func (n *namespaceShardToExecutor) fetchAndCacheExecutorStatistics(ctx context.C
 	return nil
 }
 
-func (n *namespaceShardToExecutor) Subscribe(ctx context.Context) (<-chan map[*store.ShardOwner][]string, func()) {
+func (n *namespaceShardToExecutor) Subscribe(ctx context.Context) (<-chan store.AssignmentSnapshot, func()) {
 	subCh, unSub := n.pubSub.subscribe(ctx)
 
 	// The go routine sends the initial state to the subscriber.
 	go func() {
-		initialState := n.getExecutorState()
+		initialState := n.getAssignmentSnapshot()
 
 		select {
 		case <-ctx.Done():
@@ -457,27 +458,33 @@ func (n *namespaceShardToExecutor) hasExecutorStateChanged(watchResp clientv3.Wa
 // refresh reloads both halves of the cache. The drained set is reloaded even when only
 // executor state changed: it is a small range, and one refresh path is simpler than two.
 func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
-	updated, err := n.refreshExecutorState(ctx)
+	executorsUpdated, err := n.refreshExecutorState(ctx)
 	if err != nil {
 		return fmt.Errorf("refresh executor state: %w", err)
 	}
 
-	if err := n.refreshDrainedShards(ctx); err != nil {
+	drainedUpdated, err := n.refreshDrainedShards(ctx)
+	if err != nil {
 		return fmt.Errorf("refresh drained shards: %w", err)
 	}
 
-	if updated {
-		n.pubSub.publish(n.getExecutorState())
+	// A drain alone is worth publishing: subscribers keep their own copy of the
+	// drained set and would otherwise not learn about it until executor state
+	// happened to change.
+	if executorsUpdated || drainedUpdated {
+		n.pubSub.publish(n.getAssignmentSnapshot())
 	}
 	return nil
 }
 
-func (n *namespaceShardToExecutor) refreshDrainedShards(ctx context.Context) error {
+// refreshDrainedShards reloads the drained set and reports whether its contents
+// changed, so callers know whether subscribers need to hear about it.
+func (n *namespaceShardToExecutor) refreshDrainedShards(ctx context.Context) (bool, error) {
 	drainedPrefix := etcdkeys.BuildDrainedShardsPrefix(n.etcdPrefix, n.namespace)
 
 	resp, err := n.client.Get(ctx, drainedPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return fmt.Errorf("get drained shards prefix for namespace %s: %w", n.namespace, err)
+		return false, fmt.Errorf("get drained shards prefix for namespace %s: %w", n.namespace, err)
 	}
 
 	drained := make(map[string]struct{}, len(resp.Kvs))
@@ -491,11 +498,13 @@ func (n *namespaceShardToExecutor) refreshDrainedShards(ctx context.Context) err
 		drained[shardID] = struct{}{}
 	}
 
-	n.replaceDrainedShards(resp.Header.Revision, drained)
-	return nil
+	return n.replaceDrainedShards(resp.Header.Revision, drained), nil
 }
 
-func (n *namespaceShardToExecutor) replaceDrainedShards(storeRevision int64, drained map[string]struct{}) {
+// replaceDrainedShards reports whether the stored set actually changed. A newer
+// revision on its own is not a change: refreshes are triggered by any watch event on
+// the prefix, so most of them re-read a set that is byte-for-byte identical.
+func (n *namespaceShardToExecutor) replaceDrainedShards(storeRevision int64, drained map[string]struct{}) bool {
 	n.Lock()
 	defer n.Unlock()
 
@@ -504,23 +513,32 @@ func (n *namespaceShardToExecutor) replaceDrainedShards(storeRevision int64, dra
 			tag.Dynamic("storeRevision", storeRevision),
 			tag.Dynamic("drainedRevision", n.drainedRevision),
 		)
-		return
+		return false
 	}
 
+	changed := !maps.Equal(n.drainedShards, drained)
 	n.drainedRevision = storeRevision
 	n.drainedShards = drained
+	return changed
 }
 
-func (n *namespaceShardToExecutor) getExecutorState() map[*store.ShardOwner][]string {
+// getAssignmentSnapshot copies both halves of the cache under one lock, so a
+// subscriber never sees assignments and drained shards from different revisions.
+func (n *namespaceShardToExecutor) getAssignmentSnapshot() store.AssignmentSnapshot {
 	n.RLock()
 	defer n.RUnlock()
-	executorState := make(map[*store.ShardOwner][]string)
+
+	executorState := make(map[*store.ShardOwner][]string, len(n.executorState))
 	for executor, shardIDs := range n.executorState {
-		executorState[executor] = make([]string, len(shardIDs))
-		copy(executorState[executor], shardIDs)
+		executorState[executor] = slices.Clone(shardIDs)
 	}
 
-	return executorState
+	drained := make(map[string]struct{}, len(n.drainedShards))
+	for shardID := range n.drainedShards {
+		drained[shardID] = struct{}{}
+	}
+
+	return store.AssignmentSnapshot{ExecutorState: executorState, DrainedShards: drained}
 }
 
 func (n *namespaceShardToExecutor) refreshExecutorState(ctx context.Context) (bool, error) {

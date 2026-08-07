@@ -255,10 +255,10 @@ func (mr *MockStoreMockRecorder) ResetNamespace(ctx, namespace any) *gomock.Call
 }
 
 // SubscribeToAssignmentChanges mocks base method.
-func (m *MockStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan map[*ShardOwner][]string, func(), error) {
+func (m *MockStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan AssignmentSnapshot, func(), error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SubscribeToAssignmentChanges", ctx, namespace)
-	ret0, _ := ret[0].(<-chan map[*ShardOwner][]string)
+	ret0, _ := ret[0].(<-chan AssignmentSnapshot)
 	ret1, _ := ret[1].(func())
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2

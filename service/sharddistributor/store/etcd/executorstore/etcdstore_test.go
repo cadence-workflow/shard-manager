@@ -1299,6 +1299,55 @@ func TestUndrainShardsReportsOnlyActualRemovals(t *testing.T) {
 
 // Draining must not leak across namespaces: the drained keyspace is per-namespace and
 // a prefix scan for one namespace must not observe another's keys.
+// Spectators learn about drains only through this subscription, so a drain has to
+// produce a snapshot on its own: it changes no executor assignment.
+func TestSubscribeToAssignmentChangesStreamsDrainedShards(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	executorID := "executor-drain-subscribe"
+	shardID := "shard-drain-subscribe"
+
+	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
+	require.NoError(t, executorStore.AssignShard(ctx, tc.Namespace, shardID, executorID))
+
+	snapshots, unsubscribe, err := executorStore.SubscribeToAssignmentChanges(ctx, tc.Namespace)
+	require.NoError(t, err)
+	defer unsubscribe()
+
+	_, err = executorStore.DrainShards(ctx, tc.Namespace, []string{shardID})
+	require.NoError(t, err)
+
+	// Snapshots are coalesced, so read until the drain shows up rather than assuming
+	// which snapshot carries it.
+	var drainedSnapshot store.AssignmentSnapshot
+	deadline := time.After(10 * time.Second)
+	for {
+		var gotDrain bool
+		select {
+		case drainedSnapshot = <-snapshots:
+			_, gotDrain = drainedSnapshot.DrainedShards[shardID]
+		case <-deadline:
+			t.Fatal("drain should be published to assignment subscribers")
+		}
+		if gotDrain {
+			break
+		}
+	}
+
+	// The assignment still rides along in the same snapshot: dropping it is the
+	// leader's job, and a subscriber needs both halves to agree with the read path.
+	assignedShards := make([]string, 0)
+	for owner, shardIDs := range drainedSnapshot.ExecutorState {
+		if owner.ExecutorID == executorID {
+			assignedShards = append(assignedShards, shardIDs...)
+		}
+	}
+	assert.Equal(t, []string{shardID}, assignedShards)
+}
+
 func TestDrainShardsIsolatedPerNamespace(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)

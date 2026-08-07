@@ -364,7 +364,7 @@ func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace s
 	return drained, nil
 }
 
-func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan map[*store.ShardOwner][]string, func(), error) {
+func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan store.AssignmentSnapshot, func(), error) {
 	return s.shardCache.Subscribe(ctx, namespace)
 }
 

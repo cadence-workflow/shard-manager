@@ -114,20 +114,21 @@ func TestNamespaceShardToExecutor_Subscribe(t *testing.T) {
 		defer wg.Done()
 		// Check that we get the initial state
 		state := <-subCh
-		assert.Len(t, state, 1)
-		verifyExecutorInState(t, state, "executor-1", []string{"shard-1"}, map[string]string{
+		assert.Len(t, state.ExecutorState, 1)
+		assert.Empty(t, state.DrainedShards)
+		verifyExecutorInState(t, state.ExecutorState, "executor-1", []string{"shard-1"}, map[string]string{
 			"hostname": "executor-1-host",
 			"version":  "v1.0.0",
 		})
 
 		// Check that we get the updated state
 		state = <-subCh
-		assert.Len(t, state, 2)
-		verifyExecutorInState(t, state, "executor-1", []string{"shard-1"}, map[string]string{
+		assert.Len(t, state.ExecutorState, 2)
+		verifyExecutorInState(t, state.ExecutorState, "executor-1", []string{"shard-1"}, map[string]string{
 			"hostname": "executor-1-host",
 			"version":  "v1.0.0",
 		})
-		verifyExecutorInState(t, state, "executor-2", []string{"shard-2"}, map[string]string{
+		verifyExecutorInState(t, state.ExecutorState, "executor-2", []string{"shard-2"}, map[string]string{
 			"hostname": "executor-2-host",
 			"region":   "us-west",
 		})
@@ -426,7 +427,7 @@ func TestNamespaceShardToExecutor_replaceExecutorState_skipsStaleRevision(t *tes
 		map[string]*store.ShardOwner{"exec-a": ownerA},
 	)
 
-	got := e.getExecutorState()
+	got := e.getAssignmentSnapshot().ExecutorState
 	require.Len(t, got, 1)
 
 	// Apply revision 5 (stale) — should be ignored
@@ -437,7 +438,7 @@ func TestNamespaceShardToExecutor_replaceExecutorState_skipsStaleRevision(t *tes
 		map[string]*store.ShardOwner{"exec-b": ownerB},
 	)
 
-	got = e.getExecutorState()
+	got = e.getAssignmentSnapshot().ExecutorState
 	require.Len(t, got, 1)
 	for owner := range got {
 		assert.Equal(t, "exec-a", owner.ExecutorID)
@@ -451,7 +452,7 @@ func TestNamespaceShardToExecutor_replaceExecutorState_skipsStaleRevision(t *tes
 		map[string]*store.ShardOwner{"exec-b": ownerB},
 	)
 
-	got = e.getExecutorState()
+	got = e.getAssignmentSnapshot().ExecutorState
 	require.Len(t, got, 1)
 	for owner := range got {
 		assert.Equal(t, "exec-b", owner.ExecutorID)

@@ -550,7 +550,7 @@ func TestWatchNamespaceState(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	updatesChan := make(chan map[*store.ShardOwner][]string, 1)
+	updatesChan := make(chan store.AssignmentSnapshot, 1)
 	unsubscribe := func() { close(updatesChan) }
 
 	mockServer.EXPECT().Context().Return(ctx).AnyTimes()
@@ -560,14 +560,18 @@ func TestWatchNamespaceState(t *testing.T) {
 	mockServer.EXPECT().Send(gomock.Any()).DoAndReturn(func(resp *types.WatchNamespaceStateResponse) error {
 		require.Len(t, resp.Executors, 1)
 		require.Equal(t, "executor-1", resp.Executors[0].ExecutorID)
+		require.Equal(t, []string{"shard-2"}, resp.DrainedShardKeys)
 		return nil
 	})
 
 	// Send update, then cancel
 	go func() {
 		time.Sleep(10 * time.Millisecond)
-		updatesChan <- map[*store.ShardOwner][]string{
-			{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
+		updatesChan <- store.AssignmentSnapshot{
+			ExecutorState: map[*store.ShardOwner][]string{
+				{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
+			},
+			DrainedShards: map[string]struct{}{"shard-2": {}},
 		}
 		cancel()
 	}()
@@ -575,6 +579,29 @@ func TestWatchNamespaceState(t *testing.T) {
 	err := handler.WatchNamespaceState(&types.WatchNamespaceStateRequest{Namespace: "test-ns"}, mockServer)
 	require.Error(t, err)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestSortedShardKeys(t *testing.T) {
+	tests := []struct {
+		name  string
+		input map[string]struct{}
+		want  []string
+	}{
+		{name: "nil set", want: nil},
+		// nil rather than an empty slice, so the field round-trips through protobuf.
+		{name: "empty set", input: map[string]struct{}{}, want: nil},
+		{
+			name:  "sorted regardless of map order",
+			input: map[string]struct{}{"shard-3": {}, "shard-1": {}, "shard-2": {}},
+			want:  []string{"shard-1", "shard-2", "shard-3"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, sortedShardKeys(tt.input))
+		})
+	}
 }
 
 func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
@@ -595,7 +622,7 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 	handler := rawHandler.(*handlerImpl)
 	handler.Start()
 
-	updatesChan := make(chan map[*store.ShardOwner][]string)
+	updatesChan := make(chan store.AssignmentSnapshot)
 	unsubscribe := func() { close(updatesChan) }
 	serverCtx := context.Background()
 

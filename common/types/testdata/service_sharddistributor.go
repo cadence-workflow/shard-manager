@@ -83,6 +83,7 @@ var (
 				Metadata:       map[string]string{"key-2": "value-2"},
 			},
 		},
+		DrainedShardKeys: []string{"shard-4", "shard-5"},
 	}
 	ShardDistributorGetNamespaceStateRequest = types.GetNamespaceStateRequest{
 		Namespace: "namespace",

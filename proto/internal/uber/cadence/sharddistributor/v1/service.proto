@@ -150,6 +150,9 @@ message WatchNamespaceStateRequest {
 message WatchNamespaceStateResponse {
   // Executor information with assigned shards
   repeated ExecutorInfo executors = 1;
+  // Shards drained for this namespace. A drained shard is not assignable, so
+  // watchers can refuse it locally instead of asking for its owner.
+  repeated string drained_shard_keys = 2;
 }
 
 message ExecutorInfo {

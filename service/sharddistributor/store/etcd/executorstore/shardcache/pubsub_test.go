@@ -37,7 +37,7 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 	t.Run("no subscribers doesn't panic", func(t *testing.T) {
 		pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
 		require.NotPanics(t, func() {
-			pubsub.publish(map[*store.ShardOwner][]string{})
+			pubsub.publish(store.AssignmentSnapshot{})
 		})
 	})
 
@@ -48,8 +48,11 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 		defer unsub1()
 		defer unsub2()
 
-		testState := map[*store.ShardOwner][]string{
-			{ExecutorID: "exec-1", Metadata: map[string]string{}}: {"shard-1"},
+		testState := store.AssignmentSnapshot{
+			ExecutorState: map[*store.ShardOwner][]string{
+				{ExecutorID: "exec-1", Metadata: map[string]string{}}: {"shard-1"},
+			},
+			DrainedShards: map[string]struct{}{"shard-2": {}},
 		}
 
 		var wg sync.WaitGroup
@@ -80,14 +83,18 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 
 		// Four states will be published
 		for i := range 4 {
-			state := map[*store.ShardOwner][]string{
-				{ExecutorID: fmt.Sprintf("exec-%d", i), Metadata: map[string]string{}}: {"shard-1"},
+			state := store.AssignmentSnapshot{
+				ExecutorState: map[*store.ShardOwner][]string{
+					{ExecutorID: fmt.Sprintf("exec-%d", i), Metadata: map[string]string{}}: {"shard-1"},
+				},
 			}
 			pubsub.publish(state)
 		}
 		// Last state should be the latest
-		lastState := map[*store.ShardOwner][]string{
-			{ExecutorID: "LAST_STATE_EXECUTOR", Metadata: map[string]string{}}: {"LAST_STATE_SHARD"},
+		lastState := store.AssignmentSnapshot{
+			ExecutorState: map[*store.ShardOwner][]string{
+				{ExecutorID: "LAST_STATE_EXECUTOR", Metadata: map[string]string{}}: {"LAST_STATE_SHARD"},
+			},
 		}
 		pubsub.publish(lastState)
 

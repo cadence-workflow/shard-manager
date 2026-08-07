@@ -350,9 +350,10 @@ func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequ
 				return fmt.Errorf("unexpected close of updates channel")
 			}
 			response := &types.WatchNamespaceStateResponse{
-				Executors: make([]*types.ExecutorShardAssignment, 0, len(assignmentChanges)),
+				Executors:        make([]*types.ExecutorShardAssignment, 0, len(assignmentChanges.ExecutorState)),
+				DrainedShardKeys: sortedShardKeys(assignmentChanges.DrainedShards),
 			}
-			for executor, shardIDs := range assignmentChanges {
+			for executor, shardIDs := range assignmentChanges.ExecutorState {
 				response.Executors = append(response.Executors, &types.ExecutorShardAssignment{
 					ExecutorID:     executor.ExecutorID,
 					AssignedShards: WrapShards(shardIDs),
@@ -366,6 +367,20 @@ func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequ
 			}
 		}
 	}
+}
+
+// sortedShardKeys gives the streamed drained set a stable order, which map iteration
+// would not. Returns nil for an empty set so the field round-trips through protobuf.
+func sortedShardKeys(shardIDs map[string]struct{}) []string {
+	if len(shardIDs) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(shardIDs))
+	for shardID := range shardIDs {
+		keys = append(keys, shardID)
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 func WrapShards(shardIDs []string) []*types.Shard {

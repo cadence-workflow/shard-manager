@@ -22,9 +22,12 @@
 
 // Package accesscontrolled wraps a handler.Handler with per-RPC permission checks
 // using authorization.Authorizer. Only RPCs that need a permission check are
-// overridden (currently GetNamespaceState, GetExecutorState and InspectShard); the remaining methods
-// (Health, lifecycle Start/Stop, the executor hot-path GetShardOwner, and
-// WatchNamespaceState) flow through the embedded handler.Handler unchecked.
+// overridden: the read APIs (GetNamespaceState, GetExecutorState, InspectShard and
+// GetDrainedShards) require PermissionRead, and the administrative APIs
+// (ListNamespaces, ForceResetNamespace, DrainShards and UndrainShards) require
+// PermissionAdmin. The remaining methods (Health, lifecycle Start/Stop, the
+// executor hot-path GetShardOwner, and WatchNamespaceState) flow through the
+// embedded handler.Handler unchecked.
 package accesscontrolled
 
 import (
@@ -89,6 +92,27 @@ func (a *accessControlledHandler) ForceResetNamespace(ctx context.Context, req *
 		return nil, err
 	}
 	return a.Handler.ForceResetNamespace(ctx, req)
+}
+
+func (a *accessControlledHandler) DrainShards(ctx context.Context, req *types.DrainShardsRequest) (*types.DrainShardsResponse, error) {
+	if err := a.authorize(ctx, "DrainShards", req.GetNamespace(), authorization.PermissionAdmin); err != nil {
+		return nil, err
+	}
+	return a.Handler.DrainShards(ctx, req)
+}
+
+func (a *accessControlledHandler) UndrainShards(ctx context.Context, req *types.UndrainShardsRequest) (*types.UndrainShardsResponse, error) {
+	if err := a.authorize(ctx, "UndrainShards", req.GetNamespace(), authorization.PermissionAdmin); err != nil {
+		return nil, err
+	}
+	return a.Handler.UndrainShards(ctx, req)
+}
+
+func (a *accessControlledHandler) GetDrainedShards(ctx context.Context, req *types.GetDrainedShardsRequest) (*types.GetDrainedShardsResponse, error) {
+	if err := a.authorize(ctx, "GetDrainedShards", req.GetNamespace(), authorization.PermissionRead); err != nil {
+		return nil, err
+	}
+	return a.Handler.GetDrainedShards(ctx, req)
 }
 
 func (a *accessControlledHandler) authorize(ctx context.Context, apiName, namespace string, permission authorization.Permission) error {

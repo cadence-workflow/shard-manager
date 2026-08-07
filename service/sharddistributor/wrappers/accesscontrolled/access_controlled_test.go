@@ -261,6 +261,160 @@ func TestAccessControlledHandler_ForceResetNamespace(t *testing.T) {
 	}
 }
 
+func TestAccessControlledHandler_DrainShards(t *testing.T) {
+	tests := []struct {
+		name              string
+		authorizeResult   authorization.Result
+		authorizeErr      error
+		expectInnerCalled bool
+		expectErr         error
+	}{
+		{name: "allow -> inner called", authorizeResult: authorization.Result{Decision: authorization.DecisionAllow}, expectInnerCalled: true},
+		{name: "deny -> AccessDeniedError", authorizeResult: authorization.Result{Decision: authorization.DecisionDeny}, expectErr: errUnauthorized},
+		{name: "authorizer error -> propagated", authorizeErr: errAuthorizerBoom, expectErr: errAuthorizerBoom},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			inner := handler.NewMockHandler(ctrl)
+			authz := authorization.NewMockAuthorizer(ctrl)
+
+			req := &types.DrainShardsRequest{Namespace: testNamespace, ShardKeys: []string{"shard-1"}}
+
+			authz.EXPECT().
+				Authorize(gomock.Any(), &authorization.Attributes{
+					APIName:    "DrainShards",
+					Namespace:  testNamespace,
+					Permission: authorization.PermissionAdmin,
+				}).
+				Return(tc.authorizeResult, tc.authorizeErr).
+				Times(1)
+
+			if tc.expectInnerCalled {
+				inner.EXPECT().
+					DrainShards(gomock.Any(), req).
+					Return(&types.DrainShardsResponse{DrainedShardKeys: []string{"shard-1"}}, nil).
+					Times(1)
+			}
+
+			resp, err := NewHandler(inner, authz).DrainShards(context.Background(), req)
+
+			if tc.expectErr != nil {
+				assert.Nil(t, resp)
+				assert.ErrorIs(t, err, tc.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			assert.Equal(t, []string{"shard-1"}, resp.DrainedShardKeys)
+		})
+	}
+}
+
+func TestAccessControlledHandler_UndrainShards(t *testing.T) {
+	tests := []struct {
+		name              string
+		authorizeResult   authorization.Result
+		authorizeErr      error
+		expectInnerCalled bool
+		expectErr         error
+	}{
+		{name: "allow -> inner called", authorizeResult: authorization.Result{Decision: authorization.DecisionAllow}, expectInnerCalled: true},
+		{name: "deny -> AccessDeniedError", authorizeResult: authorization.Result{Decision: authorization.DecisionDeny}, expectErr: errUnauthorized},
+		{name: "authorizer error -> propagated", authorizeErr: errAuthorizerBoom, expectErr: errAuthorizerBoom},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			inner := handler.NewMockHandler(ctrl)
+			authz := authorization.NewMockAuthorizer(ctrl)
+
+			req := &types.UndrainShardsRequest{Namespace: testNamespace, ShardKeys: []string{"shard-1"}}
+
+			authz.EXPECT().
+				Authorize(gomock.Any(), &authorization.Attributes{
+					APIName:    "UndrainShards",
+					Namespace:  testNamespace,
+					Permission: authorization.PermissionAdmin,
+				}).
+				Return(tc.authorizeResult, tc.authorizeErr).
+				Times(1)
+
+			if tc.expectInnerCalled {
+				inner.EXPECT().
+					UndrainShards(gomock.Any(), req).
+					Return(&types.UndrainShardsResponse{UndrainedShardKeys: []string{"shard-1"}}, nil).
+					Times(1)
+			}
+
+			resp, err := NewHandler(inner, authz).UndrainShards(context.Background(), req)
+
+			if tc.expectErr != nil {
+				assert.Nil(t, resp)
+				assert.ErrorIs(t, err, tc.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			assert.Equal(t, []string{"shard-1"}, resp.UndrainedShardKeys)
+		})
+	}
+}
+
+func TestAccessControlledHandler_GetDrainedShards(t *testing.T) {
+	tests := []struct {
+		name              string
+		authorizeResult   authorization.Result
+		authorizeErr      error
+		expectInnerCalled bool
+		expectErr         error
+	}{
+		{name: "allow -> inner called", authorizeResult: authorization.Result{Decision: authorization.DecisionAllow}, expectInnerCalled: true},
+		{name: "deny -> AccessDeniedError", authorizeResult: authorization.Result{Decision: authorization.DecisionDeny}, expectErr: errUnauthorized},
+		{name: "authorizer error -> propagated", authorizeErr: errAuthorizerBoom, expectErr: errAuthorizerBoom},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			inner := handler.NewMockHandler(ctrl)
+			authz := authorization.NewMockAuthorizer(ctrl)
+
+			req := &types.GetDrainedShardsRequest{Namespace: testNamespace}
+
+			authz.EXPECT().
+				Authorize(gomock.Any(), &authorization.Attributes{
+					APIName:    "GetDrainedShards",
+					Namespace:  testNamespace,
+					Permission: authorization.PermissionRead,
+				}).
+				Return(tc.authorizeResult, tc.authorizeErr).
+				Times(1)
+
+			if tc.expectInnerCalled {
+				inner.EXPECT().
+					GetDrainedShards(gomock.Any(), req).
+					Return(&types.GetDrainedShardsResponse{Namespace: testNamespace, ShardKeys: []string{"shard-1"}}, nil).
+					Times(1)
+			}
+
+			resp, err := NewHandler(inner, authz).GetDrainedShards(context.Background(), req)
+
+			if tc.expectErr != nil {
+				assert.Nil(t, resp)
+				assert.ErrorIs(t, err, tc.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			assert.Equal(t, testNamespace, resp.Namespace)
+			assert.Equal(t, []string{"shard-1"}, resp.ShardKeys)
+		})
+	}
+}
+
 func TestAccessControlledHandler_ListNamespaces(t *testing.T) {
 	tests := []struct {
 		name              string

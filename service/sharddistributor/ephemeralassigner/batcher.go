@@ -166,7 +166,7 @@ func (b *shardBatcher) loop() {
 
 		case res := <-flushDone:
 			ns := namespaces[res.namespace]
-			b.deliverResults(ns.inflight, res)
+			b.deliverResults(ns.inflight, res.results, res.err)
 
 			if len(ns.pending) > 0 {
 				ns.inflight = ns.pending
@@ -201,27 +201,28 @@ func (b *shardBatcher) startFlush(namespace string, reqs []*batchRequest, done c
 }
 
 // deliverResults writes the batch outcome to every caller's respChan.
-func (b *shardBatcher) deliverResults(reqs []*batchRequest, flushRes flushResult) {
-	err := flushRes.err
-	results := flushRes.results
+func (b *shardBatcher) deliverResults(reqs []*batchRequest, results map[string]*types.GetShardOwnerResponse, err error) {
 	for _, req := range reqs {
-		var res batchResponse
-		if err != nil {
-			res = batchResponse{err: err}
-		} else {
-			res = batchResponse{resp: results[req.shardKey]}
-			if res.resp == nil {
-				// processBatch is expected to always include an entry for
-				// every key it was given; a missing entry is an internal error.
-				res = batchResponse{err: &types.InternalServiceError{
-					Message: "batch processor returned no result for shard key: " + req.shardKey,
-				}}
-			}
-		}
 		// Non-blocking write: respChan has capacity 1 and each req has
 		// exactly one writer (this loop) and one reader (Submit).
-		req.respChan <- res
+		req.respChan <- toBatchResponse(results, err, req.shardKey)
 	}
+}
+
+// toBatchResponse picks one caller's outcome out of a whole batch's result.
+func toBatchResponse(results map[string]*types.GetShardOwnerResponse, err error, shardKey string) batchResponse {
+	if err != nil {
+		return batchResponse{err: err}
+	}
+	resp := results[shardKey]
+	if resp == nil {
+		// processBatch is expected to always include an entry for
+		// every key it was given; a missing entry is an internal error.
+		return batchResponse{err: &types.InternalServiceError{
+			Message: "batch processor returned no result for shard key: " + shardKey,
+		}}
+	}
+	return batchResponse{resp: resp}
 }
 
 func (b *shardBatcher) drainAndCancel(namespaces map[string]*namespaceState, flushDone chan flushResult) {
@@ -235,7 +236,7 @@ func (b *shardBatcher) drainAndCancel(namespaces map[string]*namespaceState, flu
 	for range inflightCount {
 		res := <-flushDone
 		ns := namespaces[res.namespace]
-		b.deliverResults(ns.inflight, res)
+		b.deliverResults(ns.inflight, res.results, res.err)
 	}
 
 	// Cancel all pending requests that never got flushed.

@@ -732,12 +732,15 @@ func (s *executorStoreImpl) AssignShard(ctx context.Context, namespace, shardID,
 	}
 }
 
-// commitGuardedOps commits the given operations in batches to stay within etcd's per-transaction operation limit.
-// Each batch creates a new guarded transaction. If any batch fails, the function returns immediately
-// with the error
-func (s *executorStoreImpl) commitGuardedOps(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc) error {
+// commitOps commits the given operations in batches to stay within etcd's
+// per-transaction operation limit, returning each batch's response in submission
+// order so callers can inspect per-op outcomes.
+//
+// Each batch is a separate guarded transaction, so a failure part-way through returns
+// immediately and leaves earlier batches committed.
+func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc) ([]*clientv3.TxnResponse, error) {
 	if len(ops) == 0 {
-		return nil
+		return nil, nil
 	}
 	maxOpsPerTxn := s.cfg.MaxEtcdTxnOps() - guardOpOverhead
 	if maxOpsPerTxn < 1 {
@@ -747,32 +750,29 @@ func (s *executorStoreImpl) commitGuardedOps(ctx context.Context, ops []clientv3
 	numBatches := (len(ops) + maxOpsPerTxn - 1) / maxOpsPerTxn
 	batchSize := (len(ops) + numBatches - 1) / numBatches
 
+	responses := make([]*clientv3.TxnResponse, 0, numBatches)
 	for i := 0; i < len(ops); i += batchSize {
-		end := i + batchSize
-		if end > len(ops) {
-			end = len(ops)
-		}
+		end := min(i+batchSize, len(ops))
 
-		nativeTxn := s.client.Txn(ctx)
-		guardedTxn, err := guard(nativeTxn)
+		guardedTxn, err := guard(s.client.Txn(ctx))
 		if err != nil {
-			return fmt.Errorf("apply transaction guard: %w", err)
+			return nil, fmt.Errorf("apply transaction guard: %w", err)
 		}
 		etcdGuardedTxn, ok := guardedTxn.(clientv3.Txn)
 		if !ok {
-			return fmt.Errorf("guard function returned invalid transaction type")
+			return nil, fmt.Errorf("guard function returned invalid transaction type")
 		}
 
-		etcdGuardedTxn = etcdGuardedTxn.Then(ops[i:end]...)
-		resp, err := etcdGuardedTxn.Commit()
+		resp, err := etcdGuardedTxn.Then(ops[i:end]...).Commit()
 		if err != nil {
-			return fmt.Errorf("commit batch: %w", err)
+			return nil, fmt.Errorf("commit batch: %w", err)
 		}
 		if !resp.Succeeded {
-			return fmt.Errorf("transaction failed, leadership may have changed")
+			return nil, fmt.Errorf("transaction failed, leadership may have changed")
 		}
+		responses = append(responses, resp)
 	}
-	return nil
+	return responses, nil
 }
 
 // DeleteExecutors deletes the given executors from the store. It does not delete the shards owned by the executors, this
@@ -788,7 +788,7 @@ func (s *executorStoreImpl) DeleteExecutors(ctx context.Context, namespace strin
 		ops = append(ops, clientv3.OpDelete(executorIDPrefix, clientv3.WithPrefix()))
 	}
 
-	if err := s.commitGuardedOps(ctx, ops, guard); err != nil {
+	if _, err := s.commitOps(ctx, ops, guard); err != nil {
 		return fmt.Errorf("delete executors: %w", err)
 	}
 	return nil
@@ -805,7 +805,7 @@ func (s *executorStoreImpl) DeleteAssignedStates(ctx context.Context, namespace 
 		ops = append(ops, clientv3.OpDelete(executorIDPrefix, clientv3.WithPrefix()))
 	}
 
-	if err := s.commitGuardedOps(ctx, ops, guard); err != nil {
+	if _, err := s.commitOps(ctx, ops, guard); err != nil {
 		return fmt.Errorf("delete assigned states: %w", err)
 	}
 	return nil
@@ -885,7 +885,7 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 		ops = append(ops, clientv3.OpPut(statsKey, string(compressedPayload)))
 	}
 
-	if err := s.commitGuardedOps(ctx, ops, guard); err != nil {
+	if _, err := s.commitOps(ctx, ops, guard); err != nil {
 		return fmt.Errorf("delete shard stats: %w", err)
 	}
 	return nil
@@ -931,7 +931,7 @@ func (s *executorStoreImpl) DrainShards(ctx context.Context, namespace string, s
 		ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID), ""))
 	}
 
-	if _, err := s.commitOpsInBatches(ctx, ops); err != nil {
+	if _, err := s.commitOps(ctx, ops, store.NopGuard()); err != nil {
 		return fmt.Errorf("drain shards: %w", err)
 	}
 	return nil
@@ -956,7 +956,7 @@ func (s *executorStoreImpl) UndrainShards(ctx context.Context, namespace string,
 		ops = append(ops, clientv3.OpDelete(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID)))
 	}
 
-	responses, err := s.commitOpsInBatches(ctx, ops)
+	responses, err := s.commitOps(ctx, ops, store.NopGuard())
 	if err != nil {
 		return nil, fmt.Errorf("undrain shards: %w", err)
 	}
@@ -986,35 +986,6 @@ func (s *executorStoreImpl) GetDrainedShards(ctx context.Context, namespace stri
 		return nil, fmt.Errorf("get drained shards: %w", err)
 	}
 	return slices.Sorted(maps.Keys(drained)), nil
-}
-
-// commitOpsInBatches commits unguarded ops in chunks that respect etcd's
-// per-transaction op limit, returning each chunk's response in submission order so
-// callers can inspect per-op outcomes.
-//
-// Chunks are independent transactions, so a failure in a later chunk leaves earlier
-// chunks committed. That is only acceptable because the drain and undrain ops are
-// idempotent: retrying the same input converges on the same state.
-func (s *executorStoreImpl) commitOpsInBatches(ctx context.Context, ops []clientv3.Op) ([]*clientv3.TxnResponse, error) {
-	if len(ops) == 0 {
-		return nil, nil
-	}
-	batchSize := s.cfg.MaxEtcdTxnOps()
-	if batchSize < 1 {
-		batchSize = 1
-	}
-
-	responses := make([]*clientv3.TxnResponse, 0, (len(ops)+batchSize-1)/batchSize)
-	for i := 0; i < len(ops); i += batchSize {
-		end := min(i+batchSize, len(ops))
-
-		resp, err := s.client.Txn(ctx).Then(ops[i:end]...).Commit()
-		if err != nil {
-			return nil, fmt.Errorf("commit batch: %w", err)
-		}
-		responses = append(responses, resp)
-	}
-	return responses, nil
 }
 
 // prepareShardStatisticsUpdates calculates the necessary changes to shard statistics based on a new shard assignment plan.

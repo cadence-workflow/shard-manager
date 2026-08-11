@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
@@ -923,7 +924,7 @@ func (t *trackingTxn) Commit() (*clientv3.TxnResponse, error) {
 	return t.commitFn(t.opsCount)
 }
 
-func TestCommitGuardedOps_Batching(t *testing.T) {
+func TestCommitOps_Batching(t *testing.T) {
 	const testMaxTxnOps = 128
 	const testMaxOpsPerBatch = testMaxTxnOps - guardOpOverhead
 
@@ -995,8 +996,9 @@ func TestCommitGuardedOps_Batching(t *testing.T) {
 				client: mockClient,
 				cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
 			}
-			err := s.commitGuardedOps(context.Background(), ops, store.NopGuard())
+			responses, err := s.commitOps(context.Background(), ops, store.NopGuard())
 			require.NoError(t, err)
+			assert.Len(t, responses, tt.expectedBatches, "one response per committed batch")
 
 			require.Len(t, batchSizes, tt.expectedBatches)
 
@@ -1010,7 +1012,7 @@ func TestCommitGuardedOps_Batching(t *testing.T) {
 	}
 }
 
-func TestCommitGuardedOps_CommitError_StopsEarly(t *testing.T) {
+func TestCommitOps_CommitError_StopsEarly(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := etcdclient.NewMockClient(ctrl)
 
@@ -1040,14 +1042,14 @@ func TestCommitGuardedOps_CommitError_StopsEarly(t *testing.T) {
 		client: mockClient,
 		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
 	}
-	err := s.commitGuardedOps(context.Background(), ops, store.NopGuard())
+	_, err := s.commitOps(context.Background(), ops, store.NopGuard())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "commit batch")
 	assert.Equal(t, 1, commitCount, "should stop after first failing batch")
 }
 
-func TestCommitGuardedOps_LeadershipLost_StopsEarly(t *testing.T) {
+func TestCommitOps_LeadershipLost_StopsEarly(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := etcdclient.NewMockClient(ctrl)
 
@@ -1073,14 +1075,14 @@ func TestCommitGuardedOps_LeadershipLost_StopsEarly(t *testing.T) {
 		client: mockClient,
 		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
 	}
-	err := s.commitGuardedOps(context.Background(), ops, store.NopGuard())
+	_, err := s.commitOps(context.Background(), ops, store.NopGuard())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "leadership may have changed")
 	assert.Equal(t, 1, commitCount, "should stop after first leadership failure")
 }
 
-func TestCommitGuardedOps_GuardError(t *testing.T) {
+func TestCommitOps_GuardError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := etcdclient.NewMockClient(ctrl)
 
@@ -1101,10 +1103,96 @@ func TestCommitGuardedOps_GuardError(t *testing.T) {
 		client: mockClient,
 		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(128)},
 	}
-	err := s.commitGuardedOps(context.Background(), ops, failingGuard)
+	_, err := s.commitOps(context.Background(), ops, failingGuard)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "apply transaction guard")
+}
+
+// The guard is applied to every batch, not just the first.
+// A leadership change part-way through a large write must stop the remaining batches.
+func TestCommitOps_GuardAppliedPerBatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockClient := etcdclient.NewMockClient(ctrl)
+
+	const testMaxTxnOps = 10
+	ops := make([]clientv3.Op, testMaxTxnOps+5)
+	for i := range ops {
+		ops[i] = clientv3.OpDelete(fmt.Sprintf("/test/key/%d", i))
+	}
+
+	for range 2 {
+		txn := &trackingTxn{
+			commitFn: func(numOps int) (*clientv3.TxnResponse, error) {
+				return &clientv3.TxnResponse{Succeeded: true}, nil
+			},
+		}
+		mockClient.EXPECT().Txn(gomock.Any()).Return(txn)
+	}
+
+	guardCalls := 0
+	countingGuard := func(txn store.Txn) (store.Txn, error) {
+		guardCalls++
+		return txn, nil
+	}
+
+	s := &executorStoreImpl{
+		client: mockClient,
+		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
+	}
+	responses, err := s.commitOps(context.Background(), ops, countingGuard)
+
+	require.NoError(t, err)
+	assert.Len(t, responses, 2)
+	assert.Equal(t, 2, guardCalls, "each batch gets its own guarded transaction")
+}
+
+// UndrainShards maps per-op delete counts back to its input by walking the returned
+// responses in order, so the responses must line up with how the ops were submitted.
+func TestCommitOps_ResponsesFollowSubmissionOrder(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockClient := etcdclient.NewMockClient(ctrl)
+
+	const testMaxTxnOps = 4
+	ops := make([]clientv3.Op, 7)
+	for i := range ops {
+		ops[i] = clientv3.OpDelete(fmt.Sprintf("/test/key/%d", i))
+	}
+
+	// Each batch reports its own op count as a delete count, so the flattened
+	// sequence of responses reveals the order the batches were committed in.
+	for range 3 {
+		txn := &trackingTxn{
+			commitFn: func(numOps int) (*clientv3.TxnResponse, error) {
+				batch := make([]*etcdserverpb.ResponseOp, 0, numOps)
+				for i := range numOps {
+					batch = append(batch, &etcdserverpb.ResponseOp{
+						Response: &etcdserverpb.ResponseOp_ResponseDeleteRange{
+							ResponseDeleteRange: &etcdserverpb.DeleteRangeResponse{Deleted: int64(i)},
+						},
+					})
+				}
+				return &clientv3.TxnResponse{Succeeded: true, Responses: batch}, nil
+			},
+		}
+		mockClient.EXPECT().Txn(gomock.Any()).Return(txn)
+	}
+
+	s := &executorStoreImpl{
+		client: mockClient,
+		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
+	}
+	responses, err := s.commitOps(context.Background(), ops, store.NopGuard())
+	require.NoError(t, err)
+
+	var deleted []int64
+	for _, resp := range responses {
+		for _, opResp := range resp.Responses {
+			deleted = append(deleted, opResp.GetResponseDeleteRange().Deleted)
+		}
+	}
+	assert.Equal(t, []int64{0, 1, 2, 0, 1, 2, 0}, deleted,
+		"every submitted op has exactly one response, in submission order")
 }
 
 // TestResetNamespace verifies that ResetNamespace removes every key under the

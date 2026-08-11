@@ -71,7 +71,7 @@ func TestExecutorStatePubSub_PublishDoesNotDeadlock(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		pubsub.publish(updateState)
+		pubsub.publish(func() map[*store.ShardOwner][]string { return updateState })
 		close(done)
 	}()
 
@@ -107,7 +107,7 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 	t.Run("no subscribers doesn't panic", func(t *testing.T) {
 		pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns", clock.NewMockedTimeSource())
 		require.NotPanics(t, func() {
-			pubsub.publish(map[*store.ShardOwner][]string{})
+			pubsub.publish(func() map[*store.ShardOwner][]string { return map[*store.ShardOwner][]string{} })
 		})
 	})
 
@@ -140,7 +140,7 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 		}()
 		time.Sleep(10 * time.Millisecond)
 
-		pubsub.publish(testState)
+		pubsub.publish(func() map[*store.ShardOwner][]string { return testState })
 
 		wg.Wait()
 	})
@@ -159,13 +159,13 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 			state := map[*store.ShardOwner][]string{
 				{ExecutorID: fmt.Sprintf("exec-%d", i), Metadata: map[string]string{}}: {"shard-1"},
 			}
-			pubsub.publish(state)
+			pubsub.publish(func() map[*store.ShardOwner][]string { return state })
 		}
 		// Last state should be the latest
 		lastState := map[*store.ShardOwner][]string{
 			{ExecutorID: "LAST_STATE_EXECUTOR", Metadata: map[string]string{}}: {"LAST_STATE_SHARD"},
 		}
-		pubsub.publish(lastState)
+		pubsub.publish(func() map[*store.ShardOwner][]string { return lastState })
 
 		// The subscriber receives the latest state
 		got := <-ch
@@ -188,9 +188,9 @@ func TestExecutorStatePubSub_DroppedUpdateLog(t *testing.T) {
 
 	// The first publish replaces the initial assignment view and starts tracking update times.
 	timeSource.Advance(time.Second)
-	pubsub.publish(map[*store.ShardOwner][]string{
+	pubsub.publish(snapshotOf(map[*store.ShardOwner][]string{
 		{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
-	})
+	}))
 
 	// Leave the replacement pending until the next publish.
 	expectedInterval := 100 * time.Millisecond
@@ -198,7 +198,7 @@ func TestExecutorStatePubSub_DroppedUpdateLog(t *testing.T) {
 	latestState := map[*store.ShardOwner][]string{
 		{ExecutorID: "executor-2", Metadata: map[string]string{}}: {"shard-2"},
 	}
-	pubsub.publish(latestState)
+	pubsub.publish(snapshotOf(latestState))
 
 	dropLogs := logs.FilterMessage("subscriber not keeping up, dropping intermediate state update and replacing with latest").All()
 	require.Len(t, dropLogs, 2)
@@ -228,18 +228,18 @@ func TestExecutorStatePubSub_ConsumerProgressResetsPendingUpdateDuration(t *test
 
 	// Replace the initial assignment view, then consume the replacement to simulate progress.
 	timeSource.Advance(time.Second)
-	pubsub.publish(map[*store.ShardOwner][]string{})
+	pubsub.publish(snapshotOf(map[*store.ShardOwner][]string{}))
 	<-ch
 
 	// Enqueue a new update, then publish twice without consuming it.
 	timeSource.Advance(time.Second)
-	pubsub.publish(map[*store.ShardOwner][]string{})
+	pubsub.publish(snapshotOf(map[*store.ShardOwner][]string{}))
 
 	publishInterval := time.Second
 	timeSource.Advance(publishInterval)
-	pubsub.publish(map[*store.ShardOwner][]string{})
+	pubsub.publish(snapshotOf(map[*store.ShardOwner][]string{}))
 	timeSource.Advance(publishInterval)
-	pubsub.publish(map[*store.ShardOwner][]string{})
+	pubsub.publish(snapshotOf(map[*store.ShardOwner][]string{}))
 
 	dropLogs := logs.FilterMessage("subscriber not keeping up, dropping intermediate state update and replacing with latest").All()
 	require.Len(t, dropLogs, 3)

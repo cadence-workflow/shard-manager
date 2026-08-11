@@ -350,7 +350,7 @@ func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
 	}
 
 	if updated {
-		n.pubSub.publish(n.getExecutorState())
+		n.pubSub.publish(n.getExecutorState)
 	}
 	return nil
 }

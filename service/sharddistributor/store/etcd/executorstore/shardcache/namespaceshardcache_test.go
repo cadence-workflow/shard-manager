@@ -458,6 +458,60 @@ func TestNamespaceShardToExecutor_replaceExecutorState_skipsStaleRevision(t *tes
 	}
 }
 
+// Regression test: publish must take its snapshot only once it holds the
+// pubsub lock, so a publish queued behind a concurrent one can never deliver
+// a snapshot older than what was already applied to the cache.
+func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnapshot(t *testing.T) {
+	tc := setupNamespaceShardToExecutorTestCase(t)
+	defer tc.ctrl.Finish()
+	defer close(tc.stopCh)
+
+	ownerA := &store.ShardOwner{ExecutorID: "exec-a", Metadata: map[string]string{}}
+	ownerB := &store.ShardOwner{ExecutorID: "exec-b", Metadata: map[string]string{}}
+
+	subCh, unsub := tc.e.pubSub.subscribe(tc.e.getExecutorState)
+	defer unsub()
+
+	// Apply the older state.
+	tc.e.replaceExecutorState(5,
+		map[string]*store.ShardOwner{"shard-a": ownerA},
+		map[*store.ShardOwner][]string{ownerA: {"shard-a"}},
+		map[string]int64{"exec-a": 5},
+		map[string]*store.ShardOwner{"exec-a": ownerA},
+	)
+
+	// Hold the pubsub lock so the publish below queues behind it, simulating
+	// a slower refresh whose publish call loses the race for the lock.
+	tc.e.pubSub.mu.Lock()
+
+	publishDone := make(chan struct{})
+	go func() {
+		tc.e.pubSub.publish(tc.e.getExecutorState)
+		close(publishDone)
+	}()
+
+	// Give the goroutine time to block on the lock before the newer state is applied.
+	time.Sleep(20 * time.Millisecond)
+
+	// A concurrent, newer refresh applies its state while the publish above is
+	// still queued.
+	tc.e.replaceExecutorState(10,
+		map[string]*store.ShardOwner{"shard-b": ownerB},
+		map[*store.ShardOwner][]string{ownerB: {"shard-b"}},
+		map[string]int64{"exec-b": 10},
+		map[string]*store.ShardOwner{"exec-b": ownerB},
+	)
+
+	tc.e.pubSub.mu.Unlock()
+	<-publishDone
+
+	got := <-subCh
+	require.Len(t, got, 1)
+	for owner := range got {
+		assert.Equal(t, "exec-b", owner.ExecutorID, "queued publish must reflect the latest cache state, not a snapshot taken before it acquired the lock")
+	}
+}
+
 func TestNamespaceShardToExecutor_namespaceRefreshLoop_watchError(t *testing.T) {
 	defer goleak.VerifyNone(t)
 

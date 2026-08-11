@@ -1190,6 +1190,14 @@ func ShardLoad(load string) Tag {
 	return newStringTag("shard-load", load)
 }
 
+func StateUpdatePublishInterval(duration time.Duration) Tag {
+	return newDurationTag("state-update-publish-interval", duration)
+}
+
+func SubscriberPendingUpdateDuration(duration time.Duration) Tag {
+	return newDurationTag("subscriber-pending-update-duration", duration)
+}
+
 func ElectionDelay(t time.Duration) Tag {
 	return newDurationTag("election-delay", t)
 }

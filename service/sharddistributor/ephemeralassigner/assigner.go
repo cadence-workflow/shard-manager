@@ -44,7 +44,11 @@ import (
 
 const (
 	// ephemeralBatchTimeout is the context timeout for each coalesced batch flush.
-	ephemeralBatchTimeout = 100 * time.Millisecond
+	// Sized as a safety net rather than a target: coalescing relies on etcd latency
+	// to widen the batching window, so a tight deadline would fail flushes exactly
+	// when batching helps most. It also has to cover a cold-cache GetExecutor, whose
+	// namespace refresh is itself bounded by refreshOperationTimeout (5s).
+	ephemeralBatchTimeout = 5 * time.Second
 
 	// versionConflictRetryInitialInterval is the starting backoff for retries
 	// triggered when a concurrent shard assignment causes a version conflict.

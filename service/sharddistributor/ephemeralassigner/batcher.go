@@ -75,7 +75,7 @@ type namespaceState struct {
 //
 // Usage:
 //
-//	b := newShardBatcher(100*time.Millisecond, processFn)
+//	b := newShardBatcher(5*time.Second, processFn)
 //	b.Start()
 //	defer b.Stop()
 //	resp, err := b.Submit(ctx, &types.GetShardOwnerRequest{Namespace: namespace, ShardKey: shardKey})

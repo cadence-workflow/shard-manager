@@ -94,9 +94,9 @@ func (a *accessControlledHandler) ForceResetNamespace(ctx context.Context, req *
 	return a.Handler.ForceResetNamespace(ctx, req)
 }
 
-func (a *accessControlledHandler) DrainShards(ctx context.Context, req *types.DrainShardsRequest) (*types.DrainShardsResponse, error) {
+func (a *accessControlledHandler) DrainShards(ctx context.Context, req *types.DrainShardsRequest) error {
 	if err := a.authorize(ctx, "DrainShards", req.GetNamespace(), authorization.PermissionAdmin); err != nil {
-		return nil, err
+		return err
 	}
 	return a.Handler.DrainShards(ctx, req)
 }

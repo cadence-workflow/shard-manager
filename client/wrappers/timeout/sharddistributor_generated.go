@@ -33,7 +33,7 @@ func NewShardDistributorClient(
 	}
 }
 
-func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (dp2 *types.DrainShardsResponse, err error) {
+func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (err error) {
 	ctx, cancel := createContext(ctx, c.timeout)
 	defer cancel()
 	return c.client.DrainShards(ctx, dp1, p1...)

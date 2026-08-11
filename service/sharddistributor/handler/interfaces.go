@@ -53,7 +53,7 @@ type Handler interface {
 
 	ListNamespaces(context.Context, *types.ListNamespacesRequest) (*types.ListNamespacesResponse, error)
 
-	DrainShards(context.Context, *types.DrainShardsRequest) (*types.DrainShardsResponse, error)
+	DrainShards(context.Context, *types.DrainShardsRequest) error
 	UndrainShards(context.Context, *types.UndrainShardsRequest) (*types.UndrainShardsResponse, error)
 	GetDrainedShards(context.Context, *types.GetDrainedShardsRequest) (*types.GetDrainedShardsResponse, error)
 

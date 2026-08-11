@@ -31,15 +31,11 @@ func NewShardDistributorClient(client sharddistributor.Client, policy backoff.Re
 	}
 }
 
-func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (dp2 *types.DrainShardsResponse, err error) {
-	var resp *types.DrainShardsResponse
+func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (err error) {
 	op := func(ctx context.Context) error {
-		var err error
-		resp, err = c.client.DrainShards(ctx, dp1, p1...)
-		return err
+		return c.client.DrainShards(ctx, dp1, p1...)
 	}
-	err = c.throttleRetry.Do(ctx, op)
-	return resp, err
+	return c.throttleRetry.Do(ctx, op)
 }
 
 func (c *sharddistributorClient) ForceResetNamespace(ctx context.Context, fp1 *types.ForceResetNamespaceRequest, p1 ...yarpc.CallOption) (fp2 *types.ForceResetNamespaceResponse, err error) {

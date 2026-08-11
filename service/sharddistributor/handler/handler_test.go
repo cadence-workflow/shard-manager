@@ -879,7 +879,6 @@ func TestDrainShards(t *testing.T) {
 		name            string
 		request         *types.DrainShardsRequest
 		setupMocks      func(*store.MockStore)
-		wantDrained     []string
 		wantErr         error
 		wantErrContains string
 	}{
@@ -908,7 +907,7 @@ func TestDrainShards(t *testing.T) {
 			request: &types.DrainShardsRequest{Namespace: _testNamespaceFixed, ShardKeys: []string{"1"}},
 			setupMocks: func(m *store.MockStore) {
 				m.EXPECT().DrainShards(gomock.Any(), _testNamespaceFixed, []string{"1"}).
-					Return(nil, errors.New("etcd is down"))
+					Return(errors.New("etcd is down"))
 			},
 			wantErrContains: "failed to drain shards",
 		},
@@ -917,9 +916,8 @@ func TestDrainShards(t *testing.T) {
 			request: &types.DrainShardsRequest{Namespace: _testNamespaceFixed, ShardKeys: []string{"1", "2"}},
 			setupMocks: func(m *store.MockStore) {
 				m.EXPECT().DrainShards(gomock.Any(), _testNamespaceFixed, []string{"1", "2"}).
-					Return([]string{"1", "2", "7"}, nil)
+					Return(nil)
 			},
-			wantDrained: []string{"1", "2", "7"},
 		},
 	}
 
@@ -932,21 +930,17 @@ func TestDrainShards(t *testing.T) {
 			}
 
 			h := newTestHandler(t, cfg, mockStorage)
-			resp, err := h.DrainShards(context.Background(), tt.request)
+			err := h.DrainShards(context.Background(), tt.request)
 
 			if tt.wantErr != nil {
-				require.Nil(t, resp)
 				require.Equal(t, tt.wantErr, err)
 				return
 			}
 			if tt.wantErrContains != "" {
-				require.Nil(t, resp)
 				require.ErrorContains(t, err, tt.wantErrContains)
 				return
 			}
 			require.NoError(t, err)
-			require.NotNil(t, resp)
-			require.Equal(t, tt.wantDrained, resp.DrainedShardKeys)
 		})
 	}
 }

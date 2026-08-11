@@ -698,26 +698,6 @@ func ToShardDistributorDrainShardsRequest(t *sharddistributorv1.DrainShardsReque
 	}
 }
 
-// FromShardDistributorDrainShardsResponse converts a types.DrainShardsResponse to its proto counterpart.
-func FromShardDistributorDrainShardsResponse(t *types.DrainShardsResponse) *sharddistributorv1.DrainShardsResponse {
-	if t == nil {
-		return nil
-	}
-	return &sharddistributorv1.DrainShardsResponse{
-		DrainedShardKeys: t.GetDrainedShardKeys(),
-	}
-}
-
-// ToShardDistributorDrainShardsResponse converts a proto DrainShardsResponse to its types counterpart.
-func ToShardDistributorDrainShardsResponse(t *sharddistributorv1.DrainShardsResponse) *types.DrainShardsResponse {
-	if t == nil {
-		return nil
-	}
-	return &types.DrainShardsResponse{
-		DrainedShardKeys: t.GetDrainedShardKeys(),
-	}
-}
-
 // FromShardDistributorUndrainShardsRequest converts a types.UndrainShardsRequest to its proto counterpart.
 func FromShardDistributorUndrainShardsRequest(t *types.UndrainShardsRequest) *sharddistributorv1.UndrainShardsRequest {
 	if t == nil {

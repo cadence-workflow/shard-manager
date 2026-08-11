@@ -40,11 +40,11 @@ func NewShardDistributorClient(client sharddistributor.Client, errorRate float64
 	}
 }
 
-func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (dp2 *types.DrainShardsResponse, err error) {
+func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (err error) {
 	fakeErr := c.fakeErrFn(c.errorRate)
 	var forwardCall bool
 	if forwardCall = c.forwardCallFn(fakeErr); forwardCall {
-		dp2, err = c.client.DrainShards(ctx, dp1, p1...)
+		err = c.client.DrainShards(ctx, dp1, p1...)
 	}
 
 	if fakeErr != nil {

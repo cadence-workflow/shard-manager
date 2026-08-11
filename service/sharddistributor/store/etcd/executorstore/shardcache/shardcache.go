@@ -110,6 +110,10 @@ func (s *ShardToExecutorCache) getNamespaceShardToExecutor(namespace string) (*n
 	s.Lock()
 	defer s.Unlock()
 
+	if namespaceShardToExecutor, ok := s.namespaceToShards[namespace]; ok {
+		return namespaceShardToExecutor, nil
+	}
+
 	namespaceShardToExecutor, err := newNamespaceShardToExecutor(s.prefix, namespace, s.client, s.stopC, s.logger, s.timeSource, s.metricsClient)
 	if err != nil {
 		return nil, fmt.Errorf("new namespace shard to executor: %w", err)

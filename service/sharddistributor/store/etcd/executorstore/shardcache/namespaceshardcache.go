@@ -91,7 +91,7 @@ func newNamespaceShardToExecutor(etcdPrefix, namespace string, client etcdclient
 		logger:             logger.WithTags(tag.ShardNamespace(namespace)),
 		client:             client,
 		timeSource:         timeSource,
-		pubSub:             newExecutorStatePubSub(logger, namespace),
+		pubSub:             newExecutorStatePubSub(logger, namespace, timeSource),
 		executorStatistics: newNamespaceExecutorStatistics(),
 		metricsClient:      metricsClient,
 		refreshTimeout:     refreshOperationTimeout,

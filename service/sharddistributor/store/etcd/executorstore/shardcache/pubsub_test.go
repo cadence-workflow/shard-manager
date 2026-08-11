@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
@@ -22,7 +23,7 @@ func snapshotOf(state map[*store.ShardOwner][]string) func() map[*store.ShardOwn
 
 func TestExecutorStatePubSub_SubscribeUnsubscribe(t *testing.T) {
 	defer goleak.VerifyNone(t)
-	pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
+	pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns", clock.NewMockedTimeSource())
 
 	ch, unsub := pubsub.subscribe(snapshotOf(emptyState))
 	assert.NotNil(t, ch)
@@ -42,7 +43,7 @@ func TestExecutorStatePubSub_SubscribeUnsubscribe(t *testing.T) {
 func TestExecutorStatePubSub_SubscribeDeliversInitialState(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
-	pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
+	pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns", clock.NewMockedTimeSource())
 	initialState := map[*store.ShardOwner][]string{
 		{ExecutorID: "exec-1", Metadata: map[string]string{}}: {"shard-1"},
 	}
@@ -57,7 +58,7 @@ func TestExecutorStatePubSub_SubscribeDeliversInitialState(t *testing.T) {
 func TestExecutorStatePubSub_PublishDoesNotDeadlock(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
-	pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
+	pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns", clock.NewMockedTimeSource())
 
 	// subscribe seeds the channel with the initial state, filling the
 	// single buffer slot. A subsequent publish must complete without
@@ -104,14 +105,14 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	t.Run("no subscribers doesn't panic", func(t *testing.T) {
-		pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
+		pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns", clock.NewMockedTimeSource())
 		require.NotPanics(t, func() {
 			pubsub.publish(map[*store.ShardOwner][]string{})
 		})
 	})
 
 	t.Run("multiple subscribers receive updates", func(t *testing.T) {
-		pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
+		pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns", clock.NewMockedTimeSource())
 		ch1, unsub1 := pubsub.subscribe(snapshotOf(emptyState))
 		ch2, unsub2 := pubsub.subscribe(snapshotOf(emptyState))
 		defer unsub1()
@@ -145,7 +146,7 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 	})
 
 	t.Run("slow consumer receives latest state", func(t *testing.T) {
-		pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
+		pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns", clock.NewMockedTimeSource())
 
 		ch, unsub := pubsub.subscribe(snapshotOf(emptyState))
 		defer unsub()
@@ -170,4 +171,78 @@ func TestExecutorStatePubSub_Publish(t *testing.T) {
 		got := <-ch
 		assert.Equal(t, lastState, got)
 	})
+}
+
+func TestExecutorStatePubSub_DroppedUpdateLog(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	timeSource := clock.NewMockedTimeSource()
+	logger, logs := testlogger.NewObserved(t)
+	pubsub := newExecutorStatePubSub(logger, "test-ns", timeSource)
+
+	initialState := map[*store.ShardOwner][]string{
+		{ExecutorID: "initial-executor", Metadata: map[string]string{}}: {"initial-shard"},
+	}
+	ch, unsub := pubsub.subscribe(snapshotOf(initialState))
+	defer unsub()
+
+	// The first publish replaces the initial assignment view and starts tracking update times.
+	timeSource.Advance(time.Second)
+	pubsub.publish(map[*store.ShardOwner][]string{
+		{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
+	})
+
+	// Leave the replacement pending until the next publish.
+	expectedInterval := 100 * time.Millisecond
+	timeSource.Advance(expectedInterval)
+	latestState := map[*store.ShardOwner][]string{
+		{ExecutorID: "executor-2", Metadata: map[string]string{}}: {"shard-2"},
+	}
+	pubsub.publish(latestState)
+
+	dropLogs := logs.FilterMessage("subscriber not keeping up, dropping intermediate state update and replacing with latest").All()
+	require.Len(t, dropLogs, 2)
+
+	// The first drop has no previously tracked publish or pending update.
+	firstDrop := dropLogs[0].ContextMap()
+	assert.Equal(t, "test-ns", firstDrop["shard-namespace"])
+	assert.Equal(t, time.Duration(0), firstDrop["state-update-publish-interval"])
+	assert.Equal(t, time.Duration(0), firstDrop["subscriber-pending-update-duration"])
+
+	secondDrop := dropLogs[1].ContextMap()
+	assert.Equal(t, expectedInterval, secondDrop["state-update-publish-interval"])
+	assert.Equal(t, expectedInterval, secondDrop["subscriber-pending-update-duration"])
+
+	assert.Equal(t, latestState, <-ch)
+}
+
+func TestExecutorStatePubSub_ConsumerProgressResetsPendingUpdateDuration(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	timeSource := clock.NewMockedTimeSource()
+	logger, logs := testlogger.NewObserved(t)
+	pubsub := newExecutorStatePubSub(logger, "test-ns", timeSource)
+
+	ch, unsub := pubsub.subscribe(snapshotOf(emptyState))
+	defer unsub()
+
+	// Replace the initial assignment view, then consume the replacement to simulate progress.
+	timeSource.Advance(time.Second)
+	pubsub.publish(map[*store.ShardOwner][]string{})
+	<-ch
+
+	// Enqueue a new update, then publish twice without consuming it.
+	timeSource.Advance(time.Second)
+	pubsub.publish(map[*store.ShardOwner][]string{})
+
+	publishInterval := time.Second
+	timeSource.Advance(publishInterval)
+	pubsub.publish(map[*store.ShardOwner][]string{})
+	timeSource.Advance(publishInterval)
+	pubsub.publish(map[*store.ShardOwner][]string{})
+
+	dropLogs := logs.FilterMessage("subscriber not keeping up, dropping intermediate state update and replacing with latest").All()
+	require.Len(t, dropLogs, 3)
+	expectedPendingDuration := 2 * publishInterval
+	assert.Equal(t, expectedPendingDuration, dropLogs[2].ContextMap()["subscriber-pending-update-duration"])
 }

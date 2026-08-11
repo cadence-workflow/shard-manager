@@ -217,21 +217,7 @@ func (n *namespaceShardToExecutor) fetchAndCacheExecutorStatistics(ctx context.C
 }
 
 func (n *namespaceShardToExecutor) Subscribe(ctx context.Context) (<-chan map[*store.ShardOwner][]string, func()) {
-	subCh, unSub := n.pubSub.subscribe(ctx)
-
-	// The go routine sends the initial state to the subscriber.
-	go func() {
-		initialState := n.getExecutorState()
-
-		select {
-		case <-ctx.Done():
-			n.logger.Warn("context finished before initial state was sent")
-		case subCh <- initialState:
-			n.logger.Info("initial state sent to subscriber", tag.Value(initialState))
-		}
-
-	}()
-
+	subCh, unSub := n.pubSub.subscribe(n.getExecutorState)
 	return subCh, unSub
 }
 

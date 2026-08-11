@@ -128,7 +128,7 @@ func (c *meteredShardDistributorClient) WatchNamespaceState(ctx context.Context,
 	return stream, err
 }
 
-func (c *meteredShardDistributorClient) DrainShards(ctx context.Context, request *types.DrainShardsRequest, opts ...yarpc.CallOption) (*types.DrainShardsResponse, error) {
+func (c *meteredShardDistributorClient) DrainShards(ctx context.Context, request *types.DrainShardsRequest, opts ...yarpc.CallOption) error {
 	scope := c.metricsScope.Tagged(map[string]string{
 		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorDrainShardsOperationTagName,
 	})
@@ -136,13 +136,13 @@ func (c *meteredShardDistributorClient) DrainShards(ctx context.Context, request
 	scope.Counter(metricsconstants.ShardDistributorSpectatorClientRequests).Inc(1)
 
 	sw := scope.Timer(metricsconstants.ShardDistributorSpectatorClientLatency).Start()
-	response, err := c.client.DrainShards(ctx, request, opts...)
+	err := c.client.DrainShards(ctx, request, opts...)
 	sw.Stop()
 
 	if err != nil {
 		scope.Counter(metricsconstants.ShardDistributorSpectatorClientFailures).Inc(1)
 	}
-	return response, err
+	return err
 }
 
 func (c *meteredShardDistributorClient) UndrainShards(ctx context.Context, request *types.UndrainShardsRequest, opts ...yarpc.CallOption) (*types.UndrainShardsResponse, error) {

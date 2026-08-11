@@ -401,6 +401,44 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_triggersRefresh(t *testin
 	wg.Wait()
 }
 
+func TestNamespaceShardToExecutor_namespaceRefreshLoop_HungRefreshDoesNotBlockStop(t *testing.T) {
+	tc := setupNamespaceShardToExecutorTestCase(t)
+	defer goleak.VerifyNone(t)
+	tc.e.refreshTimeout = 50 * time.Millisecond
+
+	tc.etcdClient.EXPECT().
+		Get(gomock.Any(), tc.executorPrefix, gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ string, _ ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}).
+		AnyTimes()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		tc.e.namespaceRefreshLoop()
+	}()
+
+	metadataKey := etcdkeys.BuildMetadataKey(tc.prefix, tc.namespace, tc.executorID, "metadata-key")
+	tc.watchChan <- clientv3.WatchResponse{
+		Events: []*clientv3.Event{{
+			Type:   clientv3.EventTypePut,
+			Kv:     &mvccpb.KeyValue{Key: []byte(metadataKey), Value: []byte("v")},
+			PrevKv: &mvccpb.KeyValue{Key: []byte(metadataKey), Value: []byte("previous")},
+		}},
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	close(tc.stopCh)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("namespaceRefreshLoop did not exit after stopCh was closed while a refresh was in flight")
+	}
+}
+
 func TestNamespaceShardToExecutor_replaceExecutorState_skipsStaleRevision(t *testing.T) {
 	defer goleak.VerifyNone(t)
 

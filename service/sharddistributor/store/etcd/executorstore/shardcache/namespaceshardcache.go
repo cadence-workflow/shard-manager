@@ -236,7 +236,11 @@ func (n *namespaceShardToExecutor) namespaceRefreshLoop() {
 				return
 			}
 
-			if err := n.refresh(context.Background()); err != nil {
+			// Bounded so a stuck etcd call can't block this loop from observing stopCh.
+			refreshCtx, cancel := context.WithTimeout(context.Background(), n.refreshTimeout)
+			err := n.refresh(refreshCtx)
+			cancel()
+			if err != nil {
 				n.logger.Error("failed to refresh namespace shard to executor", tag.Error(err))
 			}
 		}

@@ -365,9 +365,9 @@ func WrapShards(shardIDs []string) []*types.Shard {
 	return shards
 }
 
-func (h *handlerImpl) DrainShards(ctx context.Context, request *types.DrainShardsRequest) (resp *types.DrainShardsResponse, retError error) {
+func (h *handlerImpl) DrainShards(ctx context.Context, request *types.DrainShardsRequest) (retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
-	return nil, &types.InternalServiceError{Message: "DrainShards is not yet implemented"}
+	return &types.InternalServiceError{Message: "DrainShards is not yet implemented"}
 }
 
 func (h *handlerImpl) UndrainShards(ctx context.Context, request *types.UndrainShardsRequest) (resp *types.UndrainShardsResponse, retError error) {

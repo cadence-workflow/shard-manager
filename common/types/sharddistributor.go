@@ -574,19 +574,6 @@ func (v *DrainShardsRequest) GetShardKeys() (o []string) {
 	return
 }
 
-type DrainShardsResponse struct {
-	// DrainedShardKeys is the set of shard keys that are drained for the
-	// namespace after this call (includes shards that were already drained).
-	DrainedShardKeys []string
-}
-
-func (v *DrainShardsResponse) GetDrainedShardKeys() (o []string) {
-	if v != nil {
-		return v.DrainedShardKeys
-	}
-	return
-}
-
 type UndrainShardsRequest struct {
 	Namespace string
 	ShardKeys []string

@@ -878,11 +878,10 @@ func TestDrainShardsStub(t *testing.T) {
 	mockStorage := store.NewMockStore(ctrl)
 
 	h := newTestHandler(t, cfg, mockStorage)
-	resp, err := h.DrainShards(context.Background(), &types.DrainShardsRequest{
+	err := h.DrainShards(context.Background(), &types.DrainShardsRequest{
 		Namespace: _testNamespaceFixed,
 		ShardKeys: []string{"1"},
 	})
-	require.Nil(t, resp)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not yet implemented")
 }

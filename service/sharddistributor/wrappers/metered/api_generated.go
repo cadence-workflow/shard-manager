@@ -28,7 +28,7 @@ func NewMetricsHandler(handler handler.Handler, logger log.Logger, metricsClient
 	}
 }
 
-func (h *metricsHandler) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest) (dp2 *types.DrainShardsResponse, err error) {
+func (h *metricsHandler) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest) (err error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &err) }()
 
 	scope := h.metricsClient.Scope(metrics.ShardDistributorDrainShardsScope)
@@ -38,13 +38,13 @@ func (h *metricsHandler) DrainShards(ctx context.Context, dp1 *types.DrainShards
 	defer sw.Stop()
 	logger := h.logger.WithTags(tag.ShardNamespace(dp1.GetNamespace()))
 
-	dp2, err = h.handler.DrainShards(ctx, dp1)
+	err = h.handler.DrainShards(ctx, dp1)
 
 	if err != nil {
 		handleErr(err, scope, logger)
 	}
 
-	return dp2, err
+	return err
 }
 
 func (h *metricsHandler) ForceResetNamespace(ctx context.Context, fp1 *types.ForceResetNamespaceRequest) (fp2 *types.ForceResetNamespaceResponse, err error) {

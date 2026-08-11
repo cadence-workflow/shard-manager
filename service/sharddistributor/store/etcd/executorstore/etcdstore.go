@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/fx"
 
@@ -294,13 +296,18 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 	assignedStates := make(map[string]store.AssignedState)
 	shardStats := make(map[string]store.ShardStatistics)
 
-	executorPrefix := etcdkeys.BuildExecutorsPrefix(s.prefix, namespace)
-	resp, err := s.client.Get(ctx, executorPrefix, clientv3.WithPrefix())
+	txnResp, err := s.client.Txn(ctx).Then(
+		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+	).Commit()
 	if err != nil {
-		return nil, fmt.Errorf("get executor data: %w", err)
+		return nil, fmt.Errorf("get namespace state: %w", err)
+	}
+	if len(txnResp.Responses) != 2 {
+		return nil, fmt.Errorf("get namespace state: expected 2 responses, got %d", len(txnResp.Responses))
 	}
 
-	parsedData, err := common.ParseExecutorKVs(s.prefix, namespace, resp.Kvs)
+	parsedData, err := common.ParseExecutorKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
 	if err != nil {
 		return nil, err
 	}
@@ -325,31 +332,30 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 		}
 	}
 
-	drainedShards, err := s.loadDrainedShardSet(ctx, namespace)
-	if err != nil {
-		return nil, fmt.Errorf("get drained shards: %w", err)
-	}
-
 	return &store.NamespaceState{
 		Executors:        heartbeatStates,
 		ShardStats:       shardStats,
 		ShardAssignments: assignedStates,
-		DrainedShards:    drainedShards,
+		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
 	}, nil
 }
 
 // loadDrainedShardSet reads every drained-shard key for the namespace and returns
 // them as a set.
-// Malformed key format is skipped to not stall the rebalance loop
 func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace string) (map[string]struct{}, error) {
 	drainedPrefix := etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace)
 	resp, err := s.client.Get(ctx, drainedPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("get drained shards prefix: %w", err)
 	}
+	return s.parseDrainedShardKVs(namespace, resp.Kvs), nil
+}
 
-	drained := make(map[string]struct{}, len(resp.Kvs))
-	for _, kv := range resp.Kvs {
+// parseDrainedShardKVs turns drained-shard keys into a set of shard IDs.
+// Malformed keys are skipped to not stall the rebalance loop.
+func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb.KeyValue) map[string]struct{} {
+	drained := make(map[string]struct{}, len(kvs))
+	for _, kv := range kvs {
 		shardID, err := etcdkeys.ParseDrainedShardKey(s.prefix, namespace, string(kv.Key))
 		if err != nil {
 			s.logger.Warn("skipping malformed drained shard key",
@@ -361,7 +367,7 @@ func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace s
 		}
 		drained[shardID] = struct{}{}
 	}
-	return drained, nil
+	return drained
 }
 
 func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan map[*store.ShardOwner][]string, func(), error) {
@@ -912,22 +918,23 @@ func (s *executorStoreImpl) GetExecutor(ctx context.Context, namespace string, e
 // Draining is deliberately not guarded by leadership: it is an operator
 // action that must work regardless of which host is currently the leader, and the
 // leader picks the change up on its next rebalance.
-func (s *executorStoreImpl) DrainShards(ctx context.Context, namespace string, shardIDs []string) ([]string, error) {
-	if len(shardIDs) > 0 {
-		ops := make([]clientv3.Op, 0, len(shardIDs))
-		for _, shardID := range shardIDs {
-			ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID), ""))
-		}
-		if _, err := s.commitOpsInBatches(ctx, ops); err != nil {
-			return nil, fmt.Errorf("drain shards: %w", err)
-		}
+func (s *executorStoreImpl) DrainShards(ctx context.Context, namespace string, shardIDs []string) error {
+	if len(shardIDs) == 0 {
+		return nil
 	}
 
-	drained, err := s.loadDrainedShardSet(ctx, namespace)
-	if err != nil {
-		return nil, fmt.Errorf("read drained shards after drain: %w", err)
+	ops := make([]clientv3.Op, 0, len(shardIDs))
+	for _, shardID := range shardIDs {
+		if err := etcdkeys.ValidateShardID(shardID); err != nil {
+			return fmt.Errorf("drain shards: %w", err)
+		}
+		ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID), ""))
 	}
-	return sortedKeys(drained), nil
+
+	if _, err := s.commitOpsInBatches(ctx, ops); err != nil {
+		return fmt.Errorf("drain shards: %w", err)
+	}
+	return nil
 }
 
 // UndrainShards deletes the given drained-shard keys and reports which ones it
@@ -943,6 +950,9 @@ func (s *executorStoreImpl) UndrainShards(ctx context.Context, namespace string,
 
 	ops := make([]clientv3.Op, 0, len(shardIDs))
 	for _, shardID := range shardIDs {
+		if err := etcdkeys.ValidateShardID(shardID); err != nil {
+			return nil, fmt.Errorf("undrain shards: %w", err)
+		}
 		ops = append(ops, clientv3.OpDelete(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID)))
 	}
 
@@ -975,7 +985,7 @@ func (s *executorStoreImpl) GetDrainedShards(ctx context.Context, namespace stri
 	if err != nil {
 		return nil, fmt.Errorf("get drained shards: %w", err)
 	}
-	return sortedKeys(drained), nil
+	return slices.Sorted(maps.Keys(drained)), nil
 }
 
 // commitOpsInBatches commits unguarded ops in chunks that respect etcd's
@@ -1005,17 +1015,6 @@ func (s *executorStoreImpl) commitOpsInBatches(ctx context.Context, ops []client
 		responses = append(responses, resp)
 	}
 	return responses, nil
-}
-
-// sortedKeys returns the set's keys in a stable order so callers and tests see
-// deterministic output from what is otherwise an unordered map.
-func sortedKeys(set map[string]struct{}) []string {
-	keys := make([]string, 0, len(set))
-	for key := range set {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // prepareShardStatisticsUpdates calculates the necessary changes to shard statistics based on a new shard assignment plan.

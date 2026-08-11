@@ -85,7 +85,9 @@ func (p *executorStatePubSub) publish(state map[*store.ShardOwner][]string) {
 			// Reset it if the consumer drained the update concurrently.
 			select {
 			case <-sub.updates:
-				p.logDroppedUpdate(sub, now)
+				if !sub.pendingUpdateSince.IsZero() {
+					p.logDroppedUpdate(sub, now)
+				}
 			default:
 				sub.pendingUpdateSince = now
 			}

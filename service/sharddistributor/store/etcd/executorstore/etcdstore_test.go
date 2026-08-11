@@ -1182,15 +1182,15 @@ func TestDrainShardsLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, drained, "no shards are drained before the first DrainShards call")
 
-	drained, err = executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-B", "shard-A"})
-	require.NoError(t, err)
-	assert.Equal(t, []string{"shard-A", "shard-B"}, drained, "result is the full drained set, sorted")
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-B", "shard-A"}))
 
-	// Draining an already-drained shard alongside a new one is idempotent and
-	// returns the union rather than just the newly added shard.
-	drained, err = executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-C"})
+	drained, err = executorStore.GetDrainedShards(ctx, tc.Namespace)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"shard-A", "shard-B", "shard-C"}, drained)
+	assert.Equal(t, []string{"shard-A", "shard-B"}, drained, "the drained set reads back sorted")
+
+	// Draining an already-drained shard alongside a new one is idempotent: the
+	// existing shard stays drained instead of erroring.
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-C"}))
 
 	drained, err = executorStore.GetDrainedShards(ctx, tc.Namespace)
 	require.NoError(t, err)
@@ -1213,6 +1213,7 @@ func TestDrainShardsLifecycle(t *testing.T) {
 	assert.Equal(t, []string{"shard-C"}, drained)
 }
 
+
 // The read path must refuse a drained shard even while it is still assigned, and serve
 // it again once undrained. Both transitions reach the cache through its watch.
 func TestGetShardOwnerRefusesDrainedShards(t *testing.T) {
@@ -1232,8 +1233,7 @@ func TestGetShardOwnerRefusesDrainedShards(t *testing.T) {
 		return err == nil && owner.ExecutorID == executorID
 	}, 5*time.Second, 50*time.Millisecond, "assigned shard should resolve to its owner before being drained")
 
-	_, err := executorStore.DrainShards(ctx, tc.Namespace, []string{shardID})
-	require.NoError(t, err)
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{shardID}))
 
 	require.Eventually(t, func() bool {
 		_, err := executorStore.GetShardOwner(ctx, tc.Namespace, shardID)
@@ -1267,8 +1267,7 @@ func TestGetShardOwnerReportsDrainedForUnassignedShard(t *testing.T) {
 	_, err := executorStore.GetShardOwner(ctx, tc.Namespace, "never-assigned")
 	require.ErrorIs(t, err, store.ErrShardNotFound)
 
-	_, err = executorStore.DrainShards(ctx, tc.Namespace, []string{"never-assigned"})
-	require.NoError(t, err)
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"never-assigned"}))
 
 	require.Eventually(t, func() bool {
 		_, err := executorStore.GetShardOwner(ctx, tc.Namespace, "never-assigned")
@@ -1285,8 +1284,7 @@ func TestUndrainShardsReportsOnlyActualRemovals(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, err := executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"})
-	require.NoError(t, err)
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"}))
 
 	removed, err := executorStore.UndrainShards(ctx, tc.Namespace, []string{"shard-A", "never-drained"})
 	require.NoError(t, err)
@@ -1307,10 +1305,8 @@ func TestDrainShardsIsolatedPerNamespace(t *testing.T) {
 
 	otherNamespace := tc.Namespace + "-other"
 
-	_, err := executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"})
-	require.NoError(t, err)
-	_, err = executorStore.DrainShards(ctx, otherNamespace, []string{"shard-Z"})
-	require.NoError(t, err)
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"}))
+	require.NoError(t, executorStore.DrainShards(ctx, otherNamespace, []string{"shard-Z"}))
 
 	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
 	require.NoError(t, err)
@@ -1336,7 +1332,9 @@ func TestDrainShardsChunksOverTxnLimit(t *testing.T) {
 		shardIDs = append(shardIDs, fmt.Sprintf("bulk-shard-%04d", i))
 	}
 
-	drained, err := executorStore.DrainShards(ctx, tc.Namespace, shardIDs)
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, shardIDs))
+
+	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, shardIDs, drained)
 
@@ -1355,13 +1353,46 @@ func TestDrainShardsEmptyInput(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	drained, err := executorStore.DrainShards(ctx, tc.Namespace, nil)
-	require.NoError(t, err)
-	assert.Empty(t, drained)
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, nil))
 
 	removed, err := executorStore.UndrainShards(ctx, tc.Namespace, nil)
 	require.NoError(t, err)
 	assert.Empty(t, removed)
+
+	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Empty(t, drained)
+}
+
+// A shard ID that cannot round-trip through a key must be rejected at write time.
+// Writing it would succeed but every read would skip it, leaving a drained shard
+// that no API can report or undrain.
+func TestDrainUndrainRejectUnrepresentableShardIDs(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	for name, shardID := range map[string]string{
+		"empty":          "",
+		"slash":          "shard/A",
+		"trailing slash": "shard-A/",
+		"nested path":    "a/b/c",
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Error(t, executorStore.DrainShards(ctx, tc.Namespace, []string{shardID}))
+			_, err := executorStore.UndrainShards(ctx, tc.Namespace, []string{shardID})
+			require.Error(t, err)
+		})
+	}
+
+	// The rejection happens before any write, so a bad ID alongside a good one
+	// leaves nothing drained rather than partially applying.
+	require.Error(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A", "bad/id"}))
+
+	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Empty(t, drained, "a rejected batch must not write its valid shards")
 }
 
 // ResetNamespace wipes the whole namespace prefix, so drained-shard keys must go with
@@ -1372,10 +1403,9 @@ func TestResetNamespaceClearsDrainedShards(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, err := executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-B"})
-	require.NoError(t, err)
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-B"}))
 
-	_, err = executorStore.ResetNamespace(ctx, tc.Namespace)
+	_, err := executorStore.ResetNamespace(ctx, tc.Namespace)
 	require.NoError(t, err)
 
 	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
@@ -1391,17 +1421,23 @@ func TestLoadDrainedShardSetSkipsMalformedKeys(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, err := executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"})
-	require.NoError(t, err)
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"}))
 
 	// Nested key: within the drained prefix but not a valid single-segment shard ID.
+	// Only reachable by writing directly to etcd now that DrainShards validates input.
 	malformed := etcdkeys.BuildDrainedShardKey(tc.EtcdPrefix, tc.Namespace, "shard-B") + "/nested"
-	_, err = tc.Client.Put(ctx, malformed, "")
+	_, err := tc.Client.Put(ctx, malformed, "")
 	require.NoError(t, err)
 
 	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"shard-A"}, drained)
+
+	// GetState reads the same keyspace through the transaction path, so it must
+	// tolerate the malformed key too.
+	state, err := executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]struct{}{"shard-A": {}}, state.DrainedShards)
 }
 
 func createStore(t *testing.T, tc *testhelper.StoreTestCluster) store.Store {

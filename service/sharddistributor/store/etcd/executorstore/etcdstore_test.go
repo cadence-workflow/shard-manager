@@ -1363,6 +1363,50 @@ func TestGetShardOwnerReportsDrainedForUnassignedShard(t *testing.T) {
 	}, 5*time.Second, 50*time.Millisecond)
 }
 
+// TestDrainShardsLifecycle walks the drain/undrain lifecycle through the etcd-backed
+// store: reading an empty set, draining, reading back via both GetDrainedShards and
+// GetState, draining idempotently, and undraining.
+func TestDrainShardsLifecycle(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	drained, err := executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Empty(t, drained, "no shards are drained before the first DrainShards call")
+
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-B", "shard-A"}))
+
+	drained, err = executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-A", "shard-B"}, drained, "the drained set reads back sorted")
+
+	// Draining an already-drained shard alongside a new one is idempotent: the
+	// existing shard stays drained instead of erroring.
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-C"}))
+
+	drained, err = executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-A", "shard-B", "shard-C"}, drained)
+
+	state, err := executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]struct{}{
+		"shard-A": {},
+		"shard-B": {},
+		"shard-C": {},
+	}, state.DrainedShards, "GetState exposes the same set to the rebalance loop")
+
+	removed, err := executorStore.UndrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-B"})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"shard-A", "shard-B"}, removed)
+
+	drained, err = executorStore.GetDrainedShards(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"shard-C"}, drained)
+}
+
 // UndrainShards reports only the shards it actually removed. A shard that was never
 // drained, or that a previous call already removed, is excluded — that is what makes
 // the result meaningful to an operator rather than an echo of the request.
@@ -1441,6 +1485,7 @@ func TestDrainShardsEmptyInput(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, nil))
 	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, nil))
 
 	removed, err := executorStore.UndrainShards(ctx, tc.Namespace, nil)

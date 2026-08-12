@@ -186,11 +186,9 @@ message DrainShardsRequest {
   repeated string shard_keys = 2;
 }
 
-message DrainShardsResponse {
-  // shard_keys that are currently drained for the namespace after this call
-  // (includes shards that were already drained before the call).
-  repeated string drained_shard_keys = 1;
-}
+// DrainShardsResponse is intentionally empty: a successful call is reported by
+// the absence of an error.
+message DrainShardsResponse {}
 
 message UndrainShardsRequest {
   string namespace = 1;

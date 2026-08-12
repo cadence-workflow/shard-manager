@@ -44,16 +44,15 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // DrainShards mocks base method.
-func (m *MockClient) DrainShards(arg0 context.Context, arg1 *types.DrainShardsRequest, arg2 ...yarpc.CallOption) (*types.DrainShardsResponse, error) {
+func (m *MockClient) DrainShards(arg0 context.Context, arg1 *types.DrainShardsRequest, arg2 ...yarpc.CallOption) error {
 	m.ctrl.T.Helper()
 	varargs := []any{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "DrainShards", varargs...)
-	ret0, _ := ret[0].(*types.DrainShardsResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // DrainShards indicates an expected call of DrainShards.

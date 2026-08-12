@@ -378,34 +378,32 @@ func WrapShards(shardIDs []string) []*types.Shard {
 
 // DrainShards marks the requested shards as drained for the namespace.
 // A drained shard is left unassigned until it is undrained.
-// The call is idempotent, so shards that are already drained stay drained, and the
-// response returns every shard drained for the namespace
-func (h *handlerImpl) DrainShards(ctx context.Context, request *types.DrainShardsRequest) (resp *types.DrainShardsResponse, retError error) {
+// The call is idempotent, so shards that are already drained stay drained
+func (h *handlerImpl) DrainShards(ctx context.Context, request *types.DrainShardsRequest) (retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
 	if err := h.validateNamespace(namespace); err != nil {
-		return nil, err
+		return err
 	}
 	shardKeys := request.GetShardKeys()
 	if err := validateShardKeys(shardKeys); err != nil {
-		return nil, err
+		return err
 	}
 
-	drained, err := h.storage.DrainShards(ctx, namespace, shardKeys)
+	err := h.storage.DrainShards(ctx, namespace, shardKeys)
 	if err != nil {
-		return nil, &types.InternalServiceError{Message: fmt.Sprintf("failed to drain shards: %v", err)}
+		return &types.InternalServiceError{Message: fmt.Sprintf("failed to drain shards: %v", err)}
 	}
 
 	h.logger.Info("Drained shards",
 		tag.ShardNamespace(namespace),
 		tag.Dynamic("requested_shards_to_drain", shardKeys),
-		tag.Dynamic("drained_shards", drained),
 	)
 
-	return &types.DrainShardsResponse{DrainedShardKeys: drained}, nil
+	return nil
 }
 
 // UndrainShards removes the requested shards from the namespace's drained set

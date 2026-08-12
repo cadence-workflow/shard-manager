@@ -15,9 +15,9 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/types/mapper/proto"
 )
 
-func (g sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (dp2 *types.DrainShardsResponse, err error) {
-	response, err := g.c.DrainShards(ctx, proto.FromShardDistributorDrainShardsRequest(dp1), p1...)
-	return proto.ToShardDistributorDrainShardsResponse(response), proto.ToError(err)
+func (g sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (err error) {
+	_, err = g.c.DrainShards(ctx, proto.FromShardDistributorDrainShardsRequest(dp1), p1...)
+	return proto.ToError(err)
 }
 
 func (g sharddistributorClient) ForceResetNamespace(ctx context.Context, fp1 *types.ForceResetNamespaceRequest, p1 ...yarpc.CallOption) (fp2 *types.ForceResetNamespaceResponse, err error) {

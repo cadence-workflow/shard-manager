@@ -135,12 +135,11 @@ func (mr *MockStoreMockRecorder) DeleteShardStats(ctx, namespace, shardIDs, guar
 }
 
 // DrainShards mocks base method.
-func (m *MockStore) DrainShards(ctx context.Context, namespace string, shardIDs []string) ([]string, error) {
+func (m *MockStore) DrainShards(ctx context.Context, namespace string, shardIDs []string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DrainShards", ctx, namespace, shardIDs)
-	ret0, _ := ret[0].([]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // DrainShards indicates an expected call of DrainShards.

@@ -67,15 +67,15 @@ func (p *executorStatePubSub) unSubscribe(uniqueID string) {
 	delete(p.subscribers, uniqueID)
 }
 
-// Publish sends the state to all subscribers (non-blocking).
-// If a subscriber already has a pending message, it is drained and replaced
-// with the new state so the subscriber always sees the latest.
-func (p *executorStatePubSub) publish(state map[*store.ShardOwner][]string) {
+// publish sends the latest state to all subscribers.
+// snapshot is called under p.mu — it must not re-acquire p.mu.
+func (p *executorStatePubSub) publish(snapshot func() map[*store.ShardOwner][]string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	now := p.timeSource.Now()
 
+	state := snapshot()
 	for _, sub := range p.subscribers {
 		select {
 		case sub.updates <- state:

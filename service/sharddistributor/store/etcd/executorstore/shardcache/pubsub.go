@@ -1,21 +1,15 @@
 package shardcache
 
 import (
+	"context"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
-
-type executorStateSubscriber struct {
-	updates            chan map[*store.ShardOwner][]string
-	pendingUpdateSince time.Time
-}
 
 // executorStatePubSub manages subscriptions to executor state changes.
 //
@@ -24,41 +18,34 @@ type executorStateSubscriber struct {
 // the latest state, so the subscriber always catches up to the most recent
 // state rather than being stuck on a stale intermediate state.
 type executorStatePubSub struct {
-	mu              sync.Mutex
-	subscribers     map[string]*executorStateSubscriber
-	logger          log.Logger
-	namespace       string
-	timeSource      clock.TimeSource
-	lastPublishedAt time.Time
+	mu          sync.Mutex
+	subscribers map[string]chan map[*store.ShardOwner][]string
+	logger      log.Logger
+	namespace   string
 }
 
-func newExecutorStatePubSub(logger log.Logger, namespace string, timeSource clock.TimeSource) *executorStatePubSub {
+func newExecutorStatePubSub(logger log.Logger, namespace string) *executorStatePubSub {
 	return &executorStatePubSub{
-		subscribers: make(map[string]*executorStateSubscriber),
+		subscribers: make(map[string]chan map[*store.ShardOwner][]string),
 		logger:      logger,
 		namespace:   namespace,
-		timeSource:  timeSource,
 	}
 }
 
-// subscribe returns a channel that receives executor state updates.
-// snapshot is called under p.mu — it must not re-acquire p.mu.
-func (p *executorStatePubSub) subscribe(snapshot func() map[*store.ShardOwner][]string) (chan map[*store.ShardOwner][]string, func()) {
+// Subscribe returns a channel that receives executor state updates.
+func (p *executorStatePubSub) subscribe(ctx context.Context) (chan map[*store.ShardOwner][]string, func()) {
+	ch := make(chan map[*store.ShardOwner][]string, 1)
 	uniqueID := uuid.New().String()
-	subscriber := &executorStateSubscriber{
-		updates: make(chan map[*store.ShardOwner][]string, 1),
-	}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.subscribers[uniqueID] = subscriber
-	subscriber.updates <- snapshot()
+	p.subscribers[uniqueID] = ch
 
 	unSub := func() {
 		p.unSubscribe(uniqueID)
 	}
 
-	return subscriber.updates, unSub
+	return ch, unSub
 }
 
 func (p *executorStatePubSub) unSubscribe(uniqueID string) {
@@ -74,44 +61,17 @@ func (p *executorStatePubSub) publish(state map[*store.ShardOwner][]string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	now := p.timeSource.Now()
-
 	for _, sub := range p.subscribers {
 		select {
-		case sub.updates <- state:
-			sub.pendingUpdateSince = now
+		case sub <- state:
 		default:
-			// Preserve pendingUpdateSince when we drain the pending update ourselves.
-			// Reset it if the consumer drained the update concurrently.
+			// Drain the stale pending message and replace with the latest.
+			p.logger.Warn("subscriber not keeping up, dropping intermediate state update and replacing with latest", tag.ShardNamespace(p.namespace))
 			select {
-			case <-sub.updates:
-				p.logDroppedUpdate(sub, now)
+			case <-sub:
 			default:
-				sub.pendingUpdateSince = now
 			}
-			sub.updates <- state
-			if sub.pendingUpdateSince.IsZero() {
-				sub.pendingUpdateSince = now
-			}
+			sub <- state
 		}
 	}
-
-	p.lastPublishedAt = now
-}
-
-func (p *executorStatePubSub) logDroppedUpdate(sub *executorStateSubscriber, now time.Time) {
-	var publishInterval time.Duration
-	if !p.lastPublishedAt.IsZero() {
-		publishInterval = now.Sub(p.lastPublishedAt)
-	}
-	var pendingUpdateDuration time.Duration
-	if !sub.pendingUpdateSince.IsZero() {
-		pendingUpdateDuration = now.Sub(sub.pendingUpdateSince)
-	}
-	p.logger.Warn(
-		"subscriber not keeping up, dropping intermediate state update and replacing with latest",
-		tag.ShardNamespace(p.namespace),
-		tag.StateUpdatePublishInterval(publishInterval),
-		tag.SubscriberPendingUpdateDuration(pendingUpdateDuration),
-	)
 }

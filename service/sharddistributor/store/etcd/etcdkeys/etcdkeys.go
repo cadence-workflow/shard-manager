@@ -1,7 +1,6 @@
 package etcdkeys
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -109,17 +108,6 @@ func BuildDrainedShardKey(prefix, namespace, shardID string) string {
 	return fmt.Sprintf("%s%s", BuildDrainedShardsPrefix(prefix, namespace), shardID)
 }
 
-// ValidateShardID rejects shard IDs that cannot survive a key round trip
-func ValidateShardID(shardID string) error {
-	if shardID == "" {
-		return errors.New("shard ID must not be empty")
-	}
-	if strings.Contains(shardID, "/") {
-		return fmt.Errorf("shard ID '%s' must not contain '/'", shardID)
-	}
-	return nil
-}
-
 // ParseDrainedShardKey extracts the shard ID from a drained-shard etcd key.
 // Expected format: <prefix>/<namespace>/drained_shards/<shardID>
 func ParseDrainedShardKey(prefix, namespace, key string) (shardID string, err error) {
@@ -128,8 +116,8 @@ func ParseDrainedShardKey(prefix, namespace, key string) (shardID string, err er
 		return "", fmt.Errorf("key '%s' does not have expected drained shards prefix '%s'", key, drainedPrefix)
 	}
 	shardID = strings.TrimPrefix(key, drainedPrefix)
-	if err := ValidateShardID(shardID); err != nil {
-		return "", fmt.Errorf("unexpected drained shard key format '%s': %w", key, err)
+	if shardID == "" || strings.Contains(shardID, "/") {
+		return "", fmt.Errorf("unexpected drained shard key format: %s", key)
 	}
 	return shardID, nil
 }

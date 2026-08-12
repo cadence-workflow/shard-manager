@@ -7,11 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
+	"sort"
 	"time"
 
-	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/fx"
 
@@ -296,18 +294,13 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 	assignedStates := make(map[string]store.AssignedState)
 	shardStats := make(map[string]store.ShardStatistics)
 
-	txnResp, err := s.client.Txn(ctx).Then(
-		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
-		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
-	).Commit()
+	executorPrefix := etcdkeys.BuildExecutorsPrefix(s.prefix, namespace)
+	resp, err := s.client.Get(ctx, executorPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return nil, fmt.Errorf("get namespace state: %w", err)
-	}
-	if len(txnResp.Responses) != 2 {
-		return nil, fmt.Errorf("get namespace state: expected 2 responses, got %d", len(txnResp.Responses))
+		return nil, fmt.Errorf("get executor data: %w", err)
 	}
 
-	parsedData, err := common.ParseExecutorKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
+	parsedData, err := common.ParseExecutorKVs(s.prefix, namespace, resp.Kvs)
 	if err != nil {
 		return nil, err
 	}
@@ -332,30 +325,31 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 		}
 	}
 
+	drainedShards, err := s.loadDrainedShardSet(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("get drained shards: %w", err)
+	}
+
 	return &store.NamespaceState{
 		Executors:        heartbeatStates,
 		ShardStats:       shardStats,
 		ShardAssignments: assignedStates,
-		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+		DrainedShards:    drainedShards,
 	}, nil
 }
 
 // loadDrainedShardSet reads every drained-shard key for the namespace and returns
 // them as a set.
+// Malformed key format is skipped to not stall the rebalance loop
 func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace string) (map[string]struct{}, error) {
 	drainedPrefix := etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace)
 	resp, err := s.client.Get(ctx, drainedPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("get drained shards prefix: %w", err)
 	}
-	return s.parseDrainedShardKVs(namespace, resp.Kvs), nil
-}
 
-// parseDrainedShardKVs turns drained-shard keys into a set of shard IDs.
-// Malformed keys are skipped to not stall the rebalance loop.
-func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb.KeyValue) map[string]struct{} {
-	drained := make(map[string]struct{}, len(kvs))
-	for _, kv := range kvs {
+	drained := make(map[string]struct{}, len(resp.Kvs))
+	for _, kv := range resp.Kvs {
 		shardID, err := etcdkeys.ParseDrainedShardKey(s.prefix, namespace, string(kv.Key))
 		if err != nil {
 			s.logger.Warn("skipping malformed drained shard key",
@@ -367,7 +361,7 @@ func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb
 		}
 		drained[shardID] = struct{}{}
 	}
-	return drained
+	return drained, nil
 }
 
 func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan map[*store.ShardOwner][]string, func(), error) {
@@ -732,15 +726,12 @@ func (s *executorStoreImpl) AssignShard(ctx context.Context, namespace, shardID,
 	}
 }
 
-// commitOps commits the given operations in batches to stay within etcd's
-// per-transaction operation limit, returning each batch's response in submission
-// order so callers can inspect per-op outcomes.
-//
-// Each batch is a separate guarded transaction, so a failure part-way through returns
-// immediately and leaves earlier batches committed.
-func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc) ([]*clientv3.TxnResponse, error) {
+// commitGuardedOps commits the given operations in batches to stay within etcd's per-transaction operation limit.
+// Each batch creates a new guarded transaction. If any batch fails, the function returns immediately
+// with the error
+func (s *executorStoreImpl) commitGuardedOps(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc) error {
 	if len(ops) == 0 {
-		return nil, nil
+		return nil
 	}
 	maxOpsPerTxn := s.cfg.MaxEtcdTxnOps() - guardOpOverhead
 	if maxOpsPerTxn < 1 {
@@ -750,29 +741,32 @@ func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, gu
 	numBatches := (len(ops) + maxOpsPerTxn - 1) / maxOpsPerTxn
 	batchSize := (len(ops) + numBatches - 1) / numBatches
 
-	responses := make([]*clientv3.TxnResponse, 0, numBatches)
 	for i := 0; i < len(ops); i += batchSize {
-		end := min(i+batchSize, len(ops))
+		end := i + batchSize
+		if end > len(ops) {
+			end = len(ops)
+		}
 
-		guardedTxn, err := guard(s.client.Txn(ctx))
+		nativeTxn := s.client.Txn(ctx)
+		guardedTxn, err := guard(nativeTxn)
 		if err != nil {
-			return nil, fmt.Errorf("apply transaction guard: %w", err)
+			return fmt.Errorf("apply transaction guard: %w", err)
 		}
 		etcdGuardedTxn, ok := guardedTxn.(clientv3.Txn)
 		if !ok {
-			return nil, fmt.Errorf("guard function returned invalid transaction type")
+			return fmt.Errorf("guard function returned invalid transaction type")
 		}
 
-		resp, err := etcdGuardedTxn.Then(ops[i:end]...).Commit()
+		etcdGuardedTxn = etcdGuardedTxn.Then(ops[i:end]...)
+		resp, err := etcdGuardedTxn.Commit()
 		if err != nil {
-			return nil, fmt.Errorf("commit batch: %w", err)
+			return fmt.Errorf("commit batch: %w", err)
 		}
 		if !resp.Succeeded {
-			return nil, fmt.Errorf("transaction failed, leadership may have changed")
+			return fmt.Errorf("transaction failed, leadership may have changed")
 		}
-		responses = append(responses, resp)
 	}
-	return responses, nil
+	return nil
 }
 
 // DeleteExecutors deletes the given executors from the store. It does not delete the shards owned by the executors, this
@@ -788,7 +782,7 @@ func (s *executorStoreImpl) DeleteExecutors(ctx context.Context, namespace strin
 		ops = append(ops, clientv3.OpDelete(executorIDPrefix, clientv3.WithPrefix()))
 	}
 
-	if _, err := s.commitOps(ctx, ops, guard); err != nil {
+	if err := s.commitGuardedOps(ctx, ops, guard); err != nil {
 		return fmt.Errorf("delete executors: %w", err)
 	}
 	return nil
@@ -805,7 +799,7 @@ func (s *executorStoreImpl) DeleteAssignedStates(ctx context.Context, namespace 
 		ops = append(ops, clientv3.OpDelete(executorIDPrefix, clientv3.WithPrefix()))
 	}
 
-	if _, err := s.commitOps(ctx, ops, guard); err != nil {
+	if err := s.commitGuardedOps(ctx, ops, guard); err != nil {
 		return fmt.Errorf("delete assigned states: %w", err)
 	}
 	return nil
@@ -885,7 +879,7 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 		ops = append(ops, clientv3.OpPut(statsKey, string(compressedPayload)))
 	}
 
-	if _, err := s.commitOps(ctx, ops, guard); err != nil {
+	if err := s.commitGuardedOps(ctx, ops, guard); err != nil {
 		return fmt.Errorf("delete shard stats: %w", err)
 	}
 	return nil
@@ -928,23 +922,22 @@ func (s *executorStoreImpl) GetExecutor(ctx context.Context, namespace string, e
 // Draining is deliberately not guarded by leadership: it is an operator
 // action that must work regardless of which host is currently the leader, and the
 // leader picks the change up on its next rebalance.
-func (s *executorStoreImpl) DrainShards(ctx context.Context, namespace string, shardIDs []string) error {
-	if len(shardIDs) == 0 {
-		return nil
-	}
-
-	ops := make([]clientv3.Op, 0, len(shardIDs))
-	for _, shardID := range shardIDs {
-		if err := etcdkeys.ValidateShardID(shardID); err != nil {
-			return fmt.Errorf("drain shards: %w", err)
+func (s *executorStoreImpl) DrainShards(ctx context.Context, namespace string, shardIDs []string) ([]string, error) {
+	if len(shardIDs) > 0 {
+		ops := make([]clientv3.Op, 0, len(shardIDs))
+		for _, shardID := range shardIDs {
+			ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID), ""))
 		}
-		ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID), ""))
+		if _, err := s.commitOpsInBatches(ctx, ops); err != nil {
+			return nil, fmt.Errorf("drain shards: %w", err)
+		}
 	}
 
-	if _, err := s.commitOps(ctx, ops, store.NopGuard()); err != nil {
-		return fmt.Errorf("drain shards: %w", err)
+	drained, err := s.loadDrainedShardSet(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("read drained shards after drain: %w", err)
 	}
-	return nil
+	return sortedKeys(drained), nil
 }
 
 // UndrainShards deletes the given drained-shard keys and reports which ones it
@@ -960,13 +953,10 @@ func (s *executorStoreImpl) UndrainShards(ctx context.Context, namespace string,
 
 	ops := make([]clientv3.Op, 0, len(shardIDs))
 	for _, shardID := range shardIDs {
-		if err := etcdkeys.ValidateShardID(shardID); err != nil {
-			return nil, fmt.Errorf("undrain shards: %w", err)
-		}
 		ops = append(ops, clientv3.OpDelete(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID)))
 	}
 
-	responses, err := s.commitOps(ctx, ops, store.NopGuard())
+	responses, err := s.commitOpsInBatches(ctx, ops)
 	if err != nil {
 		return nil, fmt.Errorf("undrain shards: %w", err)
 	}
@@ -995,7 +985,47 @@ func (s *executorStoreImpl) GetDrainedShards(ctx context.Context, namespace stri
 	if err != nil {
 		return nil, fmt.Errorf("get drained shards: %w", err)
 	}
-	return slices.Sorted(maps.Keys(drained)), nil
+	return sortedKeys(drained), nil
+}
+
+// commitOpsInBatches commits unguarded ops in chunks that respect etcd's
+// per-transaction op limit, returning each chunk's response in submission order so
+// callers can inspect per-op outcomes.
+//
+// Chunks are independent transactions, so a failure in a later chunk leaves earlier
+// chunks committed. That is only acceptable because the drain and undrain ops are
+// idempotent: retrying the same input converges on the same state.
+func (s *executorStoreImpl) commitOpsInBatches(ctx context.Context, ops []clientv3.Op) ([]*clientv3.TxnResponse, error) {
+	if len(ops) == 0 {
+		return nil, nil
+	}
+	batchSize := s.cfg.MaxEtcdTxnOps()
+	if batchSize < 1 {
+		batchSize = 1
+	}
+
+	responses := make([]*clientv3.TxnResponse, 0, (len(ops)+batchSize-1)/batchSize)
+	for i := 0; i < len(ops); i += batchSize {
+		end := min(i+batchSize, len(ops))
+
+		resp, err := s.client.Txn(ctx).Then(ops[i:end]...).Commit()
+		if err != nil {
+			return nil, fmt.Errorf("commit batch: %w", err)
+		}
+		responses = append(responses, resp)
+	}
+	return responses, nil
+}
+
+// sortedKeys returns the set's keys in a stable order so callers and tests see
+// deterministic output from what is otherwise an unordered map.
+func sortedKeys(set map[string]struct{}) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // prepareShardStatisticsUpdates calculates the necessary changes to shard statistics based on a new shard assignment plan.

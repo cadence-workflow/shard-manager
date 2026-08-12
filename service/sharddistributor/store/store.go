@@ -116,7 +116,9 @@ type Store interface {
 
 	// DrainShards marks the given shards as drained for the namespace.
 	// The operation is idempotent: shards that are already drained stay drained.
-	DrainShards(ctx context.Context, namespace string, shardIDs []string) error
+	//
+	// Returns every shard drained for the namespace, not just the shards this call added
+	DrainShards(ctx context.Context, namespace string, shardIDs []string) ([]string, error)
 
 	// UndrainShards removes the given shards from the drained set for the namespace.
 	// The operation is idempotent: shards that are not drained are ignored.

@@ -98,7 +98,7 @@ func newNamespaceShardToExecutor(etcdPrefix, namespace string, client etcdclient
 		logger:             logger.WithTags(tag.ShardNamespace(namespace)),
 		client:             client,
 		timeSource:         timeSource,
-		pubSub:             newExecutorStatePubSub(logger, namespace, timeSource),
+		pubSub:             newExecutorStatePubSub(logger, namespace),
 		executorStatistics: newNamespaceExecutorStatistics(),
 		metricsClient:      metricsClient,
 		refreshTimeout:     refreshOperationTimeout,
@@ -248,7 +248,21 @@ func (n *namespaceShardToExecutor) fetchAndCacheExecutorStatistics(ctx context.C
 }
 
 func (n *namespaceShardToExecutor) Subscribe(ctx context.Context) (<-chan map[*store.ShardOwner][]string, func()) {
-	subCh, unSub := n.pubSub.subscribe(n.getExecutorState)
+	subCh, unSub := n.pubSub.subscribe(ctx)
+
+	// The go routine sends the initial state to the subscriber.
+	go func() {
+		initialState := n.getExecutorState()
+
+		select {
+		case <-ctx.Done():
+			n.logger.Warn("context finished before initial state was sent")
+		case subCh <- initialState:
+			n.logger.Info("initial state sent to subscriber", tag.Value(initialState))
+		}
+
+	}()
+
 	return subCh, unSub
 }
 

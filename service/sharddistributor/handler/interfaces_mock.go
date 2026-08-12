@@ -43,11 +43,12 @@ func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 }
 
 // DrainShards mocks base method.
-func (m *MockHandler) DrainShards(arg0 context.Context, arg1 *types.DrainShardsRequest) error {
+func (m *MockHandler) DrainShards(arg0 context.Context, arg1 *types.DrainShardsRequest) (*types.DrainShardsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DrainShards", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(*types.DrainShardsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // DrainShards indicates an expected call of DrainShards.

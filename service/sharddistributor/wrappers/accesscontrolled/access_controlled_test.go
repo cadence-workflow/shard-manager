@@ -294,17 +294,20 @@ func TestAccessControlledHandler_DrainShards(t *testing.T) {
 			if tc.expectInnerCalled {
 				inner.EXPECT().
 					DrainShards(gomock.Any(), req).
-					Return(nil).
+					Return(&types.DrainShardsResponse{DrainedShardKeys: []string{"shard-1"}}, nil).
 					Times(1)
 			}
 
-			err := NewHandler(inner, authz).DrainShards(context.Background(), req)
+			resp, err := NewHandler(inner, authz).DrainShards(context.Background(), req)
 
 			if tc.expectErr != nil {
+				assert.Nil(t, resp)
 				assert.ErrorIs(t, err, tc.expectErr)
 				return
 			}
 			require.NoError(t, err)
+			require.NotNil(t, resp)
+			assert.Equal(t, []string{"shard-1"}, resp.DrainedShardKeys)
 		})
 	}
 }

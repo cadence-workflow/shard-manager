@@ -89,9 +89,9 @@ func (c *meteredStore) DeleteShardStats(ctx context.Context, namespace string, s
 	return
 }
 
-func (c *meteredStore) DrainShards(ctx context.Context, namespace string, shardIDs []string) (err error) {
+func (c *meteredStore) DrainShards(ctx context.Context, namespace string, shardIDs []string) (sa1 []string, err error) {
 	op := func() error {
-		err = c.wrapped.DrainShards(ctx, namespace, shardIDs)
+		sa1, err = c.wrapped.DrainShards(ctx, namespace, shardIDs)
 		return err
 	}
 

@@ -22,8 +22,8 @@ func NewGRPCHandler(h handler.Handler) GRPCHandler {
 }
 
 func (g GRPCHandler) DrainShards(ctx context.Context, request *sharddistributorv1.DrainShardsRequest) (*sharddistributorv1.DrainShardsResponse, error) {
-	err := g.h.DrainShards(ctx, proto.ToShardDistributorDrainShardsRequest(request))
-	return &sharddistributorv1.DrainShardsResponse{}, proto.FromError(err)
+	response, err := g.h.DrainShards(ctx, proto.ToShardDistributorDrainShardsRequest(request))
+	return proto.FromShardDistributorDrainShardsResponse(response), proto.FromError(err)
 }
 
 func (g GRPCHandler) ForceResetNamespace(ctx context.Context, request *sharddistributorv1.ForceResetNamespaceRequest) (*sharddistributorv1.ForceResetNamespaceResponse, error) {

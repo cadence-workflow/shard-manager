@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestBuildNamespacePrefix(t *testing.T) {
@@ -132,56 +131,10 @@ func TestParseDrainedShardKey(t *testing.T) {
 func TestDrainedShardKeyRoundTrip(t *testing.T) {
 	for _, shardID := range []string{"0", "31", "shard-1", "fixed-32", "abc.def", "UPPER_case-9"} {
 		t.Run(shardID, func(t *testing.T) {
-			require.NoError(t, ValidateShardID(shardID))
-
 			key := BuildDrainedShardKey("/cadence", "test-ns", shardID)
 			got, err := ParseDrainedShardKey("/cadence", "test-ns", key)
 			assert.NoError(t, err)
 			assert.Equal(t, shardID, got)
-		})
-	}
-}
-
-func TestValidateShardID(t *testing.T) {
-	tests := []struct {
-		name    string
-		shardID string
-		wantErr string
-	}{
-		{name: "simple", shardID: "shard-42"},
-		{name: "numeric", shardID: "0"},
-		{name: "dots and underscores", shardID: "abc.def_9"},
-		{name: "empty", shardID: "", wantErr: "must not be empty"},
-		{name: "leading slash", shardID: "/shard-42", wantErr: "must not contain '/'"},
-		{name: "trailing slash", shardID: "shard-42/", wantErr: "must not contain '/'"},
-		{name: "embedded slash", shardID: "shard/42", wantErr: "must not contain '/'"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateShardID(tc.shardID)
-			if tc.wantErr != "" {
-				assert.ErrorContains(t, err, tc.wantErr)
-				return
-			}
-			assert.NoError(t, err)
-		})
-	}
-}
-
-// ValidateShardID is the rule ParseDrainedShardKey enforces on read, so anything it
-// accepts must survive a key round trip and anything it rejects must be refused.
-func TestValidateShardIDMatchesKeyParsing(t *testing.T) {
-	for _, shardID := range []string{"shard-42", "0", "abc.def_9", "", "/leading", "trailing/", "a/b"} {
-		t.Run(shardID, func(t *testing.T) {
-			key := BuildDrainedShardKey("/cadence", "test-ns", shardID)
-			_, parseErr := ParseDrainedShardKey("/cadence", "test-ns", key)
-
-			if ValidateShardID(shardID) != nil {
-				assert.Error(t, parseErr, "rejected shard ID must not parse back")
-				return
-			}
-			assert.NoError(t, parseErr, "accepted shard ID must parse back")
 		})
 	}
 }

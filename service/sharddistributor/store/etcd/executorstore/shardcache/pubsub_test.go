@@ -225,7 +225,7 @@ func TestExecutorStatePubSub_FirstPublishOverInitialSeed_DoesNotLog(t *testing.T
 	latestState := map[*store.ShardOwner][]string{
 		{ExecutorID: "exec-1", Metadata: map[string]string{}}: {"s2"},
 	}
-	pubsub.publish(latestState)
+	pubsub.publish(snapshotOf(latestState))
 
 	dropLogs := logs.FilterMessage("subscriber not keeping up, dropping intermediate state update and replacing with latest").All()
 	assert.Empty(t, dropLogs)

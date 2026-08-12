@@ -201,18 +201,34 @@ func TestExecutorStatePubSub_DroppedUpdateLog(t *testing.T) {
 	pubsub.publish(snapshotOf(latestState))
 
 	dropLogs := logs.FilterMessage("subscriber not keeping up, dropping intermediate state update and replacing with latest").All()
-	require.Len(t, dropLogs, 2)
+	require.Len(t, dropLogs, 1)
 
-	// The first drop has no previously tracked publish or pending update.
-	firstDrop := dropLogs[0].ContextMap()
-	assert.Equal(t, "test-ns", firstDrop["shard-namespace"])
-	assert.Equal(t, time.Duration(0), firstDrop["state-update-publish-interval"])
-	assert.Equal(t, time.Duration(0), firstDrop["subscriber-pending-update-duration"])
+	drop := dropLogs[0].ContextMap()
+	assert.Equal(t, "test-ns", drop["shard-namespace"])
+	assert.Equal(t, expectedInterval, drop["state-update-publish-interval"])
+	assert.Equal(t, expectedInterval, drop["subscriber-pending-update-duration"])
 
-	secondDrop := dropLogs[1].ContextMap()
-	assert.Equal(t, expectedInterval, secondDrop["state-update-publish-interval"])
-	assert.Equal(t, expectedInterval, secondDrop["subscriber-pending-update-duration"])
+	assert.Equal(t, latestState, <-ch)
+}
 
+func TestExecutorStatePubSub_FirstPublishOverInitialSeed_DoesNotLog(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	logger, logs := testlogger.NewObserved(t)
+	pubsub := newExecutorStatePubSub(logger, "test-ns", clock.NewMockedTimeSource())
+
+	ch, unsub := pubsub.subscribe(snapshotOf(map[*store.ShardOwner][]string{
+		{ExecutorID: "seed", Metadata: map[string]string{}}: {"s1"},
+	}))
+	defer unsub()
+
+	latestState := map[*store.ShardOwner][]string{
+		{ExecutorID: "exec-1", Metadata: map[string]string{}}: {"s2"},
+	}
+	pubsub.publish(latestState)
+
+	dropLogs := logs.FilterMessage("subscriber not keeping up, dropping intermediate state update and replacing with latest").All()
+	assert.Empty(t, dropLogs)
 	assert.Equal(t, latestState, <-ch)
 }
 
@@ -242,7 +258,7 @@ func TestExecutorStatePubSub_ConsumerProgressResetsPendingUpdateDuration(t *test
 	pubsub.publish(snapshotOf(map[*store.ShardOwner][]string{}))
 
 	dropLogs := logs.FilterMessage("subscriber not keeping up, dropping intermediate state update and replacing with latest").All()
-	require.Len(t, dropLogs, 3)
+	require.Len(t, dropLogs, 2)
 	expectedPendingDuration := 2 * publishInterval
-	assert.Equal(t, expectedPendingDuration, dropLogs[2].ContextMap()["subscriber-pending-update-duration"])
+	assert.Equal(t, expectedPendingDuration, dropLogs[1].ContextMap()["subscriber-pending-update-duration"])
 }

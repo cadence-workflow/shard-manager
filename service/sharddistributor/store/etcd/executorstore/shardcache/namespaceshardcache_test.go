@@ -752,11 +752,12 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 	defer unsub()
 
 	// Apply the older state.
-	tc.e.replaceExecutorState(5,
+	tc.e.replaceNamespaceState(5,
 		map[string]*store.ShardOwner{"shard-a": ownerA},
 		map[*store.ShardOwner][]string{ownerA: {"shard-a"}},
 		map[string]int64{"exec-a": 5},
 		map[string]*store.ShardOwner{"exec-a": ownerA},
+		map[string]struct{}{"shard-a": {}},
 	)
 
 	// Hold the pubsub lock so the publish below queues behind it, simulating
@@ -774,11 +775,12 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 
 	// A concurrent, newer refresh applies its state while the publish above is
 	// still queued.
-	tc.e.replaceExecutorState(10,
+	tc.e.replaceNamespaceState(10,
 		map[string]*store.ShardOwner{"shard-b": ownerB},
 		map[*store.ShardOwner][]string{ownerB: {"shard-b"}},
 		map[string]int64{"exec-b": 10},
 		map[string]*store.ShardOwner{"exec-b": ownerB},
+		map[string]struct{}{"shard-b": {}},
 	)
 
 	tc.e.pubSub.mu.Unlock()

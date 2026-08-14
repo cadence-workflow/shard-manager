@@ -182,6 +182,7 @@ func TestRecordHeartbeatUpdatesShardStatistics(t *testing.T) {
 	require.NoError(t, err)
 	beforeStats, ok := stateBeforeHeartbeat.ShardStats[shardID]
 	require.True(t, ok)
+	assert.True(t, beforeStats.LastUpdateTime.IsZero(), "assigned shard should be unmeasured until first heartbeat")
 
 	impl.timeSource.(clock.MockedTimeSource).Advance(5 * time.Second)
 
@@ -204,9 +205,7 @@ func TestRecordHeartbeatUpdatesShardStatistics(t *testing.T) {
 	updated, ok := nsState.ShardStats[shardID]
 	require.True(t, ok)
 	assert.True(t, updated.LastUpdateTime.After(beforeStats.LastUpdateTime))
-	expectedLoad, err := statistics.CalculateSmoothedLoad(beforeStats.SmoothedLoad, req.ReportedShards[shardID].ShardLoad, beforeStats.LastUpdateTime, updated.LastUpdateTime, 90*time.Second)
-	require.NoError(t, err)
-	assert.InDelta(t, expectedLoad, updated.SmoothedLoad, 1e-9)
+	assert.InDelta(t, req.ReportedShards[shardID].ShardLoad, updated.SmoothedLoad, 1e-9)
 	assert.Equal(t, beforeStats.LastMoveTime, updated.LastMoveTime)
 }
 

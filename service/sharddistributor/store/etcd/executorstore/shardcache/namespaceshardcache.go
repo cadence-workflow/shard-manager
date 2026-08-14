@@ -277,7 +277,11 @@ func (n *namespaceShardToExecutor) namespaceRefreshLoop() {
 				return
 			}
 
-			if err := n.refresh(context.Background()); err != nil {
+			// Bounded so a stuck etcd call can't block this loop from observing stopCh.
+			refreshCtx, cancel := context.WithTimeout(context.Background(), n.refreshTimeout)
+			err := n.refresh(refreshCtx)
+			cancel()
+			if err != nil {
 				n.logger.Error("failed to refresh namespace shard to executor", tag.Error(err))
 			}
 		}
@@ -285,7 +289,7 @@ func (n *namespaceShardToExecutor) namespaceRefreshLoop() {
 }
 
 // runWatchLoop starts the watcher and returns the refresh trigger channel plus a
-// channel closed once the watcher has stopped
+// closed channel once the watcher has stopped
 func (n *namespaceShardToExecutor) runWatchLoop() (<-chan struct{}, <-chan struct{}) {
 	triggerCh := make(chan struct{}, 1)
 	watcherDone := make(chan struct{})
@@ -440,7 +444,7 @@ func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
 	}
 
 	if updated {
-		n.pubSub.publish(n.getExecutorState())
+		n.pubSub.publish(n.getExecutorState)
 	}
 	return nil
 }

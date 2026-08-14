@@ -2,7 +2,6 @@ package smctl
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -30,6 +29,7 @@ func executorCommand(cf ClientFactory) *cliv3.Command {
 		Description: "Use --namespace/-n on the root command to identify the target namespace.",
 		Commands: []*cliv3.Command{
 			executorListCommand(cf),
+			executorStateCommand(cf),
 		},
 	}
 }
@@ -40,7 +40,7 @@ func executorListCommand(cf ClientFactory) *cliv3.Command {
 		Name:        "list",
 		Aliases:     []string{"ls"},
 		Usage:       "List executors registered in a namespace",
-		Description: "Prints an executor summary as a table (or JSON with --json). Per-executor shard assignments are collapsed to a count; use `namespace state` for full detail.",
+		Description: "Prints an executor summary as a table (or JSON with --json). Per-executor shard assignments are collapsed to a count; use `executor state` for full detail.",
 		Flags: []cliv3.Flag{
 			&cliv3.BoolFlag{
 				Name:    "json",
@@ -60,9 +60,9 @@ func runListExecutors(
 	out io.Writer,
 	cf ClientFactory,
 ) error {
-	namespace := cmd.String(FlagNamespace)
-	if namespace == "" {
-		return fmt.Errorf("--%s is required", FlagNamespace)
+	namespace, err := requiredStringFlag(cmd, FlagNamespace)
+	if err != nil {
+		return err
 	}
 
 	client, err := cf.ShardManagerClient(cmd)
@@ -87,15 +87,65 @@ func runListExecutors(
 			Namespace: resp.GetNamespace(),
 			Executors: summaries,
 		}
-		enc := json.NewEncoder(out)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(envelope); err != nil {
-			return fmt.Errorf("encode response: %w", err)
-		}
-		return nil
+		return writeIndentedJSON(out, envelope)
 	}
 
 	return renderExecutorsTable(out, summaries)
+}
+
+// executorStateCommand prints one executor's state by calling GetExecutorState
+func executorStateCommand(cf ClientFactory) *cliv3.Command {
+	return &cliv3.Command{
+		Name:        "state",
+		Aliases:     []string{"st"},
+		Usage:       "Print the current state of an executor",
+		Description: "Calls GetExecutorState on shard-manager and prints the response as indented JSON.",
+		Flags: []cliv3.Flag{
+			&cliv3.StringFlag{
+				Name:    FlagExecutorID,
+				Aliases: []string{"eid"},
+				Usage:   "executor ID to look up",
+			},
+		},
+		Action: func(ctx context.Context, cmd *cliv3.Command) error {
+			return runGetExecutorState(ctx, cmd, resolveWriter(cmd), cf)
+		},
+	}
+}
+
+func runGetExecutorState(
+	ctx context.Context,
+	cmd *cliv3.Command,
+	out io.Writer,
+	cf ClientFactory,
+) error {
+	namespace, err := requiredStringFlag(cmd, FlagNamespace)
+	if err != nil {
+		return err
+	}
+
+	executorID, err := requiredStringFlag(cmd, FlagExecutorID)
+	if err != nil {
+		return err
+	}
+
+	client, err := cf.ShardManagerClient(cmd)
+	if err != nil {
+		return err
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, cmd.Duration(FlagContextTimeout))
+	defer cancel()
+
+	resp, err := client.GetExecutorState(callCtx, &types.GetExecutorStateRequest{
+		Namespace:  namespace,
+		ExecutorID: executorID,
+	})
+	if err != nil {
+		return fmt.Errorf("GetExecutorState: %w", err)
+	}
+
+	return writeIndentedJSON(out, resp)
 }
 
 type executorSummary struct {

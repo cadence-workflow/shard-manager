@@ -682,11 +682,9 @@ func (s *executorStoreImpl) AssignShard(ctx context.Context, namespace, shardID,
 			}
 
 			shardStats, ok := executorShardStats[shardID]
-			if !ok {
-				shardStats.SmoothedLoad = 0
-				shardStats.LastUpdateTime = etcdtypes.Time(now)
+			if ok {
+				shardStats.LastMoveTime = etcdtypes.Time(now)
 			}
-			shardStats.LastMoveTime = etcdtypes.Time(now)
 			executorShardStats[shardID] = shardStats
 
 			newStatsValue, err := json.Marshal(executorShardStats)
@@ -1012,12 +1010,9 @@ func (s *executorStoreImpl) prepareShardStatisticsUpdates(ctx context.Context, n
 				continue
 			}
 
-			// Leave LastMoveTime zero so the shard isn't blocked from rebalancing
-			// before we have any load measurements.
-			newStatForShard := etcdtypes.ShardStatistics{
-				SmoothedLoad:   0,
-				LastUpdateTime: etcdtypes.Time(now),
-			}
+			// Leave stats at zero value: unmeasured until the first heartbeat sets
+			// LastUpdateTime, and not on move cooldown until reassigned from a prior owner.
+			var newStatForShard etcdtypes.ShardStatistics
 
 			if oldOwner != nil {
 				previousStats, ok := statsUpdatesByExecutor[oldOwner.ExecutorID]

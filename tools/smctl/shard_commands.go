@@ -2,7 +2,6 @@ package smctl
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 
@@ -49,14 +48,14 @@ func runInspectShard(
 	out io.Writer,
 	cf ClientFactory,
 ) error {
-	namespace := cmd.String(FlagNamespace)
-	if namespace == "" {
-		return fmt.Errorf("--%s is required", FlagNamespace)
+	namespace, err := requiredStringFlag(cmd, FlagNamespace)
+	if err != nil {
+		return err
 	}
 
-	shardKey := cmd.String(FlagShardKey)
-	if shardKey == "" {
-		return fmt.Errorf("--%s is required", FlagShardKey)
+	shardKey, err := requiredStringFlag(cmd, FlagShardKey)
+	if err != nil {
+		return err
 	}
 
 	client, err := cf.ShardManagerClient(cmd)
@@ -75,10 +74,5 @@ func runInspectShard(
 		return fmt.Errorf("InspectShard: %w", err)
 	}
 
-	enc := json.NewEncoder(out)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(resp); err != nil {
-		return fmt.Errorf("encode response: %w", err)
-	}
-	return nil
+	return writeIndentedJSON(out, resp)
 }

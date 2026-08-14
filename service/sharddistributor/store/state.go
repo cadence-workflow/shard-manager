@@ -70,7 +70,8 @@ type ShardStatistics struct {
 	// Exponential weighted moving average of shard load that persists across executor changes
 	SmoothedLoad float64
 
-	// LastUpdateTime is the heartbeat timestamp that last updated the smoothed load
+	// LastUpdateTime is the heartbeat timestamp that last updated the smoothed load.
+	// Zero means the shard has never been measured. Should not be set at assignment.
 	LastUpdateTime time.Time
 
 	// LastMoveTime is the timestamp when this shard was last reassigned

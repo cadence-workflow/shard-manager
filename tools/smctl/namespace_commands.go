@@ -3,7 +3,6 @@ package smctl
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -77,12 +76,7 @@ func runListNamespaces(
 	}
 
 	if cmd.Bool("json") {
-		enc := json.NewEncoder(out)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(resp); err != nil {
-			return fmt.Errorf("encode response: %w", err)
-		}
-		return nil
+		return writeIndentedJSON(out, resp)
 	}
 
 	return renderNamespacesTable(out, resp.GetNamespaces())
@@ -135,9 +129,9 @@ func runGetNamespaceState(
 	out io.Writer,
 	cf ClientFactory,
 ) error {
-	namespace := cmd.String(FlagNamespace)
-	if namespace == "" {
-		return fmt.Errorf("--%s is required", FlagNamespace)
+	namespace, err := requiredStringFlag(cmd, FlagNamespace)
+	if err != nil {
+		return err
 	}
 
 	client, err := cf.ShardManagerClient(cmd)
@@ -155,12 +149,7 @@ func runGetNamespaceState(
 		return fmt.Errorf("GetNamespaceState: %w", err)
 	}
 
-	enc := json.NewEncoder(out)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(resp); err != nil {
-		return fmt.Errorf("encode response: %w", err)
-	}
-	return nil
+	return writeIndentedJSON(out, resp)
 }
 
 // resolveWriter returns the writer to use for command output. urfave/cli/v3
@@ -208,9 +197,9 @@ func runForceResetNamespace(
 	in io.Reader,
 	cf ClientFactory,
 ) error {
-	namespace := cmd.String(FlagNamespace)
-	if namespace == "" {
-		return fmt.Errorf("--%s is required", FlagNamespace)
+	namespace, err := requiredStringFlag(cmd, FlagNamespace)
+	if err != nil {
+		return err
 	}
 
 	if err := confirmNamespace(out, in, namespace); err != nil {
@@ -232,12 +221,7 @@ func runForceResetNamespace(
 		return fmt.Errorf("ForceResetNamespace: %w", err)
 	}
 
-	enc := json.NewEncoder(out)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(resp); err != nil {
-		return fmt.Errorf("encode response: %w", err)
-	}
-	return nil
+	return writeIndentedJSON(out, resp)
 }
 
 // confirmNamespace prompts the operator to retype the namespace name and

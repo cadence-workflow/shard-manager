@@ -3,6 +3,7 @@ package greedy
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,7 @@ import (
 
 func TestPlanInitialPlacement(t *testing.T) {
 	t.Run("picks lowest smoothed load and bumps by average after each pick", func(t *testing.T) {
+		measuredAt := time.Now()
 		state := &store.NamespaceState{
 			Executors: map[string]store.HeartbeatState{
 				"hot":  {Status: types.ExecutorStatusACTIVE},
@@ -26,11 +28,11 @@ func TestPlanInitialPlacement(t *testing.T) {
 				"cold": {AssignedShards: map[string]*types.ShardAssignment{"s4": {}, "s5": {}}},
 			},
 			ShardStats: map[string]store.ShardStatistics{
-				"s1": {SmoothedLoad: 100.0},
-				"s2": {SmoothedLoad: 1.5},
-				"s3": {SmoothedLoad: 1.5},
-				"s4": {SmoothedLoad: 1.0},
-				"s5": {SmoothedLoad: 1.0},
+				"s1": {SmoothedLoad: 100.0, LastUpdateTime: measuredAt},
+				"s2": {SmoothedLoad: 1.5, LastUpdateTime: measuredAt},
+				"s3": {SmoothedLoad: 1.5, LastUpdateTime: measuredAt},
+				"s4": {SmoothedLoad: 1.0, LastUpdateTime: measuredAt},
+				"s5": {SmoothedLoad: 1.0, LastUpdateTime: measuredAt},
 			},
 		}
 
@@ -79,4 +81,24 @@ func TestPlanInitialPlacement(t *testing.T) {
 		_, err := PlanInitialPlacement(&store.NamespaceState{}, []string{"new-1"})
 		assert.True(t, errors.Is(err, plan.ErrNoActiveExecutors))
 	})
+}
+
+func TestEffectiveShardLoad(t *testing.T) {
+	measuredAt := time.Now()
+	assignments := map[string][]string{
+		"a": {"measured-high", "unmeasured"},
+		"b": {"measured-low"},
+	}
+
+	shardStats := map[string]store.ShardStatistics{
+		"measured-high": {SmoothedLoad: 20, LastUpdateTime: measuredAt},
+		"measured-low":  {SmoothedLoad: 10, LastUpdateTime: measuredAt},
+		"unmeasured":    {SmoothedLoad: 0},
+	}
+
+	avg := averageMeasuredShardLoad(assignments, shardStats)
+	assert.InDelta(t, 15, avg, 0.001)
+	assert.InDelta(t, 20, effectiveShardLoad("measured-high", shardStats, avg), 0.001)
+	assert.InDelta(t, 15, effectiveShardLoad("unmeasured", shardStats, avg), 0.001)
+	assert.InDelta(t, 0, averageMeasuredShardLoad(map[string][]string{"a": {"only-unmeasured"}}, shardStats), 0.001)
 }

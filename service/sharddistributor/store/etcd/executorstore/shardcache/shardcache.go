@@ -64,6 +64,15 @@ func (s *ShardToExecutorCache) GetShardOwner(ctx context.Context, namespace, sha
 	return namespaceShardToExecutor.GetShardOwner(ctx, shardID)
 }
 
+// IsShardDrained reports whether the shard marked as drained
+func (s *ShardToExecutorCache) IsShardDrained(ctx context.Context, namespace, shardID string) (bool, error) {
+	namespaceShardToExecutor, err := s.getNamespaceShardToExecutor(namespace)
+	if err != nil {
+		return false, fmt.Errorf("get namespace shard to executor: %w", err)
+	}
+	return namespaceShardToExecutor.IsShardDrained(ctx, shardID)
+}
+
 func (s *ShardToExecutorCache) GetExecutorStatistics(ctx context.Context, namespace, executorID string) (map[string]etcdtypes.ShardStatistics, error) {
 	namespaceShardToExecutor, err := s.getNamespaceShardToExecutor(namespace)
 	if err != nil {

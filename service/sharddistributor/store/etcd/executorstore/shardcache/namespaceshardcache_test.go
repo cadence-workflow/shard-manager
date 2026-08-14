@@ -628,6 +628,57 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_watchError(t *testing.T) 
 	}
 }
 
+// The watcher writes statistics straight into the cache, so it has to be gone before
+// namespaceRefreshLoop returns and releases the WaitGroup that ShardToExecutorCache.Stop
+// waits on.
+// Closing stopCh while the watcher sits in its retry backoff is the case that
+// used to strand it: the mocked clock is never advanced again, so a backoff that ignored
+// stopCh would leave the goroutine blocked for the rest of the process's life.
+func TestNamespaceShardToExecutor_namespaceRefreshLoop_waitsForWatcherInBackoff(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := etcdclient.NewMockClient(ctrl)
+	timeSource := clock.NewMockedTimeSource()
+	stopCh := make(chan struct{})
+
+	// The first watch fails, which puts the watcher into its retry backoff.
+	watchChan := make(chan clientv3.WatchResponse)
+	mockClient.EXPECT().
+		Watch(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(watchChan)
+
+	// A retry is permitted but should not happen: stopCh closes first.
+	mockClient.EXPECT().
+		Watch(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(make(chan clientv3.WatchResponse)).
+		MinTimes(0).
+		MaxTimes(1)
+
+	e, err := newNamespaceShardToExecutor("/test-prefix", "test-namespace", mockClient, stopCh, testlogger.New(t), timeSource, metrics.NewNoopMetricsClient())
+	require.NoError(t, err)
+
+	returned := make(chan struct{})
+	go func() {
+		defer close(returned)
+		e.namespaceRefreshLoop()
+	}()
+
+	// A compact revision makes WatchResponse.Err() non-nil, failing the watch.
+	watchChan <- clientv3.WatchResponse{CompactRevision: 100}
+	timeSource.BlockUntil(1)
+
+	close(stopCh)
+
+	select {
+	case <-returned:
+	case <-time.After(10 * time.Second):
+		t.Fatal("namespaceRefreshLoop did not return after stopCh closed during watch backoff")
+	}
+}
+
 // setupExecutorWithShards creates an executor in etcd with assigned shards and metadata
 func setupExecutorWithShards(t *testing.T, testCluster *testhelper.StoreTestCluster, executorID string, shards []string, metadata map[string]string) {
 	// Create assigned state

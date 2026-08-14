@@ -222,7 +222,11 @@ func (n *namespaceShardToExecutor) Subscribe(ctx context.Context) (<-chan map[*s
 }
 
 func (n *namespaceShardToExecutor) namespaceRefreshLoop() {
-	triggerCh := n.runWatchLoop()
+	triggerCh, watcherDone := n.runWatchLoop()
+
+	// The watcher applies statistics updates straight to the cache, so returning here
+	// would release the caller's WaitGroup while those writes are still possible.
+	defer func() { <-watcherDone }()
 
 	for {
 		select {
@@ -247,20 +251,33 @@ func (n *namespaceShardToExecutor) namespaceRefreshLoop() {
 	}
 }
 
-func (n *namespaceShardToExecutor) runWatchLoop() <-chan struct{} {
+// runWatchLoop starts the watcher and returns the refresh trigger channel plus a
+// closed channel once the watcher has stopped
+func (n *namespaceShardToExecutor) runWatchLoop() (<-chan struct{}, <-chan struct{}) {
 	triggerCh := make(chan struct{}, 1)
+	watcherDone := make(chan struct{})
 
 	go func() {
+		defer close(watcherDone)
 		defer close(triggerCh)
 
 		for {
 			if err := n.watch(triggerCh); err != nil {
 				n.logger.Error("error watching in namespaceRefreshLoop, retrying...", tag.Error(err))
-				n.timeSource.Sleep(backoff.JitDuration(
+
+				// The backoff observes stopCh so a pending retry interval cannot
+				// hold up shutdown, and cannot strand the watcher when the clock
+				// is mocked.
+				select {
+				case <-n.timeSource.After(backoff.JitDuration(
 					namespaceRefreshLoopWatchRetryInterval,
 					namespaceRefreshLoopWatchJitterCoeff,
-				))
-				continue
+				)):
+					continue
+				case <-n.stopCh:
+					n.logger.Info("stop channel closed during watch retry backoff, exiting watch loop")
+					return
+				}
 			}
 
 			n.logger.Info("namespaceRefreshLoop is exiting")
@@ -268,7 +285,7 @@ func (n *namespaceShardToExecutor) runWatchLoop() <-chan struct{} {
 		}
 	}()
 
-	return triggerCh
+	return triggerCh, watcherDone
 }
 
 func (n *namespaceShardToExecutor) watch(triggerCh chan<- struct{}) error {

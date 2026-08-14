@@ -26,8 +26,208 @@ func TestExecutorCommand_help_listsSubcommands(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, "list") {
-		t.Errorf("executor help should list 'list' subcommand:\n%s", out)
+	for _, want := range []string{"list", "state"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("executor help should list %q subcommand:\n%s", want, out)
+		}
+	}
+}
+
+func TestGetExecutorState(t *testing.T) {
+	heartbeatAt := time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)
+
+	type setupResult struct {
+		client    sharddistributor.Client
+		clientErr error
+	}
+
+	tests := []struct {
+		name    string
+		args    []string
+		setup   func(t *testing.T, ctrl *gomock.Controller) setupResult
+		wantErr string
+		check   func(t *testing.T, stdout string)
+	}{
+		{
+			name: "success: prints complete executor state as JSON",
+			args: []string{
+				"smctl",
+				"-n", "ns-1",
+				"executor", "state",
+				"--" + FlagExecutorID, "executor-a",
+			},
+			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
+				mc := sharddistributor.NewMockClient(ctrl)
+				mc.EXPECT().
+					GetExecutorState(gomock.Any(), &types.GetExecutorStateRequest{
+						Namespace:  "ns-1",
+						ExecutorID: "executor-a",
+					}).
+					Return(&types.GetExecutorStateResponse{
+						Namespace: "ns-1",
+						Executor: &types.NamespaceExecutorState{
+							ExecutorID:    "executor-a",
+							Status:        types.ExecutorStatusACTIVE,
+							LastHeartbeat: heartbeatAt,
+							Metadata:      map[string]string{"zone": "dca1"},
+							AssignedShards: []*types.ExecutorAssignedShardState{
+								{
+									ShardKey:                 "shard-1",
+									AssignmentStatus:         types.AssignmentStatusREADY,
+									AssignedStateModRevision: 7,
+								},
+							},
+						},
+					}, nil)
+				return setupResult{client: mc}
+			},
+			check: func(t *testing.T, stdout string) {
+				var resp types.GetExecutorStateResponse
+				if err := json.Unmarshal([]byte(stdout), &resp); err != nil {
+					t.Fatalf("output is not valid JSON: %v\nout: %s", err, stdout)
+				}
+				if resp.GetNamespace() != "ns-1" {
+					t.Errorf("namespace: got %q want ns-1", resp.GetNamespace())
+				}
+				executor := resp.GetExecutor()
+				if executor == nil {
+					t.Fatal("executor should be present")
+				}
+				if executor.GetExecutorID() != "executor-a" {
+					t.Errorf("executor ID: got %q want executor-a", executor.GetExecutorID())
+				}
+				if len(executor.GetAssignedShards()) != 1 || executor.GetAssignedShards()[0].GetShardKey() != "shard-1" {
+					t.Errorf("assigned shards: got %+v want shard-1", executor.GetAssignedShards())
+				}
+				if !strings.Contains(stdout, "AssignmentStatusREADY") {
+					t.Errorf("assignment status should be marshalled as enum string, got: %s", stdout)
+				}
+			},
+		},
+		{
+			name: "aliases ex st and eid invoke executor state",
+			args: []string{"smctl", "-n", "ns-1", "ex", "st", "--eid", "executor-a"},
+			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
+				mc := sharddistributor.NewMockClient(ctrl)
+				mc.EXPECT().
+					GetExecutorState(gomock.Any(), &types.GetExecutorStateRequest{
+						Namespace:  "ns-1",
+						ExecutorID: "executor-a",
+					}).
+					Return(&types.GetExecutorStateResponse{Namespace: "ns-1"}, nil)
+				return setupResult{client: mc}
+			},
+		},
+		{
+			name:    "missing namespace fails",
+			args:    []string{"smctl", "executor", "state", "--" + FlagExecutorID, "executor-a"},
+			setup:   func(t *testing.T, ctrl *gomock.Controller) setupResult { return setupResult{} },
+			wantErr: "--" + FlagNamespace + " is required",
+		},
+		{
+			name:    "missing executor ID fails",
+			args:    []string{"smctl", "-n", "ns-1", "executor", "state"},
+			setup:   func(t *testing.T, ctrl *gomock.Controller) setupResult { return setupResult{} },
+			wantErr: "--" + FlagExecutorID + " is required",
+		},
+		{
+			name: "API error surfaces EntityNotExists",
+			args: []string{
+				"smctl",
+				"-n", "ns-1",
+				"executor", "state",
+				"--" + FlagExecutorID, "missing",
+			},
+			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
+				mc := sharddistributor.NewMockClient(ctrl)
+				mc.EXPECT().
+					GetExecutorState(gomock.Any(), &types.GetExecutorStateRequest{
+						Namespace:  "ns-1",
+						ExecutorID: "missing",
+					}).
+					Return(nil, &types.EntityNotExistsError{Message: "executor not found ns-1:missing"})
+				return setupResult{client: mc}
+			},
+			wantErr: "GetExecutorState: executor not found ns-1:missing",
+		},
+		{
+			name: "factory error is propagated",
+			args: []string{
+				"smctl",
+				"-n", "ns-1",
+				"executor", "state",
+				"--" + FlagExecutorID, "executor-a",
+			},
+			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
+				return setupResult{clientErr: errors.New("dial: refused")}
+			},
+			wantErr: "dial: refused",
+		},
+		{
+			name: "context timeout flag is honored",
+			args: []string{
+				"smctl",
+				"--" + FlagContextTimeout, "1ms",
+				"-n", "ns-1",
+				"executor", "state",
+				"--" + FlagExecutorID, "executor-a",
+			},
+			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
+				mc := sharddistributor.NewMockClient(ctrl)
+				mc.EXPECT().
+					GetExecutorState(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, _ *types.GetExecutorStateRequest, _ ...any) (*types.GetExecutorStateResponse, error) {
+						deadline, ok := ctx.Deadline()
+						if !ok {
+							t.Errorf("ctx should have deadline from --%s", FlagContextTimeout)
+							return &types.GetExecutorStateResponse{}, nil
+						}
+						if remaining := time.Until(deadline); remaining > 50*time.Millisecond {
+							t.Errorf("--%s=1ms should produce a sub-50ms deadline, got %v", FlagContextTimeout, remaining)
+						}
+						return &types.GetExecutorStateResponse{Namespace: "ns-1"}, nil
+					})
+				return setupResult{client: mc}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			res := tt.setup(t, ctrl)
+
+			cf := NewMockClientFactory(ctrl)
+			cf.EXPECT().Close().Return(nil).Times(1)
+			if tt.wantErr == "" || res.client != nil || res.clientErr != nil {
+				cf.EXPECT().
+					ShardManagerClient(gomock.Any()).
+					Return(res.client, res.clientErr).
+					MaxTimes(1)
+			}
+
+			cmd := BuildCommandWithFactory(cf)
+			buf := new(bytes.Buffer)
+			cmd.Writer = buf
+			cmd.ErrWriter = buf
+
+			err := cmd.Run(context.Background(), tt.args)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil. out=%s", tt.wantErr, buf.String())
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error: got %q want substring %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if tt.check != nil {
+				tt.check(t, buf.String())
+			}
+		})
 	}
 }
 

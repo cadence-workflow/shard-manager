@@ -44,7 +44,7 @@ func rootFlags() []cliv3.Flag {
 		&cliv3.StringFlag{
 			Name:    FlagNamespace,
 			Aliases: []string{"n"},
-			Usage:   "namespace to operate on (required by namespace subcommands)",
+			Usage:   "namespace to operate on (required by commands that target a namespace)",
 			Sources: cliv3.EnvVars("SMCTL_NAMESPACE"),
 		},
 		&cliv3.StringFlag{

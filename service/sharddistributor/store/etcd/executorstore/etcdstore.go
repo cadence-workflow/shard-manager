@@ -899,7 +899,7 @@ func (s *executorStoreImpl) GetShardOwner(ctx context.Context, namespace, shardI
 // by leadership: any concurrent leader write will subsequently fail its own
 // leadership-key revision check, which is the desired behaviour.
 func (s *executorStoreImpl) ResetNamespace(ctx context.Context, namespace string) (int64, error) {
-	prefix := etcdkeys.BuildNamespacePrefix(s.prefix, namespace) + "/"
+	prefix := etcdkeys.BuildNamespacePrefix(s.prefix, namespace)
 	resp, err := s.client.Delete(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return 0, fmt.Errorf("delete namespace prefix %q: %w", prefix, err)

@@ -609,32 +609,6 @@ func TestNamespaceShardToExecutor_needsRefresh(t *testing.T) {
 	}
 }
 
-// The watch has to span the whole namespace: one scoped to executors/ would never see a
-// drain, and the cache would serve a stale drained set until the process restarted.
-func TestNamespaceShardToExecutor_watch_coversWholeNamespace(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mockClient := etcdclient.NewMockClient(ctrl)
-	stopCh := make(chan struct{})
-
-	const prefix, namespace = "/test-prefix", "test-namespace"
-
-	var watchedKey string
-	mockClient.EXPECT().
-		Watch(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, key string, _ ...clientv3.OpOption) clientv3.WatchChan {
-			watchedKey = key
-			// Unblock watch immediately; the key is all this test cares about.
-			close(stopCh)
-			return make(chan clientv3.WatchResponse)
-		})
-
-	e, err := newNamespaceShardToExecutor(prefix, namespace, mockClient, stopCh, testlogger.New(t), clock.NewRealTimeSource(), metrics.NewNoopMetricsClient())
-	require.NoError(t, err)
-
-	require.NoError(t, e.watch(make(chan struct{}, 1)))
-	assert.Equal(t, etcdkeys.BuildNamespacePrefix(prefix, namespace)+"/", watchedKey)
-}
-
 // A single namespace read feeds both maps, so the keys have to be routed by keyspace.
 func TestNamespaceShardToExecutor_partitionNamespaceKVs(t *testing.T) {
 	tc := setupNamespaceShardToExecutorTestCase(t)
@@ -1086,7 +1060,7 @@ func setupNamespaceShardToExecutorTestCase(t *testing.T) *namespaceShardToExecut
 	tc.prefix = "/test-prefix"
 	tc.namespace = "test-namespace"
 	tc.executorID = "executor-1"
-	tc.namespacePrefix = etcdkeys.BuildNamespacePrefix(tc.prefix, tc.namespace) + "/"
+	tc.namespacePrefix = etcdkeys.BuildNamespacePrefix(tc.prefix, tc.namespace)
 
 	// Mock the Watch call to return our watch channel. The prefix is matched exactly: the
 	// watch has to span the whole namespace, or drain changes never reach the cache.

@@ -97,7 +97,7 @@ func newNamespaceShardToExecutor(etcdPrefix, namespace string, client etcdclient
 		drainedShards:       make(map[string]struct{}),
 		namespace:           namespace,
 		etcdPrefix:          etcdPrefix,
-		namespacePrefix:     etcdkeys.BuildNamespacePrefix(etcdPrefix, namespace) + "/",
+		namespacePrefix:     etcdkeys.BuildNamespacePrefix(etcdPrefix, namespace),
 		executorsPrefix:     etcdkeys.BuildExecutorsPrefix(etcdPrefix, namespace),
 		drainedShardsPrefix: etcdkeys.BuildDrainedShardsPrefix(etcdPrefix, namespace),
 		stopCh:              stopCh,
@@ -385,9 +385,9 @@ func (n *namespaceShardToExecutor) needsRefresh(watchResp clientv3.WatchResponse
 }
 
 // hasDrainedShardsChanged checks whether any event touched the drained shards keyspace.
-// All recognized key counts as a change: draining and undraining both store an empty
-// value, so the previous-value comparison used for executor keys would read an undrain
-// as an unchanged key.
+// Every recognized key counts as a change: draining stores no value and an undrain arrives
+// as a tombstone with a nil value, so the previous-value comparison used for executor keys
+// sees "" on both sides and would count the undrain as an unchanged key.
 func (n *namespaceShardToExecutor) hasDrainedShardsChanged(watchResp clientv3.WatchResponse) bool {
 	changed := false
 	for _, event := range watchResp.Events {

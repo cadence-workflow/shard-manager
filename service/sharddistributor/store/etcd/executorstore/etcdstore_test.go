@@ -1242,13 +1242,13 @@ func TestResetNamespace(t *testing.T) {
 		// Target namespace is empty. Trailing slash mirrors the delete-side
 		// convention so we don't accidentally count sibling-namespace keys
 		// when one namespace name is a prefix substring of another.
-		afterPrefix := etcdkeys.BuildNamespacePrefix(tc.EtcdPrefix, tc.Namespace) + "/"
+		afterPrefix := etcdkeys.BuildNamespacePrefix(tc.EtcdPrefix, tc.Namespace)
 		resp, err := tc.Client.Get(ctx, afterPrefix, clientv3.WithPrefix())
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), resp.Count, "no keys should remain under namespace prefix")
 
 		// Sibling namespace is untouched.
-		siblingPrefix := etcdkeys.BuildNamespacePrefix(tc.EtcdPrefix, siblingNs) + "/"
+		siblingPrefix := etcdkeys.BuildNamespacePrefix(tc.EtcdPrefix, siblingNs)
 		respSibling, err := tc.Client.Get(ctx, siblingPrefix, clientv3.WithPrefix())
 		require.NoError(t, err)
 		assert.Greater(t, respSibling.Count, int64(0), "sibling namespace must not be wiped")

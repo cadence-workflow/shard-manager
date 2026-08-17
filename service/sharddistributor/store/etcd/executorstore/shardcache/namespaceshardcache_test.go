@@ -408,7 +408,7 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_HungRefreshDoesNotBlockSt
 	tc.e.refreshTimeout = 50 * time.Millisecond
 
 	tc.etcdClient.EXPECT().
-		Get(gomock.Any(), tc.executorPrefix, gomock.Any()).
+		Get(gomock.Any(), tc.namespacePrefix, gomock.Any()).
 		DoAndReturn(func(ctx context.Context, _ string, _ ...clientv3.OpOption) (*clientv3.GetResponse, error) {
 			<-ctx.Done()
 			return nil, ctx.Err()
@@ -440,7 +440,7 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_HungRefreshDoesNotBlockSt
 	}
 }
 
-func TestNamespaceShardToExecutor_replaceExecutorState_skipsStaleRevision(t *testing.T) {
+func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	logger := testlogger.New(t)
@@ -1071,7 +1071,6 @@ type namespaceShardToExecutorTestCase struct {
 	prefix     string
 	namespace  string
 
-	executorPrefix string
 	// namespacePrefix is what the cache reads: one range covering executors and drained shards.
 	namespacePrefix string
 }
@@ -1087,7 +1086,6 @@ func setupNamespaceShardToExecutorTestCase(t *testing.T) *namespaceShardToExecut
 	tc.prefix = "/test-prefix"
 	tc.namespace = "test-namespace"
 	tc.executorID = "executor-1"
-	tc.executorPrefix = etcdkeys.BuildExecutorsPrefix(tc.prefix, tc.namespace)
 	tc.namespacePrefix = etcdkeys.BuildNamespacePrefix(tc.prefix, tc.namespace) + "/"
 
 	// Mock the Watch call to return our watch channel. The prefix is matched exactly: the

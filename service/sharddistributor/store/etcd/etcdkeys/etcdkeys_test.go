@@ -10,7 +10,7 @@ import (
 
 func TestBuildNamespacePrefix(t *testing.T) {
 	got := BuildNamespacePrefix("/cadence", "test-ns")
-	assert.Equal(t, "/cadence/test-ns", got)
+	assert.Equal(t, "/cadence/test-ns/", got)
 }
 
 func TestBuildExecutorsPrefix(t *testing.T) {

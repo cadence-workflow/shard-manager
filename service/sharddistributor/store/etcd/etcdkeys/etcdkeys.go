@@ -7,15 +7,15 @@ import (
 )
 
 // BuildNamespacePrefix constructs the etcd key prefix for a given namespace.
-// result: <prefix>/<namespace>
+// result: <prefix>/<namespace>/
 func BuildNamespacePrefix(prefix, namespace string) string {
-	return fmt.Sprintf("%s/%s", prefix, namespace)
+	return fmt.Sprintf("%s/%s/", prefix, namespace)
 }
 
 // BuildExecutorsPrefix constructs the etcd key prefix for executors within a given namespace.
 // result: <prefix>/<namespace>/executors/
 func BuildExecutorsPrefix(prefix, namespace string) string {
-	return fmt.Sprintf("%s/executors/", BuildNamespacePrefix(prefix, namespace))
+	return fmt.Sprintf("%sexecutors/", BuildNamespacePrefix(prefix, namespace))
 }
 
 // BuildExecutorIDPrefix constructs the etcd key prefix for a specific executor within a namespace.
@@ -99,7 +99,7 @@ func BuildMetadataKey(prefix string, namespace, executorID, metadataKey string) 
 // shard is a single atomic put or delete.
 // Result: <prefix>/<namespace>/drained_shards/
 func BuildDrainedShardsPrefix(prefix, namespace string) string {
-	return fmt.Sprintf("%s/drained_shards/", BuildNamespacePrefix(prefix, namespace))
+	return fmt.Sprintf("%sdrained_shards/", BuildNamespacePrefix(prefix, namespace))
 }
 
 // BuildDrainedShardKey constructs the etcd key marking a single shard as drained.

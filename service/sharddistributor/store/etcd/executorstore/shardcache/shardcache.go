@@ -64,8 +64,7 @@ func (s *ShardToExecutorCache) GetShardOwner(ctx context.Context, namespace, sha
 	return namespaceShardToExecutor.GetShardOwner(ctx, shardID)
 }
 
-// IsShardDrained is kept separate from GetShardOwner so internal callers that only
-// need the current owner are unaffected by the drain state.
+// IsShardDrained reports whether the shard marked as drained
 func (s *ShardToExecutorCache) IsShardDrained(ctx context.Context, namespace, shardID string) (bool, error) {
 	namespaceShardToExecutor, err := s.getNamespaceShardToExecutor(namespace)
 	if err != nil {

@@ -34,10 +34,12 @@ const (
 	_requestsChannelLimit = 1024
 )
 
-// ephemeralAssignmentBatchFn is a function that assigns a batch of shards within a namespace
-// and returns a map of shardKey -> GetShardOwnerResponse for each successfully assigned shard.
-// Keys absent from the result map indicate an error for that specific shard.
-type ephemeralAssignmentBatchFn func(ctx context.Context, namespace string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, error)
+// ephemeralAssignmentBatchFn assigns a batch of shards within a namespace.
+// results maps each successfully assigned shard key to its owner.
+// drained is the set of requested keys that must not be assigned; the batcher
+// returns ShardDrainedError for those keys. Any other key absent from both maps
+// is treated as an internal error.
+type ephemeralAssignmentBatchFn func(ctx context.Context, namespace string, shardKeys []string) (results map[string]*types.GetShardOwnerResponse, drained map[string]struct{}, err error)
 
 // batchRequest is a single caller's request submitted to the shardBatcher.
 type batchRequest struct {
@@ -57,6 +59,7 @@ type batchResponse struct {
 type flushResult struct {
 	namespace string
 	results   map[string]*types.GetShardOwnerResponse
+	drained   map[string]struct{}
 	err       error
 }
 
@@ -166,7 +169,7 @@ func (b *shardBatcher) loop() {
 
 		case res := <-flushDone:
 			ns := namespaces[res.namespace]
-			b.deliverResults(ns.inflight, res.results, res.err)
+			b.deliverResults(ns.inflight, res.results, res.drained, res.err)
 
 			if len(ns.pending) > 0 {
 				ns.inflight = ns.pending
@@ -195,24 +198,30 @@ func (b *shardBatcher) startFlush(namespace string, reqs []*batchRequest, done c
 		ctx, cancel := context.WithTimeout(context.Background(), b.timeout)
 		defer cancel()
 
-		results, err := b.processBatch(ctx, namespace, shardKeys)
-		done <- flushResult{namespace: namespace, results: results, err: err}
+		results, drained, err := b.processBatch(ctx, namespace, shardKeys)
+		done <- flushResult{namespace: namespace, results: results, drained: drained, err: err}
 	}()
 }
 
 // deliverResults writes the batch outcome to every caller's respChan.
-func (b *shardBatcher) deliverResults(reqs []*batchRequest, results map[string]*types.GetShardOwnerResponse, err error) {
+func (b *shardBatcher) deliverResults(reqs []*batchRequest, results map[string]*types.GetShardOwnerResponse, drained map[string]struct{}, err error) {
 	for _, req := range reqs {
 		// Non-blocking write: respChan has capacity 1 and each req has
 		// exactly one writer (this loop) and one reader (Submit).
-		req.respChan <- toBatchResponse(results, err, req.shardKey)
+		req.respChan <- toBatchResponse(results, drained, err, req.namespace, req.shardKey)
 	}
 }
 
 // toBatchResponse picks one caller's outcome out of a whole batch's result.
-func toBatchResponse(results map[string]*types.GetShardOwnerResponse, err error, shardKey string) batchResponse {
+func toBatchResponse(results map[string]*types.GetShardOwnerResponse, drained map[string]struct{}, err error, namespace, shardKey string) batchResponse {
 	if err != nil {
 		return batchResponse{err: err}
+	}
+	if _, isDrained := drained[shardKey]; isDrained {
+		return batchResponse{err: &types.ShardDrainedError{
+			Namespace: namespace,
+			ShardKey:  shardKey,
+		}}
 	}
 	resp := results[shardKey]
 	if resp == nil {
@@ -236,7 +245,7 @@ func (b *shardBatcher) drainAndCancel(namespaces map[string]*namespaceState, flu
 	for range inflightCount {
 		res := <-flushDone
 		ns := namespaces[res.namespace]
-		b.deliverResults(ns.inflight, res.results, res.err)
+		b.deliverResults(ns.inflight, res.results, res.drained, res.err)
 	}
 
 	// Cancel all pending requests that never got flushed.

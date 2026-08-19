@@ -118,7 +118,10 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 			// winner already committed our shard's assignment we can return
 			// immediately without re-submitting to the batcher.
 			owner, err := a.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
-			// Drained while retrying: stop instead of re-submitting a drained shard
+			// Drained while retrying: stop instead of re-submitting a drained shard.
+			// throttleRetry prefers the previous version-conflict error when the
+			// new error is not retryable, so we also record drained as a side
+			// channel for the mapping below.
 			if errors.Is(err, store.ErrShardDrained) {
 				drained = true
 				return err
@@ -150,9 +153,25 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 		}
 	}
 	if err != nil {
-		return nil, &types.InternalServiceError{Message: fmt.Sprintf("failed to assign ephemeral shard: %v", err)}
+		return nil, mapAssignError(request, err)
 	}
 	return resp, nil
+}
+
+// mapAssignError keeps drain as ShardDrainedError instead of
+// wrapping it as InternalServiceError, which clients treat as retryable.
+func mapAssignError(request *types.GetShardOwnerRequest, err error) error {
+	var drained *types.ShardDrainedError
+	if errors.As(err, &drained) {
+		return drained
+	}
+	if errors.Is(err, store.ErrShardDrained) {
+		return &types.ShardDrainedError{
+			Namespace: request.Namespace,
+			ShardKey:  request.ShardKey,
+		}
+	}
+	return &types.InternalServiceError{Message: fmt.Sprintf("failed to assign ephemeral shard: %v", err)}
 }
 
 // assignEphemeralBatch is the ephemeralAssignmentBatchFn wired into the shardBatcher.
@@ -163,18 +182,18 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 //
 // Shards that already have an owner are skipped from placement,
 // the rest are placed by the load balancer and saved in a single AssignShards call
-func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, error) {
+func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 	state, err := a.storage.GetState(ctx, namespace)
 	if err != nil {
-		return nil, &types.InternalServiceError{Message: fmt.Sprintf("get namespace state: %v", err)}
+		return nil, nil, &types.InternalServiceError{Message: fmt.Sprintf("get namespace state: %v", err)}
 	}
 
-	executorByShard, toPlace := resolveOwners(state, shardKeys)
+	executorByShard, toPlace, drained := resolveOwners(state, shardKeys)
 
 	if len(toPlace) > 0 {
 		placements, err := loadbalancer.PlanInitialPlacement(a.cfg, namespace, state, toPlace)
 		if err != nil {
-			return nil, &types.InternalServiceError{Message: fmt.Sprintf("plan initial placement: %v", err)}
+			return nil, nil, &types.InternalServiceError{Message: fmt.Sprintf("plan initial placement: %v", err)}
 		}
 
 		mergePlacements(state, placements, a.timeSource.Now().UTC())
@@ -183,9 +202,9 @@ func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, s
 			if errors.Is(err, store.ErrVersionConflict) {
 				// Return the version-conflict sentinel unwrapped so callers can
 				// detect it with errors.Is and decide whether to retry.
-				return nil, fmt.Errorf("assign ephemeral shards: %w", err)
+				return nil, nil, fmt.Errorf("assign ephemeral shards: %w", err)
 			}
-			return nil, &types.InternalServiceError{Message: fmt.Sprintf("assign ephemeral shards: %v", err)}
+			return nil, nil, &types.InternalServiceError{Message: fmt.Sprintf("assign ephemeral shards: %v", err)}
 		}
 
 		for _, placement := range placements {
@@ -195,23 +214,26 @@ func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, s
 
 	executorOwners, err := a.fetchExecutorMetadata(ctx, namespace, executorByShard)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return buildResults(namespace, shardKeys, executorByShard, executorOwners), nil
+	return buildResults(namespace, shardKeys, executorByShard, executorOwners), drained, nil
 }
 
 // resolveOwners splits the requested shards into those already assigned to an
-// executor, mapped to that current owner, and those still needing placement.
+// executor, mapped to that current owner, those still needing placement, and
+// those drained since the read path last checked.
 //
-// Drained shards are dropped from both groups. The read path already rejects them
-// before they reach the batcher, so this only catches a drain committed while the
-// batch was waiting to flush
-func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByShard map[string]string, toPlace []string) {
+// Drained shards are excluded from placement so they are never written, and
+// returned in the drained set so the batcher can surface ShardDrainedError
+// instead of treating the missing result as an internal error.
+func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByShard map[string]string, toPlace []string, drained map[string]struct{}) {
 	owners := state.ShardOwners()
 	executorByShard = make(map[string]string, len(shardKeys))
+	drained = make(map[string]struct{})
 	for _, shardKey := range shardKeys {
-		if _, drained := state.DrainedShards[shardKey]; drained {
+		if _, isDrained := state.DrainedShards[shardKey]; isDrained {
+			drained[shardKey] = struct{}{}
 			continue
 		}
 		if executorID, ok := owners[shardKey]; ok {
@@ -220,7 +242,7 @@ func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByS
 		}
 		toPlace = append(toPlace, shardKey)
 	}
-	return executorByShard, toPlace
+	return executorByShard, toPlace, drained
 }
 
 // mergePlacements folds the planned shard→executor placements back into state.
@@ -265,7 +287,8 @@ func (a *Assigner) fetchExecutorMetadata(ctx context.Context, namespace string, 
 
 // buildResults constructs the shardKey -> GetShardOwnerResponse map from the
 // resolved owners and their fetched metadata.
-// Shards that resolveOwners dropped for being drained have no owner and are skipped.
+// Shards in the drained set are omitted here; the batcher maps them to
+// ShardDrainedError from the drained set returned alongside these results.
 func buildResults(namespace string, shardKeys []string, executorByShard map[string]string, executorOwners map[string]*store.ShardOwner) map[string]*types.GetShardOwnerResponse {
 	results := make(map[string]*types.GetShardOwnerResponse, len(shardKeys))
 	for _, shardKey := range shardKeys {

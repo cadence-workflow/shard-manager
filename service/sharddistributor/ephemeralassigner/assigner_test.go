@@ -52,12 +52,13 @@ func newTestShardDistributorConfig(mode string) *config.Config {
 // wrapping, and the happy-path response shape.
 func TestAssignEphemeralBatch(t *testing.T) {
 	tests := []struct {
-		name           string
-		shardKeys      []string
-		setupMocks     func(mockStore *store.MockStore)
-		expectedOwners map[string]string // shardKey -> expected owner
-		expectedError  bool
-		expectedErrMsg string
+		name            string
+		shardKeys       []string
+		setupMocks      func(mockStore *store.MockStore)
+		expectedOwners  map[string]string // shardKey -> expected owner
+		expectedDrained []string
+		expectedError   bool
+		expectedErrMsg  string
 	}{
 		{
 			name:      "HappyPath",
@@ -237,7 +238,8 @@ func TestAssignEphemeralBatch(t *testing.T) {
 					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
 				}, nil)
 			},
-			expectedOwners: map[string]string{"new-shard": "owner1"},
+			expectedOwners:  map[string]string{"new-shard": "owner1"},
+			expectedDrained: []string{"drained-shard"},
 		},
 		{
 			// A drained shard that still has an owner is not handed back: the read
@@ -258,7 +260,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 				}, nil)
 				// No AssignShards or GetExecutor: nothing to place, no owner to report.
 			},
-			expectedOwners: nil,
+			expectedDrained: []string{"shard1"},
 		},
 	}
 
@@ -275,11 +277,12 @@ func TestAssignEphemeralBatch(t *testing.T) {
 
 			tt.setupMocks(mockStorage)
 
-			results, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, tt.shardKeys)
+			results, drained, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, tt.shardKeys)
 			if tt.expectedError {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedErrMsg)
 				require.Nil(t, results)
+				require.Nil(t, drained)
 				return
 			}
 			require.NoError(t, err)
@@ -289,6 +292,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 				require.Equal(t, _testNamespaceEphemeral, results[shardKey].Namespace)
 				require.Equal(t, map[string]string{"ip": "127.0.0.1", "port": "1234"}, results[shardKey].Metadata)
 			}
+			require.ElementsMatch(t, tt.expectedDrained, drainedKeys(drained))
 		})
 	}
 }
@@ -317,9 +321,10 @@ func TestAssignEphemeralBatch_DrainedShardIsNeverPlaced(t *testing.T) {
 	}, nil)
 
 	// No AssignShards expectation: writing a plan at all would mean the shard was placed.
-	results, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, []string{"drained-shard"})
+	results, drained, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, []string{"drained-shard"})
 	require.NoError(t, err)
 	require.Empty(t, results)
+	require.Equal(t, map[string]struct{}{"drained-shard": {}}, drained)
 }
 
 // An unsupported load balancing mode bubbles up from the loadbalancer planner as an
@@ -340,8 +345,41 @@ func TestAssignEphemeralBatch_InvalidLoadBalancingMode(t *testing.T) {
 		ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
 	}, nil)
 
-	results, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, []string{"new-shard-1"})
+	results, drained, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, []string{"new-shard-1"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported load balancing mode")
 	require.Nil(t, results)
+	require.Nil(t, drained)
+}
+
+// A drain that lands before the first batch flush must come back as ShardDrainedError,
+// not as InternalServiceError from a missing result map entry.
+func TestGetOrAssign_DrainedDuringBatchFlushReturnsShardDrainedError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockStorage := store.NewMockStore(ctrl)
+
+	a := New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage)
+	a.Start()
+	defer a.Stop()
+
+	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+		Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
+		ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+		DrainedShards:    map[string]struct{}{"shard-1": {}},
+	}, nil)
+
+	resp, err := a.GetOrAssign(context.Background(), &types.GetShardOwnerRequest{
+		Namespace: _testNamespaceEphemeral,
+		ShardKey:  "shard-1",
+	})
+	require.Nil(t, resp)
+	require.Equal(t, &types.ShardDrainedError{Namespace: _testNamespaceEphemeral, ShardKey: "shard-1"}, err)
+}
+
+func drainedKeys(drained map[string]struct{}) []string {
+	keys := make([]string, 0, len(drained))
+	for k := range drained {
+		keys = append(keys, k)
+	}
+	return keys
 }

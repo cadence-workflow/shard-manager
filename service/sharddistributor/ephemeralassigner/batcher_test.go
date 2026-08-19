@@ -41,14 +41,14 @@ import (
 // processFnFromMap returns an ephemeralAssignmentBatchFn that resolves shard keys from a
 // fixed map, returning an empty map (and no error) for any key not present.
 func processFnFromMap(results map[string]*types.GetShardOwnerResponse) ephemeralAssignmentBatchFn {
-	return func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, error) {
+	return func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 		out := make(map[string]*types.GetShardOwnerResponse, len(shardKeys))
 		for _, k := range shardKeys {
 			if v, ok := results[k]; ok {
 				out[k] = v
 			}
 		}
-		return out, nil
+		return out, nil, nil
 	}
 }
 
@@ -77,8 +77,8 @@ func TestShardBatcher_Submit(t *testing.T) {
 		},
 		{
 			name: "batch function returns error - propagated to caller",
-			batchFn: func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, error) {
-				return nil, errors.New("storage unavailable")
+			batchFn: func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+				return nil, nil, errors.New("storage unavailable")
 			},
 			namespace:  "ns",
 			shardKey:   "shard-1",
@@ -87,13 +87,23 @@ func TestShardBatcher_Submit(t *testing.T) {
 		},
 		{
 			name: "key absent from batch result returns internal error",
-			batchFn: func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, error) {
-				return map[string]*types.GetShardOwnerResponse{}, nil
+			batchFn: func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+				return map[string]*types.GetShardOwnerResponse{}, nil, nil
 			},
 			namespace:  "ns",
 			shardKey:   "shard-missing",
 			wantErr:    true,
 			wantErrMsg: "shard-missing",
+		},
+		{
+			name: "drained key returns ShardDrainedError",
+			batchFn: func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+				return map[string]*types.GetShardOwnerResponse{}, map[string]struct{}{"shard-drained": {}}, nil
+			},
+			namespace:  "ns",
+			shardKey:   "shard-drained",
+			wantErr:    true,
+			wantErrMsg: "shard drained ns:shard-drained",
 		},
 		{
 			name:      "context cancelled before submit",
@@ -137,6 +147,63 @@ func TestShardBatcher_Submit(t *testing.T) {
 			if tc.wantOwner != "" {
 				assert.Equal(t, tc.wantOwner, resp.Owner)
 			}
+		})
+	}
+}
+
+func TestToBatchResponse_DrainedVsMissing(t *testing.T) {
+	tests := []struct {
+		name      string
+		results   map[string]*types.GetShardOwnerResponse
+		drained   map[string]struct{}
+		err       error
+		namespace string
+		shardKey  string
+		wantOwner string
+		wantErr   error
+	}{
+		{
+			name:      "assigned shard",
+			results:   map[string]*types.GetShardOwnerResponse{"shard-1": {Owner: "exec-1"}},
+			namespace: "ns",
+			shardKey:  "shard-1",
+			wantOwner: "exec-1",
+		},
+		{
+			name:      "drained shard",
+			results:   map[string]*types.GetShardOwnerResponse{},
+			drained:   map[string]struct{}{"shard-1": {}},
+			namespace: "ns",
+			shardKey:  "shard-1",
+			wantErr:   &types.ShardDrainedError{Namespace: "ns", ShardKey: "shard-1"},
+		},
+		{
+			name:      "missing shard is internal error",
+			results:   map[string]*types.GetShardOwnerResponse{},
+			namespace: "ns",
+			shardKey:  "shard-1",
+			wantErr:   &types.InternalServiceError{Message: "batch processor returned no result for shard key: shard-1"},
+		},
+		{
+			name:      "batch error wins over drained set",
+			drained:   map[string]struct{}{"shard-1": {}},
+			err:       errors.New("storage unavailable"),
+			namespace: "ns",
+			shardKey:  "shard-1",
+			wantErr:   errors.New("storage unavailable"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := toBatchResponse(tc.results, tc.drained, tc.err, tc.namespace, tc.shardKey)
+			if tc.wantErr != nil {
+				require.EqualError(t, got.err, tc.wantErr.Error())
+				require.Nil(t, got.resp)
+				return
+			}
+			require.NoError(t, got.err)
+			require.Equal(t, tc.wantOwner, got.resp.Owner)
 		})
 	}
 }
@@ -222,9 +289,9 @@ func TestShardBatcher_ErrorPropagatedToAllCallers(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Block the first batch so all callers queue up together.
 			firstCall := make(chan struct{})
-			batchFn := func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, error) {
+			batchFn := func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 				<-firstCall
-				return nil, tc.batchErr
+				return nil, nil, tc.batchErr
 			}
 
 			b := newShardBatcher(time.Second, batchFn)
@@ -275,7 +342,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 		gate := make(chan struct{})
 		var callCount atomic.Int32
 
-		batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, error) {
+		batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 			call := callCount.Add(1)
 			if call == 1 {
 				<-gate
@@ -288,7 +355,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 			for _, k := range shardKeys {
 				out[k] = &types.GetShardOwnerResponse{Owner: "exec-1", Namespace: "ns"}
 			}
-			return out, nil
+			return out, nil, nil
 		}
 
 		b := newShardBatcher(time.Second, batchFn)
@@ -336,13 +403,13 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 
 	t.Run("single request is processed without delay", func(t *testing.T) {
 		processed := make(chan struct{})
-		batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, error) {
+		batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 			close(processed)
 			out := make(map[string]*types.GetShardOwnerResponse, len(shardKeys))
 			for _, k := range shardKeys {
 				out[k] = &types.GetShardOwnerResponse{Owner: "exec-1", Namespace: "ns"}
 			}
-			return out, nil
+			return out, nil, nil
 		}
 
 		b := newShardBatcher(time.Second, batchFn)
@@ -386,7 +453,7 @@ func TestShardBatcher_ConcurrentRequestsBatchedTogether(t *testing.T) {
 			gate := make(chan struct{})
 			var callCount atomic.Int32
 
-			batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, error) {
+			batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 				call := callCount.Add(1)
 				if call == 1 {
 					<-gate
@@ -403,7 +470,7 @@ func TestShardBatcher_ConcurrentRequestsBatchedTogether(t *testing.T) {
 						out[k] = v
 					}
 				}
-				return out, nil
+				return out, nil, nil
 			}
 
 			b := newShardBatcher(time.Second, batchFn)
@@ -450,9 +517,9 @@ func TestShardBatcher_StopDrainsAndCancelsRemainingRequests(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			block := make(chan struct{})
-			batchFn := func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, error) {
+			batchFn := func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 				<-block
-				return nil, nil
+				return nil, nil, nil
 			}
 
 			b := newShardBatcher(time.Second, batchFn)

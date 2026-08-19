@@ -118,10 +118,7 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 			// winner already committed our shard's assignment we can return
 			// immediately without re-submitting to the batcher.
 			owner, err := a.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
-			// Drained while retrying: stop instead of re-submitting a drained shard.
-			// throttleRetry prefers the previous version-conflict error when the
-			// new error is not retryable, so we also record drained as a side
-			// channel for the mapping below.
+			// Drained while retrying
 			if errors.Is(err, store.ErrShardDrained) {
 				drained = true
 				return err
@@ -224,9 +221,8 @@ func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, s
 // executor, mapped to that current owner, those still needing placement, and
 // those drained since the read path last checked.
 //
-// Drained shards are excluded from placement so they are never written, and
+// Drained shards are excluded from placement, so they are never written, and
 // returned in the drained set so the batcher can surface ShardDrainedError
-// instead of treating the missing result as an internal error.
 func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByShard map[string]string, toPlace []string, drained map[string]struct{}) {
 	owners := state.ShardOwners()
 	executorByShard = make(map[string]string, len(shardKeys))

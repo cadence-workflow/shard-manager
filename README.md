@@ -1,116 +1,102 @@
-# Cadence
-[![Build Status](https://github.com/cadence-workflow/cadence/actions/workflows/ci-checks.yml/badge.svg)](https://github.com/cadence-workflow/cadence/actions/workflows/ci-checks.yml)
-[![Coverage](https://codecov.io/gh/cadence-workflow/cadence/graph/badge.svg?token=7SD244ImNF)](https://codecov.io/gh/cadence-workflow/cadence)
+# Shard Manager
+[![Build Status](https://github.com/cadence-workflow/shard-manager/actions/workflows/ci-checks.yml/badge.svg)](https://github.com/cadence-workflow/shard-manager/actions/workflows/ci-checks.yml)
 [![Slack Status](https://img.shields.io/badge/slack-join_chat-white.svg?logo=slack&style=social)](https://communityinviter.com/apps/cloud-native/cncf)
-[![Github release](https://img.shields.io/github/v/release/cadence-workflow/cadence.svg)](https://github.com/cadence-workflow/cadence/releases)
-[![License](https://img.shields.io/github/license/cadence-workflow/cadence.svg)](http://www.apache.org/licenses/LICENSE-2.0)
+[![License](https://img.shields.io/github/license/cadence-workflow/shard-manager.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
-Cadence Workflow is an open-source platform since 2017 for building and running scalable, fault-tolerant, and long-running workflows. This repository contains the core orchestration engine and tools including CLI, schema managment, benchmark and canary.
+Shard Manager is a service that assigns shards to the hosts of a sharded application and keeps that
+assignment balanced and up to date as hosts come and go. Applications hand over ownership decisions.
 
+The shard manager go service is backed by etcd, additionally we provide Go client libraries that
+applications embed:
+
+* **Executor client** — a host that *runs* shards. It heartbeats to the distributor, receives its
+  shard assignments, and starts/stops a `ShardProcessor` per assigned shard.
+* **Spectator client** — a host that only needs to *route*. It watches the assignment and answers
+  `GetShardOwner(shardKey)`, and can be plugged in as a YARPC peer chooser to route requests
+  straight to the owning host.
+
+Namespaces are the unit of configuration. A namespace is either:
+
+* `fixed` — a static set of shards (`shardNum`), distributed across the executors of that namespace.
+* `ephemeral` — shards are created on demand, the first time someone asks for a shard key.
+
+Rebalancing is pluggable per namespace via the `naive` or `greedy` load balancer (see
+`service/sharddistributor/loadbalancer`), tunable through dynamic config.
 
 ## Getting Started
 
-Cadence backend consists of multiple services, a database (Cassandra/MySQL/PostgreSQL) and optionally Kafka+Elasticsearch.
-As a user, you need a worker which contains your workflow implementation.
-Once you have Cadence backend and worker(s) running, you can trigger workflows by using SDKs or via CLI.
-
-1. Start cadence backend components locally
+The distributor needs an etcd cluster. The quickest way to get one locally:
 
 ```
-docker compose -f docker/docker-compose.yml up
+docker compose -f docker/github_actions/docker-compose.yml up -d etcd
 ```
 
-2. Run the Samples
+Build the binaries and start the server:
 
-Try out the sample recipes for [Go](https://github.com/cadence-workflow/cadence-samples) or [Java](https://github.com/cadence-workflow/cadence-java-samples).
+```
+make bins
+./shard-manager-server start --services shard-distributor
+```
 
-3. Visit UI
+It reads `config/development.yaml` by default, which points at `localhost:2379` and defines a
+handful of development namespaces. The gRPC API is served on port `7943`.
 
-Visit http://localhost:8088 to check workflow histories and detailed traces.
+To see it doing something, run the canary — it spins up executors and a pinger against the
+`shard-distributor-canary` (fixed) and `shard-distributor-canary-ephemeral` namespaces:
 
-
-### Client Libraries
-You can implement your workflows with one of our client libraries:
-- [Official Cadence Go SDK](https://github.com/cadence-workflow/cadence-go-client)
-- [Official Cadence Java SDK](https://github.com/cadence-workflow/cadence-java-client)
-There are also unofficial [Python](https://github.com/firdaus/cadence-python) and [Ruby](https://github.com/coinbase/cadence-ruby) SDKs developed by the community.
-
-You can also use [iWF](https://github.com/indeedeng/iwf) as a DSL framework on top of Cadence.
+```
+make start-shard-manager-canary
+```
 
 ### CLI
 
-Cadence CLI can be used to operate workflows, tasklist, domain and even the clusters.
+`smctl` is the command-line client for inspecting and operating a running distributor:
 
-You can use the following ways to install Cadence CLI:
-* Use brew to install CLI: `brew install cadence-workflow`
-  * Follow the [instructions](https://github.com/cadence-workflow/cadence/discussions/4457) if you need to install older versions of CLI via homebrew. Usually this is only needed when you are running a server of a too old version.
-* Use docker image for CLI: `docker run --rm ubercadence/cli:<releaseVersion>`  or `docker run --rm ubercadence/cli:master ` . Be sure to update your image when you want to try new features: `docker pull ubercadence/cli:master `
-* Build the CLI binary yourself, check out the repo and run `make cadence` to build all tools. See [CONTRIBUTING](CONTRIBUTING.md) for prerequisite of make command.
-* Build the CLI image yourself, see [instructions](docker/README.md#diy-building-an-image-for-any-tag-or-branch)
+```
+make smctl
+./smctl --address localhost:7943 namespace list
+./smctl --address localhost:7943 --namespace shard-distributor-canary executor list
+./smctl --address localhost:7943 --namespace shard-distributor-canary shard inspect --shard-key 7
+```
 
-Cadence CLI is a powerful tool. The commands are organized by tabs. E.g. `workflow`->`batch`->`start`, or `admin`->`workflow`->`describe`.
+The root flags (`--namespace`, `--address`, `--transport`, `--tls-cert-path`, `--context-timeout`)
+also read from `SMCTL_*` environment variables. Use `--help` on any subcommand to explore.
 
-Please read the [documentation](https://cadenceworkflow.io/docs/cli/#documentation) and always try out `--help` on any tab to learn & explore.
+### Using it from your application
 
-### UI
+Wire in one of the clients under `service/sharddistributor/client` with fx:
 
-Try out [Cadence Web UI](https://github.com/cadence-workflow/cadence-web) to view your workflows on Cadence.
-(This is already available at localhost:8088 if you run Cadence with docker compose)
+* `executorclient` — implement `ShardProcessor` (start/stop work for one shard) and
+  `ShardProcessorFactory`, and the executor takes care of heartbeating, assignment updates and
+  draining.
+* `spectatorclient` — for callers that only need to find the owner of a shard key, including a
+  ready-made YARPC peer chooser.
 
+`service/sharddistributor/canary` is a small, complete example of both.
 
-### Other binaries in this repo
+## Repository Layout
 
-#### Bench/stress test workflow tools
-See [bench documentation](./bench/README.md).
+| Path | What lives there |
+| --- | --- |
+| `service/sharddistributor` | The distributor service: handler, leader election, stores, load balancers, clients, canary |
+| `service/sharddistributor/store/etcd` | etcd-backed shard/executor/leader state |
+| `cmd/server` | The server binary (`shard-manager-server`) |
+| `cmd/smctl`, `tools/smctl` | The `smctl` CLI |
+| `cmd/sharddistributor-canary` | The canary binary (`shard-manager-canary`) |
+| `common` | Shared libraries inherited from Cadence: config, log, metrics, rpc, dynamic config, types |
+| `common/types` | Internal RPC types and mappers — service logic uses these, never generated IDL types |
+| `proto`, `idls` | API definitions |
 
-#### Periodical feature health check workflow tools(aka Canary)
-See [canary documentation](./canary/README.md).
+## Development
 
-#### Schema tools for SQL and Cassandra
-The tools are for [manual setup or upgrading database schema](docs/persistence.md)
+```
+make bins    # build all binaries
+make test    # run unit tests
+make lint    # run the linter
+make pr      # codegen + lint + fmt + tidy, run this before opening a PR
+```
 
-  * If server runs with Cassandra, Use [Cadence Cassandra tool](tools/cassandra/README.md)
-  * If server runs with SQL database, Use [Cadence SQL tool](tools/sql/README.md)
-
-The easiest way to get the schema tool is via homebrew.
-
-`brew install cadence-workflow` also includes `cadence-sql-tool` and `cadence-cassandra-tool`.
- * The schema files are located at `/usr/local/etc/cadence/schema/`.
- * To upgrade, make sure you remove the old ElasticSearch schema first: `mv /usr/local/etc/cadence/schema/elasticsearch /usr/local/etc/cadence/schema/elasticsearch.old && brew upgrade cadence-workflow`. Otherwise ElasticSearch schemas may not be able to get updated.
- * Follow the [instructions](https://github.com/cadence-workflow/cadence/discussions/4457) if you need to install older versions of schema tools via homebrew.
- However, easier way is to use new versions of schema tools with old versions of schemas.
- All you need is to check out the older version of schemas from this repo. Run `git checkout v0.21.3` to get the v0.21.3 schemas in [the schema folder](/schema).
-
-
-## Contributing
-
-We'd love your help in making Cadence great. Please review our [contribution guide](CONTRIBUTING.md).
-
-If you'd like to propose a new feature, first join the [CNCF Slack workspace](https://communityinviter.com/apps/cloud-native/cncf) in the **#cadence-users** channel to start a discussion.
-
-Please visit our [documentation](https://cadenceworkflow.io/docs/operation-guide/) site for production/cluster setup.
+Tests that need etcd are guarded by `testflags.RequireEtcd` and run via `make integration_tests_etcd`
+with the etcd compose file above running.
 
 
-### Learning Resources
-See Maxim's talk at [Data@Scale Conference](https://atscaleconference.com/videos/cadence-microservice-architecture-beyond-requestreply) for an architectural overview of Cadence.
-
-Visit [cadenceworkflow.io](https://cadenceworkflow.io) to learn more about Cadence. Join us in [Cadence Documentation](https://github.com/cadence-workflow/Cadence-Docs) project. Feel free to raise an Issue or Pull Request there.
-
-### Community
-* [Github Discussion](https://github.com/cadence-workflow/cadence/discussions)
-  * Best for Q&A, support/help, general discusion, and annoucement
-* [Github Issues](https://github.com/cadence-workflow/cadence/issues)
-  * Best for reporting bugs and feature requests
-* [StackOverflow](https://stackoverflow.com/questions/tagged/cadence-workflow)
-  * Best for Q&A and general discusion
-* [Slack](https://communityinviter.com/apps/cloud-native/cncf) - Join **#cadence-users** channel on CNCF Slack
-  * Best for contributing/development discussion
-
-
-## Stars over time
-[![Stargazers over time](https://starchart.cc/uber/cadence.svg?variant=adaptive)](https://starchart.cc/uber/cadence)
-
-
-## License
-
-Apache 2.0 License, please see [LICENSE](https://github.com/cadence-workflow/cadence/blob/master/LICENSE) for details.

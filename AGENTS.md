@@ -4,31 +4,35 @@ This document contains critical information about working with this codebase.
 
 ## Core Development Rules
 
-- NEVER ever mention a `co-authored-by` or similar aspects. In particular, never mention the tool used to create the commit message or PR.
+- NEVER mention a `co-authored-by` or similar aspects. Never mention the tool used to create the commit message or PR.
 
 ## Coding Best Practices
 
-- **Testing**: 
+- **Testing**:
   - Prefer table-tests unless the change is extremely simple
-  - don't use suite-tests, these are legacy and should only be maintained, but all new tests should be either plain Go tests or table-tests
-  - Don't use https://github.com/stretchr/testify for any new mocks, these are legacy. Always use https://github.com/uber-go/mock where creating new test
+  - Don't use suite-tests, these are legacy and should only be maintained. All new tests should be either plain Go tests or table-tests
+  - Don't use https://github.com/stretchr/testify for any new mocks, these are legacy. Always use https://github.com/uber-go/mock when creating new tests
   - Try to round-trip all mappers where possible. Generate symmetric mappers when converting types
+  - Tests should be proportional to the code they cover. Avoid standalone tests that duplicate table-test cases, and avoid exhaustive matrices when the code path is a simple error check. If tests are significantly larger than the code under test, look for redundancy.
 
-- **types**:
-  - Never use IDL code directly in service logic, map them to common/types or common/persistence types
+- **Comments**:
+  - Comments should be timeless — explain non-obvious invariants or constraints, never narrate what the current PR does or why a specific change was made. PR-level context belongs in the commit message or PR description, not in the code.
+
+- **Types**:
+  - Never use IDL code directly in service logic, map them to common/types
 
 ## System Architecture
 
-## Core Components
+### Core Components
 
-- `common/persistence` contains all persistence layer packages. These are structured with a PersistenceManager for each component and typically have a PersistenceStore which knows how to handle NoSQL and Sql datastore implementations, with various specific database implementations in plugins under these directories
-- `common/types` contains the RPC layer internal type representation. This package should have few, if any dependencies and should be the top of the dependency tree. It should have values which represent IDL values and for which there are mappers in `common/types/mapper`
-- `services` This is the major services: history, matching, frontend and worker
-- `tools/cli` is where the cadence CLI is built
+- `service/sharddistributor` is the main service
+- `common/types` contains the RPC layer internal type representation. This package should have few, if any dependencies and should be near the top of the dependency tree. It has values which represent IDL values and mappers in `common/types/mapper`
+- `cmd/` contains the entry points: `server`, `smctl` (CLI), `sharddistributor-canary`, and `tools`
 - `idls` is the submodule for building thrift specifically. Protobuf is imported via a go module.
+- `proto` contains protobuf definitions
 
 ## Development Workflow Commands
 
-- Tests are run, usually via `make test` or `go test` for a specific test
-- linting can be performed by `make lint`
-- preparing all changes for a PR should be done via `make pr` which re-performs all IDL codegen, linting, formatting etc in order.
+- Tests are run via `make test` or `go test` for a specific package
+- Linting can be performed by `make lint`
+- Preparing all changes for a PR should be done via `make pr` which re-performs all IDL codegen, linting, formatting etc in order

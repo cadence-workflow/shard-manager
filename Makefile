@@ -466,55 +466,21 @@ endif
 BINS =
 TOOLS =
 
-BINS  += cadence-cassandra-tool
-TOOLS += cadence-cassandra-tool
-cadence-cassandra-tool: $(BINS_DEPEND_ON)
-	$Q echo "compiling cadence-cassandra-tool with OS: $(GOOS), ARCH: $(GOARCH)"
-	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/tools/cassandra/main.go
+BINS += shard-manager-canary
+shard-manager-canary: $(BINS_DEPEND_ON)
+	$Q echo "compiling shard-manager-canary with OS: $(GOOS), ARCH: $(GOARCH)"
+	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/sharddistributor-canary/main.go
 
-BINS  += cadence-sql-tool
-TOOLS += cadence-sql-tool
-cadence-sql-tool: $(BINS_DEPEND_ON)
-	$Q echo "compiling cadence-sql-tool with OS: $(GOOS), ARCH: $(GOARCH)"
-	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/tools/sql/main.go
-
-BINS  += cadence
-TOOLS += cadence
-cadence: $(BINS_DEPEND_ON)
-	$Q echo "compiling cadence with OS: $(GOOS), ARCH: $(GOARCH)"
-	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/tools/cli/main.go
-
-BINS += cadence-server
-cadence-server: $(BINS_DEPEND_ON)
-	$Q echo "compiling cadence-server with OS: $(GOOS), ARCH: $(GOARCH)"
-	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/server/main.go
-
-BINS += smctl
+BINS  += smctl
 TOOLS += smctl
 smctl: $(BINS_DEPEND_ON)
 	$Q echo "compiling smctl with OS: $(GOOS), ARCH: $(GOARCH)"
 	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/smctl/main.go
 
-BINS += cadence-canary
-cadence-canary: $(BINS_DEPEND_ON)
-	$Q echo "compiling cadence-canary with OS: $(GOOS), ARCH: $(GOARCH)"
-	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/canary/main.go
-
-BINS += sharddistributor-canary
-sharddistributor-canary: $(BINS_DEPEND_ON)
-	$Q echo "compiling sharddistributor-canary with OS: $(GOOS), ARCH: $(GOARCH)"
-	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/sharddistributor-canary/main.go
-
-BINS += cadence-bench
-cadence-bench: $(BINS_DEPEND_ON)
-	$Q echo "compiling cadence-bench with OS: $(GOOS), ARCH: $(GOARCH)"
-	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/bench/main.go
-
-
-BINS  += cadence-releaser
-cadence-releaser: $(BINS_DEPEND_ON)
-	$Q echo "compiling cadence-releaser with OS: $(GOOS), ARCH: $(GOARCH)"
-	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/tools/releaser/releaser.go
+BINS += shard-manager
+shard-manager: $(BINS_DEPEND_ON)
+	$Q echo "compiling shard-manager with OS: $(GOOS), ARCH: $(GOARCH)"
+	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/server/main.go
 
 .PHONY: go-generate bins tools release clean
 
@@ -561,7 +527,6 @@ clean: ## Clean build products and SQLite database
 
 .PHONY: git-submodules test bins build clean cover help
 
-TOOLS_CMD_ROOT=./cmd/tools
 INTEG_TEST_ROOT=./host
 INTEG_TEST_DIR=host
 INTEG_TEST_XDC_ROOT=./host/xdc
@@ -711,115 +676,11 @@ $(COVER_ROOT)/cover.out: $(UNIT_COVER_FILE) $(INTEG_COVER_FILE_CASS) $(INTEG_COV
 cover: $(COVER_ROOT)/cover.out
 	go tool cover -html=$(COVER_ROOT)/cover.out;
 
-install-schema: cadence-cassandra-tool
-	$Q echo installing schema
-	./cadence-cassandra-tool create -k cadence --rf 1
-	./cadence-cassandra-tool -k cadence setup-schema -v 0.0
-	./cadence-cassandra-tool -k cadence update-schema -d ./schema/cassandra/cadence/versioned
-	./cadence-cassandra-tool create -k cadence_visibility --rf 1
-	./cadence-cassandra-tool -k cadence_visibility setup-schema -v 0.0
-	./cadence-cassandra-tool -k cadence_visibility update-schema -d ./schema/cassandra/visibility/versioned
-	$Q echo installed schema
-
-install-schema-mysql: cadence-sql-tool
-	./cadence-sql-tool --user root --pw cadence create --db cadence
-	./cadence-sql-tool --user root --pw cadence --db cadence setup-schema -v 0.0
-	./cadence-sql-tool --user root --pw cadence --db cadence update-schema -d ./schema/mysql/v8/cadence/versioned
-	./cadence-sql-tool --user root --pw cadence create --db cadence_visibility
-	./cadence-sql-tool --user root --pw cadence --db cadence_visibility setup-schema -v 0.0
-	./cadence-sql-tool --user root --pw cadence --db cadence_visibility update-schema -d ./schema/mysql/v8/visibility/versioned
-
-install-schema-multiple-mysql: cadence-sql-tool install-schema-es-v7
-	./cadence-sql-tool --user root --pw cadence create --db cadence0
-	./cadence-sql-tool --user root --pw cadence --db cadence0 setup-schema -v 0.0
-	./cadence-sql-tool --user root --pw cadence --db cadence0 update-schema -d ./schema/mysql/v8/cadence/versioned
-	./cadence-sql-tool --user root --pw cadence create --db cadence1
-	./cadence-sql-tool --user root --pw cadence --db cadence1 setup-schema -v 0.0
-	./cadence-sql-tool --user root --pw cadence --db cadence1 update-schema -d ./schema/mysql/v8/cadence/versioned
-	./cadence-sql-tool --user root --pw cadence create --db cadence2
-	./cadence-sql-tool --user root --pw cadence --db cadence2 setup-schema -v 0.0
-	./cadence-sql-tool --user root --pw cadence --db cadence2 update-schema -d ./schema/mysql/v8/cadence/versioned
-	./cadence-sql-tool --user root --pw cadence create --db cadence3
-	./cadence-sql-tool --user root --pw cadence --db cadence3 setup-schema -v 0.0
-	./cadence-sql-tool --user root --pw cadence --db cadence3 update-schema -d ./schema/mysql/v8/cadence/versioned
-
-install-schema-postgres: cadence-sql-tool
-	./cadence-sql-tool -p 5432 -u postgres -pw cadence --pl postgres create --db cadence
-	./cadence-sql-tool -p 5432 -u postgres -pw cadence --pl postgres --db cadence setup -v 0.0
-	./cadence-sql-tool -p 5432 -u postgres -pw cadence --pl postgres --db cadence update-schema -d ./schema/postgres/cadence/versioned
-	./cadence-sql-tool -p 5432 -u postgres -pw cadence --pl postgres create --db cadence_visibility
-	./cadence-sql-tool -p 5432 -u postgres -pw cadence --pl postgres --db cadence_visibility setup-schema -v 0.0
-	./cadence-sql-tool -p 5432 -u postgres -pw cadence --pl postgres --db cadence_visibility update-schema -d ./schema/postgres/visibility/versioned
-
-install-schema-sqlite: cadence-sql-tool
-	./cadence-sql-tool -pl sqlite --db cadence.db setup -v 0.0
-	./cadence-sql-tool -pl sqlite --db cadence.db update-schema -d ./schema/sqlite/cadence/versioned
-	./cadence-sql-tool -pl sqlite --db cadence_visibility.db setup -v 0.0
-	./cadence-sql-tool -pl sqlite --db cadence_visibility.db update-schema -d ./schema/sqlite/visibility/versioned
-
-install-schema-es-v7:
-	curl -X PUT "http://127.0.0.1:9200/_template/cadence-visibility-template" -H 'Content-Type: application/json' -d @./schema/elasticsearch/v7/visibility/index_template.json
-	curl -X PUT "http://127.0.0.1:9200/cadence-visibility-dev"
-
-install-schema-es-v6:
-	curl -X PUT "http://127.0.0.1:9200/_template/cadence-visibility-template" -H 'Content-Type: application/json' -d @./schema/elasticsearch/v6/visibility/index_template.json
-	curl -X PUT "http://127.0.0.1:9200/cadence-visibility-dev"
-
-install-schema-es-opensearch:
-	curl -X PUT "http://127.0.0.1:9200/_template/cadence-visibility-template" -H 'Content-Type: application/json' -d @./schema/elasticsearch/os2/visibility/index_template.json
-	curl -X PUT "http://127.0.0.1:9200/cadence-visibility-dev"
-
 start: bins
-	./cadence-server start
+	./shard-manager start
 
-install-schema-xdc: cadence-cassandra-tool
-	$Q echo Setting up cadence_cluster0 key space
-	./cadence-cassandra-tool --ep 127.0.0.1 create -k cadence_cluster0 --rf 1
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_cluster0 setup-schema -v 0.0
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_cluster0 update-schema -d ./schema/cassandra/cadence/versioned
-	./cadence-cassandra-tool --ep 127.0.0.1 create -k cadence_visibility_cluster0 --rf 1
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_visibility_cluster0 setup-schema -v 0.0
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_visibility_cluster0 update-schema -d ./schema/cassandra/visibility/versioned
-
-	$Q echo Setting up cadence_cluster1 key space
-	./cadence-cassandra-tool --ep 127.0.0.1 create -k cadence_cluster1 --rf 1
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_cluster1 setup-schema -v 0.0
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_cluster1 update-schema -d ./schema/cassandra/cadence/versioned
-	./cadence-cassandra-tool --ep 127.0.0.1 create -k cadence_visibility_cluster1 --rf 1
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_visibility_cluster1 setup-schema -v 0.0
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_visibility_cluster1 update-schema -d ./schema/cassandra/visibility/versioned
-
-	$Q echo Setting up cadence_cluster2 key space
-	./cadence-cassandra-tool --ep 127.0.0.1 create -k cadence_cluster2 --rf 1
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_cluster2 setup-schema -v 0.0
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_cluster2 update-schema -d ./schema/cassandra/cadence/versioned
-	./cadence-cassandra-tool --ep 127.0.0.1 create -k cadence_visibility_cluster2 --rf 1
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_visibility_cluster2 setup-schema -v 0.0
-	./cadence-cassandra-tool --ep 127.0.0.1 -k cadence_visibility_cluster2 update-schema -d ./schema/cassandra/visibility/versioned
-
-start-xdc-cluster0: cadence-server
-	./cadence-server --zone xdc_cluster0 start
-
-start-xdc-cluster1: cadence-server
-	./cadence-server --zone xdc_cluster1 start
-
-start-xdc-cluster2: cadence-server
-	./cadence-server --zone xdc_cluster2 start
-
-start-canary: cadence-canary
-	./cadence-canary start
-
-start-sharddistributor-canary: sharddistributor-canary
-	./sharddistributor-canary start
-
-start-bench: cadence-bench
-	./cadence-bench start
-
-start-mysql: cadence-server
-	./cadence-server --zone mysql start
-
-start-postgres: cadence-server
-	./cadence-server --zone postgres start
+start-shard-manager-canary: shard-manager-canary
+	./shard-manager-canary start
 
 # broken up into multiple += so I can interleave comments.
 # this all becomes a single line of output.

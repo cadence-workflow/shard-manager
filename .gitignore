@@ -14,7 +14,6 @@
 .cursor/
 /vendor
 /_vendor-*
-/cadence
 .DS_Store
 *.log
 test
@@ -30,16 +29,7 @@ replication-simulator-output/
 dockerize
 *.crt
 
-# Executables produced by cadence repo
-/cadence
-/cadence-server
-/cadence-canary
-/cadence-bench
-/cadence-cassandra-tool
-/cadence-sql-tool
-/cadence-releaser
-/sharddistributor-canary
-
-# SQLite databases
-cadence.db*
-cadence_visibility.db*
+# Executables
+/shard-manager
+/shard-manager-canary
+/smctl

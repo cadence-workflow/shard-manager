@@ -123,6 +123,56 @@ func TestLoadBalance_SkipsNonBeneficialHotShard(t *testing.T) {
 	assert.False(t, slices.Contains(currentAssignments[execB], "hot"))
 }
 
+func TestFindBestShardForMove_MinimumLoad(t *testing.T) {
+	now := time.Now().UTC()
+
+	for _, test := range []struct {
+		name      string
+		load      float64
+		wantFound bool
+	}{
+		{name: "below minimum", load: minShardSmoothedLoadForMove - 0.001, wantFound: false},
+		{name: "at minimum", load: minShardSmoothedLoadForMove, wantFound: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			const shardID = "shard"
+			assignments := map[string][]string{
+				"source":      {shardID},
+				"destination": {},
+			}
+			state := &store.NamespaceState{
+				ShardStats: map[string]store.ShardStatistics{
+					shardID: {SmoothedLoad: test.load, LastUpdateTime: now},
+				},
+			}
+			executorLoads := map[string]float64{
+				"source":      1,
+				"destination": 0,
+			}
+
+			gotShard, gotIndex, found := findBestShardForMove(
+				assignments,
+				state,
+				"source",
+				"destination",
+				executorLoads,
+				map[string]struct{}{},
+				now,
+				0,
+			)
+
+			assert.Equal(t, test.wantFound, found)
+			if test.wantFound {
+				assert.Equal(t, shardID, gotShard)
+				assert.Equal(t, 0, gotIndex)
+			} else {
+				assert.Empty(t, gotShard)
+				assert.Equal(t, -1, gotIndex)
+			}
+		})
+	}
+}
+
 // TestLoadBalance_NoMoveNeeded verifies the balancer does nothing when already within hysteresis bands.
 func TestLoadBalance_NoMoveNeeded(t *testing.T) {
 	cfg := testGreedyConfig()

@@ -16,6 +16,8 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
+const minShardSmoothedLoadForMove = 0.01
+
 type moveCandidate struct {
 	shardID         string
 	from            string
@@ -341,6 +343,9 @@ func findBestShardForMove(
 		}
 
 		load := stats.SmoothedLoad
+		if load < minShardSmoothedLoadForMove {
+			continue
+		}
 
 		benefit := computeBenefitOfMove(sourceLoad, destLoad, load)
 		if benefit <= 0 {

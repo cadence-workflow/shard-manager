@@ -30,6 +30,6 @@ dockerize
 *.crt
 
 # Executables
-/shard-manager
+/shard-manager-server
 /shard-manager-canary
 /smctl

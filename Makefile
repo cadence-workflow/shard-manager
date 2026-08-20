@@ -477,9 +477,9 @@ smctl: $(BINS_DEPEND_ON)
 	$Q echo "compiling smctl with OS: $(GOOS), ARCH: $(GOARCH)"
 	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/smctl/main.go
 
-BINS += shard-manager
-shard-manager: $(BINS_DEPEND_ON)
-	$Q echo "compiling shard-manager with OS: $(GOOS), ARCH: $(GOARCH)"
+BINS += shard-manager-server
+shard-manager-server: $(BINS_DEPEND_ON)
+	$Q echo "compiling shard-manager-server with OS: $(GOOS), ARCH: $(GOARCH)"
 	$Q ./scripts/build-with-ldflags.sh -o $@ cmd/server/main.go
 
 .PHONY: go-generate bins tools release clean
@@ -677,7 +677,7 @@ cover: $(COVER_ROOT)/cover.out
 	go tool cover -html=$(COVER_ROOT)/cover.out;
 
 start: bins
-	./shard-manager start
+	./shard-manager-server start
 
 start-shard-manager-canary: shard-manager-canary
 	./shard-manager-canary start

@@ -262,6 +262,22 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			},
 			expectedDrained: []string{"shard1"},
 		},
+		{
+			name:      "DrainedShardIsNeverPlaced",
+			shardKeys: []string{"drained-shard"},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					Executors: map[string]store.HeartbeatState{
+						"owner1": {Status: types.ExecutorStatusACTIVE},
+					},
+					ShardAssignments: map[string]store.AssignedState{
+						"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
+					},
+					DrainedShards: map[string]struct{}{"drained-shard": {}},
+				}, nil)
+			},
+			expectedDrained: []string{"drained-shard"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -295,36 +311,6 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			require.ElementsMatch(t, tt.expectedDrained, drainedKeys(drained))
 		})
 	}
-}
-
-// The drained set must be applied before placement, so a drained shard never reaches
-// the plan that gets persisted.
-func TestAssignEphemeralBatch_DrainedShardIsNeverPlaced(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockStorage := store.NewMockStore(ctrl)
-	a := &Assigner{
-		storage:    mockStorage,
-		cfg:        newTestShardDistributorConfig(config.LoadBalancingModeNAIVE),
-		timeSource: clock.NewRealTimeSource(),
-	}
-
-	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-		Executors: map[string]store.HeartbeatState{
-			"owner1": {Status: types.ExecutorStatusACTIVE},
-		},
-		ShardAssignments: map[string]store.AssignedState{
-			"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
-		},
-		DrainedShards: map[string]struct{}{"drained-shard": {}},
-	}, nil)
-
-	// No AssignShards expectation: writing a plan at all would mean the shard was placed.
-	results, drained, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, []string{"drained-shard"})
-	require.NoError(t, err)
-	require.Empty(t, results)
-	require.Equal(t, map[string]struct{}{"drained-shard": {}}, drained)
 }
 
 // An unsupported load balancing mode bubbles up from the loadbalancer planner as an

@@ -110,7 +110,6 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 	)
 
 	var resp *types.GetShardOwnerResponse
-	var drained bool
 	isRetry := false
 	err := throttleRetry.Do(ctx, func(ctx context.Context) error {
 		if isRetry {
@@ -118,9 +117,7 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 			// winner already committed our shard's assignment we can return
 			// immediately without re-submitting to the batcher.
 			owner, err := a.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
-			// Drained while retrying
 			if errors.Is(err, store.ErrShardDrained) {
-				drained = true
 				return err
 			}
 			if err != nil && !errors.Is(err, store.ErrShardNotFound) {
@@ -143,24 +140,17 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 		return err
 	})
 
-	if drained {
-		return nil, &types.ShardDrainedError{
-			Namespace: request.Namespace,
-			ShardKey:  request.ShardKey,
-		}
-	}
 	if err != nil {
 		return nil, mapAssignError(request, err)
 	}
 	return resp, nil
 }
 
-// mapAssignError keeps drain as ShardDrainedError instead of
-// wrapping it as InternalServiceError, which clients treat as retryable.
+// mapAssignError maps assignment failures to API errors
 func mapAssignError(request *types.GetShardOwnerRequest, err error) error {
 	var drained *types.ShardDrainedError
 	if errors.As(err, &drained) {
-		return drained
+		return err
 	}
 	if errors.Is(err, store.ErrShardDrained) {
 		return &types.ShardDrainedError{
@@ -218,18 +208,12 @@ func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, s
 }
 
 // resolveOwners splits the requested shards into those already assigned to an
-// executor, mapped to that current owner, those still needing placement, and
-// those drained since the read path last checked.
-//
-// Drained shards are excluded from placement, so they are never written, and
-// returned in the drained set so the batcher can surface ShardDrainedError
+// executor and those still needing placement
 func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByShard map[string]string, toPlace []string, drained map[string]struct{}) {
 	owners := state.ShardOwners()
 	executorByShard = make(map[string]string, len(shardKeys))
-	drained = make(map[string]struct{})
 	for _, shardKey := range shardKeys {
 		if _, isDrained := state.DrainedShards[shardKey]; isDrained {
-			drained[shardKey] = struct{}{}
 			continue
 		}
 		if executorID, ok := owners[shardKey]; ok {
@@ -238,7 +222,7 @@ func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByS
 		}
 		toPlace = append(toPlace, shardKey)
 	}
-	return executorByShard, toPlace, drained
+	return executorByShard, toPlace, state.DrainedShards
 }
 
 // mergePlacements folds the planned shard→executor placements back into state.
@@ -290,6 +274,7 @@ func buildResults(namespace string, shardKeys []string, executorByShard map[stri
 	for _, shardKey := range shardKeys {
 		executorID, ok := executorByShard[shardKey]
 		if !ok {
+			// No owner: a drained shard skipped by resolveOwners
 			continue
 		}
 		owner := executorOwners[executorID]

@@ -889,8 +889,8 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 	return nil
 }
 
-// GetShardOwner refuses drained shards with ErrShardDrained. The check is here rather
-// than in the cache lookup, so it applies only to the read path.
+// GetShardOwner returns the owner of the shard.
+// Drained shards return ErrShardDrained rather than the last assigned owner
 func (s *executorStoreImpl) GetShardOwner(ctx context.Context, namespace, shardID string) (*store.ShardOwner, error) {
 	drained, err := s.shardCache.IsShardDrained(ctx, namespace, shardID)
 	if err != nil {

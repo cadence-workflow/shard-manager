@@ -198,6 +198,9 @@ func buildExecutorID(hostname, uniqueID string) string {
 }
 
 func createShardDistributorExecutorClient(client Client, metricsScope tally.Scope) (Client, error) {
+	if client == nil {
+		return nil, fmt.Errorf("executor client is nil: ensure the shard-distributor YARPC outbound is configured")
+	}
 
 	shardDistributorExecutorClient := timeoutwrapper.NewShardDistributorExecutorClient(client, timeoutwrapper.ShardDistributorExecutorDefaultTimeout)
 

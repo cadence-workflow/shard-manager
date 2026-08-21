@@ -184,6 +184,7 @@ func createMockParams[SP executorclient.ShardProcessor](
 	mockShardProcessorFactory := executorclient.NewMockShardProcessorFactory[SP](ctrl)
 
 	return executorclient.Params[SP]{
+		ExecutorClient:        executorclient.NewMockClient(ctrl),
 		MetricsScope:          tally.NoopScope,
 		Logger:                zap.NewNop(),
 		ShardProcessorFactory: mockShardProcessorFactory,

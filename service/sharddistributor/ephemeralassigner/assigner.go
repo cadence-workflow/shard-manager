@@ -208,7 +208,7 @@ func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, s
 }
 
 // resolveOwners splits the requested shards into those already assigned to an
-// executor and those still needing placement
+// executor, mapped to that current owner, and those still needing placement
 func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByShard map[string]string, toPlace []string, drained map[string]struct{}) {
 	owners := state.ShardOwners()
 	executorByShard = make(map[string]string, len(shardKeys))
@@ -274,7 +274,7 @@ func buildResults(namespace string, shardKeys []string, executorByShard map[stri
 	for _, shardKey := range shardKeys {
 		executorID, ok := executorByShard[shardKey]
 		if !ok {
-			// No owner: a drained shard skipped by resolveOwners
+			// shard has no owner: a drained shard skipped by resolveOwners
 			continue
 		}
 		owner := executorOwners[executorID]

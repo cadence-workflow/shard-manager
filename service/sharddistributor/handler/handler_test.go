@@ -25,7 +25,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -159,7 +158,7 @@ func TestGetShardOwner(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "Drained_Fixed",
+			name: "Drained",
 			request: &types.GetShardOwnerRequest{
 				Namespace: _testNamespaceFixed,
 				ShardKey:  "1",
@@ -171,104 +170,13 @@ func TestGetShardOwner(t *testing.T) {
 			expectedErrMsg: "shard drained",
 		},
 		{
-			// A drained shard in an ephemeral namespace must not reach the batcher: the
-			// mock has no assignment expectations, so any call into the assigner fails.
-			name: "Drained_Ephemeral_IsNotAssigned",
-			request: &types.GetShardOwnerRequest{
-				Namespace: _testNamespaceEphemeral,
-				ShardKey:  "1",
-			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "1").Return(nil, store.ErrShardDrained)
-			},
-			expectedError:  true,
-			expectedErrMsg: "shard drained",
-		},
-		{
-			// ShardNotFound for an ephemeral namespace routes to the batcher, which
-			// calls assignEphemeralBatch. This case validates the routing only;
-			// detailed assignment behaviour is covered in TestAssignEphemeralBatch.
-			name: "ShardNotFound_Ephemeral_RoutesToBatcher",
+			name: "ShardNotFound_Ephemeral_RoutesToAssigner",
 			request: &types.GetShardOwnerRequest{
 				Namespace: _testNamespaceEphemeral,
 				ShardKey:  "NON-EXISTING-SHARD",
 			},
 			setupMocks: func(mockStore *store.MockStore) {
 				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
-				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-					Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-					ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-				}, nil)
-				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(nil)
-				mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
-					ExecutorID: "owner1",
-					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
-				}, nil)
-			},
-			expectedOwner: "owner1",
-			expectedError: false,
-		},
-		{
-			// A version conflict from AssignShards causes the batcher to return
-			// ErrVersionConflict. getOrAssignEphemeralShard re-reads storage on
-			// retry; here the concurrent winner has already written the assignment
-			// so the second GetShardOwner call succeeds and no second batcher
-			// submission is required.
-			name: "Ephemeral_VersionConflict_ResolvedByStorageRead",
-			request: &types.GetShardOwnerRequest{
-				Namespace: _testNamespaceEphemeral,
-				ShardKey:  "NON-EXISTING-SHARD",
-			},
-			setupMocks: func(mockStore *store.MockStore) {
-				// Initial lookup — shard absent.
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").
-					Return(nil, store.ErrShardNotFound)
-
-				// Batcher fires: GetState + AssignShards returns a version conflict.
-				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-					Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-					ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-				}, nil)
-				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).
-					Return(store.ErrVersionConflict)
-
-				// Retry: re-read finds the shard already assigned by the concurrent winner.
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").
-					Return(&store.ShardOwner{
-						ExecutorID: "owner1",
-						Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
-					}, nil)
-			},
-			expectedOwner: "owner1",
-			expectedError: false,
-		},
-		{
-			// A version conflict from AssignShards is retried; on the retry
-			// GetShardOwner still returns ErrShardNotFound, so the batcher is
-			// re-submitted and this time AssignShards succeeds.
-			name: "Ephemeral_VersionConflict_RetriedAndSucceeds",
-			request: &types.GetShardOwnerRequest{
-				Namespace: _testNamespaceEphemeral,
-				ShardKey:  "NON-EXISTING-SHARD",
-			},
-			setupMocks: func(mockStore *store.MockStore) {
-				// Initial lookup — shard absent.
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").
-					Return(nil, store.ErrShardNotFound)
-
-				// First batcher attempt: version conflict.
-				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-					Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-					ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-				}, nil)
-				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).
-					Return(fmt.Errorf("assign ephemeral shards: %w", store.ErrVersionConflict))
-
-				// Retry re-read — shard still absent, so batcher is submitted again.
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").
-					Return(nil, store.ErrShardNotFound)
-
-				// Second batcher attempt: succeeds.
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
 					Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
 					ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},

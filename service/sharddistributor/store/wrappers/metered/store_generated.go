@@ -169,7 +169,7 @@ func (c *meteredStore) ResetNamespace(ctx context.Context, namespace string) (i1
 	return
 }
 
-func (c *meteredStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (ch1 <-chan map[*store.ShardOwner][]string, f1 func(), err error) {
+func (c *meteredStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (ch1 <-chan store.AssignmentSnapshot, f1 func(), err error) {
 	op := func() error {
 		ch1, f1, err = c.wrapped.SubscribeToAssignmentChanges(ctx, namespace)
 		return err

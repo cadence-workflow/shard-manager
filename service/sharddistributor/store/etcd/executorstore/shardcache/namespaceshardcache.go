@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -253,8 +254,8 @@ func (n *namespaceShardToExecutor) fetchAndCacheExecutorStatistics(ctx context.C
 	return nil
 }
 
-func (n *namespaceShardToExecutor) Subscribe(ctx context.Context) (<-chan map[*store.ShardOwner][]string, func()) {
-	subCh, unSub := n.pubSub.subscribe(n.getExecutorState)
+func (n *namespaceShardToExecutor) Subscribe(ctx context.Context) (<-chan store.AssignmentSnapshot, func()) {
+	subCh, unSub := n.pubSub.subscribe(n.getAssignmentSnapshot)
 	return subCh, unSub
 }
 
@@ -444,21 +445,26 @@ func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
 	}
 
 	if updated {
-		n.pubSub.publish(n.getExecutorState)
+		n.pubSub.publish(n.getAssignmentSnapshot)
 	}
 	return nil
 }
 
-func (n *namespaceShardToExecutor) getExecutorState() map[*store.ShardOwner][]string {
+// getAssignmentSnapshot copies both halves of the cache under one lock, so a
+// subscriber never sees assignments and drained shards from different revisions.
+func (n *namespaceShardToExecutor) getAssignmentSnapshot() store.AssignmentSnapshot {
 	n.RLock()
 	defer n.RUnlock()
-	executorState := make(map[*store.ShardOwner][]string)
+
+	executorState := make(map[*store.ShardOwner][]string, len(n.executorState))
 	for executor, shardIDs := range n.executorState {
-		executorState[executor] = make([]string, len(shardIDs))
-		copy(executorState[executor], shardIDs)
+		executorState[executor] = slices.Clone(shardIDs)
 	}
 
-	return executorState
+	return store.AssignmentSnapshot{
+		ExecutorState: executorState,
+		DrainedShards: maps.Clone(n.drainedShards),
+	}
 }
 
 // refreshNamespaceState reads every keyspace the cache tracks in one range read, so both

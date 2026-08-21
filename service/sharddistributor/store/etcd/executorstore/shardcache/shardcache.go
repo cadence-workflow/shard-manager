@@ -97,7 +97,7 @@ func (s *ShardToExecutorCache) GetExecutorModRevisionCmp(namespace string) ([]cl
 	return namespaceShardToExecutor.GetExecutorModRevisionCmp()
 }
 
-func (s *ShardToExecutorCache) Subscribe(ctx context.Context, namespace string) (<-chan map[*store.ShardOwner][]string, func(), error) {
+func (s *ShardToExecutorCache) Subscribe(ctx context.Context, namespace string) (<-chan store.AssignmentSnapshot, func(), error) {
 	namespaceShardToExecutor, err := s.getNamespaceShardToExecutor(namespace)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get namespace shard to executor: %w", err)

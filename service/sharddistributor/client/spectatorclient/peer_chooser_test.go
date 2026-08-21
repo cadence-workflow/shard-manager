@@ -11,9 +11,11 @@ import (
 	"go.uber.org/yarpc/api/transport"
 	"go.uber.org/yarpc/peer/hostport"
 	"go.uber.org/yarpc/transport/grpc"
+	"go.uber.org/yarpc/yarpcerrors"
 	"go.uber.org/zap"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 )
 
@@ -153,6 +155,39 @@ func TestSpectatorPeerChooser_Choose_Success(t *testing.T) {
 	assert.Equal(t, "127.0.0.1:7953", p.Identifier())
 	assert.Len(t, chooser.peers, 1)
 	assert.Equal(t, "127.0.0.1:7953", chooser.peers["127.0.0.1:7953"].peer.Identifier())
+}
+
+// Routing a drained shard must fail with a code callers do not retry
+func TestSpectatorPeerChooser_Choose_DrainedShardIsNotRetryable(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockSpectator := NewMockSpectator(ctrl)
+	chooser := &SpectatorPeerChooser{
+		logger:     zap.NewNop(),
+		peers:      make(map[string]*trackedPeer),
+		timeSource: clock.NewRealTimeSource(),
+		spectators: &Spectators{
+			spectators: map[string]Spectator{"ns": mockSpectator},
+		},
+	}
+
+	req := &transport.Request{
+		ShardKey: "shard-1",
+		Headers:  transport.NewHeaders().With(NamespaceHeader, "ns"),
+	}
+
+	mockSpectator.EXPECT().
+		GetShardOwner(gomock.Any(), "shard-1").
+		Return(nil, &types.ShardDrainedError{Namespace: "ns", ShardKey: "shard-1"})
+
+	p, onFinish, err := chooser.Choose(context.Background(), req)
+
+	require.Error(t, err)
+	assert.Nil(t, p)
+	assert.Nil(t, onFinish)
+	assert.Equal(t, yarpcerrors.CodeFailedPrecondition, yarpcerrors.FromError(err).Code())
+	assert.Empty(t, chooser.peers, "a drained shard must not create a peer")
 }
 
 func TestSpectatorPeerChooser_Choose_ReusesPeer(t *testing.T) {

@@ -115,20 +115,21 @@ func TestNamespaceShardToExecutor_Subscribe(t *testing.T) {
 		defer wg.Done()
 		// Check that we get the initial state
 		state := <-subCh
-		assert.Len(t, state, 1)
-		verifyExecutorInState(t, state, "executor-1", []string{"shard-1"}, map[string]string{
+		assert.Len(t, state.ExecutorState, 1)
+		assert.Empty(t, state.DrainedShards)
+		verifyExecutorInState(t, state.ExecutorState, "executor-1", []string{"shard-1"}, map[string]string{
 			"hostname": "executor-1-host",
 			"version":  "v1.0.0",
 		})
 
 		// Check that we get the updated state
 		state = <-subCh
-		assert.Len(t, state, 2)
-		verifyExecutorInState(t, state, "executor-1", []string{"shard-1"}, map[string]string{
+		assert.Len(t, state.ExecutorState, 2)
+		verifyExecutorInState(t, state.ExecutorState, "executor-1", []string{"shard-1"}, map[string]string{
 			"hostname": "executor-1-host",
 			"version":  "v1.0.0",
 		})
-		verifyExecutorInState(t, state, "executor-2", []string{"shard-2"}, map[string]string{
+		verifyExecutorInState(t, state.ExecutorState, "executor-2", []string{"shard-2"}, map[string]string{
 			"hostname": "executor-2-host",
 			"region":   "us-west",
 		})
@@ -466,7 +467,7 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 		map[string]struct{}{"shard-1": {}},
 	)
 
-	got := e.getExecutorState()
+	got := e.getAssignmentSnapshot().ExecutorState
 	require.Len(t, got, 1)
 	assertShardDrained(t, e, "shard-1", true)
 
@@ -479,7 +480,7 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 		map[string]struct{}{"shard-2": {}},
 	)
 
-	got = e.getExecutorState()
+	got = e.getAssignmentSnapshot().ExecutorState
 	require.Len(t, got, 1)
 	for owner := range got {
 		assert.Equal(t, "exec-a", owner.ExecutorID)
@@ -496,7 +497,7 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 		map[string]struct{}{"shard-2": {}},
 	)
 
-	got = e.getExecutorState()
+	got = e.getAssignmentSnapshot().ExecutorState
 	require.Len(t, got, 1)
 	for owner := range got {
 		assert.Equal(t, "exec-b", owner.ExecutorID)
@@ -711,6 +712,67 @@ func TestNamespaceShardToExecutor_IsShardDrained_loadsOnceWhenNothingIsDrained(t
 	}
 }
 
+// A drain changes nothing about executor assignments, so it only reaches subscribers
+// if the drained set itself is enough to trigger a publish
+func TestNamespaceShardToExecutor_DrainPublishesSnapshot(t *testing.T) {
+	tc := setupNamespaceShardToExecutorTestCase(t)
+	defer tc.ctrl.Finish()
+	defer close(tc.stopCh)
+
+	subCh, unSub := tc.e.Subscribe(context.Background())
+	defer unSub()
+
+	initial := <-subCh
+	assert.Empty(t, initial.DrainedShards)
+
+	drainedKey := etcdkeys.BuildDrainedShardKey(tc.prefix, tc.namespace, "shard-1")
+	tc.etcdClient.EXPECT().
+		Get(gomock.Any(), tc.namespacePrefix, gomock.Any()).
+		Return(&clientv3.GetResponse{
+			Header: &etcdserverpb.ResponseHeader{Revision: 5},
+			Kvs:    []*mvccpb.KeyValue{{Key: []byte(drainedKey)}},
+		}, nil)
+
+	require.NoError(t, tc.e.refresh(context.Background()))
+
+	select {
+	case snapshot := <-subCh:
+		assert.Equal(t, map[string]struct{}{"shard-1": {}}, snapshot.DrainedShards)
+	case <-time.After(5 * time.Second):
+		t.Fatal("drain should be published to subscribers")
+	}
+}
+
+// Refreshes that re-read the same etcd revision must not be published as changes.
+func TestNamespaceShardToExecutor_UnchangedDrainedSetDoesNotPublish(t *testing.T) {
+	tc := setupNamespaceShardToExecutorTestCase(t)
+	defer tc.ctrl.Finish()
+	defer close(tc.stopCh)
+
+	drainedKey := etcdkeys.BuildDrainedShardKey(tc.prefix, tc.namespace, "shard-1")
+	tc.etcdClient.EXPECT().
+		Get(gomock.Any(), tc.namespacePrefix, gomock.Any()).
+		Return(&clientv3.GetResponse{
+			Header: &etcdserverpb.ResponseHeader{Revision: 5},
+			Kvs:    []*mvccpb.KeyValue{{Key: []byte(drainedKey)}},
+		}, nil).
+		Times(2)
+
+	require.NoError(t, tc.e.refresh(context.Background()))
+
+	subCh, unSub := tc.e.Subscribe(context.Background())
+	defer unSub()
+	<-subCh
+
+	require.NoError(t, tc.e.refresh(context.Background()))
+
+	select {
+	case snapshot := <-subCh:
+		t.Fatalf("unchanged state should not be published, got %v", snapshot.DrainedShards)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
 // Regression test: publish must take its snapshot only once it holds the
 // pubsub lock, so a publish queued behind a concurrent one can never deliver
 // a snapshot older than what was already applied to the cache.
@@ -722,7 +784,7 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 	ownerA := &store.ShardOwner{ExecutorID: "exec-a", Metadata: map[string]string{}}
 	ownerB := &store.ShardOwner{ExecutorID: "exec-b", Metadata: map[string]string{}}
 
-	subCh, unsub := tc.e.pubSub.subscribe(tc.e.getExecutorState)
+	subCh, unsub := tc.e.pubSub.subscribe(tc.e.getAssignmentSnapshot)
 	defer unsub()
 
 	// Apply the older state.
@@ -740,7 +802,7 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 
 	publishDone := make(chan struct{})
 	go func() {
-		tc.e.pubSub.publish(tc.e.getExecutorState)
+		tc.e.pubSub.publish(tc.e.getAssignmentSnapshot)
 		close(publishDone)
 	}()
 
@@ -761,8 +823,8 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 	<-publishDone
 
 	got := <-subCh
-	require.Len(t, got, 1)
-	for owner := range got {
+	require.Len(t, got.ExecutorState, 1)
+	for owner := range got.ExecutorState {
 		assert.Equal(t, "exec-b", owner.ExecutorID, "queued publish must reflect the latest cache state, not a snapshot taken before it acquired the lock")
 	}
 }

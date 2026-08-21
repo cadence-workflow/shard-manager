@@ -150,6 +150,8 @@ message WatchNamespaceStateRequest {
 message WatchNamespaceStateResponse {
   // Executor information with assigned shards
   repeated ExecutorInfo executors = 1;
+  // Shards drained for this namespace
+  repeated string drained_shard_keys = 2;
 }
 
 message ExecutorInfo {

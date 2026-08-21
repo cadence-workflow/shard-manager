@@ -361,7 +361,8 @@ func FromShardDistributorWatchNamespaceStateResponse(t *types.WatchNamespaceStat
 	}
 
 	return &sharddistributorv1.WatchNamespaceStateResponse{
-		Executors: executors,
+		Executors:        executors,
+		DrainedShardKeys: t.GetDrainedShardKeys(),
 	}
 }
 
@@ -392,7 +393,8 @@ func ToShardDistributorWatchNamespaceStateResponse(t *sharddistributorv1.WatchNa
 	}
 
 	return &types.WatchNamespaceStateResponse{
-		Executors: executors,
+		Executors:        executors,
+		DrainedShardKeys: t.GetDrainedShardKeys(),
 	}
 }
 

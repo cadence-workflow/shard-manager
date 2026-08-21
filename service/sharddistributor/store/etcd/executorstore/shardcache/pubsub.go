@@ -13,11 +13,12 @@ import (
 )
 
 type executorStateSubscriber struct {
-	updates            chan map[*store.ShardOwner][]string
+	updates            chan store.AssignmentSnapshot
 	pendingUpdateSince time.Time
 }
 
-// executorStatePubSub manages subscriptions to executor state changes.
+// executorStatePubSub manages subscriptions to assignment snapshots, which carry
+// both executor state and the drained set.
 //
 // Each subscriber has a buffered (size 1) channel. When a subscriber can't
 // keep up, publish drains the stale pending message and replaces it with
@@ -41,12 +42,12 @@ func newExecutorStatePubSub(logger log.Logger, namespace string, timeSource cloc
 	}
 }
 
-// subscribe returns a channel that receives executor state updates.
+// subscribe returns a channel that receives assignment snapshot updates.
 // snapshot is called under p.mu — it must not re-acquire p.mu.
-func (p *executorStatePubSub) subscribe(snapshot func() map[*store.ShardOwner][]string) (chan map[*store.ShardOwner][]string, func()) {
+func (p *executorStatePubSub) subscribe(snapshot func() store.AssignmentSnapshot) (chan store.AssignmentSnapshot, func()) {
 	uniqueID := uuid.New().String()
 	subscriber := &executorStateSubscriber{
-		updates: make(chan map[*store.ShardOwner][]string, 1),
+		updates: make(chan store.AssignmentSnapshot, 1),
 	}
 
 	p.mu.Lock()
@@ -69,7 +70,7 @@ func (p *executorStatePubSub) unSubscribe(uniqueID string) {
 
 // publish sends the latest state to all subscribers.
 // snapshot is called under p.mu — it must not re-acquire p.mu.
-func (p *executorStatePubSub) publish(snapshot func() map[*store.ShardOwner][]string) {
+func (p *executorStatePubSub) publish(snapshot func() store.AssignmentSnapshot) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

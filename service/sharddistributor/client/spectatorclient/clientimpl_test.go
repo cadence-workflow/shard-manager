@@ -167,6 +167,115 @@ func TestGetShardOwner_CacheMiss_FallbackToRPC(t *testing.T) {
 	assert.Equal(t, "127.0.0.1:7954", owner.Metadata["grpc_address"])
 }
 
+func TestGetShardOwner_DrainedShard(t *testing.T) {
+	assignedToExecutor1 := []*types.ExecutorShardAssignment{
+		{
+			ExecutorID:     "executor-1",
+			Metadata:       map[string]string{"grpc_address": "127.0.0.1:7953"},
+			AssignedShards: []*types.Shard{{ShardKey: "shard-1"}},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		response    *types.WatchNamespaceStateResponse
+		shardKey    string
+		wantDrained bool
+		wantOwner   string
+	}{
+		{
+			name: "drained shard without an owner",
+			response: &types.WatchNamespaceStateResponse{
+				DrainedShardKeys: []string{"shard-9"},
+			},
+			shardKey:    "shard-9",
+			wantDrained: true,
+		},
+		{
+			name: "drain wins over a live assignment",
+			response: &types.WatchNamespaceStateResponse{
+				Executors:        assignedToExecutor1,
+				DrainedShardKeys: []string{"shard-1"},
+			},
+			shardKey:    "shard-1",
+			wantDrained: true,
+		},
+		{
+			name: "assigned shard is unaffected by an unrelated drain",
+			response: &types.WatchNamespaceStateResponse{
+				Executors:        assignedToExecutor1,
+				DrainedShardKeys: []string{"shard-9"},
+			},
+			shardKey:  "shard-1",
+			wantOwner: "executor-1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			spectator := &spectatorImpl{
+				namespace:        "test-ns",
+				client:           sharddistributor.NewMockClient(ctrl),
+				logger:           zap.NewNop(),
+				scope:            tally.NoopScope,
+				timeSource:       clock.NewRealTimeSource(),
+				firstStateSignal: csync.NewResettableSignal(),
+				enabled:          func() bool { return true },
+			}
+
+			spectator.handleResponse(tt.response)
+
+			owner, err := spectator.GetShardOwner(context.Background(), tt.shardKey)
+
+			if tt.wantDrained {
+				var drainedErr *types.ShardDrainedError
+				require.ErrorAs(t, err, &drainedErr)
+				assert.Equal(t, "test-ns", drainedErr.Namespace)
+				assert.Equal(t, tt.shardKey, drainedErr.ShardKey)
+				assert.Nil(t, owner)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantOwner, owner.ExecutorID)
+		})
+	}
+}
+
+func TestGetShardOwner_UndrainStopsRefusing(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockClient := sharddistributor.NewMockClient(ctrl)
+
+	spectator := &spectatorImpl{
+		namespace:        "test-ns",
+		client:           mockClient,
+		logger:           zap.NewNop(),
+		scope:            tally.NoopScope,
+		timeSource:       clock.NewRealTimeSource(),
+		firstStateSignal: csync.NewResettableSignal(),
+		enabled:          func() bool { return true },
+	}
+
+	spectator.handleResponse(&types.WatchNamespaceStateResponse{
+		DrainedShardKeys: []string{"shard-1"},
+	})
+
+	_, err := spectator.GetShardOwner(context.Background(), "shard-1")
+	var drainedErr *types.ShardDrainedError
+	require.ErrorAs(t, err, &drainedErr)
+
+	spectator.handleResponse(&types.WatchNamespaceStateResponse{})
+
+	mockClient.EXPECT().
+		GetShardOwner(gomock.Any(), &types.GetShardOwnerRequest{Namespace: "test-ns", ShardKey: "shard-1"}).
+		Return(&types.GetShardOwnerResponse{Owner: "executor-1"}, nil)
+
+	owner, err := spectator.GetShardOwner(context.Background(), "shard-1")
+	require.NoError(t, err)
+	assert.Equal(t, "executor-1", owner.ExecutorID)
+}
+
 func TestStreamReconnection(t *testing.T) {
 	defer goleak.VerifyNone(t)
 

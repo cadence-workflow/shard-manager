@@ -53,7 +53,7 @@ type spectatorImpl struct {
 	// Map from shard ID to shard owner (executor ID + metadata)
 	stateMu      sync.RWMutex
 	shardToOwner map[string]*ShardOwner
-	// drainedShards lets a lookup for a drained shard locally
+	// drainedShards is the local drain set
 	drainedShards map[string]struct{}
 
 	// Signal to notify when first state is received

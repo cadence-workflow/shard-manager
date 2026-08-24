@@ -36,7 +36,6 @@ import (
 	c "github.com/cadence-workflow/shard-manager/common/dynamicconfig/configstore/config"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	ringpopprovider "github.com/cadence-workflow/shard-manager/common/peerprovider/ringpopprovider/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 	sdconfig "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 )
@@ -50,8 +49,6 @@ type (
 		Metrics Metrics `yaml:"metrics"`
 		// PProf is the PProf configuration
 		PProf PProf `yaml:"pprof"`
-		// Ringpop is the ringpop related configuration
-		Ringpop ringpopprovider.Config `yaml:"ringpop"`
 		// Membership is used to configure peer provider plugin
 		Membership Membership `yaml:"membership"`
 		// Persistence contains the configuration for cadence datastores

@@ -25,7 +25,6 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/uber-go/tally v3.3.15+incompatible
 	github.com/uber/cadence-idl v0.0.0-20260226231252-039e65827dda
-	github.com/uber/ringpop-go v0.8.5
 	github.com/uber/tchannel-go v1.22.2 // indirect
 	github.com/urfave/cli/v2 v2.27.4
 	github.com/urfave/cli/v3 v3.8.0
@@ -41,7 +40,7 @@ require (
 	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.14.0
-	golang.org/x/time v0.5.0
+	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.22.0
 	google.golang.org/grpc v1.59.0
 	gopkg.in/validator.v2 v2.0.0-20180514200540-135c24b11c19
@@ -52,7 +51,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/google/gofuzz v1.0.0
 	github.com/mark3labs/mcp-go v0.18.0
-	github.com/robfig/cron/v3 v3.0.1
 	go.etcd.io/etcd/api/v3 v3.5.5
 	go.uber.org/mock v0.5.0
 )

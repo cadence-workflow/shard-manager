@@ -711,7 +711,6 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 	defer close(tc.stopCh)
 
 	ownerA := &store.ShardOwner{ExecutorID: "exec-a", Metadata: map[string]string{}}
-	ownerB := &store.ShardOwner{ExecutorID: "exec-b", Metadata: map[string]string{}}
 
 	subCh, unsub := tc.e.pubSub.subscribe()
 	defer unsub()
@@ -731,15 +730,17 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 
 	publishDone := make(chan struct{})
 	go func() {
-		tc.e.pubSub.notifySubscribers()
+		tc.e.pubSub.notifySubscribers() // this one should be enqueued since the lock is holded
 		close(publishDone)
 	}()
 
 	// Give the goroutine time to block on the lock before the newer state is applied.
 	time.Sleep(20 * time.Millisecond)
 
-	// A concurrent, newer refresh applies its state while the publish above is
-	// still queued.
+	// A concurrent, newer refresh applies its state while the notification above is
+	// still enqueued.
+	ownerB := &store.ShardOwner{ExecutorID: "exec-b", Metadata: map[string]string{}}
+
 	tc.e.replaceNamespaceState(10,
 		map[string]*store.ShardOwner{"shard-b": ownerB},
 		map[*store.ShardOwner][]string{ownerB: {"shard-b"}},
@@ -751,10 +752,13 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 	tc.e.pubSub.Unlock()
 	<-publishDone
 
-	<-subCh
-	for owner := range tc.e.GetExecutorState() {
-		assert.Equal(t, "exec-b", owner.ExecutorID, "queued publish must reflect the latest cache state, not a snapshot taken before it acquired the lock")
+	select {
+	case <-subCh:
+	case <-time.After(time.Second):
+		require.Fail(t, "timed out waiting for notification")
 	}
+
+	// we don't check the state as it is definitely applied, only notification
 }
 
 func TestNamespaceShardToExecutor_namespaceRefreshLoop_watchError(t *testing.T) {

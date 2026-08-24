@@ -18,12 +18,6 @@ persistence:
         hosts: "127.0.0.1"
         keyspace: "cadence_visibility"
 
-ringpop:
-  name: cadence
-  bootstrapMode: hosts
-  bootstrapHosts: [ "127.0.0.1:7933", "127.0.0.1:7934", "127.0.0.1:7935" ]
-  maxJoinDuration: 30s
-
 rpc:
   port: 7941
   grpcPort: 7943

@@ -1,5 +1,0 @@
-clusterGroupMetadata:
-  clusterGroup:
-    cluster0:
-      tls:
-        enabled: true

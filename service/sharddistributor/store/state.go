@@ -58,8 +58,10 @@ type NamespaceState struct {
 	// DrainedShards holds the shards that are drained for this namespace.
 	// A drained shard is not eligible for assignment until it is
 	// explicitly undrained.
-	// Key: ShardID
-	DrainedShards map[string]struct{}
+	// Key: ShardID. Value is the time the shard was first marked drained.
+	// A zero time means the shard is drained but the start time is unknown
+	// (legacy empty etcd values).
+	DrainedShards map[string]time.Time
 }
 
 type ShardState struct {
@@ -101,4 +103,54 @@ func (ns *NamespaceState) ShardOwners() map[string]string {
 		}
 	}
 	return owners
+}
+
+// IsDrained reports whether the shard is currently drained, regardless of
+// whether its drain time is known.
+func (ns *NamespaceState) IsDrained(shardID string) bool {
+	_, drained := ns.DrainedShards[shardID]
+	return drained
+}
+
+// DrainedSince returns when the shard was first marked drained. The second
+// result is false when the shard is not drained, or when it is drained but its
+// drain time is unknown.
+func (ns *NamespaceState) DrainedSince(shardID string) (time.Time, bool) {
+	drainedAt, ok := ns.DrainedShards[shardID]
+	if !ok || drainedAt.IsZero() {
+		return time.Time{}, false
+	}
+	return drainedAt, true
+}
+
+// DrainedShardIDs returns the drained shards as a set, for callers that only
+// need membership.
+func (ns *NamespaceState) DrainedShardIDs() map[string]struct{} {
+	ids := make(map[string]struct{}, len(ns.DrainedShards))
+	for shardID := range ns.DrainedShards {
+		ids[shardID] = struct{}{}
+	}
+	return ids
+}
+
+// OldestDrainAge returns how long the longest-draining shard has been drained.
+// Shards whose drain time is unknown do not contribute, so a namespace holding
+// only those reports zero rather than an inflated age.
+func (ns *NamespaceState) OldestDrainAge(now time.Time) time.Duration {
+	var oldest time.Time
+	for _, drainedAt := range ns.DrainedShards {
+		if drainedAt.IsZero() {
+			continue
+		}
+		if oldest.IsZero() || drainedAt.Before(oldest) {
+			oldest = drainedAt
+		}
+	}
+	if oldest.IsZero() {
+		return 0
+	}
+	if age := now.Sub(oldest); age > 0 {
+		return age
+	}
+	return 0
 }

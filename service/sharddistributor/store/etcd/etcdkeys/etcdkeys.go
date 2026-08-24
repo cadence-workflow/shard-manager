@@ -103,7 +103,8 @@ func BuildDrainedShardsPrefix(prefix, namespace string) string {
 }
 
 // BuildDrainedShardKey constructs the etcd key marking a single shard as drained.
-// The value stored at this key is empty; the presence of the key is the entire signal.
+// The value is the UTC RFC3339Nano timestamp of the first drain; presence of the
+// key is what marks the shard drained.
 // Result: <prefix>/<namespace>/drained_shards/<shardID>
 func BuildDrainedShardKey(prefix, namespace, shardID string) string {
 	return fmt.Sprintf("%s%s", BuildDrainedShardsPrefix(prefix, namespace), shardID)

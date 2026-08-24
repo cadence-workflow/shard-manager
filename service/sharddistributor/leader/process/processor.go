@@ -413,6 +413,8 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 		return fmt.Errorf("get state: %w", err)
 	}
 
+	p.emitOldestDrainedShardAge(namespaceState, metricsLoopScope)
+
 	// Identify stale executors that need to be removed
 	staleExecutors := p.identifyStaleExecutors(namespaceState)
 	if len(staleExecutors) > 0 {
@@ -556,6 +558,11 @@ func (p *namespaceProcessor) emitOldestExecutorHeartbeatLag(namespaceState *stor
 
 	lag := p.timeSource.Now().Sub(oldestHeartbeat)
 	metricsLoopScope.UpdateGauge(metrics.ShardDistributorOldestExecutorHeartbeatLag, float64(lag.Milliseconds()))
+}
+
+func (p *namespaceProcessor) emitOldestDrainedShardAge(namespaceState *store.NamespaceState, metricsLoopScope metrics.Scope) {
+	age := namespaceState.OldestDrainAge(p.timeSource.Now())
+	metricsLoopScope.UpdateGauge(metrics.ShardDistributorOldestDrainedShardAge, float64(age.Milliseconds()))
 }
 
 func (p *namespaceProcessor) findDeletedShards(namespaceState *store.NamespaceState) map[string]store.ShardState {

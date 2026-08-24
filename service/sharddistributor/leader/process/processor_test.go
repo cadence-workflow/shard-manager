@@ -1230,6 +1230,75 @@ func TestEmitOldestExecutorHeartbeatLag(t *testing.T) {
 	}
 }
 
+func TestEmitOldestDrainedShardAge(t *testing.T) {
+	tests := []struct {
+		name          string
+		drainedShards map[string]time.Time
+		expectedAge   float64
+	}{
+		{
+			name:          "no drained shards",
+			drainedShards: map[string]time.Time{},
+			expectedAge:   0,
+		},
+		{
+			name: "single drained shard",
+			drainedShards: map[string]time.Time{
+				"shard-1": {},
+			},
+			expectedAge: 5000,
+		},
+		{
+			name: "oldest of several drained shards",
+			drainedShards: map[string]time.Time{
+				"shard-1": {},
+				"shard-2": {},
+				"shard-3": {},
+			},
+			expectedAge: 10000,
+		},
+		{
+			name: "unknown drain times are ignored",
+			drainedShards: map[string]time.Time{
+				"legacy":  {},
+				"shard-1": {},
+			},
+			expectedAge: 5000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+			defer mocks.ctrl.Finish()
+			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+			now := mocks.timeSource.Now()
+			switch tt.name {
+			case "single drained shard":
+				tt.drainedShards["shard-1"] = now.Add(-5 * time.Second)
+			case "oldest of several drained shards":
+				tt.drainedShards["shard-1"] = now.Add(-5 * time.Second)
+				tt.drainedShards["shard-2"] = now.Add(-10 * time.Second)
+				tt.drainedShards["shard-3"] = now.Add(-3 * time.Second)
+			case "unknown drain times are ignored":
+				tt.drainedShards["shard-1"] = now.Add(-5 * time.Second)
+			}
+
+			namespaceState := &store.NamespaceState{
+				DrainedShards: tt.drainedShards,
+			}
+
+			metricsScope := &metricmocks.Scope{}
+			metricsScope.On("UpdateGauge", metrics.ShardDistributorOldestDrainedShardAge, tt.expectedAge).Once()
+
+			processor.emitOldestDrainedShardAge(namespaceState, metricsScope)
+
+			metricsScope.AssertExpectations(t)
+		})
+	}
+}
+
 func TestEmitMaxOwnersPerShardMetric(t *testing.T) {
 	tests := []struct {
 		name                 string

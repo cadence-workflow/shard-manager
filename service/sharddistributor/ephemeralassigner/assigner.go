@@ -213,7 +213,7 @@ func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByS
 	owners := state.ShardOwners()
 	executorByShard = make(map[string]string, len(shardKeys))
 	for _, shardKey := range shardKeys {
-		if _, isDrained := state.DrainedShards[shardKey]; isDrained {
+		if state.IsDrained(shardKey) {
 			continue
 		}
 		if executorID, ok := owners[shardKey]; ok {
@@ -222,7 +222,7 @@ func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByS
 		}
 		toPlace = append(toPlace, shardKey)
 	}
-	return executorByShard, toPlace, state.DrainedShards
+	return executorByShard, toPlace, state.DrainedShardIDs()
 }
 
 // mergePlacements folds the planned shard→executor placements back into state.

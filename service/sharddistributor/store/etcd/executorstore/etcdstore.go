@@ -341,8 +341,8 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 }
 
 // loadDrainedShardSet reads every drained-shard key for the namespace and returns
-// them as a set.
-func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace string) (map[string]struct{}, error) {
+// shard ID -> first-drain time. A zero time means the start is unknown.
+func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace string) (map[string]time.Time, error) {
 	drainedPrefix := etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace)
 	resp, err := s.client.Get(ctx, drainedPrefix, clientv3.WithPrefix())
 	if err != nil {
@@ -351,10 +351,11 @@ func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace s
 	return s.parseDrainedShardKVs(namespace, resp.Kvs), nil
 }
 
-// parseDrainedShardKVs turns drained-shard keys into a set of shard IDs.
-// Malformed keys are skipped to not stall the rebalance loop.
-func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb.KeyValue) map[string]struct{} {
-	drained := make(map[string]struct{}, len(kvs))
+// parseDrainedShardKVs turns drained-shard keys into shard ID -> first-drain time.
+// Malformed keys are skipped to not stall the rebalance loop. Empty or unparseable
+// values still mark the shard drained, with a zero time.
+func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb.KeyValue) map[string]time.Time {
+	drained := make(map[string]time.Time, len(kvs))
 	for _, kv := range kvs {
 		shardID, err := etcdkeys.ParseDrainedShardKey(s.prefix, namespace, string(kv.Key))
 		if err != nil {
@@ -365,7 +366,20 @@ func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb
 			)
 			continue
 		}
-		drained[shardID] = struct{}{}
+		drainedAt := time.Time{}
+		if len(kv.Value) > 0 {
+			parsed, parseErr := etcdtypes.ParseTime(string(kv.Value))
+			if parseErr != nil {
+				s.logger.Warn("unparseable drained shard timestamp",
+					tag.ShardNamespace(namespace),
+					tag.ShardKey(shardID),
+					tag.Error(parseErr),
+				)
+			} else {
+				drainedAt = parsed
+			}
+		}
+		drained[shardID] = drainedAt
 	}
 	return drained
 }
@@ -921,8 +935,14 @@ func (s *executorStoreImpl) GetExecutor(ctx context.Context, namespace string, e
 	return s.shardCache.GetExecutor(ctx, namespace, executorID)
 }
 
-// DrainShards writes one empty-valued key per shard under the namespace's drained
-// prefix.
+// DrainShards writes one key per shard under the namespace's drained prefix,
+// with the first-drain timestamp as the value.
+//
+// Each put is wrapped in its own compare on key version 0, so a drain of an
+// already-drained shard is a no-op and the original timestamp survives. Doing
+// this in the transaction rather than by reading the drained set first keeps
+// first-drain-wins atomic under concurrent drains of the same shard.
+//
 // Draining is deliberately not guarded by leadership: it is an operator
 // action that must work regardless of which host is currently the leader, and the
 // leader picks the change up on its next rebalance.
@@ -931,12 +951,18 @@ func (s *executorStoreImpl) DrainShards(ctx context.Context, namespace string, s
 		return nil
 	}
 
+	now := etcdtypes.FormatTime(s.timeSource.Now())
 	ops := make([]clientv3.Op, 0, len(shardIDs))
 	for _, shardID := range shardIDs {
 		if err := etcdkeys.ValidateShardID(shardID); err != nil {
 			return fmt.Errorf("drain shards: %w", err)
 		}
-		ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID), ""))
+		key := etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID)
+		ops = append(ops, clientv3.OpTxn(
+			[]clientv3.Cmp{clientv3.Compare(clientv3.Version(key), "=", 0)},
+			[]clientv3.Op{clientv3.OpPut(key, now)},
+			nil,
+		))
 	}
 
 	if _, err := s.commitOps(ctx, ops, store.NopGuard()); err != nil {

@@ -2,11 +2,14 @@ package store
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
+
+var drainTestNow = time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
 
 func TestNamespaceState_CountExecutorsByStatus(t *testing.T) {
 	tests := []struct {
@@ -129,6 +132,110 @@ func TestNamespaceState_ShardOwners(t *testing.T) {
 				ShardAssignments: tt.shardAssignments,
 			}
 			assert.Equal(t, tt.expected, ns.ShardOwners())
+		})
+	}
+}
+
+func TestNamespaceState_DrainLookups(t *testing.T) {
+	drained := map[string]time.Time{
+		"shard-timed":   drainTestNow.Add(-30 * time.Minute),
+		"shard-unknown": {},
+	}
+
+	tests := []struct {
+		name          string
+		drainedShards map[string]time.Time
+		shardID       string
+		wantDrained   bool
+		wantSince     time.Time
+		wantSinceOK   bool
+		wantIDs       map[string]struct{}
+	}{
+		{
+			name:          "shard is not drained",
+			drainedShards: drained,
+			shardID:       "shard-assigned",
+			wantIDs:       map[string]struct{}{"shard-timed": {}, "shard-unknown": {}},
+		},
+		{
+			name:          "drained with a known drain time",
+			drainedShards: drained,
+			shardID:       "shard-timed",
+			wantDrained:   true,
+			wantSince:     drainTestNow.Add(-30 * time.Minute),
+			wantSinceOK:   true,
+			wantIDs:       map[string]struct{}{"shard-timed": {}, "shard-unknown": {}},
+		},
+		{
+			name:          "drained but the drain time is unknown",
+			drainedShards: drained,
+			shardID:       "shard-unknown",
+			wantDrained:   true,
+			wantIDs:       map[string]struct{}{"shard-timed": {}, "shard-unknown": {}},
+		},
+		{
+			name:    "nothing drained in the namespace",
+			shardID: "shard-timed",
+			wantIDs: map[string]struct{}{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ns := &NamespaceState{DrainedShards: tt.drainedShards}
+
+			assert.Equal(t, tt.wantDrained, ns.IsDrained(tt.shardID))
+
+			since, ok := ns.DrainedSince(tt.shardID)
+			assert.Equal(t, tt.wantSinceOK, ok)
+			assert.Equal(t, tt.wantSince, since)
+
+			assert.Equal(t, tt.wantIDs, ns.DrainedShardIDs())
+		})
+	}
+}
+
+func TestNamespaceState_OldestDrainAge(t *testing.T) {
+	tests := []struct {
+		name          string
+		drainedShards map[string]time.Time
+		want          time.Duration
+	}{
+		{
+			name: "nothing drained",
+			want: 0,
+		},
+		{
+			name: "every drain time is unknown",
+			drainedShards: map[string]time.Time{
+				"shard-1": {},
+				"shard-2": {},
+			},
+			want: 0,
+		},
+		{
+			name: "reports the oldest drain and ignores unknown ones",
+			drainedShards: map[string]time.Time{
+				"shard-recent":  drainTestNow.Add(-time.Minute),
+				"shard-oldest":  drainTestNow.Add(-3 * time.Hour),
+				"shard-middle":  drainTestNow.Add(-time.Hour),
+				"shard-unknown": {},
+			},
+			want: 3 * time.Hour,
+		},
+		{
+			name: "a drain time in the future reports zero rather than a negative age",
+			drainedShards: map[string]time.Time{
+				"shard-1": drainTestNow.Add(time.Minute),
+			},
+			want: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ns := &NamespaceState{DrainedShards: tt.drainedShards}
+			assert.Equal(t, tt.want, ns.OldestDrainAge(drainTestNow))
 		})
 	}
 }

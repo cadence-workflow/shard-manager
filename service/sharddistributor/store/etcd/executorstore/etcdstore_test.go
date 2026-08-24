@@ -1289,7 +1289,8 @@ func TestDrainShardsLifecycle(t *testing.T) {
 		"shard-A": {},
 		"shard-B": {},
 		"shard-C": {},
-	}, state.DrainedShards, "GetState exposes the same set to the rebalance loop")
+	}, drainedShardIDs(state.DrainedShards), "GetState exposes the same set to the rebalance loop")
+	assertNonZeroDrainTimes(t, state.DrainedShards)
 
 	removed, err := executorStore.UndrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-B"})
 	require.NoError(t, err)
@@ -1298,6 +1299,27 @@ func TestDrainShardsLifecycle(t *testing.T) {
 	drained, err = executorStore.GetDrainedShards(ctx, tc.Namespace)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"shard-C"}, drained)
+}
+
+func TestDrainShardsPreservesFirstDrainTime(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	impl := executorStore.(*executorStoreImpl)
+	mockedClock, ok := impl.timeSource.(clock.MockedTimeSource)
+	require.True(t, ok)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	firstDrain := mockedClock.Now()
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A"}))
+
+	mockedClock.Advance(5 * time.Second)
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-A", "shard-B"}))
+
+	state, err := executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, etcdtypes.FormatTime(firstDrain), etcdtypes.FormatTime(state.DrainedShards["shard-A"]))
+	assert.Equal(t, etcdtypes.FormatTime(mockedClock.Now()), etcdtypes.FormatTime(state.DrainedShards["shard-B"]))
 }
 
 func TestGetShardOwnerRefusesDrainedShards(t *testing.T) {
@@ -1503,7 +1525,7 @@ func TestLoadDrainedShardSetSkipsMalformedKeys(t *testing.T) {
 	// tolerate the malformed key too.
 	state, err := executorStore.GetState(ctx, tc.Namespace)
 	require.NoError(t, err)
-	assert.Equal(t, map[string]struct{}{"shard-A": {}}, state.DrainedShards)
+	assert.Equal(t, map[string]struct{}{"shard-A": {}}, drainedShardIDs(state.DrainedShards))
 }
 
 func createStore(t *testing.T, tc *testhelper.StoreTestCluster) store.Store {
@@ -1529,4 +1551,19 @@ func createStore(t *testing.T, tc *testhelper.StoreTestCluster) store.Store {
 	})
 	require.NoError(t, err)
 	return store
+}
+
+func drainedShardIDs(drained map[string]time.Time) map[string]struct{} {
+	ids := make(map[string]struct{}, len(drained))
+	for id := range drained {
+		ids[id] = struct{}{}
+	}
+	return ids
+}
+
+func assertNonZeroDrainTimes(t *testing.T, drained map[string]time.Time) {
+	t.Helper()
+	for id, drainedAt := range drained {
+		assert.False(t, drainedAt.IsZero(), "drained shard %s should have a drain time", id)
+	}
 }

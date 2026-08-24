@@ -26,6 +26,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -230,7 +231,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 					ShardAssignments: map[string]store.AssignedState{
 						"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
 					},
-					DrainedShards: map[string]struct{}{"drained-shard": {}},
+					DrainedShards: map[string]time.Time{"drained-shard": {}},
 				}, nil)
 				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(nil)
 				mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
@@ -256,7 +257,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 							"shard1": {Status: types.AssignmentStatusREADY},
 						}},
 					},
-					DrainedShards: map[string]struct{}{"shard1": {}},
+					DrainedShards: map[string]time.Time{"shard1": {}},
 				}, nil)
 				// No AssignShards or GetExecutor: nothing to place, no owner to report.
 			},
@@ -273,7 +274,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 					ShardAssignments: map[string]store.AssignedState{
 						"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
 					},
-					DrainedShards: map[string]struct{}{"drained-shard": {}},
+					DrainedShards: map[string]time.Time{"drained-shard": {}},
 				}, nil)
 			},
 			expectedDrained: []string{"drained-shard"},
@@ -351,7 +352,7 @@ func TestGetOrAssign_DrainedDuringBatchFlushReturnsShardDrainedError(t *testing.
 	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
 		Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
 		ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-		DrainedShards:    map[string]struct{}{"shard-1": {}},
+		DrainedShards:    map[string]time.Time{"shard-1": {}},
 	}, nil)
 
 	resp, err := a.GetOrAssign(context.Background(), &types.GetShardOwnerRequest{

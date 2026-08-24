@@ -385,9 +385,10 @@ func (n *namespaceShardToExecutor) needsRefresh(watchResp clientv3.WatchResponse
 }
 
 // hasDrainedShardsChanged checks whether any event touched the drained shards keyspace.
-// Every recognized key counts as a change: draining stores no value and an undrain arrives
-// as a tombstone with a nil value, so the previous-value comparison used for executor keys
-// sees "" on both sides and would count the undrain as an unchanged key.
+// Every recognized key counts as a change. The cache tracks drained shards as a set and
+// ignores the value, so the previous-value comparison used for executor keys is not
+// meaningful here; an undrain in particular arrives as a tombstone whose nil value would
+// compare equal to a legacy empty value and be counted as unchanged.
 func (n *namespaceShardToExecutor) hasDrainedShardsChanged(watchResp clientv3.WatchResponse) bool {
 	changed := false
 	for _, event := range watchResp.Events {

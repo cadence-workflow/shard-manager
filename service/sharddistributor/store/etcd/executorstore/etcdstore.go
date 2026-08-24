@@ -370,8 +370,12 @@ func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb
 	return drained
 }
 
-func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan map[*store.ShardOwner][]string, func(), error) {
-	return s.shardCache.Subscribe(ctx, namespace)
+func (s *executorStoreImpl) SubscribeToAssignmentChanges(namespace string) (<-chan struct{}, func(), error) {
+	return s.shardCache.Subscribe(namespace)
+}
+
+func (s *executorStoreImpl) GetExecutorState(namespace string) (map[*store.ShardOwner][]string, error) {
+	return s.shardCache.GetExecutorState(namespace)
 }
 
 func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {

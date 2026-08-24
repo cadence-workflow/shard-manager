@@ -104,7 +104,7 @@ func newNamespaceShardToExecutor(etcdPrefix, namespace string, client etcdclient
 		logger:              logger.WithTags(tag.ShardNamespace(namespace)),
 		client:              client,
 		timeSource:          timeSource,
-		pubSub:              newExecutorStatePubSub(logger, namespace, timeSource),
+		pubSub:              newExecutorStatePubSub(logger, namespace),
 		executorStatistics:  newNamespaceExecutorStatistics(),
 		metricsClient:       metricsClient,
 		refreshTimeout:      refreshOperationTimeout,
@@ -253,9 +253,8 @@ func (n *namespaceShardToExecutor) fetchAndCacheExecutorStatistics(ctx context.C
 	return nil
 }
 
-func (n *namespaceShardToExecutor) Subscribe(ctx context.Context) (<-chan map[*store.ShardOwner][]string, func()) {
-	subCh, unSub := n.pubSub.subscribe(n.getExecutorState)
-	return subCh, unSub
+func (n *namespaceShardToExecutor) Subscribe() (<-chan struct{}, func()) {
+	return n.pubSub.subscribe()
 }
 
 func (n *namespaceShardToExecutor) namespaceRefreshLoop() {
@@ -444,12 +443,12 @@ func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
 	}
 
 	if updated {
-		n.pubSub.publish(n.getExecutorState)
+		n.pubSub.notifySubscribers()
 	}
 	return nil
 }
 
-func (n *namespaceShardToExecutor) getExecutorState() map[*store.ShardOwner][]string {
+func (n *namespaceShardToExecutor) GetExecutorState() map[*store.ShardOwner][]string {
 	n.RLock()
 	defer n.RUnlock()
 	executorState := make(map[*store.ShardOwner][]string)

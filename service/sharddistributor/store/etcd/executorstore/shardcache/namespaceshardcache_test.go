@@ -102,44 +102,37 @@ func TestNamespaceShardToExecutor_Subscribe(t *testing.T) {
 	err = namespaceShardToExecutor.refresh(context.Background())
 	require.NoError(t, err)
 
-	subCh, unSub := namespaceShardToExecutor.Subscribe()
+	notifyCh, unSub := namespaceShardToExecutor.Subscribe()
 	defer unSub()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	assert.Len(t, namespaceShardToExecutor.GetExecutorState(), 1)
+	verifyExecutorInState(t, namespaceShardToExecutor.GetExecutorState(), "executor-1", []string{"shard-1"}, map[string]string{
+		"hostname": "executor-1-host",
+		"version":  "v1.0.0",
+	})
 
-	// start listener
-	go func() {
-		defer wg.Done()
-		// we should have an initial notification right after we got subscribed
-		<-subCh
-		assert.Len(t, namespaceShardToExecutor.GetExecutorState(), 1)
-		verifyExecutorInState(t, namespaceShardToExecutor.GetExecutorState(), "executor-1", []string{"shard-1"}, map[string]string{
-			"hostname": "executor-1-host",
-			"version":  "v1.0.0",
-		})
-
-		// Check that we get the updated state
-		<-subCh
-		assert.Len(t, namespaceShardToExecutor.GetExecutorState(), 2)
-		verifyExecutorInState(t, namespaceShardToExecutor.GetExecutorState(), "executor-1", []string{"shard-1"}, map[string]string{
-			"hostname": "executor-1-host",
-			"version":  "v1.0.0",
-		})
-		verifyExecutorInState(t, namespaceShardToExecutor.GetExecutorState(), "executor-2", []string{"shard-2"}, map[string]string{
-			"hostname": "executor-2-host",
-			"region":   "us-west",
-		})
-	}()
-	time.Sleep(10 * time.Millisecond)
-
-	// Add executor-2 with shard-2 to trigger new subscription update
+	// Modify executors to trigger a notification
 	setupExecutorWithShards(t, testCluster, "executor-2", []string{"shard-2"}, map[string]string{
 		"hostname": "executor-2-host",
 		"region":   "us-west",
 	})
 
-	wg.Wait()
+	// await for notification
+	select {
+	case <-notifyCh:
+	case <-time.After(time.Second):
+		require.Fail(t, "expected to receive a notification")
+	}
+
+	assert.Len(t, namespaceShardToExecutor.GetExecutorState(), 2)
+	verifyExecutorInState(t, namespaceShardToExecutor.GetExecutorState(), "executor-1", []string{"shard-1"}, map[string]string{
+		"hostname": "executor-1-host",
+		"version":  "v1.0.0",
+	})
+	verifyExecutorInState(t, namespaceShardToExecutor.GetExecutorState(), "executor-2", []string{"shard-2"}, map[string]string{
+		"hostname": "executor-2-host",
+		"region":   "us-west",
+	})
 }
 
 func TestNamespaceShardToExecutor_watch_watchChanErrors(t *testing.T) {

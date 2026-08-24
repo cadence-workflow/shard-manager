@@ -394,7 +394,7 @@ func TestWatchNamespaceState(t *testing.T) {
 
 	send2 := mockServer.EXPECT().Send(gomock.Any()).DoAndReturn(func(resp *types.WatchNamespaceStateResponse) error {
 		cancel()
-		
+
 		require.Len(t, resp.Executors, 2)
 		executors := []string{resp.Executors[0].ExecutorID, resp.Executors[1].ExecutorID}
 		assert.Contains(t, executors, "executor-1")

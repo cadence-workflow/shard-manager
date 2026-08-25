@@ -81,7 +81,7 @@ func NewManager(p ManagerParams) *Manager {
 }
 
 // Start initializes the namespace manager and starts handling all namespaces
-func (m *Manager) Start(ctx context.Context) error {
+func (m *Manager) Start() error {
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 
 	for _, ns := range m.cfg.Namespaces {
@@ -97,7 +97,7 @@ func (m *Manager) Start(ctx context.Context) error {
 // Stop gracefully stops all namespace handlers.
 // Cancels the manager context which cascades to all handler contexts,
 // then waits for all election goroutines to finish.
-func (m *Manager) Stop(ctx context.Context) error {
+func (m *Manager) Stop() error {
 	if m.cancel == nil {
 		return fmt.Errorf("manager was not running")
 	}

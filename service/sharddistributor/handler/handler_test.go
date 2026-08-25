@@ -370,7 +370,7 @@ func TestWatchNamespaceState(t *testing.T) {
 	mockStorage.EXPECT().SubscribeToAssignmentChanges("test-ns").Return(notifyChan, unsubscribe, nil)
 
 	// this state should be retrieved and sent at start of WatchNamespaceState
-	getState1 := mockStorage.EXPECT().GetExecutorState("test-ns").Return(
+	getState1 := mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
 		map[*store.ShardOwner][]string{
 			{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
 		},
@@ -384,7 +384,7 @@ func TestWatchNamespaceState(t *testing.T) {
 	})
 
 	// now simulate the state has been changed (after notification)
-	getState2 := mockStorage.EXPECT().GetExecutorState("test-ns").Return(
+	getState2 := mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
 		map[*store.ShardOwner][]string{
 			{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
 			{ExecutorID: "executor-2", Metadata: map[string]string{}}: {"shard-2"},
@@ -441,7 +441,7 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 	mockServer.EXPECT().Context().Return(serverCtx).AnyTimes()
 	mockStorage.EXPECT().SubscribeToAssignmentChanges("test-ns").Return(notifyChan, unsubscribe, nil)
 
-	mockStorage.EXPECT().GetExecutorState("test-ns").Return(
+	mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
 		map[*store.ShardOwner][]string{},
 		nil,
 	)

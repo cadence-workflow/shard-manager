@@ -107,12 +107,12 @@ func (s *ShardToExecutorCache) Subscribe(namespace string) (<-chan struct{}, fun
 	return ch, unSub, nil
 }
 
-func (s *ShardToExecutorCache) GetExecutorState(namespace string) (map[*store.ShardOwner][]string, error) {
+func (s *ShardToExecutorCache) GetShardAssignments(namespace string) (map[*store.ShardOwner][]string, error) {
 	namespaceShardToExecutor, err := s.getNamespaceShardToExecutor(namespace)
 	if err != nil {
 		return nil, fmt.Errorf("get namespace shard to executor: %w", err)
 	}
-	return namespaceShardToExecutor.GetExecutorState(), nil
+	return namespaceShardToExecutor.GetShardAssignments(), nil
 }
 
 func (s *ShardToExecutorCache) getNamespaceShardToExecutor(namespace string) (*namespaceShardToExecutor, error) {

@@ -119,10 +119,6 @@ func (c *meteredStore) GetExecutor(ctx context.Context, namespace string, execut
 	return
 }
 
-func (c *meteredStore) GetExecutorState(namespace string) (m1 map[*store.ShardOwner][]string, err error) {
-	return c.wrapped.GetExecutorState(namespace)
-}
-
 func (c *meteredStore) GetHeartbeat(ctx context.Context, namespace string, executorID string) (hp1 *store.HeartbeatState, ap1 *store.AssignedState, err error) {
 	op := func() error {
 		hp1, ap1, err = c.wrapped.GetHeartbeat(ctx, namespace, executorID)
@@ -131,6 +127,10 @@ func (c *meteredStore) GetHeartbeat(ctx context.Context, namespace string, execu
 
 	err = c.call(metrics.ShardDistributorStoreGetHeartbeatScope, op, metrics.NamespaceTag(namespace))
 	return
+}
+
+func (c *meteredStore) GetShardAssignments(namespace string) (m1 map[*store.ShardOwner][]string, err error) {
+	return c.wrapped.GetShardAssignments(namespace)
 }
 
 func (c *meteredStore) GetShardOwner(ctx context.Context, namespace string, shardID string) (sp1 *store.ShardOwner, err error) {

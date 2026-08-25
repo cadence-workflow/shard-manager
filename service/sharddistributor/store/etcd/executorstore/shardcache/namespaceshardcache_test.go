@@ -105,8 +105,8 @@ func TestNamespaceShardToExecutor_Subscribe(t *testing.T) {
 	notifyCh, unSub := namespaceShardToExecutor.Subscribe()
 	defer unSub()
 
-	assert.Len(t, namespaceShardToExecutor.GetExecutorState(), 1)
-	verifyExecutorInState(t, namespaceShardToExecutor.GetExecutorState(), "executor-1", []string{"shard-1"}, map[string]string{
+	assert.Len(t, namespaceShardToExecutor.GetShardAssignments(), 1)
+	verifyExecutorInState(t, namespaceShardToExecutor.GetShardAssignments(), "executor-1", []string{"shard-1"}, map[string]string{
 		"hostname": "executor-1-host",
 		"version":  "v1.0.0",
 	})
@@ -124,12 +124,12 @@ func TestNamespaceShardToExecutor_Subscribe(t *testing.T) {
 		require.Fail(t, "expected to receive a notification")
 	}
 
-	assert.Len(t, namespaceShardToExecutor.GetExecutorState(), 2)
-	verifyExecutorInState(t, namespaceShardToExecutor.GetExecutorState(), "executor-1", []string{"shard-1"}, map[string]string{
+	assert.Len(t, namespaceShardToExecutor.GetShardAssignments(), 2)
+	verifyExecutorInState(t, namespaceShardToExecutor.GetShardAssignments(), "executor-1", []string{"shard-1"}, map[string]string{
 		"hostname": "executor-1-host",
 		"version":  "v1.0.0",
 	})
-	verifyExecutorInState(t, namespaceShardToExecutor.GetExecutorState(), "executor-2", []string{"shard-2"}, map[string]string{
+	verifyExecutorInState(t, namespaceShardToExecutor.GetShardAssignments(), "executor-2", []string{"shard-2"}, map[string]string{
 		"hostname": "executor-2-host",
 		"region":   "us-west",
 	})
@@ -457,7 +457,7 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 		map[string]struct{}{"shard-1": {}},
 	)
 
-	got := e.GetExecutorState()
+	got := e.GetShardAssignments()
 	require.Len(t, got, 1)
 	assertShardDrained(t, e, "shard-1", true)
 
@@ -470,7 +470,7 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 		map[string]struct{}{"shard-2": {}},
 	)
 
-	got = e.GetExecutorState()
+	got = e.GetShardAssignments()
 	require.Len(t, got, 1)
 	for owner := range got {
 		assert.Equal(t, "exec-a", owner.ExecutorID)
@@ -487,7 +487,7 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 		map[string]struct{}{"shard-2": {}},
 	)
 
-	got = e.GetExecutorState()
+	got = e.GetShardAssignments()
 	require.Len(t, got, 1)
 	for owner := range got {
 		assert.Equal(t, "exec-b", owner.ExecutorID)

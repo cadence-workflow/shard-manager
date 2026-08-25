@@ -96,7 +96,7 @@ type Store interface {
 
 	// GetExecutor retrieves an executor within a namespace.
 	GetExecutor(ctx context.Context, namespace string, executorID string) (*ShardOwner, error)
-	GetExecutorState(namespace string) (map[*ShardOwner][]string, error)
+	GetShardAssignments(namespace string) (map[*ShardOwner][]string, error)
 
 	GetHeartbeat(ctx context.Context, namespace string, executorID string) (*HeartbeatState, *AssignedState, error)
 	RecordHeartbeat(ctx context.Context, namespace, executorID string, state HeartbeatState) error

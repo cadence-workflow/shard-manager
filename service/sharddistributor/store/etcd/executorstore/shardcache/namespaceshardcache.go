@@ -45,7 +45,7 @@ type namespaceShardToExecutor struct {
 
 	shardToExecutor  map[string]*store.ShardOwner   // shardID -> shardOwner
 	shardOwners      map[string]*store.ShardOwner   // executorID -> shardOwner
-	executorState    map[*store.ShardOwner][]string // executor -> shardIDs
+	executorToShards map[*store.ShardOwner][]string // executor -> shardIDs
 	executorRevision map[string]int64
 	drainedShards    map[string]struct{} // set of shard IDs marked drained
 	lastRevision     int64               // etcd store revision of the last applied snapshot
@@ -91,7 +91,7 @@ func newNamespaceExecutorStatistics() *namespaceExecutorStatistics {
 func newNamespaceShardToExecutor(etcdPrefix, namespace string, client etcdclient.Client, stopCh chan struct{}, logger log.Logger, timeSource clock.TimeSource, metricsClient metrics.Client) (*namespaceShardToExecutor, error) {
 	return &namespaceShardToExecutor{
 		shardToExecutor:     make(map[string]*store.ShardOwner),
-		executorState:       make(map[*store.ShardOwner][]string),
+		executorToShards:    make(map[*store.ShardOwner][]string),
 		executorRevision:    make(map[string]int64),
 		shardOwners:         make(map[string]*store.ShardOwner),
 		drainedShards:       make(map[string]struct{}),
@@ -448,11 +448,11 @@ func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
 	return nil
 }
 
-func (n *namespaceShardToExecutor) GetExecutorState() map[*store.ShardOwner][]string {
+func (n *namespaceShardToExecutor) GetShardAssignments() map[*store.ShardOwner][]string {
 	n.RLock()
 	defer n.RUnlock()
 	executorState := make(map[*store.ShardOwner][]string)
-	for executor, shardIDs := range n.executorState {
+	for executor, shardIDs := range n.executorToShards {
 		executorState[executor] = make([]string, len(shardIDs))
 		copy(executorState[executor], shardIDs)
 	}
@@ -556,7 +556,7 @@ func (n *namespaceShardToExecutor) replaceNamespaceState(
 
 	n.lastRevision = storeRevision
 	n.shardToExecutor = shardToExecutor
-	n.executorState = executorState
+	n.executorToShards = executorState
 	n.executorRevision = executorRevision
 	n.shardOwners = shardOwners
 	n.drainedShards = drainedShards

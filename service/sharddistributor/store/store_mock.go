@@ -178,21 +178,6 @@ func (mr *MockStoreMockRecorder) GetExecutor(ctx, namespace, executorID any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutor", reflect.TypeOf((*MockStore)(nil).GetExecutor), ctx, namespace, executorID)
 }
 
-// GetExecutorState mocks base method.
-func (m *MockStore) GetExecutorState(namespace string) (map[*ShardOwner][]string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetExecutorState", namespace)
-	ret0, _ := ret[0].(map[*ShardOwner][]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetExecutorState indicates an expected call of GetExecutorState.
-func (mr *MockStoreMockRecorder) GetExecutorState(namespace any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutorState", reflect.TypeOf((*MockStore)(nil).GetExecutorState), namespace)
-}
-
 // GetHeartbeat mocks base method.
 func (m *MockStore) GetHeartbeat(ctx context.Context, namespace, executorID string) (*HeartbeatState, *AssignedState, error) {
 	m.ctrl.T.Helper()
@@ -207,6 +192,21 @@ func (m *MockStore) GetHeartbeat(ctx context.Context, namespace, executorID stri
 func (mr *MockStoreMockRecorder) GetHeartbeat(ctx, namespace, executorID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHeartbeat", reflect.TypeOf((*MockStore)(nil).GetHeartbeat), ctx, namespace, executorID)
+}
+
+// GetShardAssignments mocks base method.
+func (m *MockStore) GetShardAssignments(namespace string) (map[*ShardOwner][]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetShardAssignments", namespace)
+	ret0, _ := ret[0].(map[*ShardOwner][]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetShardAssignments indicates an expected call of GetShardAssignments.
+func (mr *MockStoreMockRecorder) GetShardAssignments(namespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardAssignments", reflect.TypeOf((*MockStore)(nil).GetShardAssignments), namespace)
 }
 
 // GetShardOwner mocks base method.

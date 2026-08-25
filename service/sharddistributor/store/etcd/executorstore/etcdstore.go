@@ -374,8 +374,8 @@ func (s *executorStoreImpl) SubscribeToAssignmentChanges(namespace string) (<-ch
 	return s.shardCache.Subscribe(namespace)
 }
 
-func (s *executorStoreImpl) GetExecutorState(namespace string) (map[*store.ShardOwner][]string, error) {
-	return s.shardCache.GetExecutorState(namespace)
+func (s *executorStoreImpl) GetShardAssignments(namespace string) (map[*store.ShardOwner][]string, error) {
+	return s.shardCache.GetShardAssignments(namespace)
 }
 
 func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {

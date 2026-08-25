@@ -201,6 +201,10 @@ func (h *namespaceHandler) campaigning(ctx context.Context) stateFn {
 			return h.idle
 		case isLeader, ok = <-leaderCh:
 			if !ok {
+				// in most cases leader channel is closed among with ctx.Done()
+				if ctx.Err() != nil {
+					return nil
+				}
 				h.logger.Error("Election channel closed unexpectedly")
 				return h.campaigning
 			}

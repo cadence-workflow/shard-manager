@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -362,58 +363,60 @@ func TestWatchNamespaceState(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	updatesChan := make(chan store.AssignmentSnapshot, 1)
-	unsubscribe := func() { close(updatesChan) }
+	notifyChan := make(chan struct{}, 1)
+	unsubscribe := func() { close(notifyChan) }
 
 	mockServer.EXPECT().Context().Return(ctx).AnyTimes()
-	mockStorage.EXPECT().SubscribeToAssignmentChanges(gomock.Any(), "test-ns").Return(updatesChan, unsubscribe, nil)
+	mockStorage.EXPECT().SubscribeToAssignmentChanges(ctx, "test-ns").Return(notifyChan, unsubscribe, nil)
 
-	// Expect update send
-	mockServer.EXPECT().Send(gomock.Any()).DoAndReturn(func(resp *types.WatchNamespaceStateResponse) error {
+	// this state should be retrieved and sent at the start of WatchNamespaceState
+	getState1 := mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
+		store.AssignmentSnapshot{
+			ShardAssignments: map[*store.ShardOwner][]string{
+				{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
+			},
+			DrainedShards: nil,
+		},
+		nil,
+	)
+
+	send1 := mockServer.EXPECT().Send(gomock.Any()).DoAndReturn(func(resp *types.WatchNamespaceStateResponse) error {
 		require.Len(t, resp.Executors, 1)
-		require.Equal(t, "executor-1", resp.Executors[0].ExecutorID)
-		require.Equal(t, []string{"shard-2"}, resp.DrainedShardKeys)
+		assert.Equal(t, "executor-1", resp.Executors[0].ExecutorID)
 		return nil
 	})
 
-	// Send update, then cancel
-	go func() {
-		time.Sleep(10 * time.Millisecond)
-		updatesChan <- store.AssignmentSnapshot{
-			ExecutorState: map[*store.ShardOwner][]string{
-				{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
-			},
-			DrainedShards: map[string]struct{}{"shard-2": {}},
-		}
+	// now simulate the state has been changed (after notification)
+	getState2 := mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
+		map[*store.ShardOwner][]string{
+			{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
+			{ExecutorID: "executor-2", Metadata: map[string]string{}}: {"shard-2"},
+		},
+		nil,
+	)
+
+	send2 := mockServer.EXPECT().Send(gomock.Any()).DoAndReturn(func(resp *types.WatchNamespaceStateResponse) error {
 		cancel()
-	}()
+
+		require.Len(t, resp.Executors, 2)
+		executors := []string{resp.Executors[0].ExecutorID, resp.Executors[1].ExecutorID}
+		assert.Contains(t, executors, "executor-1")
+		assert.Contains(t, executors, "executor-2")
+		return nil
+	})
+
+	gomock.InOrder(
+		getState1,
+		send1,
+		getState2,
+		send2,
+	)
+
+	notifyChan <- struct{}{}
 
 	err := handler.WatchNamespaceState(&types.WatchNamespaceStateRequest{Namespace: "test-ns"}, mockServer)
 	require.Error(t, err)
 	require.ErrorIs(t, err, context.Canceled)
-}
-
-func TestSortedShardKeys(t *testing.T) {
-	tests := []struct {
-		name  string
-		input map[string]struct{}
-		want  []string
-	}{
-		{name: "nil set", want: nil},
-		// nil rather than an empty slice, so the field round-trips through protobuf.
-		{name: "empty set", input: map[string]struct{}{}, want: nil},
-		{
-			name:  "sorted regardless of map order",
-			input: map[string]struct{}{"shard-3": {}, "shard-1": {}, "shard-2": {}},
-			want:  []string{"shard-1", "shard-2", "shard-3"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, sortedShardKeys(tt.input))
-		})
-	}
 }
 
 func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
@@ -434,12 +437,18 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 	handler := rawHandler.(*handlerImpl)
 	handler.Start()
 
-	updatesChan := make(chan store.AssignmentSnapshot)
-	unsubscribe := func() { close(updatesChan) }
+	notifyChan := make(chan struct{}, 1)
+	unsubscribe := func() { close(notifyChan) }
 	serverCtx := context.Background()
 
 	mockServer.EXPECT().Context().Return(serverCtx).AnyTimes()
-	mockStorage.EXPECT().SubscribeToAssignmentChanges(gomock.Any(), "test-ns").Return(updatesChan, unsubscribe, nil)
+	mockStorage.EXPECT().SubscribeToAssignmentChanges(serverCtx, "test-ns").Return(notifyChan, unsubscribe, nil)
+
+	mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
+		map[*store.ShardOwner][]string{},
+		nil,
+	)
+	mockServer.EXPECT().Send(gomock.Any()).Return(nil)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -678,17 +687,17 @@ func TestGetExecutorState(t *testing.T) {
 			name:    "executor_not_found",
 			request: &types.GetExecutorStateRequest{Namespace: _testNamespaceFixed, ExecutorID: "executor1"},
 			setupMocks: func(m *store.MockStore) {
-				m.EXPECT().GetHeartbeat(gomock.Any(), _testNamespaceFixed, "executor1").
-					Return(nil, nil, store.ErrExecutorNotFound)
+				m.EXPECT().GetExecutorState(gomock.Any(), _testNamespaceFixed, "executor1").
+					Return(store.ExecutorState{}, store.ErrExecutorNotFound)
 			},
 			wantErrContains: "executor not found",
 		},
 		{
-			name:    "get_heartbeat_error",
+			name:    "get_executor_state_error",
 			request: &types.GetExecutorStateRequest{Namespace: _testNamespaceFixed, ExecutorID: "executor1"},
 			setupMocks: func(m *store.MockStore) {
-				m.EXPECT().GetHeartbeat(gomock.Any(), _testNamespaceFixed, "executor1").
-					Return(nil, nil, errors.New("etcd is down"))
+				m.EXPECT().GetExecutorState(gomock.Any(), _testNamespaceFixed, "executor1").
+					Return(store.ExecutorState{}, errors.New("etcd is down"))
 			},
 			wantErrContains: "failed to get executor state",
 		},
@@ -720,18 +729,20 @@ func TestGetExecutorState_success(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	mockStorage := store.NewMockStore(ctrl)
-	mockStorage.EXPECT().GetHeartbeat(gomock.Any(), _testNamespaceFixed, "executor1").Return(
-		&store.HeartbeatState{
-			Status:        types.ExecutorStatusACTIVE,
-			LastHeartbeat: now,
-			Metadata:      map[string]string{"ip": "127.0.0.1", "port": "1234"},
-		},
-		&store.AssignedState{
-			AssignedShards: map[string]*types.ShardAssignment{
-				"shard1": {Status: types.AssignmentStatusREADY},
-				"shard2": nil,
+	mockStorage.EXPECT().GetExecutorState(gomock.Any(), _testNamespaceFixed, "executor1").Return(
+		store.ExecutorState{
+			Heartbeat: &store.HeartbeatState{
+				Status:        types.ExecutorStatusACTIVE,
+				LastHeartbeat: now,
+				Metadata:      map[string]string{"ip": "127.0.0.1", "port": "1234"},
 			},
-			ModRevision: 42,
+			Assignment: &store.AssignedState{
+				AssignedShards: map[string]*types.ShardAssignment{
+					"shard1": {Status: types.AssignmentStatusREADY},
+					"shard2": nil,
+				},
+				ModRevision: 42,
+			},
 		},
 		nil,
 	)
@@ -770,12 +781,13 @@ func TestGetExecutorState_noAssignedState(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	mockStorage := store.NewMockStore(ctrl)
-	mockStorage.EXPECT().GetHeartbeat(gomock.Any(), _testNamespaceFixed, "executor1").Return(
-		&store.HeartbeatState{
-			Status:        types.ExecutorStatusDRAINING,
-			LastHeartbeat: now,
+	mockStorage.EXPECT().GetExecutorState(gomock.Any(), _testNamespaceFixed, "executor1").Return(
+		store.ExecutorState{
+			Heartbeat: &store.HeartbeatState{
+				Status:        types.ExecutorStatusDRAINING,
+				LastHeartbeat: now,
+			},
 		},
-		nil,
 		nil,
 	)
 

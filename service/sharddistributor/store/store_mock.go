@@ -178,20 +178,34 @@ func (mr *MockStoreMockRecorder) GetExecutor(ctx, namespace, executorID any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutor", reflect.TypeOf((*MockStore)(nil).GetExecutor), ctx, namespace, executorID)
 }
 
-// GetHeartbeat mocks base method.
-func (m *MockStore) GetHeartbeat(ctx context.Context, namespace, executorID string) (*HeartbeatState, *AssignedState, error) {
+// GetExecutorState mocks base method.
+func (m *MockStore) GetExecutorState(ctx context.Context, namespace, executorID string) (ExecutorState, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetHeartbeat", ctx, namespace, executorID)
-	ret0, _ := ret[0].(*HeartbeatState)
-	ret1, _ := ret[1].(*AssignedState)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret := m.ctrl.Call(m, "GetExecutorState", ctx, namespace, executorID)
+	ret0, _ := ret[0].(ExecutorState)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
-// GetHeartbeat indicates an expected call of GetHeartbeat.
-func (mr *MockStoreMockRecorder) GetHeartbeat(ctx, namespace, executorID any) *gomock.Call {
+// GetExecutorState indicates an expected call of GetExecutorState.
+func (mr *MockStoreMockRecorder) GetExecutorState(ctx, namespace, executorID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHeartbeat", reflect.TypeOf((*MockStore)(nil).GetHeartbeat), ctx, namespace, executorID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutorState", reflect.TypeOf((*MockStore)(nil).GetExecutorState), ctx, namespace, executorID)
+}
+
+// GetShardAssignments mocks base method.
+func (m *MockStore) GetShardAssignments(namespace string) (map[*ShardOwner][]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetShardAssignments", namespace)
+	ret0, _ := ret[0].(map[*ShardOwner][]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetShardAssignments indicates an expected call of GetShardAssignments.
+func (mr *MockStoreMockRecorder) GetShardAssignments(namespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardAssignments", reflect.TypeOf((*MockStore)(nil).GetShardAssignments), namespace)
 }
 
 // GetShardOwner mocks base method.
@@ -238,6 +252,20 @@ func (mr *MockStoreMockRecorder) RecordHeartbeat(ctx, namespace, executorID, sta
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordHeartbeat", reflect.TypeOf((*MockStore)(nil).RecordHeartbeat), ctx, namespace, executorID, state)
 }
 
+// RecordShardStatistics mocks base method.
+func (m *MockStore) RecordShardStatistics(ctx context.Context, namespace, executorID string, assignmentModRevision int64, statistics map[string]ShardStatistics) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordShardStatistics", ctx, namespace, executorID, assignmentModRevision, statistics)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecordShardStatistics indicates an expected call of RecordShardStatistics.
+func (mr *MockStoreMockRecorder) RecordShardStatistics(ctx, namespace, executorID, assignmentModRevision, statistics any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordShardStatistics", reflect.TypeOf((*MockStore)(nil).RecordShardStatistics), ctx, namespace, executorID, assignmentModRevision, statistics)
+}
+
 // ResetNamespace mocks base method.
 func (m *MockStore) ResetNamespace(ctx context.Context, namespace string) (int64, error) {
 	m.ctrl.T.Helper()
@@ -254,10 +282,10 @@ func (mr *MockStoreMockRecorder) ResetNamespace(ctx, namespace any) *gomock.Call
 }
 
 // SubscribeToAssignmentChanges mocks base method.
-func (m *MockStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan AssignmentSnapshot, func(), error) {
+func (m *MockStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan struct{}, func(), error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SubscribeToAssignmentChanges", ctx, namespace)
-	ret0, _ := ret[0].(<-chan AssignmentSnapshot)
+	ret0, _ := ret[0].(<-chan struct{})
 	ret1, _ := ret[1].(func())
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2

@@ -638,7 +638,7 @@ cover_integration_profile:
 	$Q time go test $(INTEG_TEST_ROOT) $(TEST_ARG) $(TEST_TAG) -persistenceType=$(PERSISTENCE_TYPE) -sqlPluginName=$(PERSISTENCE_PLUGIN) $(GOCOVERPKG_ARG) -coverprofile=$(BUILD)/$(INTEG_TEST_DIR)/coverage.out || exit 1;
 	$Q cat $(BUILD)/$(INTEG_TEST_DIR)/coverage.out | grep -v "^mode: \w\+" >> $(INTEG_COVER_FILE)
 
-integration_tests_etcd:
+integration_tests_etcd: ## Run integration tests with etcd
 	$Q mkdir -p $(BUILD)
 	$Q mkdir -p $(COVER_ROOT)
 	$Q echo "mode: atomic" > $(INTEG_COVER_FILE_ETCD)
@@ -713,6 +713,6 @@ deps-all: ## Check for all dependency updates
 
 help: ## Prints a help message showing any specially-commented targets
 	$Q # print the high-value ones first, so they're more visible.  the "....." prefixes match the shell coloring chars
-	$Q cat $(MAKEFILE_LIST) | grep -e "^[a-zA-Z_\-]*:.* ## .*" | awk 'BEGIN {FS = ":.*? ## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' | sort | grep -E '^.....(help|pr|bins)\b'
+	$Q cat $(MAKEFILE_LIST) | grep -e "^[a-zA-Z_\-]*:.* ## .*" | awk 'BEGIN {FS = ":.*? ## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}' | sort | grep -E '^.....(help|pr|bins)\b'
 	$Q echo '-----------------------------------'
-	$Q cat $(MAKEFILE_LIST) | grep -e "^[a-zA-Z_\-]*:.* ## .*" | awk 'BEGIN {FS = ":.*? ## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' | sort | grep -vE '^.....(help|pr|bins)\b'
+	$Q cat $(MAKEFILE_LIST) | grep -e "^[a-zA-Z_\-]*:.* ## .*" | awk 'BEGIN {FS = ":.*? ## "}; {printf "\033[36m%-22s\033[0m %s\n", $$1, $$2}' | sort | grep -vE '^.....(help|pr|bins)\b'

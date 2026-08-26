@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
@@ -114,4 +115,35 @@ func TestPlanRebalance(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, moves)
 	assert.ErrorContains(t, err, "unsupported load balancing mode")
+}
+
+func TestPrepareShardStatisticsSkipsNaiveMode(t *testing.T) {
+	cfg := &config.Config{
+		LoadBalancingMode: func(namespace string) string {
+			return config.LoadBalancingModeNAIVE
+		},
+	}
+	assignedState := &store.AssignedState{
+		AssignedShards: map[string]*types.ShardAssignment{
+			"shard-1": {Status: types.AssignmentStatusREADY},
+		},
+	}
+	reports := map[string]*types.ShardStatusReport{
+		"shard-1": {ShardLoad: 12.3},
+	}
+
+	got, shouldWrite, err := PrepareShardStatistics(
+		cfg,
+		"test-namespace",
+		"executor-1",
+		reports,
+		assignedState,
+		nil,
+		time.Now().UTC(),
+		log.NewNoop(),
+	)
+
+	require.NoError(t, err)
+	assert.False(t, shouldWrite)
+	assert.Nil(t, got)
 }

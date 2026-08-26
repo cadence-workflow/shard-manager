@@ -68,6 +68,11 @@ type AssignShardsRequest struct {
 	ChangedExecutors map[string]struct{}
 }
 
+type AssignmentSnapshot struct {
+	ShardAssignments map[*ShardOwner][]string
+	DrainedShards    map[string]struct{}
+}
+
 type Store interface {
 	// GetState retrieves the current state of a namespace, including executors,
 	// shard statistics, and shard assignments.
@@ -92,15 +97,15 @@ type Store interface {
 	// It returns ErrShardNotFound if the shard does not exist, and ErrShardDrained
 	// if the shard is drained.
 	GetShardOwner(ctx context.Context, namespace, shardID string) (*ShardOwner, error)
-	// SubscribeToAssignmentChanges streams a full snapshot of the namespace's
-	// assignments and drained shards
-	SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan AssignmentSnapshot, func(), error)
+	SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan struct{}, func(), error)
 
 	// GetExecutor retrieves an executor within a namespace.
 	GetExecutor(ctx context.Context, namespace string, executorID string) (*ShardOwner, error)
+	GetShardAssignments(namespace string) (AssignmentSnapshot, error)
 
-	GetHeartbeat(ctx context.Context, namespace string, executorID string) (*HeartbeatState, *AssignedState, error)
+	GetExecutorState(ctx context.Context, namespace string, executorID string) (ExecutorState, error)
 	RecordHeartbeat(ctx context.Context, namespace, executorID string, state HeartbeatState) error
+	RecordShardStatistics(ctx context.Context, namespace, executorID string, assignmentModRevision int64, statistics map[string]ShardStatistics) error
 
 	DeleteShardStats(ctx context.Context, namespace string, shardIDs []string, guard GuardFunc) error
 

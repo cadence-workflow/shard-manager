@@ -119,14 +119,18 @@ func (c *meteredStore) GetExecutor(ctx context.Context, namespace string, execut
 	return
 }
 
-func (c *meteredStore) GetHeartbeat(ctx context.Context, namespace string, executorID string) (hp1 *store.HeartbeatState, ap1 *store.AssignedState, err error) {
+func (c *meteredStore) GetExecutorState(ctx context.Context, namespace string, executorID string) (e1 store.ExecutorState, err error) {
 	op := func() error {
-		hp1, ap1, err = c.wrapped.GetHeartbeat(ctx, namespace, executorID)
+		e1, err = c.wrapped.GetExecutorState(ctx, namespace, executorID)
 		return err
 	}
 
-	err = c.call(metrics.ShardDistributorStoreGetHeartbeatScope, op, metrics.NamespaceTag(namespace))
+	err = c.call(metrics.ShardDistributorStoreGetExecutorStateScope, op, metrics.NamespaceTag(namespace))
 	return
+}
+
+func (c *meteredStore) GetShardAssignments(namespace string) (m1 map[*store.ShardOwner][]string, err error) {
+	return c.wrapped.GetShardAssignments(namespace)
 }
 
 func (c *meteredStore) GetShardOwner(ctx context.Context, namespace string, shardID string) (sp1 *store.ShardOwner, err error) {
@@ -159,6 +163,16 @@ func (c *meteredStore) RecordHeartbeat(ctx context.Context, namespace string, ex
 	return
 }
 
+func (c *meteredStore) RecordShardStatistics(ctx context.Context, namespace string, executorID string, assignmentModRevision int64, statistics map[string]store.ShardStatistics) (err error) {
+	op := func() error {
+		err = c.wrapped.RecordShardStatistics(ctx, namespace, executorID, assignmentModRevision, statistics)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreRecordShardStatisticsScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
 func (c *meteredStore) ResetNamespace(ctx context.Context, namespace string) (i1 int64, err error) {
 	op := func() error {
 		i1, err = c.wrapped.ResetNamespace(ctx, namespace)
@@ -169,7 +183,8 @@ func (c *meteredStore) ResetNamespace(ctx context.Context, namespace string) (i1
 	return
 }
 
-func (c *meteredStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (ch1 <-chan store.AssignmentSnapshot, f1 func(), err error) {
+func (c *meteredStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (ch1 <-chan struct {
+}, f1 func(), err error) {
 	op := func() error {
 		ch1, f1, err = c.wrapped.SubscribeToAssignmentChanges(ctx, namespace)
 		return err

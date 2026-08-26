@@ -14,6 +14,13 @@ type HeartbeatState struct {
 	Metadata       map[string]string
 }
 
+// ExecutorState contains the persisted state for one executor.
+type ExecutorState struct {
+	Heartbeat  *HeartbeatState
+	Assignment *AssignedState
+	Statistics map[string]ShardStatistics
+}
+
 type AssignedState struct {
 	// AssignedShards holds the current assignment of shards to this executor
 	// Key: ShardID
@@ -83,16 +90,16 @@ type ShardOwner struct {
 	Metadata   map[string]string
 }
 
-// AssignmentSnapshot is the namespace state published to assignment subscribers
-// It carries the drained set alongside the assignments
-type AssignmentSnapshot struct {
-	// ExecutorState maps each executor to the shards it currently owns.
-	ExecutorState map[*ShardOwner][]string
-
-	// DrainedShards holds the shards drained for this namespace.
-	// Key: ShardID
-	DrainedShards map[string]struct{}
-}
+//// AssignmentSnapshot is the namespace state published to assignment subscribers
+//// It carries the drained set alongside the assignments
+//type AssignmentSnapshot struct {
+//	// ExecutorState maps each executor to the shards it currently owns.
+//	ExecutorState map[*ShardOwner][]string
+//
+//	// DrainedShards holds the shards drained for this namespace.
+//	// Key: ShardID
+//	DrainedShards map[string]struct{}
+//}
 
 // CountExecutorsByStatus returns a map of executor status to the count of executors with that status
 func (ns *NamespaceState) CountExecutorsByStatus() map[types.ExecutorStatus]int {

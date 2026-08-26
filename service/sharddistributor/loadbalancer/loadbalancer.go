@@ -73,3 +73,40 @@ func PlanRebalance(
 		return nil, fmt.Errorf("unsupported load balancing mode: %s", mode)
 	}
 }
+
+// PrepareShardStatistics prepares a heartbeat statistics update for the
+// namespace's active load-balancing mode. The bool reports whether the caller
+// should persist the returned statistics.
+func PrepareShardStatistics(
+	cfg *config.Config,
+	namespace string,
+	executorID string,
+	reportedShards map[string]*types.ShardStatusReport,
+	assignedState *store.AssignedState,
+	previousStats map[string]store.ShardStatistics,
+	now time.Time,
+	logger log.Logger,
+) (map[string]store.ShardStatistics, bool, error) {
+	switch mode := cfg.GetLoadBalancingMode(namespace); mode {
+	case types.LoadBalancingModeGREEDY:
+		if assignedState == nil || len(reportedShards) == 0 {
+			return nil, false, nil
+		}
+
+		statistics, shouldWrite := greedy.PrepareShardStatistics(
+			cfg.LoadBalancingGreedy,
+			namespace,
+			executorID,
+			reportedShards,
+			assignedState,
+			previousStats,
+			now,
+			logger,
+		)
+		return statistics, shouldWrite, nil
+	case types.LoadBalancingModeNAIVE:
+		return nil, false, nil
+	default:
+		return nil, false, fmt.Errorf("unsupported load balancing mode: %s", mode)
+	}
+}

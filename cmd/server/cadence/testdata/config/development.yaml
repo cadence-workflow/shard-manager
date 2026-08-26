@@ -49,12 +49,6 @@ metrics:
 pprof:
   port: 7942
 
-ringpop:
-  name: cadence
-  bootstrapMode: hosts
-  bootstrapHosts: [ "127.0.0.1:7941"]
-  maxJoinDuration: 30s
-
 clusterGroupMetadata:
   failoverVersionIncrement: 10
   primaryClusterName: "cluster0"

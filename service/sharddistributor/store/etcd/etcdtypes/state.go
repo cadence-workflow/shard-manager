@@ -102,7 +102,17 @@ func FromShardStatistics(src *store.ShardStatistics) *ShardStatistics {
 	}
 }
 
-// ConvertMap converts a map[K]SrcType to map[K]DstType using a provided converter function.
+// ToShardStatisticsMap converts ETCD shard statistics to store shard statistics.
+func ToShardStatisticsMap(src map[string]ShardStatistics) map[string]store.ShardStatistics {
+	return convertMap(src, (*ShardStatistics).ToShardStatistics)
+}
+
+// FromShardStatisticsMap converts store shard statistics to ETCD shard statistics.
+func FromShardStatisticsMap(src map[string]store.ShardStatistics) map[string]ShardStatistics {
+	return convertMap(src, FromShardStatistics)
+}
+
+// convertMap converts a map[K]SrcType to map[K]DstType using a provided converter function.
 func convertMap[K comparable, SrcType any, DstType any](src map[K]SrcType, converter func(*SrcType) *DstType) map[K]DstType {
 	if src == nil {
 		return nil

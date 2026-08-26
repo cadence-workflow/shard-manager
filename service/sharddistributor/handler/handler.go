@@ -26,6 +26,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -238,7 +239,7 @@ func (h *handlerImpl) GetExecutorState(ctx context.Context, request *types.GetEx
 		}
 	}
 
-	heartbeatState, assignedState, err := h.storage.GetHeartbeat(ctx, request.GetNamespace(), request.GetExecutorID())
+	executorState, err := h.storage.GetExecutorState(ctx, request.GetNamespace(), request.GetExecutorID())
 	if errors.Is(err, store.ErrExecutorNotFound) {
 		return nil, &types.EntityNotExistsError{
 			Message: fmt.Sprintf("executor not found %v:%v", request.GetNamespace(), request.GetExecutorID()),
@@ -247,6 +248,8 @@ func (h *handlerImpl) GetExecutorState(ctx context.Context, request *types.GetEx
 	if err != nil {
 		return nil, &types.InternalServiceError{Message: fmt.Sprintf("failed to get executor state: %v", err)}
 	}
+	heartbeatState := executorState.Heartbeat
+	assignedState := executorState.Assignment
 
 	assignedShards := make([]*types.ExecutorAssignedShardState, 0)
 	if assignedState != nil {
@@ -321,21 +324,48 @@ func (h *handlerImpl) ListNamespaces(_ context.Context, _ *types.ListNamespacesR
 	return &types.ListNamespacesResponse{Namespaces: namespaces}, nil
 }
 
+func (h *handlerImpl) sendWatchResponse(namespace string, server WatchNamespaceStateServer) error {
+	state, e := h.storage.GetShardAssignments(namespace)
+	if e != nil {
+		return &types.InternalServiceError{Message: fmt.Sprintf("failed to get shard assignments: %v", e)}
+	}
+	response := &types.WatchNamespaceStateResponse{
+		Executors:        make([]*types.ExecutorShardAssignment, 0, len(state.ShardAssignments)),
+		DrainedShardKeys: slices.Sorted(maps.Keys(state.DrainedShards)),
+	}
+	for ex, shardIDs := range state.ShardAssignments {
+		response.Executors = append(response.Executors, &types.ExecutorShardAssignment{
+			ExecutorID:     ex.ExecutorID,
+			AssignedShards: WrapShards(shardIDs),
+			Metadata:       ex.Metadata,
+		})
+	}
+
+	err := server.Send(response)
+	if err != nil {
+		return fmt.Errorf("send response: %w", err)
+	}
+	return nil
+}
+
 func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequest, server WatchNamespaceStateServer) error {
 	h.startWG.Wait()
 
 	var stopDone <-chan struct{}
-	subscribeCtx := server.Context()
 	if h.stopCtx != nil {
 		stopDone = h.stopCtx.Done()
-		subscribeCtx = h.stopCtx
 	}
 
 	// Subscribe to state changes from storage
-	assignmentChangesChan, unSubscribe, err := h.storage.SubscribeToAssignmentChanges(subscribeCtx, request.Namespace)
-	defer unSubscribe()
+	notifyCh, unSubscribe, err := h.storage.SubscribeToAssignmentChanges(server.Context(), request.Namespace)
 	if err != nil {
 		return &types.InternalServiceError{Message: fmt.Sprintf("failed to subscribe to namespace state: %v", err)}
+	}
+	defer unSubscribe()
+
+	// Send the initial state
+	if err = h.sendWatchResponse(request.Namespace, server); err != nil {
+		return err
 	}
 
 	// Stream subsequent updates
@@ -345,42 +375,15 @@ func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequ
 			return server.Context().Err()
 		case <-stopDone:
 			return h.stopCtx.Err()
-		case assignmentChanges, ok := <-assignmentChangesChan:
+		case _, ok := <-notifyCh:
 			if !ok {
 				return fmt.Errorf("unexpected close of updates channel")
 			}
-			response := &types.WatchNamespaceStateResponse{
-				Executors:        make([]*types.ExecutorShardAssignment, 0, len(assignmentChanges.ExecutorState)),
-				DrainedShardKeys: sortedShardKeys(assignmentChanges.DrainedShards),
-			}
-			for executor, shardIDs := range assignmentChanges.ExecutorState {
-				response.Executors = append(response.Executors, &types.ExecutorShardAssignment{
-					ExecutorID:     executor.ExecutorID,
-					AssignedShards: WrapShards(shardIDs),
-					Metadata:       executor.Metadata,
-				})
-			}
-
-			err = server.Send(response)
-			if err != nil {
-				return fmt.Errorf("send response: %w", err)
+			if err = h.sendWatchResponse(request.Namespace, server); err != nil {
+				return err
 			}
 		}
 	}
-}
-
-// sortedShardKeys gives the streamed drained a set a stable order
-// Returns nil for an empty set so the field round-trips through protobuf
-func sortedShardKeys(shardIDs map[string]struct{}) []string {
-	if len(shardIDs) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(shardIDs))
-	for shardID := range shardIDs {
-		keys = append(keys, shardID)
-	}
-	slices.Sort(keys)
-	return keys
 }
 
 func WrapShards(shardIDs []string) []*types.Shard {

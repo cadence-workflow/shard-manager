@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"time"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -21,7 +20,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/statistics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
@@ -153,125 +151,65 @@ func (s *executorStoreImpl) RecordHeartbeat(ctx context.Context, namespace, exec
 	if err != nil {
 		return fmt.Errorf("record heartbeat: %w", err)
 	}
-	if s.cfg.GetLoadBalancingMode(namespace) == types.LoadBalancingModeGREEDY {
-		statsUpdates, err := s.calcUpdatedStatistics(ctx, namespace, executorID, request.ReportedShards)
-		if err != nil {
-			return fmt.Errorf("calculate shard statistics updates: %w", err)
-		}
-		if err := s.applyShardStatisticsUpdates(ctx, namespace, statsUpdates); err != nil {
-			return fmt.Errorf("apply shard statistics updates: %w", err)
-		}
-	}
-
 	return nil
 }
 
-func (s *executorStoreImpl) calcUpdatedStatistics(ctx context.Context, namespace, executorID string, reported map[string]*types.ShardStatusReport) ([]shardStatisticsUpdate, error) {
-	if len(reported) == 0 {
-		return nil, nil
-	}
+// RecordShardStatistics persists prepared statistics if the executor's
+// assignment has not changed since it was read.
+func (s *executorStoreImpl) RecordShardStatistics(
+	ctx context.Context,
+	namespace string,
+	executorID string,
+	assignmentModRevision int64,
+	statistics map[string]store.ShardStatistics,
+) error {
+	storedStatistics := etcdtypes.FromShardStatisticsMap(statistics)
 
-	var statsUpdate shardStatisticsUpdate
-	statsUpdate.executorID = executorID
-	statsUpdate.stats = make(map[string]etcdtypes.ShardStatistics)
-
-	oldStats, err := s.shardCache.GetExecutorStatistics(ctx, namespace, executorID)
+	payload, err := json.Marshal(storedStatistics)
 	if err != nil {
-		if errors.Is(err, store.ErrExecutorNotFound) {
-			oldStats = make(map[string]etcdtypes.ShardStatistics)
-		} else {
-			return nil, fmt.Errorf("get shard statistics for executor %s: %w", executorID, err)
-		}
+		return fmt.Errorf("marshal executor shard statistics: %w", err)
 	}
-
-	now := s.timeSource.Now().UTC()
-	for shardID, report := range reported {
-		if report == nil {
-			s.logger.Warn("empty report; skipping smoothed load update",
-				tag.ShardNamespace(namespace),
-				tag.ShardExecutor(executorID),
-				tag.ShardKey(shardID),
-			)
-			continue
-		}
-
-		shardOwner, err := s.shardCache.GetShardOwner(ctx, namespace, shardID)
-		if err != nil {
-			if errors.Is(err, store.ErrShardNotFound) {
-				continue
-			}
-			return nil, fmt.Errorf("lookup shard owner: %w", err)
-		}
-		if shardOwner.ExecutorID != executorID {
-			continue
-		}
-
-		statsUpdate.stats[shardID] = s.updateShardStatistic(namespace, executorID, shardID, report.ShardLoad, now, oldStats)
-	}
-
-	return []shardStatisticsUpdate{statsUpdate}, nil
-}
-
-func (s *executorStoreImpl) updateShardStatistic(namespace, executorID, shardID string, shardLoad float64, now time.Time, oldStats map[string]etcdtypes.ShardStatistics) etcdtypes.ShardStatistics {
-	var stats etcdtypes.ShardStatistics
-
-	prevStats, ok := oldStats[shardID]
-	if ok {
-		stats.LastMoveTime = prevStats.LastMoveTime
-	}
-
-	prevSmoothed := prevStats.SmoothedLoad
-	prevUpdate := prevStats.LastUpdateTime.ToTime()
-	newSmoothed, err := statistics.CalculateSmoothedLoad(
-		prevSmoothed,
-		shardLoad,
-		prevUpdate,
-		now,
-		s.loadSmoothingTimeConstant(namespace),
-	)
+	compressedPayload, err := s.recordWriter.Write(payload)
 	if err != nil {
-		s.logger.Error("failed to calculate smoothed load",
-			tag.ShardNamespace(namespace),
-			tag.ShardExecutor(executorID),
-			tag.ShardKey(shardID),
-		)
-		return etcdtypes.ShardStatistics{LastMoveTime: stats.LastMoveTime}
+		return fmt.Errorf("compress executor shard statistics: %w", err)
 	}
 
-	stats.SmoothedLoad = newSmoothed
-	stats.LastUpdateTime = etcdtypes.Time(now)
-
-	return stats
-}
-
-func (s *executorStoreImpl) loadSmoothingTimeConstant(namespace string) time.Duration {
-	if s.cfg == nil || s.cfg.LoadBalancingGreedy.LoadSmoothingTimeConstant == nil {
-		return statistics.DefaultLoadSmoothingTimeConstant
+	assignedStateKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorAssignedStateKey)
+	statsKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorShardStatisticsKey)
+	txnResp, err := s.client.Txn(ctx).
+		If(clientv3.Compare(clientv3.ModRevision(assignedStateKey), "=", assignmentModRevision)).
+		Then(clientv3.OpPut(statsKey, string(compressedPayload))).
+		Commit()
+	if err != nil {
+		return fmt.Errorf("put executor shard statistics: %w", err)
 	}
-	return s.cfg.LoadBalancingGreedy.LoadSmoothingTimeConstant(namespace)
+	if !txnResp.Succeeded {
+		return fmt.Errorf("%w: executor assignment changed", store.ErrVersionConflict)
+	}
+	return nil
 }
 
-// GetHeartbeat retrieves the last known heartbeat state for a single executor.
-func (s *executorStoreImpl) GetHeartbeat(ctx context.Context, namespace string, executorID string) (*store.HeartbeatState, *store.AssignedState, error) {
+// GetExecutorState retrieves the persisted state for a single executor.
+func (s *executorStoreImpl) GetExecutorState(ctx context.Context, namespace string, executorID string) (store.ExecutorState, error) {
 	// The prefix for all keys related to a single executor.
 	executorIDPrefix := etcdkeys.BuildExecutorIDPrefix(s.prefix, namespace, executorID)
 	resp, err := s.client.Get(ctx, executorIDPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return nil, nil, fmt.Errorf("etcd get failed for executor %s: %w", executorID, err)
+		return store.ExecutorState{}, fmt.Errorf("etcd get failed for executor %s: %w", executorID, err)
 	}
 
 	if resp.Count == 0 {
-		return nil, nil, store.ErrExecutorNotFound
+		return store.ExecutorState{}, store.ErrExecutorNotFound
 	}
 
 	parsedData, err := common.ParseExecutorKVs(s.prefix, namespace, resp.Kvs)
 	if err != nil {
-		return nil, nil, err
+		return store.ExecutorState{}, err
 	}
 
 	executorData, ok := parsedData[executorID]
 	if !ok {
-		return nil, nil, store.ErrExecutorNotFound
+		return store.ExecutorState{}, store.ErrExecutorNotFound
 	}
 
 	heartbeatState := &store.HeartbeatState{
@@ -286,7 +224,13 @@ func (s *executorStoreImpl) GetHeartbeat(ctx context.Context, namespace string, 
 		assignedState = executorData.AssignedState.ToAssignedState()
 	}
 
-	return heartbeatState, assignedState, nil
+	statistics := etcdtypes.ToShardStatisticsMap(executorData.Statistics)
+
+	return store.ExecutorState{
+		Heartbeat:  heartbeatState,
+		Assignment: assignedState,
+		Statistics: statistics,
+	}, nil
 }
 
 // --- ShardStore Implementation ---
@@ -370,8 +314,12 @@ func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb
 	return drained
 }
 
-func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan store.AssignmentSnapshot, func(), error) {
-	return s.shardCache.Subscribe(ctx, namespace)
+func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan struct{}, func(), error) {
+	return s.shardCache.Subscribe(namespace)
+}
+
+func (s *executorStoreImpl) GetShardAssignments(namespace string) (map[*store.ShardOwner][]string, error) {
+	return s.shardCache.GetShardAssignments(namespace)
 }
 
 func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {

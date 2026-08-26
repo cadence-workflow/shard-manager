@@ -147,7 +147,7 @@ func TestStartManager(t *testing.T) {
 		namespaces:      make(map[string]*namespaceHandler),
 	}
 
-	err := manager.Start(context.Background())
+	err := manager.Start()
 	time.Sleep(10 * time.Millisecond)
 
 	assert.NoError(t, err)
@@ -183,7 +183,7 @@ func TestStartManagerWithElectorError(t *testing.T) {
 		namespaces:      make(map[string]*namespaceHandler),
 	}
 
-	err := manager.Start(context.Background())
+	err := manager.Start()
 	assert.NoError(t, err)
 
 	// The goroutine exits on elector creation error
@@ -218,10 +218,10 @@ func TestStopManager(t *testing.T) {
 		namespaces:      make(map[string]*namespaceHandler),
 	}
 
-	_ = manager.Start(context.Background())
+	_ = manager.Start()
 	time.Sleep(10 * time.Millisecond)
 
-	err := manager.Stop(context.Background())
+	err := manager.Stop()
 	assert.NoError(t, err)
 }
 
@@ -271,7 +271,7 @@ func TestRunElection_LeadershipEvents(t *testing.T) {
 		namespaces:      make(map[string]*namespaceHandler),
 	}
 
-	err := manager.Start(context.Background())
+	err := manager.Start()
 	require.NoError(t, err)
 
 	leaderCh <- true
@@ -280,7 +280,7 @@ func TestRunElection_LeadershipEvents(t *testing.T) {
 	leaderCh <- false
 	time.Sleep(10 * time.Millisecond)
 
-	err = manager.Stop(context.Background())
+	err = manager.Stop()
 	assert.NoError(t, err)
 }
 
@@ -311,7 +311,7 @@ func TestDrainSignal_TriggersResign(t *testing.T) {
 		namespaces:      make(map[string]*namespaceHandler),
 	}
 
-	err := manager.Start(context.Background())
+	err := manager.Start()
 	require.NoError(t, err)
 
 	// Wait for the elector to be running
@@ -323,7 +323,7 @@ func TestDrainSignal_TriggersResign(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Handler should be in an idle state
-	err = manager.Stop(context.Background())
+	err = manager.Stop()
 	assert.NoError(t, err)
 }
 
@@ -351,12 +351,12 @@ func TestDrainSignal_NilDrainObserver(t *testing.T) {
 		namespaces:      make(map[string]*namespaceHandler),
 	}
 
-	err := manager.Start(context.Background())
+	err := manager.Start()
 	require.NoError(t, err)
 
 	assert.Nil(t, manager.drainObserver)
 
-	err = manager.Stop(context.Background())
+	err = manager.Stop()
 	assert.NoError(t, err)
 }
 
@@ -387,11 +387,11 @@ func TestDrainSignal_ManagerStopsBeforeDrain(t *testing.T) {
 		namespaces:      make(map[string]*namespaceHandler),
 	}
 
-	err := manager.Start(context.Background())
+	err := manager.Start()
 	require.NoError(t, err)
 
 	// Stop before drain fires
-	err = manager.Stop(context.Background())
+	err = manager.Stop()
 	assert.NoError(t, err)
 }
 
@@ -429,7 +429,7 @@ func TestDrainThenUndrain_ResumesElection(t *testing.T) {
 		namespaces:      make(map[string]*namespaceHandler),
 	}
 
-	err := manager.Start(context.Background())
+	err := manager.Start()
 	require.NoError(t, err)
 
 	// Phase 1: elector1 running, verify it becomes leader
@@ -452,7 +452,7 @@ func TestDrainThenUndrain_ResumesElection(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	assert.Equal(t, 2, logs.FilterMessage("Became leader for namespace").Len(), "expected leader elected in both phases")
 
-	err = manager.Stop(context.Background())
+	err = manager.Stop()
 	assert.NoError(t, err)
 }
 

@@ -372,10 +372,10 @@ func TestWatchNamespaceState(t *testing.T) {
 	// this state should be retrieved and sent at the start of WatchNamespaceState
 	getState1 := mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
 		store.AssignmentSnapshot{
-			ShardAssignments: map[*store.ShardOwner][]string{
+			ExecutorToShards: map[*store.ShardOwner][]string{
 				{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
 			},
-			DrainedShards: nil,
+			DrainedShards: map[string]struct{}{"shard-drained": {}},
 		},
 		nil,
 	)
@@ -383,14 +383,18 @@ func TestWatchNamespaceState(t *testing.T) {
 	send1 := mockServer.EXPECT().Send(gomock.Any()).DoAndReturn(func(resp *types.WatchNamespaceStateResponse) error {
 		require.Len(t, resp.Executors, 1)
 		assert.Equal(t, "executor-1", resp.Executors[0].ExecutorID)
+		assert.Equal(t, []string{"shard-drained"}, resp.DrainedShardKeys)
 		return nil
 	})
 
 	// now simulate the state has been changed (after notification)
 	getState2 := mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
-		map[*store.ShardOwner][]string{
-			{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
-			{ExecutorID: "executor-2", Metadata: map[string]string{}}: {"shard-2"},
+		store.AssignmentSnapshot{
+			ExecutorToShards: map[*store.ShardOwner][]string{
+				{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
+				{ExecutorID: "executor-2", Metadata: map[string]string{}}: {"shard-2"},
+			},
+			DrainedShards: map[string]struct{}{"shard-10": {}, "shard-2": {}},
 		},
 		nil,
 	)
@@ -402,6 +406,7 @@ func TestWatchNamespaceState(t *testing.T) {
 		executors := []string{resp.Executors[0].ExecutorID, resp.Executors[1].ExecutorID}
 		assert.Contains(t, executors, "executor-1")
 		assert.Contains(t, executors, "executor-2")
+		assert.Equal(t, []string{"shard-10", "shard-2"}, resp.DrainedShardKeys)
 		return nil
 	})
 
@@ -445,7 +450,10 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 	mockStorage.EXPECT().SubscribeToAssignmentChanges(serverCtx, "test-ns").Return(notifyChan, unsubscribe, nil)
 
 	mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
-		map[*store.ShardOwner][]string{},
+		store.AssignmentSnapshot{
+			ExecutorToShards: map[*store.ShardOwner][]string{},
+			DrainedShards:    map[string]struct{}{},
+		},
 		nil,
 	)
 	mockServer.EXPECT().Send(gomock.Any()).Return(nil)

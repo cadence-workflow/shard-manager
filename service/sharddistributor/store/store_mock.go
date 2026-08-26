@@ -194,10 +194,10 @@ func (mr *MockStoreMockRecorder) GetExecutorState(ctx, namespace, executorID any
 }
 
 // GetShardAssignments mocks base method.
-func (m *MockStore) GetShardAssignments(namespace string) (map[*ShardOwner][]string, error) {
+func (m *MockStore) GetShardAssignments(namespace string) (AssignmentSnapshot, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetShardAssignments", namespace)
-	ret0, _ := ret[0].(map[*ShardOwner][]string)
+	ret0, _ := ret[0].(AssignmentSnapshot)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

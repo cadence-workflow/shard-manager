@@ -129,7 +129,7 @@ func (c *meteredStore) GetExecutorState(ctx context.Context, namespace string, e
 	return
 }
 
-func (c *meteredStore) GetShardAssignments(namespace string) (m1 map[*store.ShardOwner][]string, err error) {
+func (c *meteredStore) GetShardAssignments(namespace string) (a1 store.AssignmentSnapshot, err error) {
 	return c.wrapped.GetShardAssignments(namespace)
 }
 

@@ -68,11 +68,6 @@ type AssignShardsRequest struct {
 	ChangedExecutors map[string]struct{}
 }
 
-type AssignmentSnapshot struct {
-	ShardAssignments map[*ShardOwner][]string
-	DrainedShards    map[string]struct{}
-}
-
 type Store interface {
 	// GetState retrieves the current state of a namespace, including executors,
 	// shard statistics, and shard assignments.
@@ -101,6 +96,7 @@ type Store interface {
 
 	// GetExecutor retrieves an executor within a namespace.
 	GetExecutor(ctx context.Context, namespace string, executorID string) (*ShardOwner, error)
+	// GetShardAssignments returns a snapshot of assignments and drained shards
 	GetShardAssignments(namespace string) (AssignmentSnapshot, error)
 
 	GetExecutorState(ctx context.Context, namespace string, executorID string) (ExecutorState, error)

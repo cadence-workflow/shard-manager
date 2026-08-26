@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -448,16 +449,19 @@ func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
 	return nil
 }
 
-func (n *namespaceShardToExecutor) GetShardAssignments() map[*store.ShardOwner][]string {
+func (n *namespaceShardToExecutor) GetShardAssignments() store.AssignmentSnapshot {
 	n.RLock()
 	defer n.RUnlock()
-	executorState := make(map[*store.ShardOwner][]string)
+
+	shardAssignments := make(map[*store.ShardOwner][]string, len(n.executorToShards))
 	for executor, shardIDs := range n.executorToShards {
-		executorState[executor] = make([]string, len(shardIDs))
-		copy(executorState[executor], shardIDs)
+		shardAssignments[executor] = slices.Clone(shardIDs)
 	}
 
-	return executorState
+	return store.AssignmentSnapshot{
+		ExecutorToShards: shardAssignments,
+		DrainedShards:    maps.Clone(n.drainedShards),
+	}
 }
 
 // refreshNamespaceState reads every keyspace the cache tracks in one range read, so both

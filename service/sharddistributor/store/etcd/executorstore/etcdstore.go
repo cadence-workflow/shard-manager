@@ -318,7 +318,7 @@ func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, na
 	return s.shardCache.Subscribe(namespace)
 }
 
-func (s *executorStoreImpl) GetShardAssignments(namespace string) (map[*store.ShardOwner][]string, error) {
+func (s *executorStoreImpl) GetShardAssignments(namespace string) (store.AssignmentSnapshot, error) {
 	return s.shardCache.GetShardAssignments(namespace)
 }
 

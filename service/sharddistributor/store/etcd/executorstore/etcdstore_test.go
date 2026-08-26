@@ -1314,8 +1314,8 @@ func TestUndrainShardsReportsOnlyActualRemovals(t *testing.T) {
 	assert.Empty(t, removed, "repeating the same undrain removes nothing further")
 }
 
-// Spectators learn about drains only through this subscription, so a drain has to
-// produce a snapshot on its own with no executor assignment change
+// Spectators learn about drains through this subscription, so a drain has to
+// produce a notification on its own with no executor assignment change.
 func TestSubscribeToAssignmentChangesStreamsDrainedShards(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)
@@ -1328,20 +1328,21 @@ func TestSubscribeToAssignmentChangesStreamsDrainedShards(t *testing.T) {
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
 	require.NoError(t, executorStore.AssignShard(ctx, tc.Namespace, shardID, executorID))
 
-	snapshots, unsubscribe, err := executorStore.SubscribeToAssignmentChanges(ctx, tc.Namespace)
+	notifications, unsubscribe, err := executorStore.SubscribeToAssignmentChanges(ctx, tc.Namespace)
 	require.NoError(t, err)
 	defer unsubscribe()
 
 	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{shardID}))
 
-	// Snapshots are coalesced, so read until the drain shows up rather than assuming
-	// which snapshot carries it.
+	// Notifications are coalesced, so read the current cache after each wake-up.
 	var drainedSnapshot store.AssignmentSnapshot
 	deadline := time.After(10 * time.Second)
 	for {
 		var gotDrain bool
 		select {
-		case drainedSnapshot = <-snapshots:
+		case <-notifications:
+			drainedSnapshot, err = executorStore.GetShardAssignments(tc.Namespace)
+			require.NoError(t, err)
 			_, gotDrain = drainedSnapshot.DrainedShards[shardID]
 		case <-deadline:
 			t.Fatal("drain should be published to assignment subscribers")
@@ -1351,9 +1352,9 @@ func TestSubscribeToAssignmentChangesStreamsDrainedShards(t *testing.T) {
 		}
 	}
 
-	// The assignment still rides along in the same snapshot
+	// The assignment is read atomically with the drained set.
 	assignedShards := make([]string, 0)
-	for owner, shardIDs := range drainedSnapshot.ExecutorState {
+	for owner, shardIDs := range drainedSnapshot.ExecutorToShards {
 		if owner.ExecutorID == executorID {
 			assignedShards = append(assignedShards, shardIDs...)
 		}

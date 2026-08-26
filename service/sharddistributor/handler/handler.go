@@ -330,10 +330,10 @@ func (h *handlerImpl) sendWatchResponse(namespace string, server WatchNamespaceS
 		return &types.InternalServiceError{Message: fmt.Sprintf("failed to get shard assignments: %v", e)}
 	}
 	response := &types.WatchNamespaceStateResponse{
-		Executors:        make([]*types.ExecutorShardAssignment, 0, len(state.ShardAssignments)),
+		Executors:        make([]*types.ExecutorShardAssignment, 0, len(state.ExecutorToShards)),
 		DrainedShardKeys: slices.Sorted(maps.Keys(state.DrainedShards)),
 	}
-	for ex, shardIDs := range state.ShardAssignments {
+	for ex, shardIDs := range state.ExecutorToShards {
 		response.Executors = append(response.Executors, &types.ExecutorShardAssignment{
 			ExecutorID:     ex.ExecutorID,
 			AssignedShards: WrapShards(shardIDs),

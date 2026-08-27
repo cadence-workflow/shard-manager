@@ -1332,6 +1332,7 @@ func TestSubscribeToAssignmentChanges_NotifiesOnDrain(t *testing.T) {
 	require.NoError(t, err)
 	defer unsubscribe()
 
+	// Drain a shard without touching the assigned_state
 	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{shardID}))
 
 	// Notifications are coalesced, so read the current cache after each wake-up.
@@ -1345,7 +1346,7 @@ func TestSubscribeToAssignmentChanges_NotifiesOnDrain(t *testing.T) {
 			require.NoError(t, err)
 			_, gotDrain = drainedSnapshot.DrainedShards[shardID]
 		case <-deadline:
-			t.Fatal("drain should be published to assignment subscribers")
+			t.Fatal("drain should notify the assignment subscribers")
 		}
 		if gotDrain {
 			break

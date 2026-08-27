@@ -586,22 +586,22 @@ func (p *namespaceProcessor) findDeletedShards(namespaceState *store.NamespaceSt
 	return deletedShards
 }
 
-// findDrainedAssignedShards returns the drained shards that are still
-// assigned to an active executor
+// findDrainedAssignedShards returns the unique drained shards that are still
+// assigned to an active executor.
 func findDrainedAssignedShards(namespaceState *store.NamespaceState, activeExecutors []string) []string {
 	if len(namespaceState.DrainedShards) == 0 {
 		return nil
 	}
 
-	drainedAssigned := make([]string, 0)
+	drainedAssigned := make(map[string]struct{})
 	for _, executorID := range activeExecutors {
 		for shardID := range namespaceState.ShardAssignments[executorID].AssignedShards {
 			if _, drained := namespaceState.DrainedShards[shardID]; drained {
-				drainedAssigned = append(drainedAssigned, shardID)
+				drainedAssigned[shardID] = struct{}{}
 			}
 		}
 	}
-	return drainedAssigned
+	return slices.Collect(maps.Keys(drainedAssigned))
 }
 
 func (p *namespaceProcessor) findShardsToReassign(

@@ -3,6 +3,8 @@ package process
 import (
 	"context"
 	"errors"
+	"go.uber.org/zap/zaptest/observer"
+	"maps"
 	"slices"
 	"strconv"
 	"sync"
@@ -28,13 +30,14 @@ import (
 )
 
 type testDependencies struct {
-	ctrl       *gomock.Controller
-	store      *store.MockStore
-	election   *store.MockElection
-	timeSource clock.MockedTimeSource
-	factory    Factory
-	cfg        config.Namespace
-	sdConfig   *config.Config
+	ctrl         *gomock.Controller
+	store        *store.MockStore
+	election     *store.MockElection
+	timeSource   clock.MockedTimeSource
+	factory      Factory
+	cfg          config.Namespace
+	sdConfig     *config.Config
+	observedLogs *observer.ObservedLogs
 }
 
 func setupProcessorTest(t *testing.T, namespaceType string) *testDependencies {
@@ -58,8 +61,11 @@ func setupProcessorTest(t *testing.T, namespaceType string) *testDependencies {
 		},
 	}
 
+	logger, observedLogs := testlogger.NewObserved(t)
+	deps.observedLogs = observedLogs
+
 	deps.factory = NewProcessorFactory(
-		testlogger.New(t),
+		logger,
 		metrics.NewNoopMetricsClient(),
 		mockedClock,
 		config.ShardDistribution{
@@ -462,6 +468,130 @@ func TestRebalanceShards_NoShardsToReassign(t *testing.T) {
 
 	err := processor.rebalanceShards(context.Background())
 	require.NoError(t, err)
+}
+
+func TestFindDrainedAssignedShards(t *testing.T) {
+	activeExecutors := []string{"exec-1", "exec-2"}
+
+	tests := []struct {
+		name          string
+		state         *store.NamespaceState
+		activeExec    []string
+		drainedShards []string
+	}{
+		{
+			name: "nothing drained",
+			state: &store.NamespaceState{
+				ShardAssignments: assignmentsFor("exec-1", "0", "1"),
+				DrainedShards:    nil,
+			},
+			activeExec:    activeExecutors,
+			drainedShards: nil,
+		},
+		{
+			name: "drained shards assigned to an active executor",
+			state: &store.NamespaceState{
+				ShardAssignments: assignmentsFor("exec-1", "0", "1", "2", "3"),
+				DrainedShards:    map[string]struct{}{"0": {}, "1": {}, "2": {}, "3": {}},
+			},
+			activeExec:    activeExecutors,
+			drainedShards: []string{"0", "1", "2", "3"},
+		},
+		{
+			name: "drained shard assigned to an inactive executor",
+			state: &store.NamespaceState{
+				ShardAssignments: assignmentsFor("exec-inactive", "0", "1"),
+				DrainedShards:    map[string]struct{}{"1": {}},
+			},
+			activeExec:    activeExecutors,
+			drainedShards: []string{},
+		},
+		{
+			name: "drained shard is not assigned to any executor",
+			state: &store.NamespaceState{
+				ShardAssignments: assignmentsFor("exec-1", "0", "2"),
+				DrainedShards:    map[string]struct{}{"1": {}},
+			},
+			activeExec:    activeExecutors,
+			drainedShards: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.ElementsMatch(t, tt.drainedShards, findDrainedAssignedShards(tt.state, tt.activeExec))
+		})
+	}
+}
+
+func assignmentsFor(executorID string, shardIDs ...string) map[string]store.AssignedState {
+	assigned := make(map[string]*types.ShardAssignment, len(shardIDs))
+	for _, shardID := range shardIDs {
+		assigned[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
+	}
+	return map[string]store.AssignedState{executorID: {AssignedShards: assigned}}
+}
+
+func TestRebalanceShards_DrainedShardsAreDroppedFromExecutors(t *testing.T) {
+	for _, namespaceType := range []string{config.NamespaceTypeFixed, config.NamespaceTypeEphemeral} {
+		t.Run(namespaceType, func(t *testing.T) {
+			mocks := setupProcessorTest(t, namespaceType)
+			defer mocks.ctrl.Finish()
+
+			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+			now := mocks.timeSource.Now()
+			mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+				Executors: map[string]store.HeartbeatState{
+					"exec-1": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+				},
+				ShardAssignments: assignmentsFor("exec-1", "0", "1"),
+				DrainedShards:    map[string]struct{}{"1": {}},
+			}, nil)
+
+			// Shard "1" is drained, so we only look up a shard that is active, which is "0"
+			mocks.store.EXPECT().GetShardOwner(gomock.Any(), mocks.cfg.Name, "0").Return(nil, nil)
+			mocks.election.EXPECT().Guard().Return(store.NopGuard())
+
+			var request store.AssignShardsRequest
+			mocks.store.EXPECT().AssignShard(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, _ string, req store.AssignShardsRequest, _ store.GuardFunc) error {
+					request = req
+					return nil
+				})
+
+			// Triggering rebalance to reassign the shards
+			require.NoError(t, processor.rebalanceShards(context.Background()))
+
+			assigned := request.NewState.ShardAssignments["exec-1"].AssignedShards
+
+			assert.Equal(t, []string{"0"}, slices.Sorted(maps.Keys(assigned)), "drained shard is dropped")
+			assert.Contains(t, request.ChangedExecutors, "exec-1", "exec-1 had the drained shard")
+		})
+	}
+}
+
+func TestRebalanceShards_AlreadyUnassignedDrainedShardsSkipAssign(t *testing.T) {
+	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+	defer mocks.ctrl.Finish()
+
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+	now := mocks.timeSource.Now()
+
+	// shard "2" is drained and unassigned
+	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+		Executors: map[string]store.HeartbeatState{
+			"exec-1": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+		},
+		ShardAssignments: assignmentsFor("exec-1", "0", "1"),
+		DrainedShards:    map[string]struct{}{"2": {}},
+	}, nil)
+
+	// shards should not move, drained shards should not be assigned back
+	require.NoError(t, processor.rebalanceShards(context.Background()))
+	assert.NotEmpty(t, mocks.observedLogs.FilterMessage("No changes to distribution detected. Skipping rebalance.").All())
+
 }
 
 func TestRebalanceShards_WithUnassignedShards(t *testing.T) {

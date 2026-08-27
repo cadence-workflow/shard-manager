@@ -445,6 +445,15 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 
 	metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopNumRebalancedShards, int64(len(shardsToReassign)))
 
+	// findShardsToReassign has already left these out of currentAssignments. They are
+	// surfaced here so the write below is not mistaken for a no-op.
+	drainedAssignedShards := findDrainedAssignedShards(namespaceState, activeExecutors)
+	if len(drainedAssignedShards) > 0 {
+		p.logger.Info("Dropping drained shards from executors", tag.Dynamic("drained-shards", drainedAssignedShards))
+	}
+	metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopDroppedDrainedShards, int64(len(drainedAssignedShards)))
+	metricsLoopScope.UpdateGauge(metrics.ShardDistributorAssignLoopDrainedShards, float64(len(namespaceState.DrainedShards)))
+
 	// If there are deleted shards or stale executors, the distribution has changed.
 	assignedToEmptyExecutors := assignShardsToEmptyExecutors(currentAssignments)
 	updatedAssignments := p.updateAssignments(shardsToReassign, activeExecutors, currentAssignments)
@@ -464,12 +473,16 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 	if err := applyMoves(currentAssignments, loadBalanceMoves); err != nil {
 		return fmt.Errorf("apply load balance moves: %w", err)
 	}
-	isRebalancedByShardLoad := len(loadBalanceMoves) > 0
 
 	p.emitExecutorMetric(namespaceState, metricsLoopScope)
 	loadbalancer.EmitAssignmentImbalanceMetrics(p.sdConfig, p.namespaceCfg.Name, metricsLoopScope, currentAssignments, namespaceState)
 
-	distributionChanged := len(deletedShards) > 0 || len(staleExecutors) > 0 || assignedToEmptyExecutors || updatedAssignments || isRebalancedByShardLoad
+	distributionChanged := len(deletedShards) > 0 ||
+		len(staleExecutors) > 0 ||
+		len(loadBalanceMoves) > 0 ||
+		len(drainedAssignedShards) > 0 ||
+		assignedToEmptyExecutors ||
+		updatedAssignments
 	if !distributionChanged {
 		p.logger.Info("No changes to distribution detected. Skipping rebalance.")
 		return nil
@@ -573,6 +586,24 @@ func (p *namespaceProcessor) findDeletedShards(namespaceState *store.NamespaceSt
 	return deletedShards
 }
 
+// findDrainedAssignedShards returns the drained shards that are still
+// assigned to an active executor
+func findDrainedAssignedShards(namespaceState *store.NamespaceState, activeExecutors []string) []string {
+	if len(namespaceState.DrainedShards) == 0 {
+		return nil
+	}
+
+	drainedAssigned := make([]string, 0)
+	for _, executorID := range activeExecutors {
+		for shardID := range namespaceState.ShardAssignments[executorID].AssignedShards {
+			if _, drained := namespaceState.DrainedShards[shardID]; drained {
+				drainedAssigned = append(drainedAssigned, shardID)
+			}
+		}
+	}
+	return drainedAssigned
+}
+
 func (p *namespaceProcessor) findShardsToReassign(
 	activeExecutors []string,
 	namespaceState *store.NamespaceState,
@@ -581,6 +612,12 @@ func (p *namespaceProcessor) findShardsToReassign(
 ) ([]string, map[string][]string) {
 	allShards := make(map[string]struct{})
 	for _, shardID := range getShards(p.namespaceCfg, namespaceState, deletedShards) {
+		// Leaving a drained shard out of allShards does two things: it is never queued
+		// for reassignment, and it is dropped from any executor that owns it,
+		// because the loop below only keeps assignments it finds here.
+		if _, drained := namespaceState.DrainedShards[shardID]; drained {
+			continue
+		}
 		allShards[shardID] = struct{}{}
 	}
 

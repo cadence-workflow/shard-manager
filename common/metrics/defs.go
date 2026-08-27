@@ -3096,6 +3096,10 @@ const (
 	ShardDistributorAssignLoopDeletedShards
 	// ShardDistributorAssignLoopMovedShardLoad tracks the load of a shard that was moved due to load rebalancing
 	ShardDistributorAssignLoopMovedShardLoad
+	// ShardDistributorAssignLoopDroppedDrainedShards counts drained shards taken away from an executor in a rebalance cycle
+	ShardDistributorAssignLoopDroppedDrainedShards
+	// ShardDistributorAssignLoopDrainedShards tracks how many shards are currently drained in the namespace
+	ShardDistributorAssignLoopDrainedShards
 
 	// ShardDistributorAssignmentLoadMaxOverMean measures max/mean across executor reported loads
 	ShardDistributorAssignmentLoadMaxOverMean
@@ -3937,6 +3941,9 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ShardDistributorAssignLoopLoadBasedMoves: {metricName: "shard_distributor_shard_assign_load_based_moves", metricType: Counter},
 		ShardDistributorAssignLoopDeletedShards:  {metricName: "shard_distributor_shard_assign_deleted_shards", metricType: Gauge},
 		ShardDistributorAssignLoopMovedShardLoad: {metricName: "shard_distributor_shard_assign_moved_shard_load", metricType: Gauge},
+
+		ShardDistributorAssignLoopDroppedDrainedShards: {metricName: "shard_distributor_shard_assign_dropped_drained_shards", metricType: Counter},
+		ShardDistributorAssignLoopDrainedShards:        {metricName: "shard_distributor_shard_assign_drained_shards", metricType: Gauge},
 
 		ShardDistributorAssignmentLoadMaxOverMean:         {metricName: "shard_distributor_assignment_load_max_over_mean", metricType: Gauge},
 		ShardDistributorAssignmentLoadCV:                  {metricName: "shard_distributor_assignment_load_cv", metricType: Gauge},

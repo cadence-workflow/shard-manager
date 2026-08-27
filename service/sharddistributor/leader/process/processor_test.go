@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 	"errors"
-	"go.uber.org/zap/zaptest/observer"
 	"maps"
 	"slices"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/cadence-workflow/shard-manager/common"
 	"github.com/cadence-workflow/shard-manager/common/clock"

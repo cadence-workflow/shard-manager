@@ -554,7 +554,7 @@ func TestRebalanceShards_DrainedShardsAreDroppedFromExecutors(t *testing.T) {
 			mocks.election.EXPECT().Guard().Return(store.NopGuard())
 
 			var request store.AssignShardsRequest
-			mocks.store.EXPECT().AssignShard(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
+			mocks.store.EXPECT().AssignShards(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
 				func(_ context.Context, _ string, req store.AssignShardsRequest, _ store.GuardFunc) error {
 					request = req
 					return nil

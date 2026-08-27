@@ -53,3 +53,11 @@ func requiredStringFlag(cmd *cliv3.Command, name string) (string, error) {
 	}
 	return value, nil
 }
+
+func requiredStringSliceFlag(cmd *cliv3.Command, name string) ([]string, error) {
+	values := cmd.StringSlice(name)
+	if len(values) == 0 {
+		return nil, fmt.Errorf("--%s is required", name)
+	}
+	return values, nil
+}

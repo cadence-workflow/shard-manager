@@ -1316,7 +1316,7 @@ func TestUndrainShardsReportsOnlyActualRemovals(t *testing.T) {
 
 // Spectators learn about drains through this subscription, so a drain has to
 // produce a notification on its own with no executor assignment change.
-func TestSubscribeToAssignmentChangesStreamsDrainedShards(t *testing.T) {
+func TestSubscribeToAssignmentChanges_NotifiesOnDrain(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

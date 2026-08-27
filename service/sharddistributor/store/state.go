@@ -114,3 +114,8 @@ func (ns *NamespaceState) ShardOwners() map[string]string {
 	}
 	return owners
 }
+
+func (ns *NamespaceState) IsShardDrained(shardID string) bool {
+	_, drained := ns.DrainedShards[shardID]
+	return drained
+}

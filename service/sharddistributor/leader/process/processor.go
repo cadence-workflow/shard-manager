@@ -445,14 +445,12 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 
 	metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopNumRebalancedShards, int64(len(shardsToReassign)))
 
-	// findShardsToReassign has already left these out of currentAssignments. They are
-	// surfaced here so the write below is not mistaken for a no-op.
 	drainedAssignedShards := findDrainedAssignedShards(namespaceState, activeExecutors)
 	if len(drainedAssignedShards) > 0 {
 		p.logger.Info("Dropping drained shards from executors", tag.Dynamic("drained-shards", drainedAssignedShards))
 	}
 	metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopDroppedDrainedShards, int64(len(drainedAssignedShards)))
-	metricsLoopScope.UpdateGauge(metrics.ShardDistributorAssignLoopDrainedShards, float64(len(namespaceState.DrainedShards)))
+	metricsLoopScope.UpdateGauge(metrics.ShardDistributorDrainedShards, float64(len(namespaceState.DrainedShards)))
 
 	// If there are deleted shards or stale executors, the distribution has changed.
 	assignedToEmptyExecutors := assignShardsToEmptyExecutors(currentAssignments)
@@ -587,16 +585,16 @@ func (p *namespaceProcessor) findDeletedShards(namespaceState *store.NamespaceSt
 }
 
 // findDrainedAssignedShards returns the unique drained shards that are still
-// assigned to an active executor.
-func findDrainedAssignedShards(namespaceState *store.NamespaceState, activeExecutors []string) []string {
+// assigned to given executors
+func findDrainedAssignedShards(namespaceState *store.NamespaceState, executors []string) []string {
 	if len(namespaceState.DrainedShards) == 0 {
 		return nil
 	}
 
 	drainedAssigned := make(map[string]struct{})
-	for _, executorID := range activeExecutors {
+	for _, executorID := range executors {
 		for shardID := range namespaceState.ShardAssignments[executorID].AssignedShards {
-			if _, drained := namespaceState.DrainedShards[shardID]; drained {
+			if namespaceState.IsShardDrained(shardID) {
 				drainedAssigned[shardID] = struct{}{}
 			}
 		}
@@ -610,15 +608,12 @@ func (p *namespaceProcessor) findShardsToReassign(
 	deletedShards map[string]store.ShardState,
 	staleExecutors map[string]int64,
 ) ([]string, map[string][]string) {
-	allShards := make(map[string]struct{})
+	allAvailableShards := make(map[string]struct{})
 	for _, shardID := range getShards(p.namespaceCfg, namespaceState, deletedShards) {
-		// Leaving a drained shard out of allShards does two things: it is never queued
-		// for reassignment, and it is dropped from any executor that owns it,
-		// because the loop below only keeps assignments it finds here.
-		if _, drained := namespaceState.DrainedShards[shardID]; drained {
+		if namespaceState.IsShardDrained(shardID) {
 			continue
 		}
-		allShards[shardID] = struct{}{}
+		allAvailableShards[shardID] = struct{}{}
 	}
 
 	shardsToReassign := make([]string, 0)
@@ -633,8 +628,8 @@ func (p *namespaceProcessor) findShardsToReassign(
 		_, isStale := staleExecutors[executorID]
 
 		for shardID := range state.AssignedShards {
-			if _, ok := allShards[shardID]; ok {
-				delete(allShards, shardID)
+			if _, ok := allAvailableShards[shardID]; ok {
+				delete(allAvailableShards, shardID)
 				// If executor is active AND not stale, keep the assignment
 				if isActive && !isStale {
 					currentAssignments[executorID] = append(currentAssignments[executorID], shardID)
@@ -646,7 +641,7 @@ func (p *namespaceProcessor) findShardsToReassign(
 		}
 	}
 
-	for shardID := range allShards {
+	for shardID := range allAvailableShards {
 		shardsToReassign = append(shardsToReassign, shardID)
 	}
 	return shardsToReassign, currentAssignments

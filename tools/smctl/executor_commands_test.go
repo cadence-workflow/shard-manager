@@ -413,7 +413,7 @@ func TestListExecutors(t *testing.T) {
 					Return(nil, &types.NamespaceNotFoundError{Namespace: "missing"})
 				return setupResult{client: mc}
 			},
-			wantErr: "namespace not found missing",
+			wantErr: `namespace "missing" not found`,
 		},
 		{
 			name: "factory error short-circuits before RPC",

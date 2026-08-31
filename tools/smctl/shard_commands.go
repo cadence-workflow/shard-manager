@@ -13,7 +13,6 @@ import (
 func shardCommand(cf ClientFactory) *cliv3.Command {
 	return &cliv3.Command{
 		Name:        "shard",
-		Aliases:     []string{"sh"},
 		Usage:       "Inspect and manage shard-manager shards",
 		Description: "Use --namespace/-n on the root command to identify the target namespace.",
 		Commands: []*cliv3.Command{
@@ -29,14 +28,15 @@ func shardCommand(cf ClientFactory) *cliv3.Command {
 func shardInspectCommand(cf ClientFactory) *cliv3.Command {
 	return &cliv3.Command{
 		Name:        "inspect",
-		Aliases:     []string{"in"},
 		Usage:       "Inspect the current owner of a shard from storage",
 		Description: "Calls InspectShard on shard-manager and prints the response as JSON.",
 		Flags: []cliv3.Flag{
 			&cliv3.StringFlag{
-				Name:    FlagShardKey,
-				Aliases: []string{"sk"},
-				Usage:   "shard key to look up",
+				Name:      FlagShardKey,
+				Usage:     "shard key to look up",
+				Required:  true,
+				Validator: nonEmptyString,
+				Config:    cliv3.StringConfig{TrimSpace: true},
 			},
 		},
 		Action: func(ctx context.Context, cmd *cliv3.Command) error {
@@ -56,11 +56,6 @@ func runInspectShard(
 		return err
 	}
 
-	shardKey, err := requiredStringFlag(cmd, FlagShardKey)
-	if err != nil {
-		return err
-	}
-
 	client, err := cf.ShardManagerClient(cmd)
 	if err != nil {
 		return err
@@ -71,7 +66,7 @@ func runInspectShard(
 
 	resp, err := client.InspectShard(callCtx, &types.GetShardOwnerRequest{
 		Namespace: namespace,
-		ShardKey:  shardKey,
+		ShardKey:  cmd.String(FlagShardKey),
 	})
 	if err != nil {
 		return fmt.Errorf("InspectShard: %w", err)
@@ -80,25 +75,21 @@ func runInspectShard(
 	return writeIndentedJSON(out, resp)
 }
 
-func shardKeysFlag(usage string) cliv3.Flag {
-	return &cliv3.StringSliceFlag{
-		Name:    FlagShardKey,
-		Aliases: []string{"sk"},
-		Usage:   usage,
-		Config:  cliv3.StringConfig{TrimSpace: true},
-	}
-}
-
 // shardDrainCommand marks shards as drained so they are unassigned on the
 // next rebalance and stay ineligible for assignment until undrained.
 func shardDrainCommand(cf ClientFactory) *cliv3.Command {
 	return &cliv3.Command{
 		Name:        "drain",
-		Aliases:     []string{"dr"},
 		Usage:       "Mark shards as drained so they are unassigned and not reassigned",
 		Description: "Calls DrainShards on shard-manager. Repeat --shard-key for multiple shards. The call is idempotent.",
 		Flags: []cliv3.Flag{
-			shardKeysFlag("shard key to drain (repeat for multiple keys)"),
+			&cliv3.StringSliceFlag{
+				Name:      FlagShardKey,
+				Usage:     "shard key to drain (repeat for multiple keys)",
+				Required:  true,
+				Validator: nonEmptyStrings,
+				Config:    cliv3.StringConfig{TrimSpace: true},
+			},
 		},
 		Action: func(ctx context.Context, cmd *cliv3.Command) error {
 			return runDrainShards(ctx, cmd, resolveWriter(cmd), cf)
@@ -140,11 +131,16 @@ func runDrainShards(
 func shardUndrainCommand(cf ClientFactory) *cliv3.Command {
 	return &cliv3.Command{
 		Name:        "undrain",
-		Aliases:     []string{"ud"},
 		Usage:       "Remove shards from the drained set so they can be assigned again",
 		Description: "Calls UndrainShards on shard-manager and prints the shard keys this call actually undrained. Repeat --shard-key for multiple shards. The call is idempotent.",
 		Flags: []cliv3.Flag{
-			shardKeysFlag("shard key to undrain (repeat for multiple keys)"),
+			&cliv3.StringSliceFlag{
+				Name:      FlagShardKey,
+				Usage:     "shard key to undrain (repeat for multiple keys)",
+				Required:  true,
+				Validator: nonEmptyStrings,
+				Config:    cliv3.StringConfig{TrimSpace: true},
+			},
 		},
 		Action: func(ctx context.Context, cmd *cliv3.Command) error {
 			return runUndrainShards(ctx, cmd, resolveWriter(cmd), cf)
@@ -186,7 +182,6 @@ func runUndrainShards(
 func shardListDrainedCommand(cf ClientFactory) *cliv3.Command {
 	return &cliv3.Command{
 		Name:        "list-drained",
-		Aliases:     []string{"ld"},
 		Usage:       "List shards currently marked as drained in a namespace",
 		Description: "Calls GetDrainedShards on shard-manager and prints the response as JSON.",
 		Action: func(ctx context.Context, cmd *cliv3.Command) error {
@@ -229,9 +224,5 @@ func requireNamespaceAndShardKeys(cmd *cliv3.Command) (string, []string, error) 
 	if err != nil {
 		return "", nil, err
 	}
-	shardKeys, err := requiredStringSliceFlag(cmd, FlagShardKey)
-	if err != nil {
-		return "", nil, err
-	}
-	return namespace, shardKeys, nil
+	return namespace, cmd.StringSlice(FlagShardKey), nil
 }

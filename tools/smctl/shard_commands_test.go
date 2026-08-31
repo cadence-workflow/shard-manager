@@ -109,7 +109,7 @@ func TestInspectShard(t *testing.T) {
 			name:    "missing --shard-key fails with required-flag error",
 			args:    []string{"smctl", "-n", "ns-1", "shard", "inspect"},
 			setup:   func(t *testing.T, ctrl *gomock.Controller) setupResult { return setupResult{} },
-			wantErr: `--` + FlagShardKey + ` is required`,
+			wantErr: `Required flag "` + FlagShardKey + `" not set`,
 		},
 		{
 			name: "API error surfaces NamespaceNotFound",
@@ -124,7 +124,7 @@ func TestInspectShard(t *testing.T) {
 					Return(nil, &types.NamespaceNotFoundError{Namespace: "missing"})
 				return setupResult{client: mc}
 			},
-			wantErr: "namespace not found missing",
+			wantErr: `namespace "missing" not found`,
 		},
 		{
 			name: "API error surfaces ShardNotFound",
@@ -177,32 +177,6 @@ func TestInspectShard(t *testing.T) {
 						}, nil
 					})
 				return setupResult{client: mc}
-			},
-		},
-		{
-			name: "shard alias 'sh', inspect alias 'in', and shard-key alias 'sk' work",
-			args: []string{"smctl", "-n", "ns-1", "sh", "in", "-sk", "sk-1"},
-			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
-				mc := sharddistributor.NewMockClient(ctrl)
-				mc.EXPECT().
-					InspectShard(gomock.Any(), &types.GetShardOwnerRequest{
-						Namespace: "ns-1",
-						ShardKey:  "sk-1",
-					}).
-					Return(&types.GetShardOwnerResponse{
-						Owner:     "executor-b",
-						Namespace: "ns-1",
-					}, nil)
-				return setupResult{client: mc}
-			},
-			check: func(t *testing.T, stdout string) {
-				var resp types.GetShardOwnerResponse
-				if err := json.Unmarshal([]byte(stdout), &resp); err != nil {
-					t.Fatalf("output is not valid JSON: %v\nout: %s", err, stdout)
-				}
-				if resp.Owner != "executor-b" {
-					t.Errorf("Owner: got %q want %q", resp.Owner, "executor-b")
-				}
 			},
 		},
 	}
@@ -349,7 +323,13 @@ func TestDrainShards(t *testing.T) {
 			name:    "missing --shard-key fails with required-flag error",
 			args:    []string{"smctl", "-n", "ns-1", "shard", "drain"},
 			setup:   func(t *testing.T, ctrl *gomock.Controller) setupResult { return setupResult{} },
-			wantErr: `--` + FlagShardKey + ` is required`,
+			wantErr: `Required flag "` + FlagShardKey + `" not set`,
+		},
+		{
+			name:    "empty --shard-key fails validation",
+			args:    []string{"smctl", "-n", "ns-1", "shard", "drain", "--" + FlagShardKey, ""},
+			setup:   func(t *testing.T, ctrl *gomock.Controller) setupResult { return setupResult{} },
+			wantErr: "must not be empty",
 		},
 		{
 			name: "API error surfaces NamespaceNotFound",
@@ -364,7 +344,7 @@ func TestDrainShards(t *testing.T) {
 					Return(&types.NamespaceNotFoundError{Namespace: "missing"})
 				return setupResult{client: mc}
 			},
-			wantErr: "namespace not found missing",
+			wantErr: `namespace "missing" not found`,
 		},
 		{
 			name: "factory error is propagated",
@@ -373,20 +353,6 @@ func TestDrainShards(t *testing.T) {
 				return setupResult{clientErr: errors.New("error")}
 			},
 			wantErr: "error",
-		},
-		{
-			name: "shard alias 'sh', drain alias 'dr', and shard-key alias 'sk' work",
-			args: []string{"smctl", "-n", "ns-1", "sh", "dr", "-sk", "sk-1"},
-			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
-				mc := sharddistributor.NewMockClient(ctrl)
-				mc.EXPECT().
-					DrainShards(gomock.Any(), &types.DrainShardsRequest{
-						Namespace: "ns-1",
-						ShardKeys: []string{"sk-1"},
-					}).
-					Return(nil)
-				return setupResult{client: mc}
-			},
 		},
 	})
 }
@@ -434,7 +400,7 @@ func TestUndrainShards(t *testing.T) {
 			name:    "missing --shard-key fails with required-flag error",
 			args:    []string{"smctl", "-n", "ns-1", "shard", "undrain"},
 			setup:   func(t *testing.T, ctrl *gomock.Controller) setupResult { return setupResult{} },
-			wantErr: `--` + FlagShardKey + ` is required`,
+			wantErr: `Required flag "` + FlagShardKey + `" not set`,
 		},
 		{
 			name: "API error surfaces NamespaceNotFound",
@@ -449,21 +415,7 @@ func TestUndrainShards(t *testing.T) {
 					Return(nil, &types.NamespaceNotFoundError{Namespace: "missing"})
 				return setupResult{client: mc}
 			},
-			wantErr: "namespace not found missing",
-		},
-		{
-			name: "shard alias 'sh', undrain alias 'ud', and shard-key alias 'sk' work",
-			args: []string{"smctl", "-n", "ns-1", "sh", "ud", "-sk", "sk-1"},
-			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
-				mc := sharddistributor.NewMockClient(ctrl)
-				mc.EXPECT().
-					UndrainShards(gomock.Any(), &types.UndrainShardsRequest{
-						Namespace: "ns-1",
-						ShardKeys: []string{"sk-1"},
-					}).
-					Return(&types.UndrainShardsResponse{UndrainedShardKeys: []string{"sk-1"}}, nil)
-				return setupResult{client: mc}
-			},
+			wantErr: `namespace "missing" not found`,
 		},
 	})
 }
@@ -516,20 +468,7 @@ func TestGetDrainedShards(t *testing.T) {
 					Return(nil, &types.NamespaceNotFoundError{Namespace: "missing"})
 				return setupResult{client: mc}
 			},
-			wantErr: "namespace not found missing",
-		},
-		{
-			name: "shard alias 'sh' and list-drained alias 'ld' work",
-			args: []string{"smctl", "-n", "ns-1", "sh", "ld"},
-			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
-				mc := sharddistributor.NewMockClient(ctrl)
-				mc.EXPECT().
-					GetDrainedShards(gomock.Any(), &types.GetDrainedShardsRequest{
-						Namespace: "ns-1",
-					}).
-					Return(&types.GetDrainedShardsResponse{Namespace: "ns-1"}, nil)
-				return setupResult{client: mc}
-			},
+			wantErr: `namespace "missing" not found`,
 		},
 	})
 }

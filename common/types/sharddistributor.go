@@ -301,7 +301,7 @@ type NamespaceNotFoundError struct {
 
 func (n *NamespaceNotFoundError) Error() (o string) {
 	if n != nil {
-		return fmt.Sprintf("namespace not found %v", n.Namespace)
+		return fmt.Sprintf("namespace %q not found", n.Namespace)
 	}
 	return
 }

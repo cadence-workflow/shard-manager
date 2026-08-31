@@ -490,7 +490,7 @@ func TestGetNamespaceState(t *testing.T) {
 		{
 			name:            "unknown_namespace",
 			request:         &types.GetNamespaceStateRequest{Namespace: "missing"},
-			wantErrContains: "namespace not found",
+			wantErrContains: `namespace "missing" not found`,
 		},
 		{
 			name:    "get_state_error",
@@ -597,7 +597,7 @@ func TestForceResetNamespace(t *testing.T) {
 		{
 			name:            "unknown_namespace",
 			request:         &types.ForceResetNamespaceRequest{Namespace: "missing"},
-			wantErrContains: "namespace not found",
+			wantErrContains: `namespace "missing" not found`,
 		},
 		{
 			name:    "store_error",
@@ -689,7 +689,7 @@ func TestGetExecutorState(t *testing.T) {
 		{
 			name:            "unknown_namespace",
 			request:         &types.GetExecutorStateRequest{Namespace: "missing", ExecutorID: "executor1"},
-			wantErrContains: "namespace not found",
+			wantErrContains: `namespace "missing" not found`,
 		},
 		{
 			name:    "executor_not_found",

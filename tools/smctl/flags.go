@@ -54,10 +54,18 @@ func requiredStringFlag(cmd *cliv3.Command, name string) (string, error) {
 	return value, nil
 }
 
-func requiredStringSliceFlag(cmd *cliv3.Command, name string) ([]string, error) {
-	values := cmd.StringSlice(name)
-	if len(values) == 0 {
-		return nil, fmt.Errorf("--%s is required", name)
+func nonEmptyString(value string) error {
+	if value == "" {
+		return fmt.Errorf("must not be empty")
 	}
-	return values, nil
+	return nil
+}
+
+func nonEmptyStrings(values []string) error {
+	for _, value := range values {
+		if err := nonEmptyString(value); err != nil {
+			return err
+		}
+	}
+	return nil
 }

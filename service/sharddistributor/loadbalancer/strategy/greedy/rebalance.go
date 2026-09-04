@@ -20,6 +20,7 @@ const minShardSmoothedLoadForMove = 0.01
 
 type moveCandidate struct {
 	shardID         string
+	smoothedLoad    float64
 	from            string
 	to              string
 	assignmentIndex int
@@ -52,11 +53,12 @@ func PlanRebalance(
 	}
 	moves := make([]plan.Move, 0, moveBudget)
 	movedShards := make(map[string]struct{})
+	movedReportedLoad := 0.0
 
 	// Plan multiple moves per cycle (within budget), recomputing eligibility after each move.
 	// Stop early once sources/destinations are empty, i.e. imbalance is within hysteresis bands.
 	for moveBudget > 0 {
-		move, moved, err := planAndApplyNextMove(cfg, namespace, namespaceState, workingAssignments, loads, meanLoad, movedShards, now)
+		candidate, moved, err := planAndApplyNextMove(cfg, namespace, namespaceState, workingAssignments, loads, meanLoad, movedShards, now)
 		if err != nil {
 			return nil, err
 		}
@@ -64,16 +66,24 @@ func PlanRebalance(
 			break
 		}
 
+		move := plan.Move{
+			ShardID: candidate.shardID,
+			From:    candidate.from,
+			To:      candidate.to,
+		}
 		moves = append(moves, move)
-		shardLoad := namespaceState.ShardStats[move.ShardID].SmoothedLoad
-		logGreedyMove(logger, loads, move, shardLoad)
-		if metricsScope != nil {
-			metricsScope.UpdateGauge(metrics.ShardDistributorAssignLoopMovedShardLoad, shardLoad)
+		logGreedyMove(logger, loads, move, candidate.smoothedLoad)
+		sourceExecutor := namespaceState.Executors[move.From]
+		movedShardReport := sourceExecutor.ReportedShards[move.ShardID]
+		if movedShardReport != nil {
+			movedReportedLoad += movedShardReport.ShardLoad
 		}
 		moveBudget--
 	}
 	if len(moves) > 0 && metricsScope != nil {
+		movedLoadMilli := int64(movedReportedLoad * 1000)
 		metricsScope.AddCounter(metrics.ShardDistributorAssignLoopLoadBasedMoves, int64(len(moves)))
+		metricsScope.AddCounter(metrics.ShardDistributorAssignLoopMovedLoadMilli, movedLoadMilli)
 	}
 	return moves, nil
 }
@@ -129,7 +139,7 @@ func planAndApplyNextMove(
 	meanLoad float64,
 	movedShards map[string]struct{},
 	now time.Time,
-) (plan.Move, bool, error) {
+) (moveCandidate, bool, error) {
 	sourceExecutors, destinationExecutors := classifySourcesAndDestinations(
 		loads,
 		namespaceState,
@@ -138,7 +148,7 @@ func planAndApplyNextMove(
 		cfg.HysteresisLowerBand(namespace),
 	)
 	if len(sourceExecutors) == 0 {
-		return plan.Move{}, false, nil
+		return moveCandidate{}, false, nil
 	}
 
 	destinationExecutor, ok := selectDestinationExecutor(
@@ -150,35 +160,31 @@ func planAndApplyNextMove(
 		cfg.SevereImbalanceRatio(namespace),
 	)
 	if !ok {
-		return plan.Move{}, false, nil
+		return moveCandidate{}, false, nil
 	}
 
 	candidate, found := findNextMoveCandidate(
 		sourceExecutors,
 		destinationExecutor,
 		workingAssignments,
-		namespaceState,
+		namespaceState.ShardStats,
 		loads,
 		movedShards,
 		now,
 		cfg.PerShardCooldown(namespace),
 	)
 	if !found {
-		return plan.Move{}, false, nil
+		return moveCandidate{}, false, nil
 	}
 
 	if err := applyMoveCandidate(workingAssignments, candidate); err != nil {
-		return plan.Move{}, false, err
+		return moveCandidate{}, false, err
 	}
 
 	movedShards[candidate.shardID] = struct{}{}
-	updateExecutorLoadsAfterMove(namespaceState, candidate.from, candidate.to, loads, candidate.shardID)
+	updateExecutorLoadsAfterMove(candidate.from, candidate.to, loads, candidate.smoothedLoad)
 
-	return plan.Move{
-		ShardID: candidate.shardID,
-		From:    candidate.from,
-		To:      candidate.to,
-	}, true, nil
+	return candidate, true, nil
 }
 
 // selectDestinationExecutor picks the least-loaded destination executor. If
@@ -217,7 +223,7 @@ func findNextMoveCandidate(
 	sourceExecutors []string,
 	destinationExecutor string,
 	workingAssignments map[string][]string,
-	namespaceState *store.NamespaceState,
+	shardStats map[string]store.ShardStatistics,
 	loads map[string]float64,
 	movedShards map[string]struct{},
 	now time.Time,
@@ -228,9 +234,9 @@ func findNextMoveCandidate(
 		if sourceExecutor == destinationExecutor {
 			continue
 		}
-		shardID, idx, found := findBestShardForMove(
+		candidate, found := findBestShardForMove(
 			workingAssignments,
-			namespaceState,
+			shardStats,
 			sourceExecutor,
 			destinationExecutor,
 			loads,
@@ -243,12 +249,7 @@ func findNextMoveCandidate(
 			continue
 		}
 
-		return moveCandidate{
-			shardID:         shardID,
-			from:            sourceExecutor,
-			to:              destinationExecutor,
-			assignmentIndex: idx,
-		}, true
+		return candidate, true
 	}
 
 	return moveCandidate{}, false
@@ -314,27 +315,25 @@ func sortByDescendingLoad(executors []string, executorLoads map[string]float64) 
 
 func findBestShardForMove(
 	currentAssignments map[string][]string,
-	state *store.NamespaceState,
+	shardStats map[string]store.ShardStatistics,
 	source string,
 	destination string,
 	executorLoads map[string]float64,
 	movedShards map[string]struct{},
 	now time.Time,
 	perShardCooldown time.Duration,
-) (string, int, bool) {
-	bestShard := ""
-
+) (moveCandidate, bool) {
 	sourceLoad := executorLoads[source]
 	destLoad := executorLoads[destination]
-	idx := -1
 
+	var bestCandidate moveCandidate
 	bestBenefit := 0.0
 	for i, shard := range currentAssignments[source] {
 		if _, ok := movedShards[shard]; ok {
 			continue
 		}
 
-		stats, ok := state.ShardStats[shard]
+		stats, ok := shardStats[shard]
 		if !ok || !hasSmoothedLoadUpdate(stats) {
 			continue
 		}
@@ -353,12 +352,17 @@ func findBestShardForMove(
 		}
 		if benefit > bestBenefit {
 			bestBenefit = benefit
-			bestShard = shard
-			idx = i
+			bestCandidate = moveCandidate{
+				shardID:         shard,
+				smoothedLoad:    load,
+				from:            source,
+				to:              destination,
+				assignmentIndex: i,
+			}
 		}
 	}
 
-	return bestShard, idx, bestShard != ""
+	return bestCandidate, bestCandidate.shardID != ""
 }
 
 // computeBenefitOfMove returns the reduction in squared executor load from
@@ -388,18 +392,13 @@ func applyMoveCandidate(currentAssignments map[string][]string, candidate moveCa
 }
 
 func updateExecutorLoadsAfterMove(
-	state *store.NamespaceState,
 	source string,
 	destination string,
 	executorLoads map[string]float64,
-	shardID string,
+	shardLoad float64,
 ) {
-	stats, ok := state.ShardStats[shardID]
-	if !ok {
-		return
-	}
-	executorLoads[source] -= stats.SmoothedLoad
-	executorLoads[destination] += stats.SmoothedLoad
+	executorLoads[source] -= shardLoad
+	executorLoads[destination] += shardLoad
 }
 
 func logGreedyMove(logger log.Logger, loads map[string]float64, move plan.Move, shardLoad float64) {

@@ -91,8 +91,9 @@ func PlanRebalance(
 		tag.Dynamic("hottest_executor_shard_count", len(currentAssignments[hottestExecutorID])),
 		tag.Dynamic("coldest_executor_shard_count", len(currentAssignments[coldestExecutorID])),
 	)
+	movedLoadMilli := int64(hottestShardLoad * 1000)
 	metricsScope.AddCounter(metrics.ShardDistributorAssignLoopLoadBasedMoves, 1)
-	metricsScope.UpdateGauge(metrics.ShardDistributorAssignLoopMovedShardLoad, hottestShardLoad)
+	metricsScope.AddCounter(metrics.ShardDistributorAssignLoopMovedLoadMilli, movedLoadMilli)
 
 	// Plan moving the hottest shard from the hottest executor to the coldest executor.
 	return []plan.Move{{

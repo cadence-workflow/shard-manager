@@ -8,6 +8,7 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
+	metricsmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	config "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
@@ -243,6 +244,28 @@ func TestPlanRebalanceNaiveByReportedLoad(t *testing.T) {
 			assert.Equal(t, originalAssignments, tc.currentAssignments, "planner should not mutate current assignments")
 		})
 	}
+}
+
+func TestPlanRebalanceEmitsMovedLoadMilli(t *testing.T) {
+	expectedMoveCount := 1
+	movedShardReportedLoad := 30.0
+	expectedMovedLoadMilli := int64(movedShardReportedLoad * 1000)
+
+	metricsScope := &metricsmocks.Scope{}
+	metricsScope.On("AddCounter", metrics.ShardDistributorAssignLoopLoadBasedMoves, int64(expectedMoveCount)).Once()
+	metricsScope.On("AddCounter", metrics.ShardDistributorAssignLoopMovedLoadMilli, expectedMovedLoadMilli).Once()
+
+	_, err := PlanRebalance(
+		testNaiveConfig(2),
+		testNamespace,
+		testNamespaceState(map[string]float64{"shard-1": 5, "shard-2": movedShardReportedLoad, "shard-3": 20}),
+		map[string][]string{"exec-1": {"shard-1"}, "exec-2": {"shard-2", "shard-3"}},
+		log.NewNoop(),
+		metricsScope,
+	)
+
+	require.NoError(t, err)
+	metricsScope.AssertExpectations(t)
 }
 
 func cloneAssignments(assignments map[string][]string) map[string][]string {

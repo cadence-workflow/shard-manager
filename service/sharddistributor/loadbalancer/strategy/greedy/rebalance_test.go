@@ -11,6 +11,7 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
+	metricsmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
@@ -140,19 +141,17 @@ func TestFindBestShardForMove_MinimumLoad(t *testing.T) {
 				"source":      {shardID},
 				"destination": {},
 			}
-			state := &store.NamespaceState{
-				ShardStats: map[string]store.ShardStatistics{
-					shardID: {SmoothedLoad: test.load, LastUpdateTime: now},
-				},
+			shardStats := map[string]store.ShardStatistics{
+				shardID: {SmoothedLoad: test.load, LastUpdateTime: now},
 			}
 			executorLoads := map[string]float64{
 				"source":      1,
 				"destination": 0,
 			}
 
-			gotShard, gotIndex, found := findBestShardForMove(
+			candidate, found := findBestShardForMove(
 				assignments,
-				state,
+				shardStats,
 				"source",
 				"destination",
 				executorLoads,
@@ -163,11 +162,11 @@ func TestFindBestShardForMove_MinimumLoad(t *testing.T) {
 
 			assert.Equal(t, test.wantFound, found)
 			if test.wantFound {
-				assert.Equal(t, shardID, gotShard)
-				assert.Equal(t, 0, gotIndex)
+				assert.Equal(t, shardID, candidate.shardID)
+				assert.Equal(t, test.load, candidate.smoothedLoad)
+				assert.Equal(t, 0, candidate.assignmentIndex)
 			} else {
-				assert.Empty(t, gotShard)
-				assert.Equal(t, -1, gotIndex)
+				assert.Empty(t, candidate.shardID)
 			}
 		})
 	}
@@ -416,8 +415,12 @@ func TestLoadBalance_BudgetConstraint(t *testing.T) {
 // TestLoadBalance_MultiMovePerCycle verifies multiple moves can be planned within a single pass up to the budget.
 func TestLoadBalance_MultiMovePerCycle(t *testing.T) {
 	cfg := testGreedyConfig()
+	reportedShardLoad := 0.6
+	expectedMoveCount := 2
 
 	execA, execB := "exec-A", "exec-B"
+	initialExecAShardCount := 100
+	initialExecBShardCount := 50
 	now := time.Now().UTC()
 
 	assignments := map[string]store.AssignedState{
@@ -429,14 +432,16 @@ func TestLoadBalance_MultiMovePerCycle(t *testing.T) {
 		execB: {},
 	}
 	shardStats := make(map[string]store.ShardStatistics)
+	reportedShards := make(map[string]*types.ShardStatusReport)
 
-	for i := range 100 {
+	for i := range initialExecAShardCount {
 		sID := fmt.Sprintf("A-%d", i)
 		assignments[execA].AssignedShards[sID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
 		currentAssignments[execA] = append(currentAssignments[execA], sID)
 		shardStats[sID] = store.ShardStatistics{SmoothedLoad: 2.0, LastUpdateTime: now}
+		reportedShards[sID] = &types.ShardStatusReport{ShardLoad: reportedShardLoad}
 	}
-	for i := range 50 {
+	for i := range initialExecBShardCount {
 		sID := fmt.Sprintf("B-%d", i)
 		assignments[execB].AssignedShards[sID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
 		currentAssignments[execB] = append(currentAssignments[execB], sID)
@@ -445,22 +450,30 @@ func TestLoadBalance_MultiMovePerCycle(t *testing.T) {
 
 	totalShards := len(shardStats)
 	expectedBudget := computeMoveBudget(totalShards, cfg.MoveBudgetProportion(testNamespace))
+	require.Equal(t, expectedMoveCount, expectedBudget)
+	// The counter stores milli-load, so the aggregated 1.2 reported load is emitted as 1200.
+	expectedMovedLoadMilli := int64(float64(expectedMoveCount) * reportedShardLoad * 1000)
 
 	namespaceState := &store.NamespaceState{
 		Executors: map[string]store.HeartbeatState{
-			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now, ReportedShards: reportedShards},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
 		ShardAssignments: assignments,
 		ShardStats:       shardStats,
 	}
 
-	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
+	metricsScope := &metricsmocks.Scope{}
+	metricsScope.On("AddCounter", metrics.ShardDistributorAssignLoopLoadBasedMoves, int64(expectedMoveCount)).Once()
+	metricsScope.On("AddCounter", metrics.ShardDistributorAssignLoopMovedLoadMilli, expectedMovedLoadMilli).Once()
+
+	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metricsScope)
 	require.NoError(t, err)
-	require.NotEmpty(t, moves)
+	require.Len(t, moves, expectedMoveCount)
+	metricsScope.AssertExpectations(t)
 	applyMoves(t, currentAssignments, moves)
-	assert.Equal(t, 100-expectedBudget, len(currentAssignments[execA]), "ExecA should shed budgeted shards")
-	assert.Equal(t, 50+expectedBudget, len(currentAssignments[execB]), "ExecB should gain budgeted shards")
+	assert.Equal(t, initialExecAShardCount-expectedBudget, len(currentAssignments[execA]), "ExecA should shed budgeted shards")
+	assert.Equal(t, initialExecBShardCount+expectedBudget, len(currentAssignments[execB]), "ExecB should gain budgeted shards")
 }
 
 // TestLoadBalance_PerShardCooldownSkipsHotShard verifies a recently moved hot shard is skipped due to cooldown.

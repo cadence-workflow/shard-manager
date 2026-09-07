@@ -148,14 +148,10 @@ func BuildDrainedHostKey(prefix, namespace, hostname string) string {
 	return fmt.Sprintf("%s%s", BuildDrainedHostsPrefix(prefix, namespace), hostname)
 }
 
-// NormalizeHostname applies the same hostname rewriting used when building executor IDs:
-// slashes become underscores and the result is truncated to 128 bytes.
+// NormalizeHostname rewrites slashes to underscores so a hostname can be an etcd
+// path segment
 func NormalizeHostname(hostname string) string {
-	hostname = strings.ReplaceAll(hostname, "/", "_")
-	if len(hostname) > maxHostnameLength {
-		hostname = hostname[:maxHostnameLength]
-	}
-	return hostname
+	return strings.ReplaceAll(hostname, "/", "_")
 }
 
 // ValidateHostname rejects hostnames that cannot survive a key round trip or that
@@ -163,6 +159,9 @@ func NormalizeHostname(hostname string) string {
 func ValidateHostname(hostname string) error {
 	if hostname == "" {
 		return errors.New("hostname must not be empty")
+	}
+	if len(hostname) > maxHostnameLength {
+		return fmt.Errorf("hostname exceeds %d bytes", maxHostnameLength)
 	}
 	if strings.Contains(hostname, "/") {
 		return fmt.Errorf("hostname '%s' must not contain '/'", hostname)

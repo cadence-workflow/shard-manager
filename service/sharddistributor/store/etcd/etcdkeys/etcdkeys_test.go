@@ -198,7 +198,7 @@ func TestDrainedHostsPrefixIsDisjointFromSiblingPrefixes(t *testing.T) {
 	}
 }
 
-func TestNormalizeHostnameTruncatesToExecutorIDLimit(t *testing.T) {
-	got := NormalizeHostname(strings.Repeat("a", 200))
-	assert.Equal(t, strings.Repeat("a", 128), got)
+func TestValidateHostnameRejectsOverLength(t *testing.T) {
+	assert.NoError(t, ValidateHostname(strings.Repeat("a", 128)))
+	assert.ErrorContains(t, ValidateHostname(strings.Repeat("a", 129)), "exceeds 128 bytes")
 }

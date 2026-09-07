@@ -132,3 +132,34 @@ func TestNamespaceState_ShardOwners(t *testing.T) {
 		})
 	}
 }
+
+func TestNamespaceState_IsHostDrained(t *testing.T) {
+	tests := []struct {
+		name     string
+		hosts    map[string]DrainedHost
+		hostname string
+		want     bool
+	}{
+		{name: "nil map", hostname: "host-a", want: false},
+		{name: "empty map", hosts: map[string]DrainedHost{}, hostname: "host-a", want: false},
+		{
+			name:     "drained",
+			hosts:    map[string]DrainedHost{"host-a": {Hostname: "host-a"}},
+			hostname: "host-a",
+			want:     true,
+		},
+		{
+			name:     "other host",
+			hosts:    map[string]DrainedHost{"host-a": {Hostname: "host-a"}},
+			hostname: "host-b",
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ns := &NamespaceState{DrainedHosts: tt.hosts}
+			assert.Equal(t, tt.want, ns.IsHostDrained(tt.hostname))
+		})
+	}
+}

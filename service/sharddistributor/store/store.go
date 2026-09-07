@@ -98,9 +98,10 @@ type Store interface {
 
 	// ResetNamespace deletes every key under the namespace prefix in storage,
 	// including the leader key, executor heartbeats/status/metadata, shard
-	// assignments, and shard statistics. The namespace itself stays configured
-	// at the service-config level; executors will re-register on their next
-	// heartbeat and the next leader will rebuild the assignment plan.
+	// assignments, shard statistics, drained shards, and drained hosts. The
+	// namespace itself stays configured at the service-config level; executors
+	// will re-register on their next heartbeat and the next leader will rebuild
+	// the assignment plan.
 	//
 	// This is intentionally NOT guarded by leadership: any in-flight leader
 	// writes will fail their own leadership guard once the leader key is gone,
@@ -122,4 +123,19 @@ type Store interface {
 
 	// GetDrainedShards returns the shards currently drained for the namespace.
 	GetDrainedShards(ctx context.Context, namespace string) ([]string, error)
+
+	// DrainHosts marks the given hosts as drained for the namespace.
+	// The operation is idempotent: a host that is already drained keeps its
+	// original drain metadata (including drained_at).
+	DrainHosts(ctx context.Context, namespace string, hosts []DrainedHost) error
+
+	// UndrainHosts removes the given hosts from the drained set for the namespace.
+	// The operation is idempotent: hosts that are not drained are ignored.
+	//
+	// Returns the subset of hostnames that this call actually removed. A host that
+	// was already absent is excluded, so a repeated call reports nothing removed.
+	UndrainHosts(ctx context.Context, namespace string, hostnames []string) ([]string, error)
+
+	// GetDrainedHosts returns the hosts currently drained for the namespace.
+	GetDrainedHosts(ctx context.Context, namespace string) ([]DrainedHost, error)
 }

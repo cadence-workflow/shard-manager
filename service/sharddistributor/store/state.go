@@ -66,6 +66,19 @@ type NamespaceState struct {
 	// explicitly undrained.
 	// Key: ShardID
 	DrainedShards map[string]struct{}
+
+	// DrainedHosts holds host drains for this namespace.
+	// A drained host's executors are not eligible for assignment until
+	// the host is explicitly undrained
+	DrainedHosts map[string]DrainedHost
+}
+
+// DrainedHost is the persisted metadata for a host drain
+type DrainedHost struct {
+	Hostname  string    `json:"hostname"`
+	DrainedAt time.Time `json:"drained_at"`
+	DrainedBy string    `json:"drained_by,omitempty"`
+	Reason    string    `json:"reason,omitempty"`
 }
 
 type ShardState struct {
@@ -122,5 +135,10 @@ func (ns *NamespaceState) ShardOwners() map[string]string {
 
 func (ns *NamespaceState) IsShardDrained(shardID string) bool {
 	_, drained := ns.DrainedShards[shardID]
+	return drained
+}
+
+func (ns *NamespaceState) IsHostDrained(hostname string) bool {
+	_, drained := ns.DrainedHosts[hostname]
 	return drained
 }

@@ -1525,6 +1525,9 @@ const (
 	ShardDistributorStoreDrainShardsScope
 	ShardDistributorStoreUndrainShardsScope
 	ShardDistributorStoreGetDrainedShardsScope
+	ShardDistributorStoreDrainHostsScope
+	ShardDistributorStoreUndrainHostsScope
+	ShardDistributorStoreGetDrainedHostsScope
 
 	// The scope for the shard distributor executor
 	ShardDistributorExecutorScope
@@ -2248,6 +2251,9 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorStoreDrainShardsScope:                      {operation: "StoreDrainShards"},
 		ShardDistributorStoreUndrainShardsScope:                    {operation: "StoreUndrainShards"},
 		ShardDistributorStoreGetDrainedShardsScope:                 {operation: "StoreGetDrainedShards"},
+		ShardDistributorStoreDrainHostsScope:                       {operation: "StoreDrainHosts"},
+		ShardDistributorStoreUndrainHostsScope:                     {operation: "StoreUndrainHosts"},
+		ShardDistributorStoreGetDrainedHostsScope:                  {operation: "StoreGetDrainedHosts"},
 		ShardDistributorWatchScope:                                 {operation: "Watch"},
 		ShardDistributorLeaderScope:                                {operation: "Leader"},
 		ShardDistributorInspectShardScope:                          {operation: "InspectShard"},

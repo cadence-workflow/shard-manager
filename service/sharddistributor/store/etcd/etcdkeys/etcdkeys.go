@@ -133,3 +133,56 @@ func ParseDrainedShardKey(prefix, namespace, key string) (shardID string, err er
 	}
 	return shardID, nil
 }
+
+const maxHostnameLength = 128
+
+// BuildDrainedHostsPrefix constructs the etcd key prefix for drained hosts within a given namespace
+// Expected format: <prefix>/<namespace>/drained_hosts/
+func BuildDrainedHostsPrefix(prefix, namespace string) string {
+	return fmt.Sprintf("%sdrained_hosts/", BuildNamespacePrefix(prefix, namespace))
+}
+
+// BuildDrainedHostKey constructs the etcd key marking a single host as drained
+// Expected format: <prefix>/<namespace>/drained_hosts/<hostname>
+func BuildDrainedHostKey(prefix, namespace, hostname string) string {
+	return fmt.Sprintf("%s%s", BuildDrainedHostsPrefix(prefix, namespace), hostname)
+}
+
+// NormalizeHostname applies the same hostname rewriting used when building executor IDs:
+// slashes become underscores and the result is truncated to 128 bytes.
+func NormalizeHostname(hostname string) string {
+	hostname = strings.ReplaceAll(hostname, "/", "_")
+	if len(hostname) > maxHostnameLength {
+		hostname = hostname[:maxHostnameLength]
+	}
+	return hostname
+}
+
+// ValidateHostname rejects hostnames that cannot survive a key round trip or that
+// would break hostname@uuid matching. Call after NormalizeHostname.
+func ValidateHostname(hostname string) error {
+	if hostname == "" {
+		return errors.New("hostname must not be empty")
+	}
+	if strings.Contains(hostname, "/") {
+		return fmt.Errorf("hostname '%s' must not contain '/'", hostname)
+	}
+	if strings.Contains(hostname, "@") {
+		return fmt.Errorf("hostname '%s' must not contain '@'", hostname)
+	}
+	return nil
+}
+
+// ParseDrainedHostKey extracts the hostname from a drained-host etcd key.
+// Expected format: <prefix>/<namespace>/drained_hosts/<hostname>
+func ParseDrainedHostKey(prefix, namespace, key string) (hostname string, err error) {
+	drainedPrefix := BuildDrainedHostsPrefix(prefix, namespace)
+	if !strings.HasPrefix(key, drainedPrefix) {
+		return "", fmt.Errorf("key '%s' does not have expected drained hosts prefix '%s'", key, drainedPrefix)
+	}
+	hostname = strings.TrimPrefix(key, drainedPrefix)
+	if err := ValidateHostname(hostname); err != nil {
+		return "", fmt.Errorf("unexpected drained host key format '%s': %w", key, err)
+	}
+	return hostname, nil
+}

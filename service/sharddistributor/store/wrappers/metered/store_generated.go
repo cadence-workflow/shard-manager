@@ -79,6 +79,16 @@ func (c *meteredStore) DeleteShardStats(ctx context.Context, namespace string, s
 	return
 }
 
+func (c *meteredStore) DrainHosts(ctx context.Context, namespace string, hosts []store.DrainedHost) (err error) {
+	op := func() error {
+		err = c.wrapped.DrainHosts(ctx, namespace, hosts)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreDrainHostsScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
 func (c *meteredStore) DrainShards(ctx context.Context, namespace string, shardIDs []string) (err error) {
 	op := func() error {
 		err = c.wrapped.DrainShards(ctx, namespace, shardIDs)
@@ -86,6 +96,16 @@ func (c *meteredStore) DrainShards(ctx context.Context, namespace string, shardI
 	}
 
 	err = c.call(metrics.ShardDistributorStoreDrainShardsScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
+func (c *meteredStore) GetDrainedHosts(ctx context.Context, namespace string) (da1 []store.DrainedHost, err error) {
+	op := func() error {
+		da1, err = c.wrapped.GetDrainedHosts(ctx, namespace)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreGetDrainedHostsScope, op, metrics.NamespaceTag(namespace))
 	return
 }
 
@@ -201,6 +221,16 @@ func (c *meteredStore) SubscribeToExecutorStatusChanges(ctx context.Context, nam
 	}
 
 	err = c.call(metrics.ShardDistributorStoreSubscribeToExecutorStatusChangesScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
+func (c *meteredStore) UndrainHosts(ctx context.Context, namespace string, hostnames []string) (sa1 []string, err error) {
+	op := func() error {
+		sa1, err = c.wrapped.UndrainHosts(ctx, namespace, hostnames)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreUndrainHostsScope, op, metrics.NamespaceTag(namespace))
 	return
 }
 

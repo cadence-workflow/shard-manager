@@ -235,6 +235,7 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 	txn := s.client.Txn(ctx).Then(
 		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+		clientv3.OpGet(etcdkeys.BuildDrainedHostsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 	)
 	start := s.timeSource.Now()
 	txnResp, err := txn.Commit()
@@ -242,8 +243,8 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 	if err != nil {
 		return nil, fmt.Errorf("get namespace state: %w", err)
 	}
-	if len(txnResp.Responses) != 2 {
-		return nil, fmt.Errorf("get namespace state: expected 2 responses, got %d", len(txnResp.Responses))
+	if len(txnResp.Responses) != 3 {
+		return nil, fmt.Errorf("get namespace state: expected 3 responses, got %d", len(txnResp.Responses))
 	}
 
 	parsedData, err := common.ParseExecutorKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
@@ -273,6 +274,7 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 		ShardStats:       shardStats,
 		ShardAssignments: assignedStates,
 		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+		DrainedHosts:     s.parseDrainedHostKVs(namespace, txnResp.Responses[2].GetResponseRange().Kvs),
 	}, nil
 }
 
@@ -302,6 +304,48 @@ func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb
 			continue
 		}
 		drained[shardID] = struct{}{}
+	}
+	return drained
+}
+
+// loadDrainedHostSet reads every drained-host key for the namespace.
+func (s *executorStoreImpl) loadDrainedHostSet(ctx context.Context, namespace string) (map[string]store.DrainedHost, error) {
+	drainedPrefix := etcdkeys.BuildDrainedHostsPrefix(s.prefix, namespace)
+	resp, err := s.client.Get(ctx, drainedPrefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("get drained hosts prefix: %w", err)
+	}
+	return s.parseDrainedHostKVs(namespace, resp.Kvs), nil
+}
+
+// parseDrainedHostKVs turns drained-host keys into hostname -> metadata
+func (s *executorStoreImpl) parseDrainedHostKVs(namespace string, kvs []*mvccpb.KeyValue) map[string]store.DrainedHost {
+	drained := make(map[string]store.DrainedHost, len(kvs))
+	for _, kv := range kvs {
+		hostname, err := etcdkeys.ParseDrainedHostKey(s.prefix, namespace, string(kv.Key))
+		if err != nil {
+			s.logger.Warn("skipping malformed drained host key",
+				tag.ShardNamespace(namespace),
+				tag.Key(string(kv.Key)),
+				tag.Error(err),
+			)
+			continue
+		}
+		record := store.DrainedHost{Hostname: hostname}
+		if len(kv.Value) > 0 {
+			var parsed store.DrainedHost
+			if err := json.Unmarshal(kv.Value, &parsed); err != nil {
+				s.logger.Warn("skipping malformed drained host value",
+					tag.ShardNamespace(namespace),
+					tag.Key(string(kv.Key)),
+					tag.Error(err),
+				)
+			} else {
+				parsed.Hostname = hostname
+				record = parsed
+			}
+		}
+		drained[hostname] = record
 	}
 	return drained
 }
@@ -669,9 +713,10 @@ func (s *executorStoreImpl) GetShardOwner(ctx context.Context, namespace, shardI
 
 // ResetNamespace deletes every key under <prefix>/<namespace>/ in a single
 // etcd op. This wipes the leader key, executor heartbeats/status/metadata,
-// shard assignments, and shard statistics. It is intentionally NOT guarded
-// by leadership: any concurrent leader write will subsequently fail its own
-// leadership-key revision check, which is the desired behaviour.
+// shard assignments, shard statistics, drained shards, and drained hosts.
+// It is intentionally NOT guarded by leadership: any concurrent leader write
+// will subsequently fail its own leadership-key revision check, which is the
+// desired behaviour.
 func (s *executorStoreImpl) ResetNamespace(ctx context.Context, namespace string) (int64, error) {
 	prefix := etcdkeys.BuildNamespacePrefix(s.prefix, namespace)
 	resp, err := s.client.Delete(ctx, prefix, clientv3.WithPrefix())
@@ -758,6 +803,115 @@ func (s *executorStoreImpl) GetDrainedShards(ctx context.Context, namespace stri
 		return nil, fmt.Errorf("get drained shards: %w", err)
 	}
 	return slices.Sorted(maps.Keys(drained)), nil
+}
+
+// DrainHosts writes one JSON-valued key per host under the namespace's drained
+// hosts prefix
+func (s *executorStoreImpl) DrainHosts(ctx context.Context, namespace string, hosts []store.DrainedHost) error {
+	if len(hosts) == 0 {
+		return nil
+	}
+
+	normalized, err := normalizeDrainedHosts(hosts)
+	if err != nil {
+		return fmt.Errorf("drain hosts: %w", err)
+	}
+
+	existing, err := s.loadDrainedHostSet(ctx, namespace)
+	if err != nil {
+		return fmt.Errorf("drain hosts: %w", err)
+	}
+
+	ops := make([]clientv3.Op, 0, len(normalized))
+	for hostname, host := range normalized {
+		if _, already := existing[hostname]; already {
+			continue
+		}
+		value, err := json.Marshal(host)
+		if err != nil {
+			return fmt.Errorf("drain hosts: marshal %s: %w", hostname, err)
+		}
+		ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedHostKey(s.prefix, namespace, hostname), string(value)))
+	}
+	if len(ops) == 0 {
+		return nil
+	}
+
+	if _, err := s.commitOps(ctx, ops, store.NopGuard()); err != nil {
+		return fmt.Errorf("drain hosts: %w", err)
+	}
+	return nil
+}
+
+// UndrainHosts deletes the given drained-host keys and reports which ones it
+// actually removed.
+func (s *executorStoreImpl) UndrainHosts(ctx context.Context, namespace string, hostnames []string) ([]string, error) {
+	if len(hostnames) == 0 {
+		return nil, nil
+	}
+
+	normalized := make([]string, 0, len(hostnames))
+	for _, hostname := range hostnames {
+		hostname = etcdkeys.NormalizeHostname(hostname)
+		if err := etcdkeys.ValidateHostname(hostname); err != nil {
+			return nil, fmt.Errorf("undrain hosts: %w", err)
+		}
+		normalized = append(normalized, hostname)
+	}
+
+	ops := make([]clientv3.Op, 0, len(normalized))
+	for _, hostname := range normalized {
+		ops = append(ops, clientv3.OpDelete(etcdkeys.BuildDrainedHostKey(s.prefix, namespace, hostname)))
+	}
+
+	responses, err := s.commitOps(ctx, ops, store.NopGuard())
+	if err != nil {
+		return nil, fmt.Errorf("undrain hosts: %w", err)
+	}
+
+	removed := make([]string, 0, len(normalized))
+	opIdx := 0
+	for _, resp := range responses {
+		for _, opResp := range resp.Responses {
+			if opIdx >= len(normalized) {
+				return nil, fmt.Errorf("undrain hosts: got more op responses than the %d ops submitted", len(normalized))
+			}
+			if del := opResp.GetResponseDeleteRange(); del != nil && del.Deleted > 0 {
+				removed = append(removed, normalized[opIdx])
+			}
+			opIdx++
+		}
+	}
+	return removed, nil
+}
+
+// GetDrainedHosts returns the hosts currently drained for the namespace, sorted by hostname
+func (s *executorStoreImpl) GetDrainedHosts(ctx context.Context, namespace string) ([]store.DrainedHost, error) {
+	drained, err := s.loadDrainedHostSet(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("get drained hosts: %w", err)
+	}
+	hosts := make([]store.DrainedHost, 0, len(drained))
+	for _, hostname := range slices.Sorted(maps.Keys(drained)) {
+		hosts = append(hosts, drained[hostname])
+	}
+	return hosts, nil
+}
+
+func normalizeDrainedHosts(hosts []store.DrainedHost) (map[string]store.DrainedHost, error) {
+	normalized := make(map[string]store.DrainedHost, len(hosts))
+	for _, host := range hosts {
+		hostname := etcdkeys.NormalizeHostname(host.Hostname)
+		if err := etcdkeys.ValidateHostname(hostname); err != nil {
+			return nil, err
+		}
+		if _, exists := normalized[hostname]; exists {
+			continue
+		}
+		host.Hostname = hostname
+		normalized[hostname] = host
+	}
+	return normalized, nil
 }
 
 // RecordShardStatisticsBatch records complete statistics maps for multiple

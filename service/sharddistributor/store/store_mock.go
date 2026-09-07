@@ -120,6 +120,20 @@ func (mr *MockStoreMockRecorder) DeleteShardStats(ctx, namespace, shardIDs, guar
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteShardStats", reflect.TypeOf((*MockStore)(nil).DeleteShardStats), ctx, namespace, shardIDs, guard)
 }
 
+// DrainHosts mocks base method.
+func (m *MockStore) DrainHosts(ctx context.Context, namespace string, hosts []DrainedHost) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DrainHosts", ctx, namespace, hosts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DrainHosts indicates an expected call of DrainHosts.
+func (mr *MockStoreMockRecorder) DrainHosts(ctx, namespace, hosts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DrainHosts", reflect.TypeOf((*MockStore)(nil).DrainHosts), ctx, namespace, hosts)
+}
+
 // DrainShards mocks base method.
 func (m *MockStore) DrainShards(ctx context.Context, namespace string, shardIDs []string) error {
 	m.ctrl.T.Helper()
@@ -132,6 +146,21 @@ func (m *MockStore) DrainShards(ctx context.Context, namespace string, shardIDs 
 func (mr *MockStoreMockRecorder) DrainShards(ctx, namespace, shardIDs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DrainShards", reflect.TypeOf((*MockStore)(nil).DrainShards), ctx, namespace, shardIDs)
+}
+
+// GetDrainedHosts mocks base method.
+func (m *MockStore) GetDrainedHosts(ctx context.Context, namespace string) ([]DrainedHost, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDrainedHosts", ctx, namespace)
+	ret0, _ := ret[0].([]DrainedHost)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDrainedHosts indicates an expected call of GetDrainedHosts.
+func (mr *MockStoreMockRecorder) GetDrainedHosts(ctx, namespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDrainedHosts", reflect.TypeOf((*MockStore)(nil).GetDrainedHosts), ctx, namespace)
 }
 
 // GetDrainedShards mocks base method.
@@ -310,6 +339,21 @@ func (m *MockStore) SubscribeToExecutorStatusChanges(ctx context.Context, namesp
 func (mr *MockStoreMockRecorder) SubscribeToExecutorStatusChanges(ctx, namespace any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToExecutorStatusChanges", reflect.TypeOf((*MockStore)(nil).SubscribeToExecutorStatusChanges), ctx, namespace)
+}
+
+// UndrainHosts mocks base method.
+func (m *MockStore) UndrainHosts(ctx context.Context, namespace string, hostnames []string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UndrainHosts", ctx, namespace, hostnames)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UndrainHosts indicates an expected call of UndrainHosts.
+func (mr *MockStoreMockRecorder) UndrainHosts(ctx, namespace, hostnames any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UndrainHosts", reflect.TypeOf((*MockStore)(nil).UndrainHosts), ctx, namespace, hostnames)
 }
 
 // UndrainShards mocks base method.

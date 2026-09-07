@@ -9,6 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/uber-go/tally"
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.uber.org/fx/fxtest"
+	"go.uber.org/mock/gomock"
+	"gopkg.in/yaml.v2"
+
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
@@ -23,13 +32,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/common"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/leaderstore"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/testhelper"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/uber-go/tally"
-	"go.etcd.io/etcd/api/v3/etcdserverpb"
-	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.uber.org/fx/fxtest"
-	"go.uber.org/mock/gomock"
 )
 
 // TestRecordHeartbeat verifies that an executor's heartbeat is correctly stored.

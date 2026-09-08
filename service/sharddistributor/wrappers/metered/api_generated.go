@@ -226,7 +226,7 @@ func (h *metricsHandler) WatchNamespaceState(wp1 *types.WatchNamespaceStateReque
 	err = h.handler.WatchNamespaceState(wp1, w1)
 
 	if err != nil {
-		handleErr(err, scope, logger)
+		handleStreamErr(err, scope, logger)
 	}
 
 	return err

@@ -43,6 +43,14 @@ func (h *{{$decorator}}) {{$method.Declaration}} {
             {{- end }}
         {{- end }}
 
+        {{- /* Streaming methods take their context from the stream server, so they have no context.Context param. */}}
+        {{- $errHandler := "handleStreamErr" }}
+        {{- range $method.Params }}
+            {{- if contains "context.Context" .Type }}
+                {{- $errHandler = "handleErr" }}
+            {{- end }}
+        {{- end }}
+
         scope := h.metricsClient.Scope({{ printf "metrics.ShardDistributor%sScope" $method.Name }})
         scope = scope.Tagged(metrics.NamespaceTag({{ $namespace }}))
         scope.IncCounter(metrics.ShardDistributorRequests)
@@ -53,7 +61,7 @@ func (h *{{$decorator}}) {{$method.Declaration}} {
         {{$method.ResultsNames}} = h.handler.{{ $method.Call }}
 
         if err != nil {
-            handleErr(err, scope, logger)
+            {{ $errHandler }}(err, scope, logger)
         }
 
         return {{ $method.ResultsNames }}

@@ -3118,6 +3118,10 @@ const (
 	// ShardDistributorAssignLoopNoActiveExecutors counts rebalance cycles that found no active executors
 	ShardDistributorAssignLoopNoActiveExecutors
 
+	// ShardDistributorErrContextCanceledCounter counts requests terminated by a canceled context or a
+	// closed stream. These are expected terminations (client disconnect, server shutdown), not failures.
+	ShardDistributorErrContextCanceledCounter
+
 	NumShardDistributorMetrics
 )
 
@@ -3957,6 +3961,7 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		},
 		ShardDistributorIsLeader:                    {metricName: "shard_distributor_is_leader", metricType: Gauge},
 		ShardDistributorAssignLoopNoActiveExecutors: {metricName: "shard_distributor_shard_assign_no_active_executors", metricType: Counter},
+		ShardDistributorErrContextCanceledCounter:   {metricName: "shard_distributor_err_context_canceled", metricType: Counter},
 	},
 }
 

@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/yarpc/yarpcerrors"
 
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
@@ -218,6 +219,19 @@ func TestHandleErr(t *testing.T) {
 			metricName: "shard_distributor_err_context_timeout",
 		},
 		{
+			// Only streams treat cancellation as an expected termination.
+			name:          "ContextCanceled",
+			err:           context.Canceled,
+			expectedError: context.Canceled,
+			setupMocks: func(mockLogger *log.MockLogger) {
+				mockLogger.EXPECT().Error(
+					"internal uncategorized error",
+					[]tag.Tag{tag.Error(context.Canceled)},
+				).Times(1)
+			},
+			metricName: "shard_distributor_failures",
+		},
+		{
 			name:          "UncategorizedError",
 			err:           errors.New("uncategorized error"),
 			expectedError: errors.New("uncategorized error"),
@@ -246,6 +260,85 @@ func TestHandleErr(t *testing.T) {
 			fullName := fmt.Sprintf("test.%s+operation=GetShardOwner", tt.metricName)
 			counter := testScope.Snapshot().Counters()[fullName]
 			assert.NotNil(t, counter)
+			assert.Equal(t, int64(1), counter.Value())
+		})
+	}
+}
+
+func TestHandleStreamErr(t *testing.T) {
+	wrappedCancel := fmt.Errorf("send response: %w", context.Canceled)
+	yarpcCancel := yarpcerrors.CancelledErrorf("client went away")
+
+	tests := []struct {
+		name       string
+		err        error
+		setupMocks func(mockLogger *log.MockLogger)
+		metricName string
+	}{
+		{
+			name: "ContextCanceled",
+			err:  context.Canceled,
+			setupMocks: func(mockLogger *log.MockLogger) {
+				mockLogger.EXPECT().Debug("stream canceled", []tag.Tag{tag.Error(context.Canceled)}).Times(1)
+			},
+			metricName: "shard_distributor_err_context_canceled",
+		},
+		{
+			name: "WrappedContextCanceled",
+			err:  wrappedCancel,
+			setupMocks: func(mockLogger *log.MockLogger) {
+				mockLogger.EXPECT().Debug("stream canceled", []tag.Tag{tag.Error(wrappedCancel)}).Times(1)
+			},
+			metricName: "shard_distributor_err_context_canceled",
+		},
+		{
+			name: "YARPCCancelled",
+			err:  yarpcCancel,
+			setupMocks: func(mockLogger *log.MockLogger) {
+				mockLogger.EXPECT().Debug("stream canceled", []tag.Tag{tag.Error(yarpcCancel)}).Times(1)
+			},
+			metricName: "shard_distributor_err_context_canceled",
+		},
+		{
+			// A typed error still classifies by its type, even if it carries a canceled context.
+			name: "InternalServiceError",
+			err:  &types.InternalServiceError{},
+			setupMocks: func(mockLogger *log.MockLogger) {
+				mockLogger.EXPECT().Error(
+					"Internal service error",
+					[]tag.Tag{tag.Error(&types.InternalServiceError{})},
+				).Times(1)
+			},
+			metricName: "shard_distributor_failures",
+		},
+		{
+			name: "UncategorizedError",
+			err:  errors.New("uncategorized error"),
+			setupMocks: func(mockLogger *log.MockLogger) {
+				mockLogger.EXPECT().Error(
+					"internal uncategorized error",
+					[]tag.Tag{tag.Error(errors.New("uncategorized error"))},
+				).Times(1)
+			},
+			metricName: "shard_distributor_failures",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testScope := tally.NewTestScope("test", nil)
+			metricsClient := metrics.NewClient(testScope, metrics.ShardDistributor, metrics.MigrationConfig{})
+			mockLogger := log.NewMockLogger(gomock.NewController(t))
+			mockLogger.EXPECT().Helper().Return(mockLogger)
+
+			tt.setupMocks(mockLogger)
+			scope := metricsClient.Scope(metrics.ShardDistributorWatchNamespaceStateScope)
+			err := handleStreamErr(tt.err, scope, mockLogger)
+			require.Equal(t, tt.err, err)
+
+			fullName := fmt.Sprintf("test.%s+operation=WatchNamespaceState", tt.metricName)
+			counter := testScope.Snapshot().Counters()[fullName]
+			require.NotNil(t, counter)
 			assert.Equal(t, int64(1), counter.Value())
 		})
 	}

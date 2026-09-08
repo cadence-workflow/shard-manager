@@ -22,6 +22,8 @@ package executorclient
 
 import (
 	"context"
+
+	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
 // noopExecutor is an Executor implementation used when no shard-distributor
@@ -42,6 +44,9 @@ func (e *noopExecutor[SP]) GetNamespace() string            { return "" }
 func (e *noopExecutor[SP]) GetExecutorID() string           { return "" }
 func (e *noopExecutor[SP]) SetMetadata(_ map[string]string) {}
 func (e *noopExecutor[SP]) GetMetadata() map[string]string  { return nil }
+func (e *noopExecutor[SP]) GetShardStatusReports() map[string]*types.ShardStatusReport {
+	return map[string]*types.ShardStatusReport{}
+}
 
 // GetShardProcess always returns ErrShardProcessNotFound so that callers
 // fall back to local hash-ring ownership checks.

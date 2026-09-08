@@ -54,4 +54,8 @@ func TestNoopExecutor(t *testing.T) {
 		assert.Nil(t, sp)
 		assert.ErrorIs(t, err, ErrShardProcessNotFound)
 	})
+
+	t.Run("GetShardStatusReports returns empty map", func(t *testing.T) {
+		assert.Empty(t, exec.GetShardStatusReports())
+	})
 }

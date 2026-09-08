@@ -581,6 +581,25 @@ func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, gu
 	return responses, nil
 }
 
+// deletedIDs returns the IDs whose delete ops actually removed a key.
+// responses are in the same order as ids; commitOps preserves that across batches.
+func deletedIDs(responses []*clientv3.TxnResponse, ids []string) ([]string, error) {
+	removed := make([]string, 0, len(ids))
+	opIdx := 0
+	for _, resp := range responses {
+		for _, opResp := range resp.Responses {
+			if opIdx >= len(ids) {
+				return nil, fmt.Errorf("got more op responses than the %d ops submitted", len(ids))
+			}
+			if del := opResp.GetResponseDeleteRange(); del != nil && del.Deleted > 0 {
+				removed = append(removed, ids[opIdx])
+			}
+			opIdx++
+		}
+	}
+	return removed, nil
+}
+
 // DeleteExecutors deletes the given executors from the store. It does not delete the shards owned by the executors, this
 // should be handled by the namespace processor loop as we want to reassign, not delete the shards.
 func (s *executorStoreImpl) DeleteExecutors(ctx context.Context, namespace string, executorIDs []string, guard store.GuardFunc) error {
@@ -778,20 +797,9 @@ func (s *executorStoreImpl) UndrainShards(ctx context.Context, namespace string,
 		return nil, fmt.Errorf("undrain shards: %w", err)
 	}
 
-	// Responses arrive in the same order the ops were submitted, so a flat counter
-	// across batches maps each op response back to its input shard ID.
-	removed := make([]string, 0, len(shardIDs))
-	opIdx := 0
-	for _, resp := range responses {
-		for _, opResp := range resp.Responses {
-			if opIdx >= len(shardIDs) {
-				return nil, fmt.Errorf("undrain shards: got more op responses than the %d ops submitted", len(shardIDs))
-			}
-			if del := opResp.GetResponseDeleteRange(); del != nil && del.Deleted > 0 {
-				removed = append(removed, shardIDs[opIdx])
-			}
-			opIdx++
-		}
+	removed, err := deletedIDs(responses, shardIDs)
+	if err != nil {
+		return nil, fmt.Errorf("undrain shards: %w", err)
 	}
 	return removed, nil
 }
@@ -869,18 +877,9 @@ func (s *executorStoreImpl) UndrainHosts(ctx context.Context, namespace string, 
 		return nil, fmt.Errorf("undrain hosts: %w", err)
 	}
 
-	removed := make([]string, 0, len(normalized))
-	opIdx := 0
-	for _, resp := range responses {
-		for _, opResp := range resp.Responses {
-			if opIdx >= len(normalized) {
-				return nil, fmt.Errorf("undrain hosts: got more op responses than the %d ops submitted", len(normalized))
-			}
-			if del := opResp.GetResponseDeleteRange(); del != nil && del.Deleted > 0 {
-				removed = append(removed, normalized[opIdx])
-			}
-			opIdx++
-		}
+	removed, err := deletedIDs(responses, normalized)
+	if err != nil {
+		return nil, fmt.Errorf("undrain hosts: %w", err)
 	}
 	return removed, nil
 }

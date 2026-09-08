@@ -47,6 +47,10 @@ func NewExecutorHandler(
 }
 
 func (h *executor) Heartbeat(ctx context.Context, request *types.ExecutorHeartbeatRequest) (*types.ExecutorHeartbeatResponse, error) {
+	if request.Status == types.ExecutorStatusPERMANENTLY_DRAINED {
+		return nil, types.BadRequestError{Message: "status PERMANENTLY_DRAINED cannot be reported by heartbeat"}
+	}
+
 	executorState, err := h.storage.GetExecutorState(ctx, request.Namespace, request.ExecutorID)
 	// We ignore Executor not found errors, since it just means that this executor heartbeat the first time.
 	if err != nil && !errors.Is(err, store.ErrExecutorNotFound) {

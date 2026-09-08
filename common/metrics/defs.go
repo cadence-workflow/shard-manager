@@ -3107,6 +3107,8 @@ const (
 	ShardDistributorAssignLoopDroppedDrainedShards
 	// ShardDistributorDrainedShards tracks how many shards are currently drained in the namespace
 	ShardDistributorDrainedShards
+	// ShardDistributorDrainedHostAge tracks seconds since a host was operator-drained
+	ShardDistributorDrainedHostAge
 
 	// ShardDistributorAssignmentLoadMaxOverMean measures max/mean across executor reported loads
 	ShardDistributorAssignmentLoadMaxOverMean
@@ -3952,6 +3954,7 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 
 		ShardDistributorAssignLoopDroppedDrainedShards: {metricName: "shard_distributor_shard_assign_dropped_drained_shards", metricType: Counter},
 		ShardDistributorDrainedShards:                  {metricName: "shard_distributor_drained_shards", metricType: Gauge},
+		ShardDistributorDrainedHostAge:                 {metricName: "shard_distributor_drained_host_age", metricType: Gauge},
 
 		ShardDistributorAssignmentLoadMaxOverMean:         {metricName: "shard_distributor_assignment_load_max_over_mean", metricType: Gauge},
 		ShardDistributorAssignmentLoadCV:                  {metricName: "shard_distributor_assignment_load_cv", metricType: Gauge},

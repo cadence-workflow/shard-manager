@@ -135,6 +135,8 @@ func FromShardDistributorExecutorHeartbeatRequest(t *types.ExecutorHeartbeatRequ
 		status = sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_DRAINING
 	case types.ExecutorStatusDRAINED:
 		status = sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_DRAINED
+	case types.ExecutorStatusPERMANENTLY_DRAINED:
+		status = sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_PERMANENTLY_DRAINED
 	default:
 		status = sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_INVALID
 	}
@@ -189,6 +191,8 @@ func ToShardDistributorExecutorHeartbeatRequest(t *sharddistributorv1.HeartbeatR
 		status = types.ExecutorStatusDRAINING
 	case sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_DRAINED:
 		status = types.ExecutorStatusDRAINED
+	case sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_PERMANENTLY_DRAINED:
+		status = types.ExecutorStatusPERMANENTLY_DRAINED
 	default:
 		status = types.ExecutorStatusINVALID
 	}
@@ -454,6 +458,8 @@ func fromShardDistributorNamespaceExecutorState(ex *types.NamespaceExecutorState
 		status = sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_DRAINING
 	case types.ExecutorStatusDRAINED:
 		status = sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_DRAINED
+	case types.ExecutorStatusPERMANENTLY_DRAINED:
+		status = sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_PERMANENTLY_DRAINED
 	default:
 		status = sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_INVALID
 	}
@@ -525,6 +531,8 @@ func toShardDistributorNamespaceExecutorState(ex *sharddistributorv1.NamespaceEx
 		status = types.ExecutorStatusDRAINING
 	case sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_DRAINED:
 		status = types.ExecutorStatusDRAINED
+	case sharddistributorv1.ExecutorStatus_EXECUTOR_STATUS_PERMANENTLY_DRAINED:
+		status = types.ExecutorStatusPERMANENTLY_DRAINED
 	default:
 		status = types.ExecutorStatusINVALID
 	}

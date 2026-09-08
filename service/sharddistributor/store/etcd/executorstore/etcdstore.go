@@ -18,6 +18,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
@@ -214,6 +215,10 @@ func (s *executorStoreImpl) GetExecutorState(ctx context.Context, namespace stri
 
 	statistics := etcdtypes.ToShardStatisticsMap(executorData.Statistics)
 
+	if err := s.overlayExecutorHeartbeatIfHostDrained(ctx, namespace, executorID, heartbeatState); err != nil {
+		return store.ExecutorState{}, err
+	}
+
 	return store.ExecutorState{
 		Heartbeat:  heartbeatState,
 		Assignment: assignedState,
@@ -269,13 +274,15 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 		}
 	}
 
-	return &store.NamespaceState{
+	state := &store.NamespaceState{
 		Executors:        heartbeatStates,
 		ShardStats:       shardStats,
 		ShardAssignments: assignedStates,
 		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
 		DrainedHosts:     s.parseDrainedHostKVs(namespace, txnResp.Responses[2].GetResponseRange().Kvs),
-	}, nil
+	}
+	store.OverlayOperatorDrain(state)
+	return state, nil
 }
 
 // loadDrainedShardSet reads every drained-shard key for the namespace and returns
@@ -348,6 +355,23 @@ func (s *executorStoreImpl) parseDrainedHostKVs(namespace string, kvs []*mvccpb.
 		drained[hostname] = record
 	}
 	return drained
+}
+
+// overlayExecutorHeartbeatIfHostDrained looks up the single drained-host key for
+// this executor's host. Invalid hostnames cannot have been drained.
+func (s *executorStoreImpl) overlayExecutorHeartbeatIfHostDrained(ctx context.Context, namespace, executorID string, heartbeat *store.HeartbeatState) error {
+	hostname := etcdkeys.NormalizeHostname(store.ExecutorHost(executorID))
+	if err := etcdkeys.ValidateHostname(hostname); err != nil {
+		return nil
+	}
+	resp, err := s.client.Get(ctx, etcdkeys.BuildDrainedHostKey(s.prefix, namespace, hostname))
+	if err != nil {
+		return fmt.Errorf("get drained host: %w", err)
+	}
+	if resp.Count > 0 {
+		heartbeat.Status = types.ExecutorStatusPERMANENTLY_DRAINED
+	}
+	return nil
 }
 
 func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan struct{}, func(), error) {

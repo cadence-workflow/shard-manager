@@ -133,7 +133,7 @@ func TestFromShardDistributorForceResetNamespaceResponse(t *testing.T) {
 
 // ExecutorStatusFuzzer generates valid ExecutorStatus enum values (0-3: INVALID, ACTIVE, DRAINING, DRAINED).
 func ExecutorStatusFuzzer(e *types.ExecutorStatus, c fuzz.Continue) {
-	*e = types.ExecutorStatus(c.Intn(4)) // 0-3
+	*e = types.ExecutorStatus(c.Intn(5)) // 0-4
 }
 
 // ShardStatusFuzzer generates valid ShardStatus enum values (0-2: INVALID, READY, DONE).

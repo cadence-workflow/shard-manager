@@ -380,10 +380,11 @@ func (v *ExecutorHeartbeatRequest) GetMetadata() (o map[string]string) {
 type ExecutorStatus int32
 
 const (
-	ExecutorStatusINVALID  ExecutorStatus = 0
-	ExecutorStatusACTIVE   ExecutorStatus = 1
-	ExecutorStatusDRAINING ExecutorStatus = 2
-	ExecutorStatusDRAINED  ExecutorStatus = 3
+	ExecutorStatusINVALID             ExecutorStatus = 0
+	ExecutorStatusACTIVE              ExecutorStatus = 1
+	ExecutorStatusDRAINING            ExecutorStatus = 2
+	ExecutorStatusDRAINED             ExecutorStatus = 3
+	ExecutorStatusPERMANENTLY_DRAINED ExecutorStatus = 4
 )
 
 type ShardStatusReport struct {

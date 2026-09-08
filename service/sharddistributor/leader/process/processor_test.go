@@ -176,6 +176,53 @@ func TestRebalanceShards_ExecutorRemoved(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRebalanceShards_PermanentlyDrainedExecutorGetsEmptyAssignment(t *testing.T) {
+	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+	defer mocks.ctrl.Finish()
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+	now := mocks.timeSource.Now()
+	drainedExecutor := "host-a@uuid"
+	heartbeats := map[string]store.HeartbeatState{
+		"exec-1":        {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+		drainedExecutor: {Status: types.ExecutorStatusPERMANENTLY_DRAINED, LastHeartbeat: now},
+	}
+	assignments := map[string]store.AssignedState{
+		drainedExecutor: {
+			AssignedShards: map[string]*types.ShardAssignment{
+				"0": {Status: types.AssignmentStatusREADY},
+				"1": {Status: types.AssignmentStatusREADY},
+			},
+		},
+	}
+	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+		Executors:        heartbeats,
+		ShardAssignments: assignments,
+		DrainedHosts: map[string]store.DrainedHost{
+			"host-a": {Hostname: "host-a", DrainedAt: now.Add(-time.Hour)},
+		},
+	}, nil)
+	mocks.store.EXPECT().GetShardOwner(gomock.Any(), mocks.cfg.Name, "0").Return(&store.ShardOwner{ExecutorID: drainedExecutor}, nil)
+	mocks.store.EXPECT().GetShardOwner(gomock.Any(), mocks.cfg.Name, "1").Return(&store.ShardOwner{ExecutorID: drainedExecutor}, nil)
+	mocks.election.EXPECT().Guard().Return(store.NopGuard())
+	mocks.store.EXPECT().AssignShards(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) error {
+			require.Contains(t, request.NewState.ShardAssignments, drainedExecutor)
+			assert.Empty(t, request.NewState.ShardAssignments[drainedExecutor].AssignedShards)
+			assert.Len(t, request.NewState.ShardAssignments["exec-1"].AssignedShards, 2)
+			require.Len(t, request.NewState.ShardAssignments["exec-1"].ShardHandoverStats, 2)
+			for _, stats := range request.NewState.ShardAssignments["exec-1"].ShardHandoverStats {
+				assert.Equal(t, types.HandoverTypeGRACEFUL, stats.HandoverType)
+			}
+			assert.Contains(t, request.ChangedExecutors, drainedExecutor)
+			return nil
+		},
+	)
+
+	err := processor.rebalanceShards(context.Background())
+	require.NoError(t, err)
+}
+
 func TestRebalanceShards_ExecutorStale(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
 	defer mocks.ctrl.Finish()
@@ -1077,6 +1124,21 @@ func TestNewHandoverStats(t *testing.T) {
 			executors: map[string]store.HeartbeatState{
 				"old-drained": {
 					Status:        types.ExecutorStatusDRAINING,
+					LastHeartbeat: now.Add(-10 * time.Second),
+				},
+			},
+			expectShardStats: &store.ShardHandoverStats{
+				HandoverType:                      types.HandoverTypeGRACEFUL,
+				PreviousExecutorLastHeartbeatTime: now.Add(-10 * time.Second),
+			},
+		},
+		{
+			name:        "prev executor PERMANENTLY_DRAINED -> graceful handover",
+			getOwner:    &store.ShardOwner{ExecutorID: "old-operator-drained"},
+			getOwnerErr: nil,
+			executors: map[string]store.HeartbeatState{
+				"old-operator-drained": {
+					Status:        types.ExecutorStatusPERMANENTLY_DRAINED,
 					LastHeartbeat: now.Add(-10 * time.Second),
 				},
 			},

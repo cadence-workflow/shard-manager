@@ -174,6 +174,25 @@ func TestHeartbeat(t *testing.T) {
 		assert.Equal(t, zapcore.WarnLevel, entries[0].Level)
 	})
 
+	t.Run("RejectsPermanentlyDrainedStatus", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStore := store.NewMockStore(ctrl)
+		mockTimeSource := clock.NewMockedTimeSourceAt(now)
+		handler := newTestExecutorHandler(t, mockStore, mockTimeSource)
+
+		req := &types.ExecutorHeartbeatRequest{
+			Namespace:  namespace,
+			ExecutorID: executorID,
+			Status:     types.ExecutorStatusPERMANENTLY_DRAINED,
+		}
+
+		_, err := handler.Heartbeat(ctx, req)
+		require.Error(t, err)
+		var badRequest types.BadRequestError
+		require.ErrorAs(t, err, &badRequest)
+		assert.Contains(t, badRequest.Message, "PERMANENTLY_DRAINED")
+	})
+
 	// Test Case 9: Heartbeat with metadata validation failure - too many keys
 	t.Run("MetadataValidationTooManyKeys", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

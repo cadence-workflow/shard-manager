@@ -1540,6 +1540,36 @@ func TestDrainHostsLifecycle(t *testing.T) {
 	}))
 }
 
+func TestOperatorDrainOverlaysStatusOnRead(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	executorID := "host-a@uuid"
+	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{
+		Status: types.ExecutorStatusACTIVE,
+	}))
+	require.NoError(t, executorStore.DrainHosts(ctx, tc.Namespace, []store.DrainedHost{
+		{Hostname: "host-a", DrainedAt: time.Now().UTC()},
+	}))
+
+	state, err := executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, types.ExecutorStatusPERMANENTLY_DRAINED, state.Executors[executorID].Status)
+
+	executorState, err := executorStore.GetExecutorState(ctx, tc.Namespace, executorID)
+	require.NoError(t, err)
+	assert.Equal(t, types.ExecutorStatusPERMANENTLY_DRAINED, executorState.Heartbeat.Status)
+
+	_, err = executorStore.UndrainHosts(ctx, tc.Namespace, []string{"host-a"})
+	require.NoError(t, err)
+
+	state, err = executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, types.ExecutorStatusACTIVE, state.Executors[executorID].Status)
+}
+
 func TestGetStateSkipsMalformedDrainedHosts(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)

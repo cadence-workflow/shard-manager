@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _ExecutorStatusName = "ExecutorStatusINVALIDExecutorStatusACTIVEExecutorStatusDRAININGExecutorStatusDRAINED"
+const _ExecutorStatusName = "ExecutorStatusINVALIDExecutorStatusACTIVEExecutorStatusDRAININGExecutorStatusDRAINEDExecutorStatusPERMANENTLY_DRAINED"
 
-var _ExecutorStatusIndex = [...]uint8{0, 21, 41, 63, 84}
+var _ExecutorStatusIndex = [...]uint8{0, 21, 41, 63, 84, 117}
 
-const _ExecutorStatusLowerName = "executorstatusinvalidexecutorstatusactiveexecutorstatusdrainingexecutorstatusdrained"
+const _ExecutorStatusLowerName = "executorstatusinvalidexecutorstatusactiveexecutorstatusdrainingexecutorstatusdrainedexecutorstatuspermanently_drained"
 
 func (i ExecutorStatus) String() string {
 	if i < 0 || i >= ExecutorStatus(len(_ExecutorStatusIndex)-1) {
@@ -29,19 +29,22 @@ func _ExecutorStatusNoOp() {
 	_ = x[ExecutorStatusACTIVE-(1)]
 	_ = x[ExecutorStatusDRAINING-(2)]
 	_ = x[ExecutorStatusDRAINED-(3)]
+	_ = x[ExecutorStatusPERMANENTLY_DRAINED-(4)]
 }
 
-var _ExecutorStatusValues = []ExecutorStatus{ExecutorStatusINVALID, ExecutorStatusACTIVE, ExecutorStatusDRAINING, ExecutorStatusDRAINED}
+var _ExecutorStatusValues = []ExecutorStatus{ExecutorStatusINVALID, ExecutorStatusACTIVE, ExecutorStatusDRAINING, ExecutorStatusDRAINED, ExecutorStatusPERMANENTLY_DRAINED}
 
 var _ExecutorStatusNameToValueMap = map[string]ExecutorStatus{
-	_ExecutorStatusName[0:21]:       ExecutorStatusINVALID,
-	_ExecutorStatusLowerName[0:21]:  ExecutorStatusINVALID,
-	_ExecutorStatusName[21:41]:      ExecutorStatusACTIVE,
-	_ExecutorStatusLowerName[21:41]: ExecutorStatusACTIVE,
-	_ExecutorStatusName[41:63]:      ExecutorStatusDRAINING,
-	_ExecutorStatusLowerName[41:63]: ExecutorStatusDRAINING,
-	_ExecutorStatusName[63:84]:      ExecutorStatusDRAINED,
-	_ExecutorStatusLowerName[63:84]: ExecutorStatusDRAINED,
+	_ExecutorStatusName[0:21]:        ExecutorStatusINVALID,
+	_ExecutorStatusLowerName[0:21]:   ExecutorStatusINVALID,
+	_ExecutorStatusName[21:41]:       ExecutorStatusACTIVE,
+	_ExecutorStatusLowerName[21:41]:  ExecutorStatusACTIVE,
+	_ExecutorStatusName[41:63]:       ExecutorStatusDRAINING,
+	_ExecutorStatusLowerName[41:63]:  ExecutorStatusDRAINING,
+	_ExecutorStatusName[63:84]:       ExecutorStatusDRAINED,
+	_ExecutorStatusLowerName[63:84]:  ExecutorStatusDRAINED,
+	_ExecutorStatusName[84:117]:      ExecutorStatusPERMANENTLY_DRAINED,
+	_ExecutorStatusLowerName[84:117]: ExecutorStatusPERMANENTLY_DRAINED,
 }
 
 var _ExecutorStatusNames = []string{
@@ -49,6 +52,7 @@ var _ExecutorStatusNames = []string{
 	_ExecutorStatusName[21:41],
 	_ExecutorStatusName[41:63],
 	_ExecutorStatusName[63:84],
+	_ExecutorStatusName[84:117],
 }
 
 // ExecutorStatusString retrieves an enum value from the enum constants string name.

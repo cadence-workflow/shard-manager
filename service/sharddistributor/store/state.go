@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strings"
 	"time"
 
 	"github.com/cadence-workflow/shard-manager/common/types"
@@ -141,4 +142,27 @@ func (ns *NamespaceState) IsShardDrained(shardID string) bool {
 func (ns *NamespaceState) IsHostDrained(hostname string) bool {
 	_, drained := ns.DrainedHosts[hostname]
 	return drained
+}
+
+// ExecutorHost returns the host portion of an executor ID (hostname@uuid).
+// IDs without '@' are treated as a bare hostname.
+func ExecutorHost(executorID string) string {
+	if i := strings.LastIndex(executorID, "@"); i >= 0 {
+		return executorID[:i]
+	}
+	return executorID
+}
+
+// OverlayOperatorDrain sets PERMANENTLY_DRAINED on executors whose host is in
+// DrainedHosts. This is a read-time overlay; persisted heartbeat status is unchanged.
+func OverlayOperatorDrain(state *NamespaceState) {
+	if state == nil || len(state.DrainedHosts) == 0 {
+		return
+	}
+	for id, heartbeat := range state.Executors {
+		if state.IsHostDrained(ExecutorHost(id)) {
+			heartbeat.Status = types.ExecutorStatusPERMANENTLY_DRAINED
+			state.Executors[id] = heartbeat
+		}
+	}
 }

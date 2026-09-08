@@ -133,6 +133,83 @@ func TestNamespaceState_ShardOwners(t *testing.T) {
 	}
 }
 
+func TestExecutorHost(t *testing.T) {
+	tests := []struct {
+		executorID string
+		want       string
+	}{
+		{executorID: "host-a@uuid", want: "host-a"},
+		{executorID: "host-a", want: "host-a"},
+		{executorID: "user@host@uuid", want: "user@host"},
+		{executorID: "", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.executorID, func(t *testing.T) {
+			assert.Equal(t, tt.want, ExecutorHost(tt.executorID))
+		})
+	}
+}
+
+func TestOverlayOperatorDrain(t *testing.T) {
+	tests := []struct {
+		name    string
+		state   *NamespaceState
+		want    map[string]types.ExecutorStatus
+		wantNil bool
+	}{
+		{
+			name:    "nil state",
+			wantNil: true,
+		},
+		{
+			name: "no drained hosts",
+			state: &NamespaceState{
+				Executors: map[string]HeartbeatState{
+					"host-a@uuid": {Status: types.ExecutorStatusACTIVE},
+				},
+			},
+			want: map[string]types.ExecutorStatus{
+				"host-a@uuid": types.ExecutorStatusACTIVE,
+			},
+		},
+		{
+			name: "overlays hostname@uuid and bare id",
+			state: &NamespaceState{
+				Executors: map[string]HeartbeatState{
+					"host-a@uuid": {Status: types.ExecutorStatusACTIVE},
+					"host-b":      {Status: types.ExecutorStatusDRAINING},
+					"host-c@uuid": {Status: types.ExecutorStatusACTIVE},
+				},
+				DrainedHosts: map[string]DrainedHost{
+					"host-a": {Hostname: "host-a"},
+					"host-b": {Hostname: "host-b"},
+				},
+			},
+			want: map[string]types.ExecutorStatus{
+				"host-a@uuid": types.ExecutorStatusPERMANENTLY_DRAINED,
+				"host-b":      types.ExecutorStatusPERMANENTLY_DRAINED,
+				"host-c@uuid": types.ExecutorStatusACTIVE,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			OverlayOperatorDrain(tt.state)
+			if tt.wantNil {
+				assert.Nil(t, tt.state)
+				return
+			}
+			got := make(map[string]types.ExecutorStatus, len(tt.state.Executors))
+			for id, heartbeat := range tt.state.Executors {
+				got[id] = heartbeat.Status
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestNamespaceState_IsHostDrained(t *testing.T) {
 	tests := []struct {
 		name     string

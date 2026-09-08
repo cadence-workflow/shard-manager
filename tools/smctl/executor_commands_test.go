@@ -527,6 +527,7 @@ func TestShortExecutorStatus(t *testing.T) {
 		{in: types.ExecutorStatusACTIVE, want: "ACTIVE"},
 		{in: types.ExecutorStatusDRAINING, want: "DRAINING"},
 		{in: types.ExecutorStatusDRAINED, want: "DRAINED"},
+		{in: types.ExecutorStatusPERMANENTLY_DRAINED, want: "PERMANENTLY_DRAINED"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {

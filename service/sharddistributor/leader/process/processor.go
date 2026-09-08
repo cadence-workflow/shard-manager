@@ -419,6 +419,8 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 		p.logger.Info("Identified stale executors for removal", tag.ShardExecutors(slices.Collect(maps.Keys(staleExecutors))))
 	}
 
+	p.emitDrainedHostAge(namespaceState, metricsLoopScope)
+
 	activeExecutors := p.getActiveExecutors(namespaceState, staleExecutors)
 	if len(activeExecutors) == 0 {
 		p.logger.Debug("No active executors found. Cannot assign shards.")
@@ -472,6 +474,10 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 		return fmt.Errorf("apply load balance moves: %w", err)
 	}
 
+	// Operator-drained executors are added after planning so they are not
+	// treated as empty assignment targets.
+	clearedPermanentlyDrained := addEmptyAssignmentsForPermanentlyDrained(namespaceState, currentAssignments, staleExecutors)
+
 	p.emitExecutorMetric(namespaceState, metricsLoopScope)
 	loadbalancer.EmitAssignmentImbalanceMetrics(p.sdConfig, p.namespaceCfg.Name, metricsLoopScope, currentAssignments, namespaceState)
 
@@ -480,7 +486,8 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 		len(loadBalanceMoves) > 0 ||
 		len(drainedAssignedShards) > 0 ||
 		assignedToEmptyExecutors ||
-		updatedAssignments
+		updatedAssignments ||
+		clearedPermanentlyDrained
 	if !distributionChanged {
 		p.logger.Info("No changes to distribution detected. Skipping rebalance.")
 		return nil
@@ -538,6 +545,17 @@ func (p *namespaceProcessor) emitActiveShardMetric(shardAssignments map[string]s
 func (p *namespaceProcessor) emitExecutorMetric(namespaceState *store.NamespaceState, metricsLoopScope metrics.Scope) {
 	for status, count := range namespaceState.CountExecutorsByStatus() {
 		metricsLoopScope.Tagged(metrics.ExecutorStatusTag(status.String())).UpdateGauge(metrics.ShardDistributorTotalExecutors, float64(count))
+	}
+}
+
+func (p *namespaceProcessor) emitDrainedHostAge(namespaceState *store.NamespaceState, metricsLoopScope metrics.Scope) {
+	now := p.timeSource.Now()
+	for hostname, host := range namespaceState.DrainedHosts {
+		age := now.Sub(host.DrainedAt).Seconds()
+		if age < 0 {
+			age = 0
+		}
+		metricsLoopScope.Tagged(metrics.HostTag(hostname)).UpdateGauge(metrics.ShardDistributorDrainedHostAge, age)
 	}
 }
 
@@ -811,9 +829,9 @@ func (p *namespaceProcessor) newHandoverStats(
 
 	handoverType := types.HandoverTypeEMERGENCY
 
-	// Consider it a graceful handover if the previous executor was in DRAINING or DRAINED status
-	// otherwise, it's an emergency handover
-	if prevExecutorHeartbeat.Status == types.ExecutorStatusDRAINING || prevExecutorHeartbeat.Status == types.ExecutorStatusDRAINED {
+	// Consider it a graceful handover if the previous executor was draining
+	// (executor-initiated or operator host drain). Otherwise it's emergency.
+	if isGracefulHandoverStatus(prevExecutorHeartbeat.Status) {
 		handoverType = types.HandoverTypeGRACEFUL
 	}
 
@@ -836,6 +854,38 @@ func (*namespaceProcessor) getActiveExecutors(namespaceState *store.NamespaceSta
 
 	sort.Strings(activeExecutors)
 	return activeExecutors
+}
+
+func isGracefulHandoverStatus(status types.ExecutorStatus) bool {
+	return status == types.ExecutorStatusDRAINING ||
+		status == types.ExecutorStatusDRAINED ||
+		status == types.ExecutorStatusPERMANENTLY_DRAINED
+}
+
+// addEmptyAssignmentsForPermanentlyDrained writes an empty shard list for live
+// operator-drained executors so heartbeat stops returning the old assignment.
+// Executor-initiated DRAINING is left unchanged.
+func addEmptyAssignmentsForPermanentlyDrained(
+	namespaceState *store.NamespaceState,
+	currentAssignments map[string][]string,
+	staleExecutors map[string]int64,
+) bool {
+	changed := false
+	for executorID, heartbeat := range namespaceState.Executors {
+		if heartbeat.Status != types.ExecutorStatusPERMANENTLY_DRAINED {
+			continue
+		}
+		if _, stale := staleExecutors[executorID]; stale {
+			continue
+		}
+		assigned, hasAssignment := namespaceState.ShardAssignments[executorID]
+		if !hasAssignment || len(assigned.AssignedShards) == 0 {
+			continue
+		}
+		currentAssignments[executorID] = []string{}
+		changed = true
+	}
+	return changed
 }
 
 func assignShardsToEmptyExecutors(currentAssignments map[string][]string) bool {

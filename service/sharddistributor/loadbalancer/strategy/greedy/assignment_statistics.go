@@ -9,12 +9,11 @@ import (
 // PrepareAssignmentStatistics returns complete statistics maps for executors
 // affected by an assignment change.
 func PrepareAssignmentStatistics(
-	previousAssignments map[string]store.AssignedState,
+	previousOwnersByShard map[string]string,
 	newAssignments map[string]store.AssignedState,
 	previousStatistics map[string]store.ShardStatistics,
 	now time.Time,
 ) []store.ExecutorShardStatistics {
-	previousOwnersByShard := shardOwners(previousAssignments)
 	executorsAffectedByAssignmentChange := findAffectedExecutors(previousOwnersByShard, newAssignments)
 	statisticsUpdatesForAffectedExecutors := buildStatisticsUpdates(
 		executorsAffectedByAssignmentChange,
@@ -24,17 +23,6 @@ func PrepareAssignmentStatistics(
 		now,
 	)
 	return statisticsUpdatesForAffectedExecutors
-}
-
-// shardOwners flattens per-executor assignments into a shardID -> executorID lookup.
-func shardOwners(assignments map[string]store.AssignedState) map[string]string {
-	owners := make(map[string]string)
-	for executorID, assignedState := range assignments {
-		for shardID := range assignedState.AssignedShards {
-			owners[shardID] = executorID
-		}
-	}
-	return owners
 }
 
 func findAffectedExecutors(

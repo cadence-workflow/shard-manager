@@ -115,7 +115,7 @@ func PrepareShardStatistics(
 func PrepareAssignmentStatistics(
 	cfg *config.Config,
 	namespace string,
-	previousAssignments map[string]store.AssignedState,
+	previousOwnersByShard map[string]string,
 	newAssignments map[string]store.AssignedState,
 	previousStatistics map[string]store.ShardStatistics,
 	assignmentTime time.Time,
@@ -123,7 +123,7 @@ func PrepareAssignmentStatistics(
 	switch mode := cfg.GetLoadBalancingMode(namespace); mode {
 	case types.LoadBalancingModeGREEDY:
 		return greedy.PrepareAssignmentStatistics(
-			previousAssignments,
+			previousOwnersByShard,
 			newAssignments,
 			previousStatistics,
 			assignmentTime,

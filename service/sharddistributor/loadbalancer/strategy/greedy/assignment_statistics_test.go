@@ -46,19 +46,11 @@ func TestPrepareAssignmentStatistics(t *testing.T) {
 		sourceShardID:      sourceShardStatistics,
 		destinationShardID: destinationShardStatistics,
 	}
-	previousAssignments := map[string]store.AssignedState{
-		sourceExecutorID: {
-			AssignedShards: map[string]*types.ShardAssignment{
-				movedShardID:            {Status: types.AssignmentStatusREADY},
-				sourceShardID:           {Status: types.AssignmentStatusREADY},
-				unmeasuredSourceShardID: {Status: types.AssignmentStatusREADY},
-			},
-		},
-		destinationExecutorID: {
-			AssignedShards: map[string]*types.ShardAssignment{
-				destinationShardID: {Status: types.AssignmentStatusREADY},
-			},
-		},
+	previousOwnersByShard := map[string]string{
+		movedShardID:            sourceExecutorID,
+		sourceShardID:           sourceExecutorID,
+		unmeasuredSourceShardID: sourceExecutorID,
+		destinationShardID:      destinationExecutorID,
 	}
 	newAssignments := map[string]store.AssignedState{
 		sourceExecutorID: {
@@ -77,7 +69,7 @@ func TestPrepareAssignmentStatistics(t *testing.T) {
 	}
 
 	updates := PrepareAssignmentStatistics(
-		previousAssignments,
+		previousOwnersByShard,
 		newAssignments,
 		previousStatistics,
 		now,

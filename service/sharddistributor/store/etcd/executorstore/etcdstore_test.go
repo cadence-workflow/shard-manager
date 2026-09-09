@@ -1501,6 +1501,54 @@ func TestLoadDrainedShardSetSkipsMalformedKeys(t *testing.T) {
 	assert.Equal(t, map[string]struct{}{"shard-A": {}}, state.DrainedShards)
 }
 
+func TestDeletedIDs(t *testing.T) {
+	deleteOp := func(deleted int64) *etcdserverpb.ResponseOp {
+		return &etcdserverpb.ResponseOp{
+			Response: &etcdserverpb.ResponseOp_ResponseDeleteRange{
+				ResponseDeleteRange: &etcdserverpb.DeleteRangeResponse{Deleted: deleted},
+			},
+		}
+	}
+
+	tests := []struct {
+		name      string
+		responses []*clientv3.TxnResponse
+		ids       []string
+		want      []string
+		wantErr   string
+	}{
+		{
+			name: "keeps ids whose delete removed a key",
+			responses: []*clientv3.TxnResponse{
+				{Responses: []*etcdserverpb.ResponseOp{deleteOp(1), deleteOp(0)}},
+				{Responses: []*etcdserverpb.ResponseOp{deleteOp(2)}},
+			},
+			ids:  []string{"a", "b", "c"},
+			want: []string{"a", "c"},
+		},
+		{
+			name: "errors when there are more responses than ids",
+			responses: []*clientv3.TxnResponse{
+				{Responses: []*etcdserverpb.ResponseOp{deleteOp(1), deleteOp(1)}},
+			},
+			ids:     []string{"a"},
+			wantErr: "got more op responses than the 1 ops submitted",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := deletedIDs(tt.responses, tt.ids)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestDrainHostsLifecycle(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)
@@ -1540,36 +1588,6 @@ func TestDrainHostsLifecycle(t *testing.T) {
 	}))
 }
 
-func TestOperatorDrainOverlaysStatusOnRead(t *testing.T) {
-	tc := testhelper.SetupStoreTestCluster(t)
-	executorStore := createStore(t, tc)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	executorID := "host-a@uuid"
-	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{
-		Status: types.ExecutorStatusACTIVE,
-	}))
-	require.NoError(t, executorStore.DrainHosts(ctx, tc.Namespace, []store.DrainedHost{
-		{Hostname: "host-a", DrainedAt: time.Now().UTC()},
-	}))
-
-	state, err := executorStore.GetState(ctx, tc.Namespace)
-	require.NoError(t, err)
-	assert.Equal(t, types.ExecutorStatusPERMANENTLY_DRAINED, state.Executors[executorID].Status)
-
-	executorState, err := executorStore.GetExecutorState(ctx, tc.Namespace, executorID)
-	require.NoError(t, err)
-	assert.Equal(t, types.ExecutorStatusPERMANENTLY_DRAINED, executorState.Heartbeat.Status)
-
-	_, err = executorStore.UndrainHosts(ctx, tc.Namespace, []string{"host-a"})
-	require.NoError(t, err)
-
-	state, err = executorStore.GetState(ctx, tc.Namespace)
-	require.NoError(t, err)
-	assert.Equal(t, types.ExecutorStatusACTIVE, state.Executors[executorID].Status)
-}
-
 func TestGetStateSkipsMalformedDrainedHosts(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)
@@ -1599,6 +1617,36 @@ func hostnames(hosts []store.DrainedHost) []string {
 		out = append(out, host.Hostname)
 	}
 	return out
+}
+
+func TestOperatorDrainOverlaysStatusOnRead(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	executorID := "host-a@uuid"
+	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{
+		Status: types.ExecutorStatusACTIVE,
+	}))
+	require.NoError(t, executorStore.DrainHosts(ctx, tc.Namespace, []store.DrainedHost{
+		{Hostname: "host-a", DrainedAt: time.Now().UTC()},
+	}))
+
+	state, err := executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, types.ExecutorStatusPERMANENTLY_DRAINED, state.Executors[executorID].Status)
+
+	executorState, err := executorStore.GetExecutorState(ctx, tc.Namespace, executorID)
+	require.NoError(t, err)
+	assert.Equal(t, types.ExecutorStatusPERMANENTLY_DRAINED, executorState.Heartbeat.Status)
+
+	_, err = executorStore.UndrainHosts(ctx, tc.Namespace, []string{"host-a"})
+	require.NoError(t, err)
+
+	state, err = executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assert.Equal(t, types.ExecutorStatusACTIVE, state.Executors[executorID].Status)
 }
 
 func createStore(t *testing.T, tc *testhelper.StoreTestCluster) store.Store {

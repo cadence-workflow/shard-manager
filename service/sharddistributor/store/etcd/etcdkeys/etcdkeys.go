@@ -148,14 +148,8 @@ func BuildDrainedHostKey(prefix, namespace, hostname string) string {
 	return fmt.Sprintf("%s%s", BuildDrainedHostsPrefix(prefix, namespace), hostname)
 }
 
-// NormalizeHostname rewrites slashes to underscores so a hostname can be an etcd
-// path segment
-func NormalizeHostname(hostname string) string {
-	return strings.ReplaceAll(hostname, "/", "_")
-}
-
 // ValidateHostname rejects hostnames that cannot survive a key round trip or that
-// would break hostname@uuid matching. Call after NormalizeHostname.
+// would break hostname@uuid matching.
 func ValidateHostname(hostname string) error {
 	if hostname == "" {
 		return errors.New("hostname must not be empty")

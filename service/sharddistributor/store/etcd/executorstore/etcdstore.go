@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"time"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -820,7 +821,7 @@ func (s *executorStoreImpl) DrainHosts(ctx context.Context, namespace string, ho
 		return nil
 	}
 
-	normalized, err := normalizeDrainedHosts(hosts)
+	validated, err := validateDrainedHosts(hosts, s.timeSource.Now().UTC())
 	if err != nil {
 		return fmt.Errorf("drain hosts: %w", err)
 	}
@@ -830,8 +831,8 @@ func (s *executorStoreImpl) DrainHosts(ctx context.Context, namespace string, ho
 		return fmt.Errorf("drain hosts: %w", err)
 	}
 
-	ops := make([]clientv3.Op, 0, len(normalized))
-	for hostname, host := range normalized {
+	ops := make([]clientv3.Op, 0, len(validated))
+	for hostname, host := range validated {
 		if _, already := existing[hostname]; already {
 			continue
 		}
@@ -858,17 +859,14 @@ func (s *executorStoreImpl) UndrainHosts(ctx context.Context, namespace string, 
 		return nil, nil
 	}
 
-	normalized := make([]string, 0, len(hostnames))
 	for _, hostname := range hostnames {
-		hostname = etcdkeys.NormalizeHostname(hostname)
 		if err := etcdkeys.ValidateHostname(hostname); err != nil {
 			return nil, fmt.Errorf("undrain hosts: %w", err)
 		}
-		normalized = append(normalized, hostname)
 	}
 
-	ops := make([]clientv3.Op, 0, len(normalized))
-	for _, hostname := range normalized {
+	ops := make([]clientv3.Op, 0, len(hostnames))
+	for _, hostname := range hostnames {
 		ops = append(ops, clientv3.OpDelete(etcdkeys.BuildDrainedHostKey(s.prefix, namespace, hostname)))
 	}
 
@@ -877,7 +875,7 @@ func (s *executorStoreImpl) UndrainHosts(ctx context.Context, namespace string, 
 		return nil, fmt.Errorf("undrain hosts: %w", err)
 	}
 
-	removed, err := deletedIDs(responses, normalized)
+	removed, err := deletedIDs(responses, hostnames)
 	if err != nil {
 		return nil, fmt.Errorf("undrain hosts: %w", err)
 	}
@@ -897,20 +895,23 @@ func (s *executorStoreImpl) GetDrainedHosts(ctx context.Context, namespace strin
 	return hosts, nil
 }
 
-func normalizeDrainedHosts(hosts []store.DrainedHost) (map[string]store.DrainedHost, error) {
-	normalized := make(map[string]store.DrainedHost, len(hosts))
+// validateDrainedHosts rejects unusable hostnames and collapses duplicates,
+// keeping the first occurrence of each host.
+func validateDrainedHosts(hosts []store.DrainedHost, now time.Time) (map[string]store.DrainedHost, error) {
+	validated := make(map[string]store.DrainedHost, len(hosts))
 	for _, host := range hosts {
-		hostname := etcdkeys.NormalizeHostname(host.Hostname)
-		if err := etcdkeys.ValidateHostname(hostname); err != nil {
+		if err := etcdkeys.ValidateHostname(host.Hostname); err != nil {
 			return nil, err
 		}
-		if _, exists := normalized[hostname]; exists {
+		if _, exists := validated[host.Hostname]; exists {
 			continue
 		}
-		host.Hostname = hostname
-		normalized[hostname] = host
+		if host.DrainedAt.IsZero() {
+			host.DrainedAt = now
+		}
+		validated[host.Hostname] = host
 	}
-	return normalized, nil
+	return validated, nil
 }
 
 // RecordShardStatisticsBatch records complete statistics maps for multiple

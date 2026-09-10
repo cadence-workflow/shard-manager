@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1557,35 +1558,74 @@ func TestDrainHostsLifecycle(t *testing.T) {
 
 	firstDrain := time.Date(2026, 8, 25, 7, 40, 0, 0, time.UTC)
 	require.NoError(t, executorStore.DrainHosts(ctx, tc.Namespace, []store.DrainedHost{
-		{Hostname: "host/name", DrainedAt: firstDrain, DrainedBy: "gaziza", Reason: "test"},
+		{Hostname: "host-a", DrainedAt: firstDrain, DrainedBy: "gaziza", Reason: "test"},
 		{Hostname: "host-b", DrainedAt: firstDrain, DrainedBy: "gaziza", Reason: "test"},
 	}))
 
 	hosts, err := executorStore.GetDrainedHosts(ctx, tc.Namespace)
 	require.NoError(t, err)
-	require.Equal(t, []string{"host-b", "host_name"}, hostnames(hosts))
+	require.Equal(t, []string{"host-a", "host-b"}, hostnames(hosts))
 
-	// Re-drain keeps the original metadata; a slash and underscore are the same host.
+	// Re-draining an already drained host keeps the original metadata.
 	require.NoError(t, executorStore.DrainHosts(ctx, tc.Namespace, []store.DrainedHost{
-		{Hostname: "host_name", DrainedAt: firstDrain.Add(time.Hour), DrainedBy: "other", Reason: "changed"},
+		{Hostname: "host-a", DrainedAt: firstDrain.Add(time.Hour), DrainedBy: "other", Reason: "changed"},
 	}))
 
 	state, err := executorStore.GetState(ctx, tc.Namespace)
 	require.NoError(t, err)
-	assert.Equal(t, firstDrain, state.DrainedHosts["host_name"].DrainedAt.UTC())
-	assert.Equal(t, "test", state.DrainedHosts["host_name"].Reason)
+	assert.Equal(t, firstDrain, state.DrainedHosts["host-a"].DrainedAt.UTC())
+	assert.Equal(t, "test", state.DrainedHosts["host-a"].Reason)
 
-	removed, err := executorStore.UndrainHosts(ctx, tc.Namespace, []string{"host/name", "never-drained"})
+	removed, err := executorStore.UndrainHosts(ctx, tc.Namespace, []string{"host-a", "never-drained"})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"host_name"}, removed)
+	assert.Equal(t, []string{"host-a"}, removed)
 
 	hosts, err = executorStore.GetDrainedHosts(ctx, tc.Namespace)
 	require.NoError(t, err)
 	require.Equal(t, []string{"host-b"}, hostnames(hosts))
+}
 
-	require.Error(t, executorStore.DrainHosts(ctx, tc.Namespace, []store.DrainedHost{
-		{Hostname: "host@uuid"},
+func TestDrainHostsRejectsUnusableHostnames(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	tests := []struct {
+		name     string
+		hostname string
+	}{
+		{name: "contains @", hostname: "host@uuid"},
+		{name: "contains /", hostname: "host/name"},
+		{name: "empty", hostname: ""},
+		{name: "too long", hostname: strings.Repeat("a", 129)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Error(t, executorStore.DrainHosts(ctx, tc.Namespace, []store.DrainedHost{
+				{Hostname: tt.hostname},
+			}))
+			_, err := executorStore.UndrainHosts(ctx, tc.Namespace, []string{tt.hostname})
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestDrainHostsDefaultsDrainedAt(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	require.NoError(t, executorStore.DrainHosts(ctx, tc.Namespace, []store.DrainedHost{
+		{Hostname: "host-a"},
 	}))
+
+	hosts, err := executorStore.GetDrainedHosts(ctx, tc.Namespace)
+	require.NoError(t, err)
+	require.Len(t, hosts, 1)
+	assert.False(t, hosts[0].DrainedAt.IsZero())
 }
 
 func TestGetStateSkipsMalformedDrainedHosts(t *testing.T) {

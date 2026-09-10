@@ -11,26 +11,26 @@ import (
 
 type ExecutorResult struct {
 	fx.Out
-	Executor executorclient.Executor[*processor.ShardProcessor] `group:"executor-fixed-proc"`
-	Debugger executorclient.Debugger                            `group:"shard-distributor-executors"`
+	Executor     executorclient.Executor[*processor.ShardProcessor] `group:"executor-fixed-proc"`
+	ExecutorInfo executorclient.ExecutorInfo                        `group:"shard-distributor-executors"`
 }
 
 type ExecutorEphemeralResult struct {
 	fx.Out
-	Executor executorclient.Executor[*processorephemeral.ShardProcessor] `group:"executor-ephemeral-proc"`
-	Debugger executorclient.Debugger                                     `group:"shard-distributor-executors"`
+	Executor     executorclient.Executor[*processorephemeral.ShardProcessor] `group:"executor-ephemeral-proc"`
+	ExecutorInfo executorclient.ExecutorInfo                                 `group:"shard-distributor-executors"`
 }
 
 type ExecutorsResult struct {
 	fx.Out
-	Executors []executorclient.Executor[*processor.ShardProcessor] `group:"executor-fixed-proc,flatten"`
-	Debuggers []executorclient.Debugger                            `group:"shard-distributor-executors,flatten"`
+	Executors     []executorclient.Executor[*processor.ShardProcessor] `group:"executor-fixed-proc,flatten"`
+	ExecutorInfos []executorclient.ExecutorInfo                        `group:"shard-distributor-executors,flatten"`
 }
 
 type ExecutorsEphemeralResult struct {
 	fx.Out
-	Executors []executorclient.Executor[*processorephemeral.ShardProcessor] `group:"executor-ephemeral-proc,flatten"`
-	Debuggers []executorclient.Debugger                                     `group:"shard-distributor-executors,flatten"`
+	Executors     []executorclient.Executor[*processorephemeral.ShardProcessor] `group:"executor-ephemeral-proc,flatten"`
+	ExecutorInfos []executorclient.ExecutorInfo                                 `group:"shard-distributor-executors,flatten"`
 }
 
 func NewExecutorsWithFixedNamespace(params executorclient.Params[*processor.ShardProcessor], namespace string, numExecutors int) (ExecutorsResult, error) {
@@ -46,7 +46,7 @@ func NewExecutorsWithFixedNamespace(params executorclient.Params[*processor.Shar
 			return ExecutorsResult{}, err
 		}
 		result.Executors = append(result.Executors, executor)
-		result.Debuggers = append(result.Debuggers, executor)
+		result.ExecutorInfos = append(result.ExecutorInfos, executor)
 	}
 
 	return result, nil
@@ -57,7 +57,7 @@ func NewExecutorWithFixedNamespace(params executorclient.Params[*processor.Shard
 	if err != nil {
 		return ExecutorResult{}, err
 	}
-	return ExecutorResult{Executor: executor, Debugger: executor}, nil
+	return ExecutorResult{Executor: executor, ExecutorInfo: executor}, nil
 }
 
 func NewExecutorsWithEphemeralNamespace(params executorclient.Params[*processorephemeral.ShardProcessor], namespace string, numExecutors int) (ExecutorsEphemeralResult, error) {
@@ -73,7 +73,7 @@ func NewExecutorsWithEphemeralNamespace(params executorclient.Params[*processore
 			return ExecutorsEphemeralResult{}, err
 		}
 		result.Executors = append(result.Executors, executor)
-		result.Debuggers = append(result.Debuggers, executor)
+		result.ExecutorInfos = append(result.ExecutorInfos, executor)
 	}
 
 	return result, nil
@@ -84,7 +84,7 @@ func NewExecutorWithEphemeralNamespace(params executorclient.Params[*processorep
 	if err != nil {
 		return ExecutorEphemeralResult{}, err
 	}
-	return ExecutorEphemeralResult{Executor: executor, Debugger: executor}, nil
+	return ExecutorEphemeralResult{Executor: executor, ExecutorInfo: executor}, nil
 }
 
 type ExecutorsParams struct {

@@ -22,7 +22,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/metricsconstants"
 )
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go . ShardProcessorFactory,ShardProcessor,Executor,Client,Debugger
+//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go . ShardProcessorFactory,ShardProcessor,Executor,Client,ExecutorInfo
 
 // ErrShardProcessNotFound is returned by GetShardProcess when this host is not
 // assigned the requested shard. Callers that interpret shard ownership should
@@ -76,8 +76,8 @@ type Executor[SP ShardProcessor] interface {
 	GetShardStatusReports() map[string]*types.ShardStatusReport
 }
 
-// Debugger is the non-generic identity of a local executor
-type Debugger interface {
+// ExecutorInfo is the non-generic identity of a local executor
+type ExecutorInfo interface {
 	GetNamespace() string
 	GetExecutorID() string
 	GetMetadata() map[string]string
@@ -85,18 +85,9 @@ type Debugger interface {
 }
 
 var (
-	_ Debugger = (*executorImpl[ShardProcessor])(nil)
-	_ Debugger = (*noopExecutor[ShardProcessor])(nil)
+	_ ExecutorInfo = (*executorImpl[ShardProcessor])(nil)
+	_ ExecutorInfo = (*noopExecutor[ShardProcessor])(nil)
 )
-
-// executorFxOut publishes both the typed executor and a Debugger into the
-// process-wide local-executors group
-type executorFxOut[SP ShardProcessor] struct {
-	fx.Out
-
-	Executor Executor[SP]
-	Debugger Debugger `group:"shard-distributor-executors"`
-}
 
 type Params[SP ShardProcessor] struct {
 	fx.In
@@ -238,7 +229,8 @@ func createShardDistributorExecutorClient(client Client, metricsScope tally.Scop
 
 func Module[SP ShardProcessor]() fx.Option {
 	return fx.Module("shard-distributor-executor-client",
-		fx.Provide(provideExecutor[SP]),
+		fx.Provide(NewExecutor[SP]),
+		provideExecutorInfo[SP](),
 		fx.Invoke(func(executor Executor[SP], lc fx.Lifecycle) {
 			lc.Append(fx.StartStopHook(executor.Start, executor.Stop))
 		}),
@@ -248,26 +240,21 @@ func Module[SP ShardProcessor]() fx.Option {
 // ModuleWithNamespace creates an executor module for a specific namespace
 func ModuleWithNamespace[SP ShardProcessor](namespace string) fx.Option {
 	return fx.Module(fmt.Sprintf("shard-distributor-executor-client-%s", namespace),
-		fx.Provide(provideExecutorWithNamespace[SP](namespace)),
+		fx.Provide(func(params Params[SP]) (Executor[SP], error) {
+			return NewExecutorWithNamespace(params, namespace)
+		}),
+		provideExecutorInfo[SP](),
 		fx.Invoke(func(executor Executor[SP], lc fx.Lifecycle) {
 			lc.Append(fx.StartStopHook(executor.Start, executor.Stop))
 		}),
 	)
 }
 
-func provideExecutor[SP ShardProcessor](params Params[SP]) (executorFxOut[SP], error) {
-	return newExecutorFxOut(NewExecutor(params))
-}
-
-func provideExecutorWithNamespace[SP ShardProcessor](namespace string) func(Params[SP]) (executorFxOut[SP], error) {
-	return func(params Params[SP]) (executorFxOut[SP], error) {
-		return newExecutorFxOut(NewExecutorWithNamespace(params, namespace))
-	}
-}
-
-func newExecutorFxOut[SP ShardProcessor](exec Executor[SP], err error) (executorFxOut[SP], error) {
-	if err != nil {
-		return executorFxOut[SP]{}, err
-	}
-	return executorFxOut[SP]{Executor: exec, Debugger: exec}, nil
+// provideExecutorInfo re-registers the constructed Executor[SP] as ExecutorInfo
+// in a process-wide group.
+func provideExecutorInfo[SP ShardProcessor]() fx.Option {
+	return fx.Provide(fx.Annotate(
+		func(e Executor[SP]) ExecutorInfo { return e },
+		fx.ResultTags(`group:"shard-distributor-executors"`),
+	))
 }

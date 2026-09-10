@@ -41,12 +41,12 @@ func TestModule(t *testing.T) {
 	}
 
 	// Create a test app with the library, check that it starts and stops
-	// and publishes the executor as Debugger.
+	// and publishes the executor as ExecutorInfo.
 	var got struct {
 		fx.In
 
-		Executor  Executor[*MockShardProcessor]
-		Debuggers []Debugger `group:"shard-distributor-executors"`
+		Executor Executor[*MockShardProcessor]
+		Infos    []ExecutorInfo `group:"shard-distributor-executors"`
 	}
 
 	fxtest.New(t,
@@ -64,10 +64,10 @@ func TestModule(t *testing.T) {
 		fx.Populate(&got),
 	).RequireStart().RequireStop()
 
-	require.Len(t, got.Debuggers, 1)
-	assert.Equal(t, "test-namespace", got.Debuggers[0].GetNamespace())
-	assert.Equal(t, got.Executor.GetExecutorID(), got.Debuggers[0].GetExecutorID())
-	assert.Empty(t, got.Debuggers[0].GetShardStatusReports())
+	require.Len(t, got.Infos, 1)
+	assert.Equal(t, "test-namespace", got.Infos[0].GetNamespace())
+	assert.Equal(t, got.Executor.GetExecutorID(), got.Infos[0].GetExecutorID())
+	assert.Empty(t, got.Infos[0].GetShardStatusReports())
 }
 
 func TestNewExecutor_ExecutorID(t *testing.T) {
@@ -185,7 +185,7 @@ func TestModuleWithNamespace(t *testing.T) {
 	var got struct {
 		fx.In
 
-		Debuggers []Debugger `group:"shard-distributor-executors"`
+		Infos []ExecutorInfo `group:"shard-distributor-executors"`
 	}
 
 	fxtest.New(t,
@@ -206,7 +206,7 @@ func TestModuleWithNamespace(t *testing.T) {
 		fx.Populate(&got),
 	).RequireStart().RequireStop()
 
-	require.Len(t, got.Debuggers, 2)
-	namespaces := []string{got.Debuggers[0].GetNamespace(), got.Debuggers[1].GetNamespace()}
+	require.Len(t, got.Infos, 2)
+	namespaces := []string{got.Infos[0].GetNamespace(), got.Infos[1].GetNamespace()}
 	assert.ElementsMatch(t, []string{"namespace1", "namespace2"}, namespaces)
 }

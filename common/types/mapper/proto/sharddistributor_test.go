@@ -131,9 +131,10 @@ func TestFromShardDistributorForceResetNamespaceResponse(t *testing.T) {
 
 // --- Fuzz tests for sharddistributor mapper functions ---
 
-// ExecutorStatusFuzzer generates valid ExecutorStatus enum values (0-3: INVALID, ACTIVE, DRAINING, DRAINED).
+// ExecutorStatusFuzzer generates valid ExecutorStatus enum values
 func ExecutorStatusFuzzer(e *types.ExecutorStatus, c fuzz.Continue) {
-	*e = types.ExecutorStatus(c.Intn(4)) // 0-3
+	values := types.ExecutorStatusValues()
+	*e = values[c.Intn(len(values))]
 }
 
 // ShardStatusFuzzer generates valid ShardStatus enum values (0-2: INVALID, READY, DONE).

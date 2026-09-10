@@ -133,6 +133,38 @@ func TestNamespaceState_ShardOwners(t *testing.T) {
 	}
 }
 
+func TestNamespaceState_IsExecutorAssignable(t *testing.T) {
+	staleExecutors := map[string]int64{"stale": 1}
+	state := &NamespaceState{
+		Executors: map[string]HeartbeatState{
+			"active":   {Status: types.ExecutorStatusACTIVE},
+			"draining": {Status: types.ExecutorStatusDRAINING},
+			"drained":  {Status: types.ExecutorStatusDRAINED},
+			"stale":    {Status: types.ExecutorStatusACTIVE},
+			"invalid":  {Status: types.ExecutorStatusINVALID},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		executorID string
+		want       bool
+	}{
+		{name: "active", executorID: "active", want: true},
+		{name: "draining", executorID: "draining", want: false},
+		{name: "drained", executorID: "drained", want: false},
+		{name: "stale", executorID: "stale", want: false},
+		{name: "invalid status", executorID: "invalid", want: false},
+		{name: "absent executor", executorID: "missing", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, state.IsExecutorAssignable(tt.executorID, staleExecutors))
+		})
+	}
+}
+
 func TestNamespaceState_IsHostDrained(t *testing.T) {
 	tests := []struct {
 		name     string

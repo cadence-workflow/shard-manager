@@ -142,3 +142,14 @@ func (ns *NamespaceState) IsHostDrained(hostname string) bool {
 	_, drained := ns.DrainedHosts[hostname]
 	return drained
 }
+
+// IsExecutorAssignable reports whether an executor may hold shards
+func (ns *NamespaceState) IsExecutorAssignable(executorID string, staleExecutors map[string]int64) bool {
+	if ns.Executors[executorID].Status != types.ExecutorStatusACTIVE {
+		return false
+	}
+	if _, stale := staleExecutors[executorID]; stale {
+		return false
+	}
+	return true
+}

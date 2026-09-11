@@ -34,6 +34,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
@@ -46,13 +47,14 @@ func NewHandler(
 	shardDistributionCfg config.ShardDistribution,
 	cfg *config.Config,
 	storage store.Store,
+	metricsClient metrics.Client,
 ) Handler {
 	handler := &handlerImpl{
 		logger:               logger,
 		shardDistributionCfg: shardDistributionCfg,
 		storage:              storage,
 		timeSource:           timeSource,
-		assigner:             ephemeralassigner.New(timeSource, cfg, storage),
+		assigner:             ephemeralassigner.New(timeSource, cfg, storage, metricsClient),
 	}
 	handler.stopCtx, handler.cancel = context.WithCancel(context.Background())
 

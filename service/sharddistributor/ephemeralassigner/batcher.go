@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
@@ -66,25 +67,28 @@ type flushResult struct {
 // namespaceState tracks inflight and pending requests for a single namespace.
 // Only accessed from the loop goroutine — no synchronization needed.
 type namespaceState struct {
-	inflight []*batchRequest
-	pending  []*batchRequest
+	inflight  []*batchRequest
+	pending   []*batchRequest
+	scheduled bool
 }
 
 // shardBatcher coalesces GetShardOwner calls for ephemeral namespaces. The first
-// request for a namespace triggers an immediate flush. Requests that arrive while
-// a flush is in-flight accumulate and are processed as the next batch as soon as
-// the current one completes. At most one flush per namespace is in-flight at any
-// time — etcd write latency acts as the natural batching window.
+// request for an idle namespace starts a short collection window. Requests that
+// arrive while a flush is in-flight accumulate and are processed as the next
+// batch as soon as the current one completes. At most one flush per namespace is
+// in-flight at any time.
 //
 // Usage:
 //
-//	b := newShardBatcher(5*time.Second, processFn)
+//	b := newShardBatcher(timeSource, 5*time.Second, 10*time.Millisecond, processFn)
 //	b.Start()
 //	defer b.Stop()
 //	resp, err := b.Submit(ctx, &types.GetShardOwnerRequest{Namespace: namespace, ShardKey: shardKey})
 type shardBatcher struct {
-	timeout      time.Duration
-	processBatch ephemeralAssignmentBatchFn
+	timeSource       clock.TimeSource
+	timeout          time.Duration
+	coalescingWindow time.Duration
+	processBatch     ephemeralAssignmentBatchFn
 
 	requestChan chan *batchRequest
 
@@ -93,14 +97,16 @@ type shardBatcher struct {
 	wg     sync.WaitGroup
 }
 
-func newShardBatcher(timeout time.Duration, processBatch ephemeralAssignmentBatchFn) *shardBatcher {
+func newShardBatcher(timeSource clock.TimeSource, timeout, coalescingWindow time.Duration, processBatch ephemeralAssignmentBatchFn) *shardBatcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &shardBatcher{
-		timeout:      timeout,
-		processBatch: processBatch,
-		requestChan:  make(chan *batchRequest, _requestsChannelLimit),
-		ctx:          ctx,
-		cancel:       cancel,
+		timeSource:       timeSource,
+		timeout:          timeout,
+		coalescingWindow: coalescingWindow,
+		processBatch:     processBatch,
+		requestChan:      make(chan *batchRequest, _requestsChannelLimit),
+		ctx:              ctx,
+		cancel:           cancel,
 	}
 }
 
@@ -150,6 +156,7 @@ func (b *shardBatcher) loop() {
 
 	namespaces := make(map[string]*namespaceState)
 	flushDone := make(chan flushResult, _requestsChannelLimit)
+	flushReady := make(chan string, _requestsChannelLimit)
 
 	for {
 		select {
@@ -160,12 +167,21 @@ func (b *shardBatcher) loop() {
 				namespaces[req.namespace] = ns
 			}
 
-			if ns.inflight == nil {
-				ns.inflight = []*batchRequest{req}
-				b.startFlush(req.namespace, ns.inflight, flushDone)
-			} else {
-				ns.pending = append(ns.pending, req)
+			ns.pending = append(ns.pending, req)
+			if ns.inflight == nil && !ns.scheduled {
+				ns.scheduled = true
+				b.scheduleFlush(req.namespace, flushReady)
 			}
+
+		case namespace := <-flushReady:
+			ns := namespaces[namespace]
+			if ns == nil || !ns.scheduled {
+				continue
+			}
+			ns.scheduled = false
+			ns.inflight = ns.pending
+			ns.pending = nil
+			b.startFlush(namespace, ns.inflight, flushDone)
 
 		case res := <-flushDone:
 			ns := namespaces[res.namespace]
@@ -184,6 +200,21 @@ func (b *shardBatcher) loop() {
 			return
 		}
 	}
+}
+
+func (b *shardBatcher) scheduleFlush(namespace string, ready chan<- string) {
+	go func() {
+		timer := b.timeSource.NewTimer(b.coalescingWindow)
+		defer timer.Stop()
+		select {
+		case <-timer.Chan():
+			select {
+			case ready <- namespace:
+			case <-b.ctx.Done():
+			}
+		case <-b.ctx.Done():
+		}
+	}()
 }
 
 // startFlush spawns a goroutine that calls processBatch and sends the result

@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
@@ -122,7 +123,7 @@ func TestShardBatcher_Submit(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			b := newShardBatcher(time.Second, tc.batchFn)
+			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, 0, tc.batchFn)
 			b.Start()
 			defer b.Stop()
 
@@ -238,7 +239,7 @@ func TestShardBatcher_MultipleNamespacesIsolated(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			b := newShardBatcher(time.Second, processFnFromMap(tc.results))
+			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, 0, processFnFromMap(tc.results))
 			b.Start()
 			defer b.Stop()
 
@@ -294,7 +295,7 @@ func TestShardBatcher_ErrorPropagatedToAllCallers(t *testing.T) {
 				return nil, nil, tc.batchErr
 			}
 
-			b := newShardBatcher(time.Second, batchFn)
+			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, 0, batchFn)
 			b.Start()
 			defer b.Stop()
 
@@ -336,6 +337,39 @@ func TestShardBatcher_ErrorPropagatedToAllCallers(t *testing.T) {
 func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
+	t.Run("requests queued during initial window share one batch", func(t *testing.T) {
+		batchCalls := make(chan []string, 1)
+		batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+			batchCalls <- shardKeys
+			out := make(map[string]*types.GetShardOwnerResponse, len(shardKeys))
+			for _, key := range shardKeys {
+				out[key] = &types.GetShardOwnerResponse{Owner: "exec-1", Namespace: "ns"}
+			}
+			return out, nil, nil
+		}
+
+		timeSource := clock.NewMockedTimeSource()
+		b := newShardBatcher(timeSource, time.Second, 100*time.Millisecond, batchFn)
+		for _, key := range []string{"shard-1", "shard-2"} {
+			b.requestChan <- &batchRequest{
+				namespace: "ns",
+				shardKey:  key,
+				respChan:  make(chan batchResponse, 1),
+			}
+		}
+		b.Start()
+		defer b.Stop()
+		timeSource.BlockUntil(1)
+		timeSource.Advance(100 * time.Millisecond)
+
+		select {
+		case shards := <-batchCalls:
+			assert.ElementsMatch(t, []string{"shard-1", "shard-2"}, shards)
+		case <-time.After(time.Second):
+			t.Fatal("initial batch did not flush")
+		}
+	})
+
 	t.Run("requests arriving during inflight batch are coalesced into the next batch", func(t *testing.T) {
 		var mu sync.Mutex
 		batchCalls := make([][]string, 0)
@@ -358,7 +392,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 			return out, nil, nil
 		}
 
-		b := newShardBatcher(time.Second, batchFn)
+		b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, 0, batchFn)
 		b.Start()
 		defer b.Stop()
 
@@ -412,7 +446,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 			return out, nil, nil
 		}
 
-		b := newShardBatcher(time.Second, batchFn)
+		b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, 0, batchFn)
 		b.Start()
 		defer b.Stop()
 
@@ -473,7 +507,7 @@ func TestShardBatcher_ConcurrentRequestsBatchedTogether(t *testing.T) {
 				return out, nil, nil
 			}
 
-			b := newShardBatcher(time.Second, batchFn)
+			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, 0, batchFn)
 			b.Start()
 			defer b.Stop()
 
@@ -522,7 +556,7 @@ func TestShardBatcher_StopDrainsAndCancelsRemainingRequests(t *testing.T) {
 				return nil, nil, nil
 			}
 
-			b := newShardBatcher(time.Second, batchFn)
+			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, 0, batchFn)
 			b.Start()
 
 			errCh := make(chan error, 1)

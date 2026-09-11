@@ -28,9 +28,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/uber-go/tally"
 	"go.uber.org/mock/gomock"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -79,7 +81,14 @@ func TestAssignEphemeralBatch(t *testing.T) {
 						}},
 					},
 				}, nil)
-				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(nil)
+				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Do(
+					func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) {
+						require.Equal(t, map[string]struct{}{"owner2": {}}, request.ChangedExecutors)
+						require.Len(t, request.NewState.ShardAssignments, 2)
+						require.Len(t, request.NewState.ShardAssignments["owner1"].AssignedShards, 2)
+						require.Contains(t, request.NewState.ShardAssignments["owner2"].AssignedShards, "NON-EXISTING-SHARD")
+					},
+				).Return(nil)
 				mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner2").Return(&store.ShardOwner{
 					ExecutorID: "owner2",
 					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
@@ -98,19 +107,30 @@ func TestAssignEphemeralBatch(t *testing.T) {
 		},
 		{
 			// When two batches race and the first wins, the second gets
-			// ErrVersionConflict from AssignShards. The assigner returns this
-			// unwrapped so callers can detect it with errors.Is and retry.
-			name:      "VersionConflict",
+			// ErrVersionConflict from AssignShards. The assigner retries the batch,
+			// rereads state, and returns the assignment committed by the winner.
+			name:      "VersionConflictRetriesBatchAndFindsExistingOwner",
 			shardKeys: []string{"CONCURRENT-SHARD"},
 			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-					Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-					ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-				}, nil)
-				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(store.ErrVersionConflict)
+				gomock.InOrder(
+					mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+						Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
+						ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+					}, nil),
+					mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(store.ErrVersionConflict),
+					mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+						Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
+						ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{
+							"CONCURRENT-SHARD": {Status: types.AssignmentStatusREADY},
+						}}},
+					}, nil),
+					mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
+						ExecutorID: "owner1",
+						Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
+					}, nil),
+				)
 			},
-			expectedError:  true,
-			expectedErrMsg: "version conflict",
+			expectedOwners: map[string]string{"CONCURRENT-SHARD": "owner1"},
 		},
 		{
 			name:      "AssignShardsFailure",
@@ -289,6 +309,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 				storage:    mockStorage,
 				cfg:        newTestShardDistributorConfig(config.LoadBalancingModeNAIVE),
 				timeSource: clock.NewRealTimeSource(),
+				metrics:    metrics.NoopScope,
 			}
 
 			tt.setupMocks(mockStorage)
@@ -324,6 +345,7 @@ func TestAssignEphemeralBatch_InvalidLoadBalancingMode(t *testing.T) {
 		storage:    mockStorage,
 		cfg:        newTestShardDistributorConfig("not-a-valid-mode"),
 		timeSource: clock.NewRealTimeSource(),
+		metrics:    metrics.NoopScope,
 	}
 
 	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
@@ -338,13 +360,98 @@ func TestAssignEphemeralBatch_InvalidLoadBalancingMode(t *testing.T) {
 	require.Nil(t, drained)
 }
 
+func TestAssignEphemeralBatch_RetriesWholeBatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockStorage := store.NewMockStore(ctrl)
+	testScope := tally.NewTestScope("test", nil)
+	metricsClient := metrics.NewClient(testScope, metrics.ShardDistributor, metrics.MigrationConfig{})
+	a := &Assigner{
+		storage:    mockStorage,
+		cfg:        newTestShardDistributorConfig(config.LoadBalancingModeNAIVE),
+		timeSource: clock.NewRealTimeSource(),
+		metrics:    metricsClient.Scope(metrics.ShardDistributorEphemeralAssignmentScope),
+	}
+
+	shardKeys := []string{"shard-1", "shard-2", "shard-3"}
+	newState := func() *store.NamespaceState {
+		return &store.NamespaceState{
+			Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
+			ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+		}
+	}
+	assertWholeBatch := func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) {
+		require.Equal(t, map[string]struct{}{"owner1": {}}, request.ChangedExecutors)
+		require.Len(t, request.NewState.ShardAssignments["owner1"].AssignedShards, len(shardKeys))
+		for _, shardKey := range shardKeys {
+			require.Contains(t, request.NewState.ShardAssignments["owner1"].AssignedShards, shardKey)
+		}
+	}
+
+	gomock.InOrder(
+		mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(newState(), nil),
+		mockStorage.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Do(assertWholeBatch).Return(store.ErrVersionConflict),
+		mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(newState(), nil),
+		mockStorage.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Do(assertWholeBatch).Return(nil),
+		mockStorage.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
+			ExecutorID: "owner1",
+		}, nil),
+	)
+
+	results, drained, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, shardKeys)
+	require.NoError(t, err)
+	require.Empty(t, drained)
+	require.Len(t, results, len(shardKeys))
+	for _, shardKey := range shardKeys {
+		require.Equal(t, "owner1", results[shardKey].Owner)
+	}
+
+	snapshot := testScope.Snapshot()
+	metricSuffix := "+namespace=test-ephemeral,operation=EphemeralAssignment"
+	writeConflictMetric := "test.shard_distributor_ephemeral_assignment_write_attempts+assignment_write_result=version_conflict,namespace=test-ephemeral,operation=EphemeralAssignment"
+	writeSuccessMetric := "test.shard_distributor_ephemeral_assignment_write_attempts+assignment_write_result=success,namespace=test-ephemeral,operation=EphemeralAssignment"
+	require.Contains(t, snapshot.Histograms(), "test.shard_distributor_ephemeral_assignment_batch_size"+metricSuffix)
+	require.Equal(t, int64(1), snapshot.Counters()[writeConflictMetric].Value())
+	require.Equal(t, int64(1), snapshot.Counters()[writeSuccessMetric].Value())
+}
+
+func TestAssignEphemeralBatch_ExhaustsConflictRetries(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockStorage := store.NewMockStore(ctrl)
+	testScope := tally.NewTestScope("test", nil)
+	metricsClient := metrics.NewClient(testScope, metrics.ShardDistributor, metrics.MigrationConfig{})
+	a := &Assigner{
+		storage:    mockStorage,
+		cfg:        newTestShardDistributorConfig(config.LoadBalancingModeNAIVE),
+		timeSource: clock.NewRealTimeSource(),
+		metrics:    metricsClient.Scope(metrics.ShardDistributorEphemeralAssignmentScope),
+	}
+
+	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).DoAndReturn(func(context.Context, string) (*store.NamespaceState, error) {
+		return &store.NamespaceState{
+			Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
+			ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+		}, nil
+	}).Times(versionConflictRetryMaxAttempts + 1)
+	mockStorage.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(store.ErrVersionConflict).Times(versionConflictRetryMaxAttempts + 1)
+
+	shardKeys := []string{"shard-1", "shard-2", "shard-3"}
+	results, drained, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, shardKeys)
+	require.ErrorIs(t, err, store.ErrVersionConflict)
+	require.Nil(t, results)
+	require.Nil(t, drained)
+
+	snapshot := testScope.Snapshot()
+	writeConflictMetric := "test.shard_distributor_ephemeral_assignment_write_attempts+assignment_write_result=version_conflict,namespace=test-ephemeral,operation=EphemeralAssignment"
+	require.Equal(t, int64(versionConflictRetryMaxAttempts+1), snapshot.Counters()[writeConflictMetric].Value())
+}
+
 // A drain that lands before the first batch flush must come back as ShardDrainedError,
 // not as InternalServiceError from a missing result map entry.
 func TestGetOrAssign_DrainedDuringBatchFlushReturnsShardDrainedError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockStorage := store.NewMockStore(ctrl)
 
-	a := New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage)
+	a := New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage, metrics.NewNoopMetricsClient())
 	a.Start()
 	defer a.Stop()
 

@@ -85,7 +85,7 @@ type ServersResult struct {
 }
 
 func provideServers(params serversParams) ServersResult {
-	rawHandler := handler.NewHandler(params.Logger, params.TimeSource, params.ShardDistributionCfg, params.Config, params.Store)
+	rawHandler := handler.NewHandler(params.Logger, params.TimeSource, params.ShardDistributionCfg, params.Config, params.Store, params.MetricsClient)
 	wrappedHandler := metered.NewMetricsHandler(rawHandler, params.Logger, params.MetricsClient)
 	wrappedHandler = accesscontrolled.NewHandler(wrappedHandler, params.Authorizer)
 

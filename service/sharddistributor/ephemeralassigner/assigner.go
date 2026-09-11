@@ -22,9 +22,9 @@
 
 // Package ephemeralassigner assigns ephemeral shards to executors on demand.
 // Cache-miss GetShardOwner calls for ephemeral namespaces are coalesced: the
-// first request triggers an immediate flush and subsequent requests that arrive
-// while the flush is in-flight are batched into the next flush. Each batch is
-// planned and persisted with a single pair of storage operations.
+// first request starts a short collection window, and requests that arrive while
+// a flush is in-flight are batched into the next flush. Each flush reads state
+// once and persists all new assignments in one write.
 package ephemeralassigner
 
 import (
@@ -35,6 +35,7 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common/backoff"
 	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer"
@@ -44,11 +45,11 @@ import (
 
 const (
 	// ephemeralBatchTimeout is the context timeout for each coalesced batch flush.
-	// Sized as a safety net rather than a target: coalescing relies on etcd latency
-	// to widen the batching window, so a tight deadline would fail flushes exactly
-	// when batching helps most. It also has to cover a cold-cache GetExecutor, whose
-	// namespace refresh is itself bounded by refreshOperationTimeout (5s).
-	ephemeralBatchTimeout = 5 * time.Second
+	// Sized as a safety net rather than a target. It covers conflict retries and a
+	// cold-cache GetExecutor, whose namespace refresh is itself bounded by
+	// refreshOperationTimeout (5s).
+	ephemeralBatchTimeout          = 5 * time.Second
+	ephemeralBatchCoalescingWindow = 10 * time.Millisecond
 
 	// versionConflictRetryInitialInterval is the starting backoff for retries
 	// triggered when a concurrent shard assignment causes a version conflict.
@@ -67,18 +68,20 @@ type Assigner struct {
 	timeSource clock.TimeSource
 	cfg        *config.Config
 	storage    store.Store
+	metrics    metrics.Scope
 
 	batcher *shardBatcher
 }
 
 // New builds an Assigner. Call Start before serving requests and Stop on shutdown.
-func New(timeSource clock.TimeSource, cfg *config.Config, storage store.Store) *Assigner {
+func New(timeSource clock.TimeSource, cfg *config.Config, storage store.Store, metricsClient metrics.Client) *Assigner {
 	a := &Assigner{
 		timeSource: timeSource,
 		cfg:        cfg,
 		storage:    storage,
+		metrics:    metricsClient.Scope(metrics.ShardDistributorEphemeralAssignmentScope),
 	}
-	a.batcher = newShardBatcher(ephemeralBatchTimeout, a.assignEphemeralBatch)
+	a.batcher = newShardBatcher(timeSource, ephemeralBatchTimeout, ephemeralBatchCoalescingWindow, a.assignEphemeralBatch)
 	return a
 }
 
@@ -92,54 +95,9 @@ func (a *Assigner) Stop() {
 	a.batcher.Stop()
 }
 
-// GetOrAssign assigns an ephemeral shard that does not yet exist in storage. It
-// submits the request to the batcher and, on a version conflict (concurrent
-// assignment by another goroutine), retries with exponential backoff. Each retry
-// re-reads storage first: if the concurrent writer already committed the
-// assignment we return it immediately without re-submitting to the batcher.
+// GetOrAssign assigns an ephemeral shard that does not yet exist in storage.
 func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwnerRequest) (*types.GetShardOwnerResponse, error) {
-	retryPolicy := backoff.NewExponentialRetryPolicy(versionConflictRetryInitialInterval)
-	retryPolicy.SetMaximumInterval(versionConflictRetryMaxInterval)
-	retryPolicy.SetMaximumAttempts(versionConflictRetryMaxAttempts)
-
-	throttleRetry := backoff.NewThrottleRetry(
-		backoff.WithRetryPolicy(retryPolicy),
-		backoff.WithRetryableError(func(err error) bool {
-			return errors.Is(err, store.ErrVersionConflict)
-		}),
-	)
-
-	var resp *types.GetShardOwnerResponse
-	isRetry := false
-	err := throttleRetry.Do(ctx, func(ctx context.Context) error {
-		if isRetry {
-			// A concurrent batch won the race. Re-read storage first: if the
-			// winner already committed our shard's assignment we can return
-			// immediately without re-submitting to the batcher.
-			owner, err := a.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
-			if errors.Is(err, store.ErrShardDrained) {
-				return err
-			}
-			if err != nil && !errors.Is(err, store.ErrShardNotFound) {
-				return &types.InternalServiceError{Message: fmt.Sprintf("failed to get shard owner: %v", err)}
-			}
-			if err == nil {
-				resp = &types.GetShardOwnerResponse{
-					Owner:     owner.ExecutorID,
-					Metadata:  owner.Metadata,
-					Namespace: request.Namespace,
-				}
-				return nil
-			}
-		}
-		isRetry = true
-
-		// Submit to the batcher to assign the shard.
-		var err error
-		resp, err = a.batcher.Submit(ctx, request)
-		return err
-	})
-
+	resp, err := a.batcher.Submit(ctx, request)
 	if err != nil {
 		return nil, mapAssignError(request, err)
 	}
@@ -163,13 +121,44 @@ func mapAssignError(request *types.GetShardOwnerRequest, err error) error {
 
 // assignEphemeralBatch is the ephemeralAssignmentBatchFn wired into the shardBatcher.
 // It processes a whole batch of unassigned shard keys for a single ephemeral
-// namespace using two storage operations:
+// namespace using up to two storage operations per attempt:
 //  1. GetState — read current namespace state once for the whole batch.
 //  2. AssignShards — write all new assignments atomically in one operation.
 //
 // Shards that already have an owner are skipped from placement,
 // the rest are placed by the load balancer and saved in a single AssignShards call
 func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+	batchMetrics := a.metrics.Tagged(metrics.NamespaceTag(namespace))
+	batchMetrics.RecordHistogramValue(metrics.ShardDistributorEphemeralAssignmentBatchSize, float64(len(shardKeys)))
+
+	retryPolicy := backoff.NewExponentialRetryPolicy(versionConflictRetryInitialInterval)
+	retryPolicy.SetMaximumInterval(versionConflictRetryMaxInterval)
+	retryPolicy.SetMaximumAttempts(versionConflictRetryMaxAttempts)
+
+	throttleRetry := backoff.NewThrottleRetry(
+		backoff.WithRetryPolicy(retryPolicy),
+		backoff.WithRetryableError(func(err error) bool {
+			return errors.Is(err, store.ErrVersionConflict)
+		}),
+		backoff.WithClock(a.timeSource),
+	)
+
+	var results map[string]*types.GetShardOwnerResponse
+	var drained map[string]struct{}
+	err := throttleRetry.Do(ctx, func(ctx context.Context) error {
+		var err error
+		results, drained, err = a.tryAssignEphemeralBatch(ctx, namespace, shardKeys, batchMetrics)
+		return err
+	})
+	return results, drained, err
+}
+
+func (a *Assigner) tryAssignEphemeralBatch(
+	ctx context.Context,
+	namespace string,
+	shardKeys []string,
+	batchMetrics metrics.Scope,
+) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 	state, err := a.storage.GetState(ctx, namespace)
 	if err != nil {
 		return nil, nil, &types.InternalServiceError{Message: fmt.Sprintf("get namespace state: %v", err)}
@@ -183,15 +172,21 @@ func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, s
 			return nil, nil, &types.InternalServiceError{Message: fmt.Sprintf("plan initial placement: %v", err)}
 		}
 
-		mergePlacements(state, placements, a.timeSource.Now().UTC())
+		changedExecutors := mergePlacements(state, placements, a.timeSource.Now().UTC())
 
-		if err := a.storage.AssignShards(ctx, namespace, store.AssignShardsRequest{NewState: state}, store.NopGuard()); err != nil {
-			if errors.Is(err, store.ErrVersionConflict) {
-				// Return the version-conflict sentinel unwrapped so callers can
-				// detect it with errors.Is and decide whether to retry.
-				return nil, nil, fmt.Errorf("assign ephemeral shards: %w", err)
+		writeErr := a.storage.AssignShards(ctx, namespace, store.AssignShardsRequest{
+			NewState:         state,
+			ChangedExecutors: changedExecutors,
+		}, store.NopGuard())
+		recordAssignmentWriteAttempt(batchMetrics, writeErr)
+
+		if writeErr != nil {
+			if errors.Is(writeErr, store.ErrVersionConflict) {
+				// Return the version-conflict sentinel wrapped so the batch retry can
+				// detect it with errors.Is.
+				return nil, nil, fmt.Errorf("assign ephemeral shards: %w", writeErr)
 			}
-			return nil, nil, &types.InternalServiceError{Message: fmt.Sprintf("assign ephemeral shards: %v", err)}
+			return nil, nil, &types.InternalServiceError{Message: fmt.Sprintf("assign ephemeral shards: %v", writeErr)}
 		}
 
 		for _, placement := range placements {
@@ -205,6 +200,19 @@ func (a *Assigner) assignEphemeralBatch(ctx context.Context, namespace string, s
 	}
 
 	return buildResults(namespace, shardKeys, executorByShard, executorOwners), drained, nil
+}
+
+func recordAssignmentWriteAttempt(scope metrics.Scope, err error) {
+	writeResult := metrics.ShardDistributorAssignmentWriteResultSuccess
+	if err != nil {
+		writeResult = metrics.ShardDistributorAssignmentWriteResultError
+		if errors.Is(err, store.ErrVersionConflict) {
+			writeResult = metrics.ShardDistributorAssignmentWriteResultVersionConflict
+		}
+	}
+	scope.Tagged(
+		metrics.ShardDistributorAssignmentWriteResultTag(writeResult),
+	).IncCounter(metrics.ShardDistributorEphemeralAssignmentWriteAttempts)
 }
 
 // resolveOwners splits the requested shards into those already assigned to an
@@ -225,10 +233,13 @@ func resolveOwners(state *store.NamespaceState, shardKeys []string) (executorByS
 	return executorByShard, toPlace, state.DrainedShards
 }
 
-// mergePlacements folds the planned shard→executor placements back into state.
+// mergePlacements folds the planned shard→executor placements back into state
+// and returns the set of modified executors.
 // The AssignedShards maps are copied to avoid mutating the object returned by
 // GetState.
-func mergePlacements(state *store.NamespaceState, placements []plan.Placement, now time.Time) {
+func mergePlacements(state *store.NamespaceState, placements []plan.Placement, now time.Time) map[string]struct{} {
+	// Track executors whose assignments change so persistence can avoid rewriting unchanged executor state.
+	changedExecutors := make(map[string]struct{})
 	if state.ShardAssignments == nil {
 		state.ShardAssignments = make(map[string]store.AssignedState)
 	}
@@ -244,7 +255,9 @@ func mergePlacements(state *store.NamespaceState, placements []plan.Placement, n
 		existing.AssignedShards = newShards
 		existing.LastUpdated = now
 		state.ShardAssignments[executorID] = existing
+		changedExecutors[executorID] = struct{}{}
 	}
+	return changedExecutors
 }
 
 // fetchExecutorMetadata calls GetExecutor once per unique executor referenced by

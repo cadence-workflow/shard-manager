@@ -35,6 +35,7 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
@@ -51,7 +52,7 @@ const (
 // ready to use; callers should call Stop() when done.
 func newTestHandler(t *testing.T, cfg config.ShardDistribution, mockStore *store.MockStore) *handlerImpl {
 	t.Helper()
-	assigner := ephemeralassigner.New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStore)
+	assigner := ephemeralassigner.New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStore, metrics.NewNoopMetricsClient())
 	handler := &handlerImpl{
 		logger:               testlogger.New(t),
 		shardDistributionCfg: cfg,
@@ -438,7 +439,7 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 		},
 	}
 
-	rawHandler := NewHandler(logger, clock.NewRealTimeSource(), cfg, newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage)
+	rawHandler := NewHandler(logger, clock.NewRealTimeSource(), cfg, newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage, metrics.NewNoopMetricsClient())
 	handler := rawHandler.(*handlerImpl)
 	handler.Start()
 

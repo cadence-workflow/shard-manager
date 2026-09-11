@@ -173,6 +173,45 @@ func TestRebalanceShards_ExecutorRemoved(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRebalanceShards_ClearsAssignmentOfLiveDrainingExecutor(t *testing.T) {
+	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+	defer mocks.ctrl.Finish()
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+	now := mocks.timeSource.Now()
+	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+		Executors: map[string]store.HeartbeatState{
+			"exec-active":   {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+			"exec-draining": {Status: types.ExecutorStatusDRAINING, LastHeartbeat: now},
+		},
+		ShardAssignments: map[string]store.AssignedState{
+			"exec-draining": {
+				AssignedShards: map[string]*types.ShardAssignment{
+					"0": {Status: types.AssignmentStatusREADY},
+					"1": {Status: types.AssignmentStatusREADY},
+				},
+				ModRevision: 7,
+			},
+		},
+	}, nil)
+	mocks.election.EXPECT().Guard().Return(store.NopGuard())
+	mocks.store.EXPECT().AssignShards(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) error {
+			assert.Len(t, request.NewState.ShardAssignments["exec-active"].AssignedShards, 2)
+
+			drainingAssignment := request.NewState.ShardAssignments["exec-draining"]
+			assert.Empty(t, drainingAssignment.AssignedShards, "the draining executor must stop being told to serve its old shards")
+			assert.Equal(t, int64(7), drainingAssignment.ModRevision)
+			assert.Contains(t, request.ChangedExecutors, "exec-draining", "the emptied assignment has to be written out")
+			assert.Empty(t, request.ExecutorsToDelete, "a heartbeating executor is not stale")
+			return nil
+		},
+	)
+
+	err := processor.rebalanceShards(context.Background())
+	require.NoError(t, err)
+}
+
 func TestRebalanceShards_ExecutorStale(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
 	defer mocks.ctrl.Finish()
@@ -298,12 +337,18 @@ func TestCleanupStaleExecutors(t *testing.T) {
 	heartbeats := map[string]store.HeartbeatState{
 		"exec-active": {LastHeartbeat: now},
 		"exec-stale":  {LastHeartbeat: now.Add(-_defaultHeartbeatTTL).Add(-1 * time.Second)},
+		"exec-orphan": {},
 	}
 
-	namespaceState := &store.NamespaceState{Executors: heartbeats}
+	namespaceState := &store.NamespaceState{
+		Executors: heartbeats,
+		ShardAssignments: map[string]store.AssignedState{
+			"exec-orphan": {ModRevision: 12},
+		},
+	}
 
 	staleExecutors := processor.identifyStaleExecutors(namespaceState)
-	assert.Equal(t, map[string]int64{"exec-stale": 0}, staleExecutors)
+	assert.Equal(t, map[string]int64{"exec-stale": 0, "exec-orphan": 12}, staleExecutors)
 }
 
 func TestCleanupStaleShardStats(t *testing.T) {
@@ -1155,6 +1200,13 @@ func TestBuildNewAssignmentsState_OnlyChangedExecutors(t *testing.T) {
 				LastUpdated: oldTime,
 				ModRevision: 20,
 			},
+			"exec-4": {
+				AssignedShards: map[string]*types.ShardAssignment{
+					"shard-6": {Status: types.AssignmentStatusREADY},
+				},
+				LastUpdated: oldTime,
+				ModRevision: 30,
+			},
 		},
 	}
 
@@ -1163,21 +1215,91 @@ func TestBuildNewAssignmentsState_OnlyChangedExecutors(t *testing.T) {
 		"exec-2": {"shard-3", "shard-4"}, // changed (added shard-4)
 		"exec-3": {"shard-5"},            // new
 	}
+	executorsToUnassign := map[string]int64{"exec-4": 30}
 
 	newAssignments, executorsWithChangedAssignments := processor.buildNewAssignmentsState(
 		namespaceState,
 		currentAssignments,
+		executorsToUnassign,
 		namespaceState.ShardOwners(),
 		now,
 	)
 
-	assert.Len(t, newAssignments, 3)
-	assert.Equal(t, map[string]struct{}{"exec-2": {}, "exec-3": {}}, executorsWithChangedAssignments)
+	assert.Len(t, newAssignments, 4)
+	assert.Equal(t, map[string]struct{}{"exec-2": {}, "exec-3": {}, "exec-4": {}}, executorsWithChangedAssignments)
 	assert.Equal(t, oldTime, newAssignments["exec-1"].LastUpdated)
 	assert.Equal(t, now, newAssignments["exec-2"].LastUpdated)
 	assert.Equal(t, int64(10), newAssignments["exec-1"].ModRevision)
 	assert.Equal(t, int64(20), newAssignments["exec-2"].ModRevision)
 	assert.Equal(t, int64(0), newAssignments["exec-3"].ModRevision)
+	assert.Empty(t, newAssignments["exec-4"].AssignedShards)
+	assert.Equal(t, int64(30), newAssignments["exec-4"].ModRevision, "cleared assignments")
+}
+
+func TestFindExecutorsToUnassign(t *testing.T) {
+	assignment := func(modRevision int64, shards ...string) store.AssignedState {
+		assigned := make(map[string]*types.ShardAssignment, len(shards))
+		for _, shardID := range shards {
+			assigned[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
+		}
+		return store.AssignedState{AssignedShards: assigned, ModRevision: modRevision}
+	}
+
+	tests := []struct {
+		name       string
+		status     types.ExecutorStatus
+		assignment store.AssignedState
+		stale      bool
+		want       map[string]int64
+	}{
+		{
+			name:       "active executor keeps its shards",
+			status:     types.ExecutorStatusACTIVE,
+			assignment: assignment(7, "0"),
+			want:       map[string]int64{},
+		},
+		{
+			name:       "draining executor is emptied at its current revision",
+			status:     types.ExecutorStatusDRAINING,
+			assignment: assignment(7, "0"),
+			want:       map[string]int64{"exec": 7},
+		},
+		{
+			name:       "drained executor is emptied",
+			status:     types.ExecutorStatusDRAINED,
+			assignment: assignment(7, "0"),
+			want:       map[string]int64{"exec": 7},
+		},
+		{
+			name:       "stale executor is deleted rather than emptied",
+			status:     types.ExecutorStatusACTIVE,
+			assignment: assignment(7, "0"),
+			stale:      true,
+			want:       map[string]int64{},
+		},
+		{
+			name:       "already emptied record is not rewritten",
+			status:     types.ExecutorStatusDRAINING,
+			assignment: assignment(7),
+			want:       map[string]int64{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			staleExecutors := map[string]int64{}
+			if tt.stale {
+				staleExecutors["exec"] = tt.assignment.ModRevision
+			}
+
+			namespaceState := &store.NamespaceState{
+				Executors:        map[string]store.HeartbeatState{"exec": {Status: tt.status}},
+				ShardAssignments: map[string]store.AssignedState{"exec": tt.assignment},
+			}
+
+			assert.Equal(t, tt.want, findExecutorsToUnassign(namespaceState, staleExecutors))
+		})
+	}
 }
 
 func TestEmitExecutorMetric(t *testing.T) {

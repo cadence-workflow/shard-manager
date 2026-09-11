@@ -294,6 +294,9 @@ func (p *namespaceProcessor) runShardStatsCleanupLoop(ctx context.Context) {
 			p.logger.Info("Periodic shard stats cleanup triggered.")
 			namespaceState, err := p.shardStore.GetState(ctx, p.namespaceCfg.Name)
 			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
 				p.logger.Error("Failed to get state for shard stats cleanup", tag.Error(err))
 				continue
 			}

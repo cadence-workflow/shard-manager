@@ -30,6 +30,10 @@ func (m *Manager) Confirm(ctx context.Context, message string) (bool, error) {
 // ConfirmWithDefault asks for user confirmation with a default value
 // Returns defaultValue if user just presses enter
 func (m *Manager) ConfirmWithDefault(ctx context.Context, message string, defaultValue bool) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+
 	prompt := fmt.Sprintf("%s [y/N]: ", message)
 	if defaultValue {
 		prompt = fmt.Sprintf("%s [Y/n]: ", message)

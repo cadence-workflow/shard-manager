@@ -37,6 +37,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
@@ -68,17 +69,19 @@ type Assigner struct {
 	timeSource clock.TimeSource
 	cfg        *config.Config
 	storage    store.Store
+	shardCache cache.ShardCache
 	metrics    metrics.Scope
 
 	batcher *shardBatcher
 }
 
 // New builds an Assigner. Call Start before serving requests and Stop on shutdown.
-func New(timeSource clock.TimeSource, cfg *config.Config, storage store.Store, metricsClient metrics.Client) *Assigner {
+func New(timeSource clock.TimeSource, cfg *config.Config, storage store.Store, shardCache cache.ShardCache, metricsClient metrics.Client) *Assigner {
 	a := &Assigner{
 		timeSource: timeSource,
 		cfg:        cfg,
 		storage:    storage,
+		shardCache: shardCache,
 		metrics:    metricsClient.Scope(metrics.ShardDistributorEphemeralAssignmentScope),
 	}
 	a.batcher = newShardBatcher(timeSource, ephemeralBatchTimeout, ephemeralBatchCoalescingWindow, a.assignEphemeralBatch)
@@ -269,7 +272,7 @@ func (a *Assigner) fetchExecutorMetadata(ctx context.Context, namespace string, 
 		if _, already := executorOwners[executorID]; already {
 			continue
 		}
-		owner, err := a.storage.GetExecutor(ctx, namespace, executorID)
+		owner, err := a.shardCache.GetExecutor(ctx, namespace, executorID)
 		if err != nil {
 			return nil, &types.InternalServiceError{Message: fmt.Sprintf("get executor %q: %v", executorID, err)}
 		}

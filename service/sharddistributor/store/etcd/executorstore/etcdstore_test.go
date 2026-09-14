@@ -3,7 +3,6 @@ package executorstore
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -1243,47 +1242,6 @@ func TestDrainShardsLifecycle(t *testing.T) {
 	assert.Equal(t, []string{"shard-C"}, drained)
 }
 
-func TestGetShardOwnerRefusesDrainedShards(t *testing.T) {
-	tc := testhelper.SetupStoreTestCluster(t)
-	executorStore := createStore(t, tc)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	executorID := "executor-drain-read-path"
-	shardID := "shard-drain-read-path"
-
-	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
-	assignShardForTest(ctx, t, executorStore, tc.Namespace, shardID, executorID)
-	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{shardID}))
-
-	require.Eventually(t, func() bool {
-		_, err := executorStore.GetShardOwner(ctx, tc.Namespace, shardID)
-		return errors.Is(err, store.ErrShardDrained)
-	}, 5*time.Second, 50*time.Millisecond)
-
-	_, err := executorStore.UndrainShards(ctx, tc.Namespace, []string{shardID})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		owner, err := executorStore.GetShardOwner(ctx, tc.Namespace, shardID)
-		return err == nil && owner.ExecutorID == executorID
-	}, 5*time.Second, 50*time.Millisecond)
-}
-
-func TestGetShardOwnerReportsDrainedForUnassignedShard(t *testing.T) {
-	tc := testhelper.SetupStoreTestCluster(t)
-	executorStore := createStore(t, tc)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"never-assigned"}))
-
-	require.Eventually(t, func() bool {
-		_, err := executorStore.GetShardOwner(ctx, tc.Namespace, "never-assigned")
-		return errors.Is(err, store.ErrShardDrained)
-	}, 5*time.Second, 50*time.Millisecond)
-}
-
 // UndrainShards reports only the shards it actually removed. A shard that was never
 // drained, or that a previous call already removed, is excluded — that is what makes
 // the result meaningful to an operator rather than an echo of the request.
@@ -1302,59 +1260,6 @@ func TestUndrainShardsReportsOnlyActualRemovals(t *testing.T) {
 	removed, err = executorStore.UndrainShards(ctx, tc.Namespace, []string{"shard-A", "never-drained"})
 	require.NoError(t, err)
 	assert.Empty(t, removed, "repeating the same undrain removes nothing further")
-}
-
-// Spectators learn about drains through this subscription, so a drain has to
-// produce a notification on its own with no executor assignment change.
-func TestSubscribeToAssignmentChanges_NotifiesOnDrain(t *testing.T) {
-	tc := testhelper.SetupStoreTestCluster(t)
-	executorStore := createStore(t, tc)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	executorID := "executor-drain-subscribe"
-	shardID := "shard-drain-subscribe"
-
-	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
-	assignShardForTest(ctx, t, executorStore, tc.Namespace, shardID, executorID)
-	require.Eventually(t, func() bool {
-		owner, err := executorStore.GetShardOwner(ctx, tc.Namespace, shardID)
-		return err == nil && owner.ExecutorID == executorID
-	}, 5*time.Second, 50*time.Millisecond)
-
-	notifications, unsubscribe, err := executorStore.SubscribeToAssignmentChanges(ctx, tc.Namespace)
-	require.NoError(t, err)
-	defer unsubscribe()
-
-	// Drain a shard without touching the assigned_state
-	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{shardID}))
-
-	// Notifications are coalesced, so read the current cache after each wake-up.
-	var drainedSnapshot store.AssignmentSnapshot
-	deadline := time.After(10 * time.Second)
-	for {
-		var gotDrain bool
-		select {
-		case <-notifications:
-			drainedSnapshot, err = executorStore.GetShardAssignments(tc.Namespace)
-			require.NoError(t, err)
-			_, gotDrain = drainedSnapshot.DrainedShards[shardID]
-		case <-deadline:
-			t.Fatal("drain should notify the assignment subscribers")
-		}
-		if gotDrain {
-			break
-		}
-	}
-
-	// The assignment is read atomically with the drained set.
-	assignedShards := make([]string, 0)
-	for owner, shardIDs := range drainedSnapshot.ExecutorToShards {
-		if owner.ExecutorID == executorID {
-			assignedShards = append(assignedShards, shardIDs...)
-		}
-	}
-	assert.Equal(t, []string{shardID}, assignedShards)
 }
 
 // Draining must not leak across namespaces: the drained keyspace is per-namespace and

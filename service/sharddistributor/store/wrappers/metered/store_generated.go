@@ -119,16 +119,6 @@ func (c *meteredStore) GetDrainedShards(ctx context.Context, namespace string) (
 	return
 }
 
-func (c *meteredStore) GetExecutor(ctx context.Context, namespace string, executorID string) (sp1 *store.ShardOwner, err error) {
-	op := func() error {
-		sp1, err = c.wrapped.GetExecutor(ctx, namespace, executorID)
-		return err
-	}
-
-	err = c.call(metrics.ShardDistributorStoreGetExecutorScope, op, metrics.NamespaceTag(namespace))
-	return
-}
-
 func (c *meteredStore) GetExecutorState(ctx context.Context, namespace string, executorID string) (e1 store.ExecutorState, err error) {
 	op := func() error {
 		e1, err = c.wrapped.GetExecutorState(ctx, namespace, executorID)
@@ -136,20 +126,6 @@ func (c *meteredStore) GetExecutorState(ctx context.Context, namespace string, e
 	}
 
 	err = c.call(metrics.ShardDistributorStoreGetExecutorStateScope, op, metrics.NamespaceTag(namespace))
-	return
-}
-
-func (c *meteredStore) GetShardAssignments(namespace string) (a1 store.AssignmentSnapshot, err error) {
-	return c.wrapped.GetShardAssignments(namespace)
-}
-
-func (c *meteredStore) GetShardOwner(ctx context.Context, namespace string, shardID string) (sp1 *store.ShardOwner, err error) {
-	op := func() error {
-		sp1, err = c.wrapped.GetShardOwner(ctx, namespace, shardID)
-		return err
-	}
-
-	err = c.call(metrics.ShardDistributorStoreGetShardOwnerScope, op, metrics.NamespaceTag(namespace))
 	return
 }
 
@@ -203,17 +179,6 @@ func (c *meteredStore) ResetNamespace(ctx context.Context, namespace string) (i1
 	return
 }
 
-func (c *meteredStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (ch1 <-chan struct {
-}, f1 func(), err error) {
-	op := func() error {
-		ch1, f1, err = c.wrapped.SubscribeToAssignmentChanges(ctx, namespace)
-		return err
-	}
-
-	err = c.call(metrics.ShardDistributorStoreSubscribeToAssignmentChangesScope, op, metrics.NamespaceTag(namespace))
-	return
-}
-
 func (c *meteredStore) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (ch1 <-chan int64, err error) {
 	op := func() error {
 		ch1, err = c.wrapped.SubscribeToExecutorStatusChanges(ctx, namespace)
@@ -222,6 +187,11 @@ func (c *meteredStore) SubscribeToExecutorStatusChanges(ctx context.Context, nam
 
 	err = c.call(metrics.ShardDistributorStoreSubscribeToExecutorStatusChangesScope, op, metrics.NamespaceTag(namespace))
 	return
+}
+
+func (c *meteredStore) SubscribeToNamespaceChanges(namespace string) (ch1 <-chan struct {
+}, err error) {
+	return c.wrapped.SubscribeToNamespaceChanges(namespace)
 }
 
 func (c *meteredStore) UndrainHosts(ctx context.Context, namespace string, hostnames []string) (sa1 []string, err error) {

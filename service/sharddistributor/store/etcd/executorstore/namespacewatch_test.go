@@ -3,6 +3,7 @@ package executorstore
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.uber.org/fx/fxtest"
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
@@ -21,35 +23,29 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
 )
 
+var _watchTestConfig = etcdclient.ExecutorStoreConfig{
+	BaseConfig: etcdclient.BaseConfig{Prefix: _watchTestPrefix},
+}
+
 const (
 	_watchTestPrefix    = "/test-prefix"
 	_watchTestNamespace = "test-namespace"
 	_watchTestExecutor  = "executor-1"
 )
 
-// newNamespaceWatchStore builds a store wired to a mock etcd client, with the watch
-// context the watch goroutines are bounded by.
-func newNamespaceWatchStore(t *testing.T, client etcdclient.Client, timeSource clock.TimeSource) *executorStoreImpl {
+// newTestNamespaceWatcher builds a watcher wired to a mock etcd client.
+func newTestNamespaceWatcher(t *testing.T, client etcdclient.Client, timeSource clock.TimeSource) *namespaceWatcher {
 	t.Helper()
 
-	watchCtx, cancelWatch := context.WithCancel(context.Background())
-	t.Cleanup(cancelWatch)
-
-	return &executorStoreImpl{
-		client:        client,
-		prefix:        _watchTestPrefix,
-		logger:        testlogger.New(t),
-		timeSource:    timeSource,
-		metricsClient: metrics.NewNoopMetricsClient(),
-		watchCtx:      watchCtx,
-		cancelWatch:   cancelWatch,
-	}
+	w := newNamespaceWatcher(client, _watchTestConfig, testlogger.New(t), timeSource, metrics.NewNoopMetricsClient())
+	t.Cleanup(w.cancelWatch)
+	return w
 }
 
 // The namespace is watched as a single range, so the store must refresh for drain changes,
 // ignore the keyspaces subscribers do not track, and treat unchanged rewrites as no-ops.
 func TestHasNamespaceStateChanged(t *testing.T) {
-	s := newNamespaceWatchStore(t, etcdclient.NewMockClient(gomock.NewController(t)), clock.NewRealTimeSource())
+	w := newTestNamespaceWatcher(t, etcdclient.NewMockClient(gomock.NewController(t)), clock.NewRealTimeSource())
 
 	drainedKey := etcdkeys.BuildDrainedShardKey(_watchTestPrefix, _watchTestNamespace, "shard-1")
 	leaderKey := fmt.Sprintf("%s/%s/leader/1234", _watchTestPrefix, _watchTestNamespace)
@@ -155,7 +151,7 @@ func TestHasNamespaceStateChanged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, s.hasNamespaceStateChanged(clientv3.WatchResponse{Events: tt.events}, _watchTestNamespace))
+			assert.Equal(t, tt.expected, w.hasNamespaceStateChanged(clientv3.WatchResponse{Events: tt.events}, _watchTestNamespace))
 		})
 	}
 }
@@ -167,18 +163,18 @@ func TestWatchNamespace_ReturnsWatchFailures(t *testing.T) {
 	watchChan := make(chan clientv3.WatchResponse)
 	mockClient.EXPECT().Watch(gomock.Any(), gomock.Any(), gomock.Any()).Return(watchChan).AnyTimes()
 
-	s := newNamespaceWatchStore(t, mockClient, clock.NewRealTimeSource())
+	w := newTestNamespaceWatcher(t, mockClient, clock.NewRealTimeSource())
 	changeChan := make(chan struct{}, 1)
 
 	go func() {
 		watchChan <- clientv3.WatchResponse{CompactRevision: 100}
 	}()
-	err := s.watchNamespace(_watchTestNamespace, changeChan)
+	err := w.watchNamespace(_watchTestNamespace, changeChan)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "etcdserver: mvcc: required revision has been compacted")
 
 	close(watchChan)
-	err = s.watchNamespace(_watchTestNamespace, changeChan)
+	err = w.watchNamespace(_watchTestNamespace, changeChan)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "watch channel closed")
 }
@@ -194,12 +190,12 @@ func TestWatchNamespace_SignalsOnEstablishAndNeverBlocks(t *testing.T) {
 	watchChan := make(chan clientv3.WatchResponse)
 	mockClient.EXPECT().Watch(gomock.Any(), gomock.Any(), gomock.Any()).Return(watchChan).AnyTimes()
 
-	s := newNamespaceWatchStore(t, mockClient, clock.NewRealTimeSource())
+	w := newTestNamespaceWatcher(t, mockClient, clock.NewRealTimeSource())
 	changeChan := make(chan struct{}, 1)
 
 	watchDone := make(chan error, 1)
 	go func() {
-		watchDone <- s.watchNamespace(_watchTestNamespace, changeChan)
+		watchDone <- w.watchNamespace(_watchTestNamespace, changeChan)
 	}()
 
 	// A reconnected watch resumes at the current revision, so establishing one has to
@@ -233,12 +229,82 @@ func TestWatchNamespace_SignalsOnEstablishAndNeverBlocks(t *testing.T) {
 // Subscribing once the store is stopping must fail rather than hand back a channel
 // that closes immediately, which a subscriber cannot tell from a quiet namespace.
 func TestSubscribeToNamespaceChanges_AfterStop(t *testing.T) {
-	s := newNamespaceWatchStore(t, etcdclient.NewMockClient(gomock.NewController(t)), clock.NewRealTimeSource())
-	s.Stop()
+	w := newTestNamespaceWatcher(t, etcdclient.NewMockClient(gomock.NewController(t)), clock.NewRealTimeSource())
+	w.Stop()
 
-	changeChan, err := s.SubscribeToNamespaceChanges(_watchTestNamespace)
+	changeChan, err := w.SubscribeToNamespaceChanges(_watchTestNamespace)
 	assert.Nil(t, changeChan)
 	assert.ErrorContains(t, err, "store is stopping")
+}
+
+// Subscribe and Stop must not race on the WaitGroup: an Add that lands after Stop has
+// committed to waiting is a reuse, which either panics or leaves the watch unawaited.
+func TestNamespaceWatcher_SubscribeRacesStop(t *testing.T) {
+	mockClient := etcdclient.NewMockClient(gomock.NewController(t))
+	closed := make(chan clientv3.WatchResponse)
+	close(closed)
+	mockClient.EXPECT().Watch(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return((clientv3.WatchChan)(closed)).AnyTimes()
+
+	w := newTestNamespaceWatcher(t, mockClient, clock.NewRealTimeSource())
+
+	start := make(chan struct{})
+	var callers sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		callers.Add(1)
+		go func() {
+			defer callers.Done()
+			<-start
+			_, _ = w.SubscribeToNamespaceChanges(_watchTestNamespace)
+		}()
+	}
+	callers.Add(1)
+	go func() {
+		defer callers.Done()
+		<-start
+		w.Stop()
+	}()
+
+	close(start)
+	callers.Wait()
+}
+
+// The watcher registers its own shutdown, so fx stopping the app must end every watch
+// it started without anything else calling Stop.
+func TestNamespaceWatcher_StopsOnLifecycleShutdown(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	mockClient := etcdclient.NewMockClient(gomock.NewController(t))
+	// etcd closes the watch channel when its context is cancelled; the mock must too,
+	// or the watch goroutine could never exit.
+	mockClient.EXPECT().Watch(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ string, _ ...clientv3.OpOption) clientv3.WatchChan {
+			ch := make(chan clientv3.WatchResponse)
+			go func() {
+				<-ctx.Done()
+				close(ch)
+			}()
+			return ch
+		}).AnyTimes()
+
+	lifecycle := fxtest.NewLifecycle(t)
+	w := provideNamespaceWatcher(NamespaceWatcherParams{
+		Client:        mockClient,
+		ETCDConfig:    _watchTestConfig,
+		Lifecycle:     lifecycle,
+		Logger:        testlogger.New(t),
+		TimeSource:    clock.NewRealTimeSource(),
+		MetricsClient: metrics.NewNoopMetricsClient(),
+	})
+
+	changeChan, err := w.SubscribeToNamespaceChanges(_watchTestNamespace)
+	require.NoError(t, err)
+	lifecycle.RequireStart()
+
+	lifecycle.RequireStop()
+
+	for range changeChan {
+	}
 }
 
 // A failed watch must be retried rather than ending the subscription, and the
@@ -263,9 +329,9 @@ func TestSubscribeToNamespaceChanges_RetriesFailedWatch(t *testing.T) {
 		MinTimes(0).
 		MaxTimes(1)
 
-	s := newNamespaceWatchStore(t, mockClient, timeSource)
+	w := newTestNamespaceWatcher(t, mockClient, timeSource)
 
-	changeChan, err := s.SubscribeToNamespaceChanges(_watchTestNamespace)
+	changeChan, err := w.SubscribeToNamespaceChanges(_watchTestNamespace)
 	require.NoError(t, err)
 
 	closed := atomic.Bool{}
@@ -287,7 +353,7 @@ func TestSubscribeToNamespaceChanges_RetriesFailedWatch(t *testing.T) {
 	timeSource.BlockUntil(1)
 	require.False(t, closed.Load(), "a closed watch channel must not end the subscription")
 
-	s.Stop()
+	w.Stop()
 	<-drained
 	assert.True(t, closed.Load(), "stopping the store must close the change channel")
 }
@@ -311,9 +377,9 @@ func TestSubscribeToNamespaceChanges_StopDuringRetryBackoff(t *testing.T) {
 		MinTimes(0).
 		MaxTimes(1)
 
-	s := newNamespaceWatchStore(t, mockClient, timeSource)
+	w := newTestNamespaceWatcher(t, mockClient, timeSource)
 
-	_, err := s.SubscribeToNamespaceChanges(_watchTestNamespace)
+	_, err := w.SubscribeToNamespaceChanges(_watchTestNamespace)
 	require.NoError(t, err)
 
 	watchChan <- clientv3.WatchResponse{CompactRevision: 100}
@@ -322,7 +388,7 @@ func TestSubscribeToNamespaceChanges_StopDuringRetryBackoff(t *testing.T) {
 	stopped := make(chan struct{})
 	go func() {
 		defer close(stopped)
-		s.Stop()
+		w.Stop()
 	}()
 
 	select {

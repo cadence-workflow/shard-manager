@@ -14,7 +14,6 @@ import (
 	"github.com/uber-go/tally"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v2"
 
@@ -813,7 +812,7 @@ func stringStatus(s types.ExecutorStatus) string {
 	return string(res)
 }
 
-func assignShardForTest(ctx context.Context, t *testing.T, executorStore store.Store, namespace, shardID, executorID string) {
+func assignShardForTest(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace, shardID, executorID string) {
 	t.Helper()
 
 	namespaceState, err := executorStore.GetState(ctx, namespace)
@@ -824,8 +823,7 @@ func assignShardForTest(ctx context.Context, t *testing.T, executorStore store.S
 		assignedState.AssignedShards = make(map[string]*types.ShardAssignment)
 	}
 	assignedState.AssignedShards[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
-	storeImpl := executorStore.(*executorStoreImpl)
-	assignedState.LastUpdated = storeImpl.timeSource.Now().UTC()
+	assignedState.LastUpdated = executorStore.timeSource.Now().UTC()
 	namespaceState.ShardAssignments[executorID] = assignedState
 
 	err = executorStore.AssignShards(
@@ -837,7 +835,7 @@ func assignShardForTest(ctx context.Context, t *testing.T, executorStore store.S
 	require.NoError(t, err)
 }
 
-func recordHeartbeats(ctx context.Context, t *testing.T, executorStore store.Store, namespace string, executorIDs ...string) {
+func recordHeartbeats(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace string, executorIDs ...string) {
 	t.Helper()
 
 	for _, executorID := range executorIDs {
@@ -845,12 +843,11 @@ func recordHeartbeats(ctx context.Context, t *testing.T, executorStore store.Sto
 	}
 }
 
-func setLoadBalancingMode(executorStore store.Store, mode string) {
-	impl := executorStore.(*executorStoreImpl)
-	if impl.cfg == nil {
-		impl.cfg = &config.Config{}
+func setLoadBalancingMode(executorStore *executorStoreImpl, mode string) {
+	if executorStore.cfg == nil {
+		executorStore.cfg = &config.Config{}
 	}
-	impl.cfg.LoadBalancingMode = func(string) string { return mode }
+	executorStore.cfg.LoadBalancingMode = func(string) string { return mode }
 }
 
 // trackingTxn implements clientv3.Txn to record operations per batch for testing.
@@ -1564,27 +1561,21 @@ func hostnames(hosts []store.DrainedHost) []string {
 	return out
 }
 
-func createStore(t *testing.T, tc *testhelper.StoreTestCluster) store.Store {
+func createStore(t *testing.T, tc *testhelper.StoreTestCluster) *executorStoreImpl {
 	t.Helper()
 
 	etcdConfig, err := etcdclient.NewExecutorStoreConfig(tc.SDConfig)
 	require.NoError(t, err)
 
-	store, err := NewStore(ExecutorStoreParams{
-		Client:        tc.Client,
-		ETCDConfig:    etcdConfig,
-		Lifecycle:     fxtest.NewLifecycle(t),
-		Logger:        testlogger.New(t),
-		TimeSource:    clock.NewMockedTimeSourceAt(time.Now()),
-		MetricsClient: metrics.NewNoopMetricsClient(),
-		Config: &config.Config{
-			LoadBalancingMode: func(namespace string) string { return config.LoadBalancingModeNAIVE },
-			MaxEtcdTxnOps:     dynamicproperties.GetIntPropertyFn(128),
-			LoadBalancingGreedy: config.LoadBalancingGreedyConfig{
-				LoadSmoothingTimeConstant: func(string) time.Duration { return statistics.DefaultLoadSmoothingTimeConstant },
-			},
+	timeSource := clock.NewMockedTimeSourceAt(time.Now())
+	impl, err := newExecutorStoreImpl(tc.Client, etcdConfig, testlogger.New(t), timeSource, &config.Config{
+		LoadBalancingMode: func(namespace string) string { return config.LoadBalancingModeNAIVE },
+		MaxEtcdTxnOps:     dynamicproperties.GetIntPropertyFn(128),
+		LoadBalancingGreedy: config.LoadBalancingGreedyConfig{
+			LoadSmoothingTimeConstant: func(string) time.Duration { return statistics.DefaultLoadSmoothingTimeConstant },
 		},
-	})
+	}, metrics.NewNoopMetricsClient())
 	require.NoError(t, err)
-	return store
+
+	return impl
 }

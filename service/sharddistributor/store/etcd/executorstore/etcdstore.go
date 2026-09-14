@@ -9,15 +9,11 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
-	"sync"
 	"time"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.uber.org/fx"
 
-	"github.com/cadence-workflow/shard-manager/common/backoff"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
@@ -31,10 +27,6 @@ import (
 )
 
 const (
-	// Namespace watch retries land between 50ms and 150ms apart.
-	namespaceWatchRetryInterval = 100 * time.Millisecond
-	namespaceWatchJitterCoeff   = 0.5
-
 	// guardOpOverhead is the number of transaction slots consumed by the leadership guard's If condition.
 	guardOpOverhead = 1
 )
@@ -47,64 +39,30 @@ type executorStoreImpl struct {
 	recordWriter  *common.RecordWriter
 	cfg           *config.Config
 	metricsClient metrics.Client
-
-	// watchCtx bounds every long-running watch the store starts. Stop cancels it,
-	// which closes the etcd watch channels, and waits for those goroutines to exit.
-	watchCtx    context.Context
-	cancelWatch context.CancelFunc
-	wg          sync.WaitGroup
 }
 
-// ExecutorStoreParams defines the dependencies for the etcd store, for use with fx.
-type ExecutorStoreParams struct {
-	fx.In
-
-	Client        etcdclient.Client `name:"executorstore"`
-	ETCDConfig    etcdclient.ExecutorStoreConfig
-	Lifecycle     fx.Lifecycle
-	Logger        log.Logger
-	TimeSource    clock.TimeSource
-	Config        *config.Config
-	MetricsClient metrics.Client
-}
-
-// NewStore creates a new etcd-backed store and provides it to the fx application.
-func NewStore(p ExecutorStoreParams) (store.Store, error) {
-	timeSource := p.TimeSource
-	if timeSource == nil {
-		timeSource = clock.NewRealTimeSource()
-	}
-
-	recordWriter, err := common.NewRecordWriter(p.ETCDConfig.Compression)
+func newExecutorStoreImpl(
+	client etcdclient.Client,
+	etcdCfg etcdclient.ExecutorStoreConfig,
+	logger log.Logger,
+	timeSource clock.TimeSource,
+	cfg *config.Config,
+	metricsClient metrics.Client,
+) (*executorStoreImpl, error) {
+	recordWriter, err := common.NewRecordWriter(etcdCfg.Compression)
 	if err != nil {
 		return nil, fmt.Errorf("create record writer: %w", err)
 	}
 
-	watchCtx, cancelWatch := context.WithCancel(context.Background())
-
-	store := &executorStoreImpl{
-		client:        p.Client,
-		prefix:        p.ETCDConfig.Prefix,
-		logger:        p.Logger,
+	return &executorStoreImpl{
+		client:        client,
+		prefix:        etcdCfg.Prefix,
+		logger:        logger,
 		timeSource:    timeSource,
 		recordWriter:  recordWriter,
-		cfg:           p.Config,
-		metricsClient: p.MetricsClient,
-		watchCtx:      watchCtx,
-		cancelWatch:   cancelWatch,
-	}
-
-	p.Lifecycle.Append(fx.StartStopHook(store.Start, store.Stop))
-
-	return store, nil
-}
-
-func (s *executorStoreImpl) Start() {
-}
-
-func (s *executorStoreImpl) Stop() {
-	s.cancelWatch()
-	s.wg.Wait()
+		cfg:           cfg,
+		metricsClient: metricsClient,
+	}, nil
 }
 
 // --- HeartbeatStore Implementation ---
@@ -362,130 +320,6 @@ func (s *executorStoreImpl) parseDrainedHostKVs(namespace string, kvs []*mvccpb.
 		drained[hostname] = record
 	}
 	return drained
-}
-
-func (s *executorStoreImpl) SubscribeToNamespaceChanges(namespace string) (<-chan struct{}, error) {
-	if err := s.watchCtx.Err(); err != nil {
-		return nil, fmt.Errorf("store is stopping: %w", err)
-	}
-
-	changeChan := make(chan struct{}, 1)
-
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		defer close(changeChan)
-
-		logger := s.logger.WithTags(tag.ShardNamespace(namespace))
-
-		for {
-			err := s.watchNamespace(namespace, changeChan)
-			if s.watchCtx.Err() != nil {
-				return
-			}
-			if err != nil {
-				logger.Error("namespace watch failed, retrying", tag.Error(err))
-			}
-
-			select {
-			case <-s.timeSource.After(backoff.JitDuration(
-				namespaceWatchRetryInterval,
-				namespaceWatchJitterCoeff,
-			)):
-			case <-s.watchCtx.Done():
-				return
-			}
-		}
-	}()
-
-	return changeChan, nil
-}
-
-// watchNamespace feeds changeChan until the watch ends, returning the reason it did.
-func (s *executorStoreImpl) watchNamespace(namespace string, changeChan chan<- struct{}) error {
-	scope := s.metricsClient.Scope(metrics.ShardDistributorWatchScope).
-		Tagged(metrics.NamespaceTag(namespace)).
-		Tagged(metrics.ShardDistributorWatchTypeTag("namespace_state"))
-
-	// The whole namespace is watched as one range so assignment, metadata and
-	// drained-shard changes arrive in revision order on a single watch.
-	watchChan := s.client.Watch(
-		// WithRequireLeader ensures that the etcd cluster has a leader
-		clientv3.WithRequireLeader(s.watchCtx),
-		etcdkeys.BuildNamespacePrefix(s.prefix, namespace),
-		clientv3.WithPrefix(),
-		clientv3.WithPrevKV(),
-	)
-
-	// A reconnected watch resumes at the current revision, so anything written while
-	// it was down is never delivered. Signalling here makes the subscriber re-read and
-	// pick those changes up. It must follow the Watch call: a read the subscriber
-	// starts before the watch exists could miss writes that land in between.
-	s.signalNamespaceChange(changeChan)
-
-	for watchResp := range watchChan {
-		if err := watchResp.Err(); err != nil {
-			return fmt.Errorf("watch response: %w", err)
-		}
-
-		sw := scope.StartTimer(metrics.ShardDistributorWatchProcessingLatency)
-		scope.AddCounter(metrics.ShardDistributorWatchEventsReceived, int64(len(watchResp.Events)))
-
-		if s.hasNamespaceStateChanged(watchResp, namespace) {
-			s.signalNamespaceChange(changeChan)
-		}
-		sw.Stop()
-	}
-
-	return fmt.Errorf("watch channel closed")
-}
-
-// signalNamespaceChange nudges the subscriber to re-read. A pending signal already
-// says that, so it is coalesced rather than blocking on a slow consumer.
-func (s *executorStoreImpl) signalNamespaceChange(changeChan chan<- struct{}) {
-	select {
-	case changeChan <- struct{}{}:
-	default:
-	}
-}
-
-// hasNamespaceStateChanged reports whether a namespace watch response touched
-// executor assignments, executor metadata, or the drained shard set.
-func (s *executorStoreImpl) hasNamespaceStateChanged(watchResp clientv3.WatchResponse, namespace string) bool {
-	executorsPrefix := etcdkeys.BuildExecutorsPrefix(s.prefix, namespace)
-	drainedShardsPrefix := etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace)
-
-	for _, event := range watchResp.Events {
-		key := string(event.Kv.Key)
-
-		switch {
-		case strings.HasPrefix(key, executorsPrefix):
-			_, keyType, err := etcdkeys.ParseExecutorKey(s.prefix, namespace, key)
-			if err != nil {
-				s.logger.Warn("Received watch event with unrecognized key format", tag.Key(key))
-				continue
-			}
-			if keyType != etcdkeys.ExecutorAssignedStateKey && keyType != etcdkeys.ExecutorMetadataKey {
-				continue
-			}
-			// Skip a rewrite of the same value.
-			if event.PrevKv != nil && string(event.Kv.Value) == string(event.PrevKv.Value) {
-				continue
-			}
-			return true
-
-		case strings.HasPrefix(key, drainedShardsPrefix):
-			// Every recognized drained key counts as a change: draining stores no value
-			// and undraining arrives as a nil-valued tombstone, so a previous-value
-			// comparison would see "" on both sides and miss the undrain.
-			if _, err := etcdkeys.ParseDrainedShardKey(s.prefix, namespace, key); err != nil {
-				s.logger.Warn("Received drained shards watch event with unrecognized key format", tag.Error(err))
-				continue
-			}
-			return true
-		}
-	}
-	return false
 }
 
 func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {

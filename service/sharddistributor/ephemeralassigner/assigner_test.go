@@ -238,6 +238,34 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			expectedOwners: map[string]string{"shard1": "draining-owner"},
 		},
 		{
+			// A shard recorded under an ACTIVE executor on a drained host keeps that
+			// owner: the assigner never re-places owned shards. Moving them off the
+			// drained host is the leader rebalance loop's job.
+			name:      "ShardOwnedByDrainedHostExecutorKeepsOwnerWithoutWrite",
+			shardKeys: []string{"shard1"},
+			setupMocks: func(mockStore *store.MockStore) {
+				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					Executors: map[string]store.HeartbeatState{
+						"host-a@uuid-1": {Status: types.ExecutorStatusACTIVE},
+						"host-b@uuid-1": {Status: types.ExecutorStatusACTIVE},
+					},
+					ShardAssignments: map[string]store.AssignedState{
+						"host-a@uuid-1": {AssignedShards: map[string]*types.ShardAssignment{
+							"shard1": {Status: types.AssignmentStatusREADY},
+						}},
+					},
+					DrainedHosts: map[string]store.DrainedHost{
+						"host-a": {Hostname: "host-a"},
+					},
+				}, nil)
+				mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "host-a@uuid-1").Return(&store.ShardOwner{
+					ExecutorID: "host-a@uuid-1",
+					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
+				}, nil)
+			},
+			expectedOwners: map[string]string{"shard1": "host-a@uuid-1"},
+		},
+		{
 			// A drain that lands while the batch is waiting to flush must not
 			// produce an assignment
 			name:      "DrainedShardIsOmittedFromResults",

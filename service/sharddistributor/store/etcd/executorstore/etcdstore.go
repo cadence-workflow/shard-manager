@@ -1,7 +1,5 @@
 package executorstore
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination=executorstore_mock.go ExecutorStore
-
 import (
 	"context"
 	"encoding/json"

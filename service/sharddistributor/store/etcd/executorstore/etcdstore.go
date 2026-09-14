@@ -365,6 +365,10 @@ func (s *executorStoreImpl) parseDrainedHostKVs(namespace string, kvs []*mvccpb.
 }
 
 func (s *executorStoreImpl) SubscribeToNamespaceChanges(namespace string) (<-chan struct{}, error) {
+	if err := s.watchCtx.Err(); err != nil {
+		return nil, fmt.Errorf("store is stopping: %w", err)
+	}
+
 	changeChan := make(chan struct{}, 1)
 
 	s.wg.Add(1)

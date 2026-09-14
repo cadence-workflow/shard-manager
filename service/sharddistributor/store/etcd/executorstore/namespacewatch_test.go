@@ -230,6 +230,17 @@ func TestWatchNamespace_SignalsOnEstablishAndNeverBlocks(t *testing.T) {
 	}
 }
 
+// Subscribing once the store is stopping must fail rather than hand back a channel
+// that closes immediately, which a subscriber cannot tell from a quiet namespace.
+func TestSubscribeToNamespaceChanges_AfterStop(t *testing.T) {
+	s := newNamespaceWatchStore(t, etcdclient.NewMockClient(gomock.NewController(t)), clock.NewRealTimeSource())
+	s.Stop()
+
+	changeChan, err := s.SubscribeToNamespaceChanges(_watchTestNamespace)
+	assert.Nil(t, changeChan)
+	assert.ErrorContains(t, err, "store is stopping")
+}
+
 // A failed watch must be retried rather than ending the subscription, and the
 // retry loop must exit once the store stops.
 func TestSubscribeToNamespaceChanges_RetriesFailedWatch(t *testing.T) {

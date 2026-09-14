@@ -10,7 +10,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -187,8 +186,8 @@ func planAndApplyNextMove(
 }
 
 // selectDestinationExecutor picks the least-loaded destination executor. If
-// there are no destination executors, it falls back to all ACTIVE executors only
-// when the namespace is severely imbalanced.
+// there are no destination executors, it falls back to all assignable executors
+// only when the namespace is severely imbalanced.
 func selectDestinationExecutor(
 	destinationExecutors []string,
 	workingAssignments map[string][]string,
@@ -201,16 +200,16 @@ func selectDestinationExecutor(
 		if !isSevereImbalance(loads, meanLoad, severeImbalanceRatio) {
 			return "", false
 		}
-		allActiveExecutors := make([]string, 0, len(workingAssignments))
+		allAssignableExecutors := make([]string, 0, len(workingAssignments))
 		for executorID := range workingAssignments {
-			if namespaceState.Executors[executorID].Status == types.ExecutorStatusACTIVE {
-				allActiveExecutors = append(allActiveExecutors, executorID)
+			if namespaceState.IsExecutorAssignable(executorID, nil) {
+				allAssignableExecutors = append(allAssignableExecutors, executorID)
 			}
 		}
-		if len(allActiveExecutors) == 0 {
+		if len(allAssignableExecutors) == 0 {
 			return "", false
 		}
-		destinationExecutors = allActiveExecutors
+		destinationExecutors = allAssignableExecutors
 	}
 
 	return findBestDestination(destinationExecutors, loads)
@@ -265,11 +264,12 @@ func classifySourcesAndDestinations(
 	destinations := make([]string, 0)
 
 	for executorID, load := range executorLoads {
-		executor := state.Executors[executorID]
-		// Intentionally allow DRAINING executors as sources so they can shed shards
+		// Intentionally allow DRAINING executors as sources so they can shed shards.
+		// Staleness is already filtered out of executorLoads by the caller, so it
+		// does not need to be re-checked here.
 		if load > meanLoad*upperBand {
 			sources = append(sources, executorID)
-		} else if executor.Status == types.ExecutorStatusACTIVE && load < meanLoad*lowerBand {
+		} else if state.IsExecutorAssignable(executorID, nil) && load < meanLoad*lowerBand {
 			destinations = append(destinations, executorID)
 		}
 	}

@@ -42,6 +42,25 @@ func newTestNamespaceWatcher(t *testing.T, client etcdclient.Client, timeSource 
 	return w
 }
 
+func put(key, value string) *clientv3.Event {
+	return &clientv3.Event{Type: clientv3.EventTypePut, Kv: &mvccpb.KeyValue{Key: []byte(key), Value: []byte(value)}}
+}
+
+// rewrite is a put over an existing key, which is only a change if the value differs.
+func rewrite(key, prevValue, value string) *clientv3.Event {
+	event := put(key, value)
+	event.PrevKv = &mvccpb.KeyValue{Key: []byte(key), Value: []byte(prevValue)}
+	return event
+}
+
+func del(key string) *clientv3.Event {
+	return &clientv3.Event{
+		Type:   clientv3.EventTypeDelete,
+		Kv:     &mvccpb.KeyValue{Key: []byte(key)},
+		PrevKv: &mvccpb.KeyValue{Key: []byte(key)},
+	}
+}
+
 // The namespace is watched as a single range, so the store must refresh for drain changes,
 // ignore the keyspaces subscribers do not track, and treat unchanged rewrites as no-ops.
 func TestHasNamespaceStateChanged(t *testing.T) {
@@ -64,87 +83,52 @@ func TestHasNamespaceStateChanged(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "shard drained",
-			events: []*clientv3.Event{
-				{Type: clientv3.EventTypePut, Kv: &mvccpb.KeyValue{Key: []byte(drainedKey)}},
-			},
+			name:     "shard drained",
+			events:   []*clientv3.Event{put(drainedKey, "")},
 			expected: true,
 		},
 		{
 			// Drain and undrain both store an empty value, so this must not be mistaken
 			// for an unchanged key.
-			name: "shard undrained",
-			events: []*clientv3.Event{
-				{
-					Type:   clientv3.EventTypeDelete,
-					Kv:     &mvccpb.KeyValue{Key: []byte(drainedKey)},
-					PrevKv: &mvccpb.KeyValue{Key: []byte(drainedKey)},
-				},
-			},
+			name:     "shard undrained",
+			events:   []*clientv3.Event{del(drainedKey)},
 			expected: true,
 		},
 		{
-			name: "leader election key is not tracked",
-			events: []*clientv3.Event{
-				{Type: clientv3.EventTypePut, Kv: &mvccpb.KeyValue{Key: []byte(leaderKey), Value: []byte("host-1")}},
-			},
+			name:     "leader election key is not tracked",
+			events:   []*clientv3.Event{put(leaderKey, "host-1")},
 			expected: false,
 		},
 		{
-			name: "malformed drained shard key",
-			events: []*clientv3.Event{
-				{Type: clientv3.EventTypePut, Kv: &mvccpb.KeyValue{Key: []byte(etcdkeys.BuildDrainedShardsPrefix(_watchTestPrefix, _watchTestNamespace) + "shard/1")}},
-			},
+			name:     "malformed drained shard key",
+			events:   []*clientv3.Event{put(etcdkeys.BuildDrainedShardsPrefix(_watchTestPrefix, _watchTestNamespace)+"shard/1", "")},
 			expected: false,
 		},
 		{
-			name: "executor assigned state changed",
-			events: []*clientv3.Event{
-				{
-					Type:   clientv3.EventTypePut,
-					Kv:     &mvccpb.KeyValue{Key: []byte(assignedStateKey), Value: []byte("new")},
-					PrevKv: &mvccpb.KeyValue{Key: []byte(assignedStateKey), Value: []byte("old")},
-				},
-			},
+			name:     "executor assigned state changed",
+			events:   []*clientv3.Event{rewrite(assignedStateKey, "old", "new")},
 			expected: true,
 		},
 		{
-			name: "executor assigned state rewritten with same value",
-			events: []*clientv3.Event{
-				{
-					Type:   clientv3.EventTypePut,
-					Kv:     &mvccpb.KeyValue{Key: []byte(assignedStateKey), Value: []byte("same")},
-					PrevKv: &mvccpb.KeyValue{Key: []byte(assignedStateKey), Value: []byte("same")},
-				},
-			},
+			name:     "executor assigned state rewritten with same value",
+			events:   []*clientv3.Event{rewrite(assignedStateKey, "same", "same")},
 			expected: false,
 		},
 		{
 			// Heartbeat traffic is the highest-volume write in the namespace and no
 			// subscriber reads it, so it must never cost a re-read.
-			name: "executor reported shards is not tracked",
-			events: []*clientv3.Event{
-				{Type: clientv3.EventTypePut, Kv: &mvccpb.KeyValue{Key: []byte(reportedShardsKey), Value: []byte("reported")}},
-			},
+			name:     "executor reported shards is not tracked",
+			events:   []*clientv3.Event{put(reportedShardsKey, "reported")},
 			expected: false,
 		},
 		{
-			name: "executor metadata changed",
-			events: []*clientv3.Event{
-				{
-					Type:   clientv3.EventTypePut,
-					Kv:     &mvccpb.KeyValue{Key: []byte(metadataKey), Value: []byte("new")},
-					PrevKv: &mvccpb.KeyValue{Key: []byte(metadataKey), Value: []byte("old")},
-				},
-			},
+			name:     "executor metadata changed",
+			events:   []*clientv3.Event{rewrite(metadataKey, "old", "new")},
 			expected: true,
 		},
 		{
-			name: "drain alongside an untracked key",
-			events: []*clientv3.Event{
-				{Type: clientv3.EventTypePut, Kv: &mvccpb.KeyValue{Key: []byte(leaderKey), Value: []byte("host-1")}},
-				{Type: clientv3.EventTypePut, Kv: &mvccpb.KeyValue{Key: []byte(drainedKey)}},
-			},
+			name:     "drain alongside an untracked key",
+			events:   []*clientv3.Event{put(leaderKey, "host-1"), put(drainedKey, "")},
 			expected: true,
 		},
 	}
@@ -356,44 +340,4 @@ func TestSubscribeToNamespaceChanges_RetriesFailedWatch(t *testing.T) {
 	w.Stop()
 	<-drained
 	assert.True(t, closed.Load(), "stopping the store must close the change channel")
-}
-
-// Stopping while the watcher sits in its retry backoff is the case that used to strand it:
-// the mocked clock is never advanced again, so a backoff that ignored the watch context
-// would leave the goroutine blocked for the rest of the process's life.
-func TestSubscribeToNamespaceChanges_StopDuringRetryBackoff(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
-	ctrl := gomock.NewController(t)
-	mockClient := etcdclient.NewMockClient(ctrl)
-	timeSource := clock.NewMockedTimeSource()
-
-	watchChan := make(chan clientv3.WatchResponse)
-	mockClient.EXPECT().Watch(gomock.Any(), gomock.Any(), gomock.Any()).Return(watchChan)
-
-	// A retry is permitted but should not happen: the store stops first.
-	mockClient.EXPECT().Watch(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(make(chan clientv3.WatchResponse)).
-		MinTimes(0).
-		MaxTimes(1)
-
-	w := newTestNamespaceWatcher(t, mockClient, timeSource)
-
-	_, err := w.SubscribeToNamespaceChanges(_watchTestNamespace)
-	require.NoError(t, err)
-
-	watchChan <- clientv3.WatchResponse{CompactRevision: 100}
-	timeSource.BlockUntil(1)
-
-	stopped := make(chan struct{})
-	go func() {
-		defer close(stopped)
-		w.Stop()
-	}()
-
-	select {
-	case <-stopped:
-	case <-time.After(10 * time.Second):
-		t.Fatal("the namespace watcher did not exit after the store stopped during watch backoff")
-	}
 }

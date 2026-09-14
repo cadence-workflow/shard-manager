@@ -71,6 +71,10 @@ type NamespaceState struct {
 	// A drained host's executors are not eligible for assignment until
 	// the host is explicitly undrained
 	DrainedHosts map[string]DrainedHost
+
+	// Revision is the store revision the whole snapshot was read at. Readers that
+	// cache the state use it to discard a snapshot older than the one they hold.
+	Revision int64
 }
 
 // DrainedHost is the persisted metadata for a host drain

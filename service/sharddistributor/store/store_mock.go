@@ -178,21 +178,6 @@ func (mr *MockStoreMockRecorder) GetDrainedShards(ctx, namespace any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDrainedShards", reflect.TypeOf((*MockStore)(nil).GetDrainedShards), ctx, namespace)
 }
 
-// GetExecutor mocks base method.
-func (m *MockStore) GetExecutor(ctx context.Context, namespace, executorID string) (*ShardOwner, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetExecutor", ctx, namespace, executorID)
-	ret0, _ := ret[0].(*ShardOwner)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetExecutor indicates an expected call of GetExecutor.
-func (mr *MockStoreMockRecorder) GetExecutor(ctx, namespace, executorID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutor", reflect.TypeOf((*MockStore)(nil).GetExecutor), ctx, namespace, executorID)
-}
-
 // GetExecutorState mocks base method.
 func (m *MockStore) GetExecutorState(ctx context.Context, namespace, executorID string) (ExecutorState, error) {
 	m.ctrl.T.Helper()
@@ -206,36 +191,6 @@ func (m *MockStore) GetExecutorState(ctx context.Context, namespace, executorID 
 func (mr *MockStoreMockRecorder) GetExecutorState(ctx, namespace, executorID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutorState", reflect.TypeOf((*MockStore)(nil).GetExecutorState), ctx, namespace, executorID)
-}
-
-// GetShardAssignments mocks base method.
-func (m *MockStore) GetShardAssignments(namespace string) (AssignmentSnapshot, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetShardAssignments", namespace)
-	ret0, _ := ret[0].(AssignmentSnapshot)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetShardAssignments indicates an expected call of GetShardAssignments.
-func (mr *MockStoreMockRecorder) GetShardAssignments(namespace any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardAssignments", reflect.TypeOf((*MockStore)(nil).GetShardAssignments), namespace)
-}
-
-// GetShardOwner mocks base method.
-func (m *MockStore) GetShardOwner(ctx context.Context, namespace, shardID string) (*ShardOwner, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetShardOwner", ctx, namespace, shardID)
-	ret0, _ := ret[0].(*ShardOwner)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetShardOwner indicates an expected call of GetShardOwner.
-func (mr *MockStoreMockRecorder) GetShardOwner(ctx, namespace, shardID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardOwner", reflect.TypeOf((*MockStore)(nil).GetShardOwner), ctx, namespace, shardID)
 }
 
 // GetState mocks base method.
@@ -310,22 +265,6 @@ func (mr *MockStoreMockRecorder) ResetNamespace(ctx, namespace any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetNamespace", reflect.TypeOf((*MockStore)(nil).ResetNamespace), ctx, namespace)
 }
 
-// SubscribeToAssignmentChanges mocks base method.
-func (m *MockStore) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan struct{}, func(), error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubscribeToAssignmentChanges", ctx, namespace)
-	ret0, _ := ret[0].(<-chan struct{})
-	ret1, _ := ret[1].(func())
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// SubscribeToAssignmentChanges indicates an expected call of SubscribeToAssignmentChanges.
-func (mr *MockStoreMockRecorder) SubscribeToAssignmentChanges(ctx, namespace any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToAssignmentChanges", reflect.TypeOf((*MockStore)(nil).SubscribeToAssignmentChanges), ctx, namespace)
-}
-
 // SubscribeToExecutorStatusChanges mocks base method.
 func (m *MockStore) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {
 	m.ctrl.T.Helper()
@@ -339,6 +278,21 @@ func (m *MockStore) SubscribeToExecutorStatusChanges(ctx context.Context, namesp
 func (mr *MockStoreMockRecorder) SubscribeToExecutorStatusChanges(ctx, namespace any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToExecutorStatusChanges", reflect.TypeOf((*MockStore)(nil).SubscribeToExecutorStatusChanges), ctx, namespace)
+}
+
+// SubscribeToNamespaceChanges mocks base method.
+func (m *MockStore) SubscribeToNamespaceChanges(namespace string) (<-chan struct{}, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubscribeToNamespaceChanges", namespace)
+	ret0, _ := ret[0].(<-chan struct{})
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SubscribeToNamespaceChanges indicates an expected call of SubscribeToNamespaceChanges.
+func (mr *MockStoreMockRecorder) SubscribeToNamespaceChanges(namespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubscribeToNamespaceChanges", reflect.TypeOf((*MockStore)(nil).SubscribeToNamespaceChanges), namespace)
 }
 
 // UndrainHosts mocks base method.

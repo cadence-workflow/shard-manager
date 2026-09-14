@@ -1511,19 +1511,16 @@ const (
 	ShardDistributorUndrainShardsScope
 	ShardDistributorGetDrainedShardsScope
 
-	ShardDistributorStoreGetShardOwnerScope
 	ShardDistributorStoreAssignShardsScope
 	ShardDistributorStoreDeleteExecutorsScope
 	ShardDistributorStoreGetShardStatsScope
 	ShardDistributorStoreDeleteShardStatsScope
 	ShardDistributorStoreGetExecutorStateScope
-	ShardDistributorStoreGetExecutorScope
 	ShardDistributorStoreGetStateScope
 	ShardDistributorStoreRecordHeartbeatScope
 	ShardDistributorStoreRecordShardStatisticsScope
 	ShardDistributorStoreRecordShardStatisticsBatchScope
 	ShardDistributorStoreSubscribeToExecutorStatusChangesScope
-	ShardDistributorStoreSubscribeToAssignmentChangesScope
 	ShardDistributorStoreDeleteAssignedStatesScope
 	ShardDistributorStoreResetNamespaceScope
 	ShardDistributorStoreDrainShardsScope
@@ -2242,19 +2239,16 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorUndrainShardsScope:                         {operation: "UndrainShards"},
 		ShardDistributorGetDrainedShardsScope:                      {operation: "GetDrainedShards"},
 		ShardDistributorExecutorScope:                              {operation: "Executor"},
-		ShardDistributorStoreGetShardOwnerScope:                    {operation: "StoreGetShardOwner"},
 		ShardDistributorStoreAssignShardsScope:                     {operation: "StoreAssignShards"},
 		ShardDistributorStoreDeleteExecutorsScope:                  {operation: "StoreDeleteExecutors"},
 		ShardDistributorStoreGetShardStatsScope:                    {operation: "StoreGetShardStats"},
 		ShardDistributorStoreDeleteShardStatsScope:                 {operation: "StoreDeleteShardStats"},
 		ShardDistributorStoreGetExecutorStateScope:                 {operation: "StoreGetExecutorState"},
-		ShardDistributorStoreGetExecutorScope:                      {operation: "StoreGetExecutor"},
 		ShardDistributorStoreGetStateScope:                         {operation: "StoreGetState"},
 		ShardDistributorStoreRecordHeartbeatScope:                  {operation: "StoreRecordHeartbeat"},
 		ShardDistributorStoreRecordShardStatisticsScope:            {operation: "StoreRecordShardStatistics"},
 		ShardDistributorStoreRecordShardStatisticsBatchScope:       {operation: "StoreRecordShardStatisticsBatch"},
 		ShardDistributorStoreSubscribeToExecutorStatusChangesScope: {operation: "StoreSubscribeToExecutorStatusChanges"},
-		ShardDistributorStoreSubscribeToAssignmentChangesScope:     {operation: "StoreSubscribeToAssignmentChanges"},
 		ShardDistributorStoreDeleteAssignedStatesScope:             {operation: "StoreDeleteAssignedStates"},
 		ShardDistributorStoreResetNamespaceScope:                   {operation: "StoreResetNamespace"},
 		ShardDistributorStoreDrainShardsScope:                      {operation: "StoreDrainShards"},

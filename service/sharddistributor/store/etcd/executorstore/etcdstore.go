@@ -9,12 +9,15 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/fx"
 
+	"github.com/cadence-workflow/shard-manager/common/backoff"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
@@ -25,10 +28,13 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/common"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/shardcache"
 )
 
 const (
+	// Namespace watch retries land between 50ms and 150ms apart.
+	namespaceWatchRetryInterval = 100 * time.Millisecond
+	namespaceWatchJitterCoeff   = 0.5
+
 	// guardOpOverhead is the number of transaction slots consumed by the leadership guard's If condition.
 	guardOpOverhead = 1
 )
@@ -37,11 +43,16 @@ type executorStoreImpl struct {
 	client        etcdclient.Client
 	prefix        string
 	logger        log.Logger
-	shardCache    *shardcache.ShardToExecutorCache
 	timeSource    clock.TimeSource
 	recordWriter  *common.RecordWriter
 	cfg           *config.Config
 	metricsClient metrics.Client
+
+	// watchCtx bounds every long-running watch the store starts. Stop cancels it,
+	// which closes the etcd watch channels, and waits for those goroutines to exit.
+	watchCtx    context.Context
+	cancelWatch context.CancelFunc
+	wg          sync.WaitGroup
 }
 
 // ExecutorStoreParams defines the dependencies for the etcd store, for use with fx.
@@ -59,8 +70,6 @@ type ExecutorStoreParams struct {
 
 // NewStore creates a new etcd-backed store and provides it to the fx application.
 func NewStore(p ExecutorStoreParams) (store.Store, error) {
-	shardCache := shardcache.NewShardToExecutorCache(p.ETCDConfig.Prefix, p.Client, p.Logger, p.TimeSource, p.MetricsClient)
-
 	timeSource := p.TimeSource
 	if timeSource == nil {
 		timeSource = clock.NewRealTimeSource()
@@ -71,15 +80,18 @@ func NewStore(p ExecutorStoreParams) (store.Store, error) {
 		return nil, fmt.Errorf("create record writer: %w", err)
 	}
 
+	watchCtx, cancelWatch := context.WithCancel(context.Background())
+
 	store := &executorStoreImpl{
 		client:        p.Client,
 		prefix:        p.ETCDConfig.Prefix,
 		logger:        p.Logger,
-		shardCache:    shardCache,
 		timeSource:    timeSource,
 		recordWriter:  recordWriter,
 		cfg:           p.Config,
 		metricsClient: p.MetricsClient,
+		watchCtx:      watchCtx,
+		cancelWatch:   cancelWatch,
 	}
 
 	p.Lifecycle.Append(fx.StartStopHook(store.Start, store.Stop))
@@ -88,11 +100,11 @@ func NewStore(p ExecutorStoreParams) (store.Store, error) {
 }
 
 func (s *executorStoreImpl) Start() {
-	s.shardCache.Start()
 }
 
 func (s *executorStoreImpl) Stop() {
-	s.shardCache.Stop()
+	s.cancelWatch()
+	s.wg.Wait()
 }
 
 // --- HeartbeatStore Implementation ---
@@ -276,6 +288,7 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 		ShardAssignments: assignedStates,
 		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
 		DrainedHosts:     s.parseDrainedHostKVs(namespace, txnResp.Responses[2].GetResponseRange().Kvs),
+		Revision:         txnResp.Header.Revision,
 	}, nil
 }
 
@@ -351,12 +364,124 @@ func (s *executorStoreImpl) parseDrainedHostKVs(namespace string, kvs []*mvccpb.
 	return drained
 }
 
-func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan struct{}, func(), error) {
-	return s.shardCache.Subscribe(namespace)
+func (s *executorStoreImpl) SubscribeToNamespaceChanges(namespace string) (<-chan struct{}, error) {
+	changeChan := make(chan struct{}, 1)
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		defer close(changeChan)
+
+		logger := s.logger.WithTags(tag.ShardNamespace(namespace))
+
+		for {
+			err := s.watchNamespace(namespace, changeChan)
+			if s.watchCtx.Err() != nil {
+				return
+			}
+			if err != nil {
+				logger.Error("namespace watch failed, retrying", tag.Error(err))
+			}
+
+			select {
+			case <-s.timeSource.After(backoff.JitDuration(
+				namespaceWatchRetryInterval,
+				namespaceWatchJitterCoeff,
+			)):
+			case <-s.watchCtx.Done():
+				return
+			}
+		}
+	}()
+
+	return changeChan, nil
 }
 
-func (s *executorStoreImpl) GetShardAssignments(namespace string) (store.AssignmentSnapshot, error) {
-	return s.shardCache.GetShardAssignments(namespace)
+// watchNamespace feeds changeChan until the watch ends, returning the reason it did.
+func (s *executorStoreImpl) watchNamespace(namespace string, changeChan chan<- struct{}) error {
+	scope := s.metricsClient.Scope(metrics.ShardDistributorWatchScope).
+		Tagged(metrics.NamespaceTag(namespace)).
+		Tagged(metrics.ShardDistributorWatchTypeTag("namespace_state"))
+
+	// The whole namespace is watched as one range so assignment, metadata and
+	// drained-shard changes arrive in revision order on a single watch.
+	watchChan := s.client.Watch(
+		// WithRequireLeader ensures that the etcd cluster has a leader
+		clientv3.WithRequireLeader(s.watchCtx),
+		etcdkeys.BuildNamespacePrefix(s.prefix, namespace),
+		clientv3.WithPrefix(),
+		clientv3.WithPrevKV(),
+	)
+
+	// A reconnected watch resumes at the current revision, so anything written while
+	// it was down is never delivered. Signalling here makes the subscriber re-read and
+	// pick those changes up. It must follow the Watch call: a read the subscriber
+	// starts before the watch exists could miss writes that land in between.
+	s.signalNamespaceChange(changeChan)
+
+	for watchResp := range watchChan {
+		if err := watchResp.Err(); err != nil {
+			return fmt.Errorf("watch response: %w", err)
+		}
+
+		sw := scope.StartTimer(metrics.ShardDistributorWatchProcessingLatency)
+		scope.AddCounter(metrics.ShardDistributorWatchEventsReceived, int64(len(watchResp.Events)))
+
+		if s.hasNamespaceStateChanged(watchResp, namespace) {
+			s.signalNamespaceChange(changeChan)
+		}
+		sw.Stop()
+	}
+
+	return fmt.Errorf("watch channel closed")
+}
+
+// signalNamespaceChange nudges the subscriber to re-read. A pending signal already
+// says that, so it is coalesced rather than blocking on a slow consumer.
+func (s *executorStoreImpl) signalNamespaceChange(changeChan chan<- struct{}) {
+	select {
+	case changeChan <- struct{}{}:
+	default:
+	}
+}
+
+// hasNamespaceStateChanged reports whether a namespace watch response touched
+// executor assignments, executor metadata, or the drained shard set.
+func (s *executorStoreImpl) hasNamespaceStateChanged(watchResp clientv3.WatchResponse, namespace string) bool {
+	executorsPrefix := etcdkeys.BuildExecutorsPrefix(s.prefix, namespace)
+	drainedShardsPrefix := etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace)
+
+	for _, event := range watchResp.Events {
+		key := string(event.Kv.Key)
+
+		switch {
+		case strings.HasPrefix(key, executorsPrefix):
+			_, keyType, err := etcdkeys.ParseExecutorKey(s.prefix, namespace, key)
+			if err != nil {
+				s.logger.Warn("Received watch event with unrecognized key format", tag.Key(key))
+				continue
+			}
+			if keyType != etcdkeys.ExecutorAssignedStateKey && keyType != etcdkeys.ExecutorMetadataKey {
+				continue
+			}
+			// Skip a rewrite of the same value.
+			if event.PrevKv != nil && string(event.Kv.Value) == string(event.PrevKv.Value) {
+				continue
+			}
+			return true
+
+		case strings.HasPrefix(key, drainedShardsPrefix):
+			// Every recognized drained key counts as a change: draining stores no value
+			// and undraining arrives as a nil-valued tombstone, so a previous-value
+			// comparison would see "" on both sides and miss the undrain.
+			if _, err := etcdkeys.ParseDrainedShardKey(s.prefix, namespace, key); err != nil {
+				s.logger.Warn("Received drained shards watch event with unrecognized key format", tag.Error(err))
+				continue
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {
@@ -717,20 +842,6 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 	return nil
 }
 
-// GetShardOwner returns the owner of the shard.
-// Drained shards return ErrShardDrained rather than the last assigned owner
-func (s *executorStoreImpl) GetShardOwner(ctx context.Context, namespace, shardID string) (*store.ShardOwner, error) {
-	drained, err := s.shardCache.IsShardDrained(ctx, namespace, shardID)
-	if err != nil {
-		return nil, fmt.Errorf("check shard drained: %w", err)
-	}
-	if drained {
-		return nil, store.ErrShardDrained
-	}
-
-	return s.shardCache.GetShardOwner(ctx, namespace, shardID)
-}
-
 // ResetNamespace deletes every key under <prefix>/<namespace>/ in a single
 // etcd op. This wipes the leader key, executor heartbeats/status/metadata,
 // shard assignments, shard statistics, drained shards, and drained hosts.
@@ -744,10 +855,6 @@ func (s *executorStoreImpl) ResetNamespace(ctx context.Context, namespace string
 		return 0, fmt.Errorf("delete namespace prefix %q: %w", prefix, err)
 	}
 	return resp.Deleted, nil
-}
-
-func (s *executorStoreImpl) GetExecutor(ctx context.Context, namespace string, executorID string) (*store.ShardOwner, error) {
-	return s.shardCache.GetExecutor(ctx, namespace, executorID)
 }
 
 // DrainShards writes one empty-valued key per shard under the namespace's drained

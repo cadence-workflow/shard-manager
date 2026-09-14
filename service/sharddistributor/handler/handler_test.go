@@ -37,6 +37,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -50,13 +51,14 @@ const (
 // newTestHandler creates a handlerImpl wired with a real ephemeral assigner backed
 // by the provided store mock. The assigner is started and the handler is returned
 // ready to use; callers should call Stop() when done.
-func newTestHandler(t *testing.T, cfg config.ShardDistribution, mockStore *store.MockStore) *handlerImpl {
+func newTestHandler(t *testing.T, cfg config.ShardDistribution, mockStore *store.MockStore, mockCache *cache.MockShardCache) *handlerImpl {
 	t.Helper()
-	assigner := ephemeralassigner.New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStore, metrics.NewNoopMetricsClient())
+	assigner := ephemeralassigner.New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStore, mockCache, metrics.NewNoopMetricsClient())
 	handler := &handlerImpl{
 		logger:               testlogger.New(t),
 		shardDistributionCfg: cfg,
 		storage:              mockStore,
+		shardCache:           mockCache,
 		timeSource:           clock.NewRealTimeSource(),
 		assigner:             assigner,
 	}
@@ -94,7 +96,7 @@ func TestGetShardOwner(t *testing.T) {
 	tests := []struct {
 		name           string
 		request        *types.GetShardOwnerRequest
-		setupMocks     func(mockStore *store.MockStore)
+		setupMocks     func(mockStore *store.MockStore, mockCache *cache.MockShardCache)
 		expectedOwner  string
 		expectedError  bool
 		expectedErrMsg string
@@ -114,8 +116,8 @@ func TestGetShardOwner(t *testing.T) {
 				Namespace: _testNamespaceFixed,
 				ShardKey:  "1",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, errors.New("lookup error"))
+			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, errors.New("lookup error"))
 			},
 			expectedError:  true,
 			expectedErrMsg: "lookup error",
@@ -126,8 +128,8 @@ func TestGetShardOwner(t *testing.T) {
 				Namespace: _testNamespaceFixed,
 				ShardKey:  "123",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "123").Return(&store.ShardOwner{
+			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "123").Return(&store.ShardOwner{
 					ExecutorID: "owner1",
 					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
 				}, nil)
@@ -141,8 +143,8 @@ func TestGetShardOwner(t *testing.T) {
 				Namespace: _testNamespaceFixed,
 				ShardKey:  "NON-EXISTING-SHARD",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
+			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
 			},
 			expectedError:  true,
 			expectedErrMsg: "shard not found",
@@ -153,8 +155,8 @@ func TestGetShardOwner(t *testing.T) {
 				Namespace: _testNamespaceEphemeral,
 				ShardKey:  "123",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "123").Return(&store.ShardOwner{
+			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "123").Return(&store.ShardOwner{
 					ExecutorID: "owner1",
 					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
 				}, nil)
@@ -168,8 +170,8 @@ func TestGetShardOwner(t *testing.T) {
 				Namespace: _testNamespaceFixed,
 				ShardKey:  "1",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, store.ErrShardDrained)
+			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, store.ErrShardDrained)
 			},
 			expectedError:  true,
 			expectedErrMsg: "shard drained",
@@ -180,14 +182,14 @@ func TestGetShardOwner(t *testing.T) {
 				Namespace: _testNamespaceEphemeral,
 				ShardKey:  "NON-EXISTING-SHARD",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
+			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
 					Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
 					ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
 				}, nil)
 				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(nil)
-				mockStore.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
+				mockCache.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
 					ExecutorID: "owner1",
 					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
 				}, nil)
@@ -201,11 +203,12 @@ func TestGetShardOwner(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockStorage := store.NewMockStore(ctrl)
+			mockCache := cache.NewMockShardCache(ctrl)
 
-			handler := newTestHandler(t, cfg, mockStorage)
+			handler := newTestHandler(t, cfg, mockStorage, mockCache)
 
 			if tt.setupMocks != nil {
-				tt.setupMocks(mockStorage)
+				tt.setupMocks(mockStorage, mockCache)
 			}
 			resp, err := handler.GetShardOwner(context.Background(), tt.request)
 			if tt.expectedError {
@@ -241,7 +244,7 @@ func TestInspectShard(t *testing.T) {
 	tests := []struct {
 		name           string
 		request        *types.GetShardOwnerRequest
-		setupMocks     func(mockStore *store.MockStore)
+		setupMocks     func(mockCache *cache.MockShardCache)
 		expectedOwner  string
 		expectedError  bool
 		expectedErrMsg string
@@ -261,8 +264,8 @@ func TestInspectShard(t *testing.T) {
 				Namespace: _testNamespaceFixed,
 				ShardKey:  "1",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, errors.New("lookup error"))
+			setupMocks: func(mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, errors.New("lookup error"))
 			},
 			expectedError:  true,
 			expectedErrMsg: "lookup error",
@@ -273,8 +276,8 @@ func TestInspectShard(t *testing.T) {
 				Namespace: _testNamespaceFixed,
 				ShardKey:  "123",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "123").Return(&store.ShardOwner{
+			setupMocks: func(mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "123").Return(&store.ShardOwner{
 					ExecutorID: "owner1",
 					Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
 				}, nil)
@@ -288,8 +291,8 @@ func TestInspectShard(t *testing.T) {
 				Namespace: _testNamespaceFixed,
 				ShardKey:  "NON-EXISTING-SHARD",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
+			setupMocks: func(mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
 			},
 			expectedError:  true,
 			expectedErrMsg: "shard not found",
@@ -300,8 +303,8 @@ func TestInspectShard(t *testing.T) {
 				Namespace: _testNamespaceEphemeral,
 				ShardKey:  "NON-EXISTING-SHARD",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
+			setupMocks: func(mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
 			},
 			expectedError:  true,
 			expectedErrMsg: "shard not found",
@@ -312,8 +315,8 @@ func TestInspectShard(t *testing.T) {
 				Namespace: _testNamespaceFixed,
 				ShardKey:  "1",
 			},
-			setupMocks: func(mockStore *store.MockStore) {
-				mockStore.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, store.ErrShardDrained)
+			setupMocks: func(mockCache *cache.MockShardCache) {
+				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceFixed, "1").Return(nil, store.ErrShardDrained)
 			},
 			expectedError:  true,
 			expectedErrMsg: "shard drained",
@@ -324,11 +327,12 @@ func TestInspectShard(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockStorage := store.NewMockStore(ctrl)
+			mockCache := cache.NewMockShardCache(ctrl)
 
-			handler := newTestHandler(t, cfg, mockStorage)
+			handler := newTestHandler(t, cfg, mockStorage, mockCache)
 
 			if tt.setupMocks != nil {
-				tt.setupMocks(mockStorage)
+				tt.setupMocks(mockCache)
 			}
 			resp, err := handler.InspectShard(context.Background(), tt.request)
 			if tt.expectedError {
@@ -351,6 +355,7 @@ func TestWatchNamespaceState(t *testing.T) {
 	logger := testlogger.New(t)
 	mockStorage := store.NewMockStore(ctrl)
 	mockServer := NewMockWatchNamespaceStateServer(ctrl)
+	mockCache := cache.NewMockShardCache(ctrl)
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
@@ -362,6 +367,7 @@ func TestWatchNamespaceState(t *testing.T) {
 		logger:               logger,
 		shardDistributionCfg: cfg,
 		storage:              mockStorage,
+		shardCache:           mockCache,
 		startWG:              sync.WaitGroup{},
 	}
 
@@ -371,10 +377,10 @@ func TestWatchNamespaceState(t *testing.T) {
 	unsubscribe := func() { close(notifyChan) }
 
 	mockServer.EXPECT().Context().Return(ctx).AnyTimes()
-	mockStorage.EXPECT().SubscribeToAssignmentChanges(ctx, "test-ns").Return(notifyChan, unsubscribe, nil)
+	mockCache.EXPECT().Subscribe("test-ns").Return(notifyChan, unsubscribe, nil)
 
 	// this state should be retrieved and sent at the start of WatchNamespaceState
-	getState1 := mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
+	getState1 := mockCache.EXPECT().GetShardAssignments("test-ns").Return(
 		store.AssignmentSnapshot{
 			ExecutorToShards: map[*store.ShardOwner][]string{
 				{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
@@ -392,7 +398,7 @@ func TestWatchNamespaceState(t *testing.T) {
 	})
 
 	// now simulate the state has been changed (after notification)
-	getState2 := mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
+	getState2 := mockCache.EXPECT().GetShardAssignments("test-ns").Return(
 		store.AssignmentSnapshot{
 			ExecutorToShards: map[*store.ShardOwner][]string{
 				{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
@@ -435,6 +441,7 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 	logger := testlogger.New(t)
 	mockStorage := store.NewMockStore(ctrl)
 	mockServer := NewMockWatchNamespaceStateServer(ctrl)
+	mockCache := cache.NewMockShardCache(ctrl)
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
@@ -442,7 +449,7 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 		},
 	}
 
-	rawHandler := NewHandler(logger, clock.NewRealTimeSource(), cfg, newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage, metrics.NewNoopMetricsClient())
+	rawHandler := NewHandler(logger, clock.NewRealTimeSource(), cfg, newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage, mockCache, metrics.NewNoopMetricsClient())
 	handler := rawHandler.(*handlerImpl)
 	handler.Start()
 
@@ -451,9 +458,9 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 	serverCtx := context.Background()
 
 	mockServer.EXPECT().Context().Return(serverCtx).AnyTimes()
-	mockStorage.EXPECT().SubscribeToAssignmentChanges(serverCtx, "test-ns").Return(notifyChan, unsubscribe, nil)
+	mockCache.EXPECT().Subscribe("test-ns").Return(notifyChan, unsubscribe, nil)
 
-	mockStorage.EXPECT().GetShardAssignments("test-ns").Return(
+	mockCache.EXPECT().GetShardAssignments("test-ns").Return(
 		store.AssignmentSnapshot{
 			ExecutorToShards: map[*store.ShardOwner][]string{},
 			DrainedShards:    map[string]struct{}{},
@@ -513,7 +520,7 @@ func TestGetNamespaceState(t *testing.T) {
 			if tt.setupMocks != nil {
 				tt.setupMocks(mockStorage)
 			}
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			resp, err := h.GetNamespaceState(context.Background(), tt.request)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tt.wantErrContains)
@@ -554,7 +561,7 @@ func TestGetNamespaceState_successMultipleExecutors(t *testing.T) {
 		},
 	}, nil)
 
-	h := newTestHandler(t, cfg, mockStorage)
+	h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 	resp, err := h.GetNamespaceState(context.Background(), &types.GetNamespaceStateRequest{Namespace: _testNamespaceFixed})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -787,7 +794,7 @@ func TestForceResetNamespace(t *testing.T) {
 			if tt.setupMocks != nil {
 				tt.setupMocks(mockStorage)
 			}
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			resp, err := h.ForceResetNamespace(context.Background(), tt.request)
 			if tt.wantErrContains != "" {
 				require.Error(t, err)
@@ -823,7 +830,7 @@ func TestGetNamespaceState_heartbeatWithoutAssignments(t *testing.T) {
 		ShardAssignments: map[string]store.AssignedState{},
 	}, nil)
 
-	h := newTestHandler(t, cfg, mockStorage)
+	h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 	resp, err := h.GetNamespaceState(context.Background(), &types.GetNamespaceStateRequest{Namespace: _testNamespaceFixed})
 	require.NoError(t, err)
 	require.Len(t, resp.Executors, 1)
@@ -879,7 +886,7 @@ func TestGetExecutorState(t *testing.T) {
 			if tt.setupMocks != nil {
 				tt.setupMocks(mockStorage)
 			}
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			resp, err := h.GetExecutorState(context.Background(), tt.request)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tt.wantErrContains)
@@ -916,7 +923,7 @@ func TestGetExecutorState_success(t *testing.T) {
 		nil,
 	)
 
-	h := newTestHandler(t, cfg, mockStorage)
+	h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 	resp, err := h.GetExecutorState(context.Background(), &types.GetExecutorStateRequest{
 		Namespace:  _testNamespaceFixed,
 		ExecutorID: "executor1",
@@ -960,7 +967,7 @@ func TestGetExecutorState_noAssignedState(t *testing.T) {
 		nil,
 	)
 
-	h := newTestHandler(t, cfg, mockStorage)
+	h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 	resp, err := h.GetExecutorState(context.Background(), &types.GetExecutorStateRequest{
 		Namespace:  _testNamespaceFixed,
 		ExecutorID: "executor1",
@@ -1015,7 +1022,7 @@ func TestListNamespaces(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockStorage := store.NewMockStore(ctrl) // ListNamespaces does not call storage.
 
-			h := newTestHandler(t, tt.cfg, mockStorage)
+			h := newTestHandler(t, tt.cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			resp, err := h.ListNamespaces(context.Background(), &types.ListNamespacesRequest{})
 			require.NoError(t, err)
 			require.NotNil(t, resp)
@@ -1083,7 +1090,7 @@ func TestDrainShards(t *testing.T) {
 				tt.setupMocks(mockStorage)
 			}
 
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			err := h.DrainShards(context.Background(), tt.request)
 
 			if tt.wantErr != nil {
@@ -1159,7 +1166,7 @@ func TestUndrainShards(t *testing.T) {
 				tt.setupMocks(mockStorage)
 			}
 
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			resp, err := h.UndrainShards(context.Background(), tt.request)
 
 			if tt.wantErr != nil {
@@ -1233,7 +1240,7 @@ func TestGetDrainedShards(t *testing.T) {
 				tt.setupMocks(mockStorage)
 			}
 
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			resp, err := h.GetDrainedShards(context.Background(), tt.request)
 
 			if tt.wantErr != nil {

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"strings"
 	"time"
 
 	"github.com/cadence-workflow/shard-manager/common/types"
@@ -143,12 +144,23 @@ func (ns *NamespaceState) IsHostDrained(hostname string) bool {
 	return drained
 }
 
+func ExecutorHostname(executorID string) string {
+	hostname, _, found := strings.Cut(executorID, "@")
+	if !found {
+		return ""
+	}
+	return hostname
+}
+
 // IsExecutorAssignable reports whether an executor may hold shards
 func (ns *NamespaceState) IsExecutorAssignable(executorID string, staleExecutors map[string]int64) bool {
 	if ns.Executors[executorID].Status != types.ExecutorStatusACTIVE {
 		return false
 	}
 	if _, stale := staleExecutors[executorID]; stale {
+		return false
+	}
+	if hostname := ExecutorHostname(executorID); hostname != "" && ns.IsHostDrained(hostname) {
 		return false
 	}
 	return true

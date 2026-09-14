@@ -81,6 +81,25 @@ func TestPlanInitialPlacement(t *testing.T) {
 		_, err := PlanInitialPlacement(&store.NamespaceState{}, []string{"new-1"})
 		assert.True(t, errors.Is(err, plan.ErrNoActiveExecutors))
 	})
+
+	t.Run("skips executors on a drained host", func(t *testing.T) {
+		state := &store.NamespaceState{
+			Executors: map[string]store.HeartbeatState{
+				"host-a@uuid-1": {Status: types.ExecutorStatusACTIVE},
+				"host-b@uuid-1": {Status: types.ExecutorStatusACTIVE},
+			},
+			ShardAssignments: map[string]store.AssignedState{
+				"host-a@uuid-1": {AssignedShards: map[string]*types.ShardAssignment{"s1": {}}},
+			},
+			DrainedHosts: map[string]store.DrainedHost{
+				"host-a": {Hostname: "host-a"},
+			},
+		}
+
+		placements, err := PlanInitialPlacement(state, []string{"new-1"})
+		require.NoError(t, err)
+		assert.Equal(t, []plan.Placement{{ShardID: "new-1", ExecutorID: "host-b@uuid-1"}}, placements)
+	})
 }
 
 func TestEffectiveShardLoad(t *testing.T) {

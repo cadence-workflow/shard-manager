@@ -106,7 +106,9 @@ func (w *namespaceWatcher) SubscribeToNamespaceChanges(namespace string) (<-chan
 				return
 			}
 			if err != nil {
-				logger.Error("namespace watch failed, retrying", tag.Error(err))
+				// A watch drops whenever its etcd node goes away, which is expected and
+				// self-healing: the retry below re-establishes it.
+				logger.Info("namespace watch failed, retrying", tag.Error(err))
 			}
 
 			select {

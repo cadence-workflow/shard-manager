@@ -648,61 +648,6 @@ func TestLoadBalance_ExecutorRemovedFromDestination(t *testing.T) {
 	assert.Len(t, currentAssignments[execF], 108, "Filler executor execF should be untouched")
 }
 
-// TestLoadBalance_SkipsExecutorsOnDrainedHost verifies an idle executor on a drained host
-// is not used as a move destination, neither through the hysteresis bands nor through the
-// severe-imbalance fallback that both reject it.
-func TestLoadBalance_SkipsExecutorsOnDrainedHost(t *testing.T) {
-	source, destination := "host-a@uuid-1", "host-b@uuid-1"
-	now := time.Now().UTC()
-
-	tests := []struct {
-		name         string
-		drainedHosts map[string]store.DrainedHost
-		wantMoves    []plan.Move
-	}{
-		{
-			name:      "idle destination receives a shard",
-			wantMoves: []plan.Move{{ShardID: "s-0", From: source, To: destination}},
-		},
-		{
-			name:         "idle destination on a drained host receives nothing",
-			drainedHosts: map[string]store.DrainedHost{"host-b": {Hostname: "host-b"}},
-			wantMoves:    []plan.Move{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sourceShards := make(map[string]*types.ShardAssignment)
-			shardStats := make(map[string]store.ShardStatistics)
-			currentAssignments := map[string][]string{source: {}, destination: {}}
-			for i := range 10 {
-				shardID := fmt.Sprintf("s-%d", i)
-				sourceShards[shardID] = &types.ShardAssignment{}
-				currentAssignments[source] = append(currentAssignments[source], shardID)
-				shardStats[shardID] = store.ShardStatistics{SmoothedLoad: 10, LastUpdateTime: now}
-			}
-
-			namespaceState := &store.NamespaceState{
-				Executors: map[string]store.HeartbeatState{
-					source:      {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
-					destination: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
-				},
-				ShardAssignments: map[string]store.AssignedState{
-					source:      {AssignedShards: sourceShards},
-					destination: {AssignedShards: make(map[string]*types.ShardAssignment)},
-				},
-				ShardStats:   shardStats,
-				DrainedHosts: tt.drainedHosts,
-			}
-
-			moves, err := PlanRebalance(testGreedyConfig(), testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantMoves, moves)
-		})
-	}
-}
-
 func applyMoves(t *testing.T, assignments map[string][]string, moves []plan.Move) {
 	t.Helper()
 

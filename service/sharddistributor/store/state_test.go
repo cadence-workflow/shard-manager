@@ -147,7 +147,7 @@ func TestExecutorHostname(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, ExecutorHostname(tt.executorID))
+			assert.Equal(t, tt.want, executorHostname(tt.executorID))
 		})
 	}
 }

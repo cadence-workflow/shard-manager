@@ -838,7 +838,7 @@ func (p *namespaceProcessor) buildHandoverStats(
 		// or DRAINED status, or its host is drained.
 		if previousExecutorHeartbeat.Status == types.ExecutorStatusDRAINING ||
 			previousExecutorHeartbeat.Status == types.ExecutorStatusDRAINED ||
-			namespaceState.IsHostDrained(store.ExecutorHostname(previousOwner)) {
+			namespaceState.IsExecutorHostDrained(previousOwner) {
 			handoverType = types.HandoverTypeGRACEFUL
 		}
 		stats[shardID] = store.ShardHandoverStats{

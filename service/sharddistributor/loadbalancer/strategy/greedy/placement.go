@@ -5,7 +5,6 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
@@ -49,8 +48,8 @@ func executorLoads(state *store.NamespaceState) (map[string]executorLoad, float6
 
 func activeExecutorAssignments(state *store.NamespaceState) map[string][]string {
 	assignments := make(map[string][]string)
-	for executorID, executorState := range state.Executors {
-		if executorState.Status != types.ExecutorStatusACTIVE {
+	for executorID := range state.Executors {
+		if !state.IsExecutorAssignable(executorID, nil) {
 			continue
 		}
 		shards := make([]string, 0, len(state.ShardAssignments[executorID].AssignedShards))

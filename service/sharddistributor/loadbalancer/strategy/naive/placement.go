@@ -5,7 +5,6 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
@@ -29,8 +28,8 @@ func PlanInitialPlacement(state *store.NamespaceState, shardIDs []string) ([]pla
 
 func assignmentCounts(state *store.NamespaceState) map[string]int {
 	counts := make(map[string]int, len(state.Executors))
-	for executorID, executorState := range state.Executors {
-		if executorState.Status != types.ExecutorStatusACTIVE {
+	for executorID := range state.Executors {
+		if !state.IsExecutorAssignable(executorID, nil) {
 			continue
 		}
 		counts[executorID] = len(state.ShardAssignments[executorID].AssignedShards)

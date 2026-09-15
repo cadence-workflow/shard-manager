@@ -338,6 +338,13 @@ type ExecutorHeartbeatRequest struct {
 	Status             ExecutorStatus
 	ShardStatusReports map[string]*ShardStatusReport
 	Metadata           map[string]string
+	HostID             string
+	HostMetadata       *HostMetadata
+}
+
+// HostMetadata carries host-level attributes reported on each heartbeat
+type HostMetadata struct {
+	HostName string
 }
 
 func (v *ExecutorHeartbeatRequest) GetNamespace() (o string) {
@@ -371,6 +378,27 @@ func (v *ExecutorHeartbeatRequest) GetShardStatusReports() (o map[string]*ShardS
 func (v *ExecutorHeartbeatRequest) GetMetadata() (o map[string]string) {
 	if v != nil {
 		return v.Metadata
+	}
+	return
+}
+
+func (v *ExecutorHeartbeatRequest) GetHostID() (o string) {
+	if v != nil {
+		return v.HostID
+	}
+	return
+}
+
+func (v *ExecutorHeartbeatRequest) GetHostMetadata() (o *HostMetadata) {
+	if v != nil {
+		return v.HostMetadata
+	}
+	return
+}
+
+func (v *HostMetadata) GetHostName() (o string) {
+	if v != nil {
+		return v.HostName
 	}
 	return
 }

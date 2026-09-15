@@ -56,6 +56,10 @@ var (
 			"key-1": "value-1",
 			"key-2": "value-2",
 		},
+		HostID: "host-id",
+		HostMetadata: &types.HostMetadata{
+			HostName: "host-name",
+		},
 	}
 	ShardDistributorExecutorHeartbeatResponse = types.ExecutorHeartbeatResponse{
 		ShardAssignments: map[string]*types.ShardAssignment{

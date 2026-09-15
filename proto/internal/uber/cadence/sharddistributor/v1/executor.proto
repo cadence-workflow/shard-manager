@@ -37,6 +37,13 @@ message HeartbeatRequest {
   ExecutorStatus status = 3;
   map<string, ShardStatusReport> shard_status_reports = 4;
   map<string, string> metadata = 5;
+  string host_id = 6;
+  HostMetadata host_metadata = 7;
+}
+
+// HostMetadata carries host-level attributes reported on each heartbeat
+message HostMetadata {
+  string host_name = 1;
 }
 
 enum ExecutorStatus {

@@ -170,6 +170,8 @@ func FromShardDistributorExecutorHeartbeatRequest(t *types.ExecutorHeartbeatRequ
 		Status:             status,
 		ShardStatusReports: shardStatusReports,
 		Metadata:           t.GetMetadata(),
+		HostId:             t.GetHostID(),
+		HostMetadata:       fromShardDistributorHostMetadata(t.GetHostMetadata()),
 	}
 }
 
@@ -223,6 +225,26 @@ func ToShardDistributorExecutorHeartbeatRequest(t *sharddistributorv1.HeartbeatR
 		Status:             status,
 		ShardStatusReports: shardStatusReports,
 		Metadata:           t.GetMetadata(),
+		HostID:             t.GetHostId(),
+		HostMetadata:       toShardDistributorHostMetadata(t.GetHostMetadata()),
+	}
+}
+
+func fromShardDistributorHostMetadata(t *types.HostMetadata) *sharddistributorv1.HostMetadata {
+	if t == nil {
+		return nil
+	}
+	return &sharddistributorv1.HostMetadata{
+		HostName: t.GetHostName(),
+	}
+}
+
+func toShardDistributorHostMetadata(t *sharddistributorv1.HostMetadata) *types.HostMetadata {
+	if t == nil {
+		return nil
+	}
+	return &types.HostMetadata{
+		HostName: t.GetHostName(),
 	}
 }
 

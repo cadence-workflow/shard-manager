@@ -36,6 +36,8 @@ type Manager struct {
 	client      sharddistributorexecutor.Client
 	namespace   string
 	executorID  string
+	hostID      string
+	hostName    string
 	state       StateProvider
 	hostMetrics tally.Scope
 	sf          singleflight.Group
@@ -49,6 +51,8 @@ func NewManager(
 	client sharddistributorexecutor.Client,
 	namespace string,
 	executorID string,
+	hostID string,
+	hostName string,
 	state StateProvider,
 	hostMetrics tally.Scope,
 	heartbeatInterval time.Duration,
@@ -57,6 +61,8 @@ func NewManager(
 		client:                 client,
 		namespace:              namespace,
 		executorID:             executorID,
+		hostID:                 hostID,
+		hostName:               hostName,
 		state:                  state,
 		hostMetrics:            hostMetrics,
 		activeHeartbeatTimeout: max(heartbeatInterval, minActiveHeartbeatTimeout),
@@ -126,6 +132,10 @@ func (m *Manager) sendRPC(ctx context.Context, status types.ExecutorStatus) (map
 		Status:             status,
 		ShardStatusReports: reports,
 		Metadata:           m.state.GetMetadata(),
+		HostID:             m.hostID,
+	}
+	if m.hostName != "" {
+		request.HostMetadata = &types.HostMetadata{HostName: m.hostName}
 	}
 
 	response, err := m.client.Heartbeat(ctx, request)

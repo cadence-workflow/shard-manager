@@ -152,6 +152,7 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 	}
 
 	uniqueID := uuid.New().String()
+	sanitizedHostname := sanitizeHostname(hostname)
 	executorID := buildExecutorID(hostname, uniqueID)
 
 	metricsScope := params.MetricsScope.Tagged(map[string]string{
@@ -191,6 +192,8 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 		shardDistributorClient,
 		namespaceConfig.Namespace,
 		executorID,
+		sanitizedHostname,
+		sanitizedHostname,
 		executor,
 		hostMetricsScope,
 		namespaceConfig.HeartBeatInterval,
@@ -200,17 +203,17 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 }
 
 func buildExecutorID(hostname, uniqueID string) string {
+	return sanitizeHostname(hostname) + "@" + uniqueID
+}
+
+func sanitizeHostname(hostname string) string {
 	// Executor IDs are etcd path segments, so they cannot contain slashes.
 	hostname = strings.ReplaceAll(hostname, "/", "_")
 
-	// Trim the hostname to ensure it's not unbounded
 	if len(hostname) > maxHostnameLength {
 		hostname = hostname[:maxHostnameLength]
 	}
-
-	executorID := hostname + "@" + uniqueID
-
-	return executorID
+	return hostname
 }
 
 func createShardDistributorExecutorClient(client Client, metricsScope tally.Scope) (Client, error) {

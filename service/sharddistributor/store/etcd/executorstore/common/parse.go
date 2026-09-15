@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -61,6 +62,14 @@ func ParseExecutorKVs(etcdPrefix, namespace string, kvs []*mvccpb.KeyValue) (map
 			if err := DecompressAndUnmarshal(kv.Value, &execData.Statistics); err != nil {
 				return nil, fmt.Errorf("parse shard statistics for %s: %w", executorID, err)
 			}
+		case etcdkeys.ExecutorHostIDKey:
+			execData.HostID = string(kv.Value)
+		case etcdkeys.ExecutorHostMetadataKey:
+			var hostMetadata types.HostMetadata
+			if err := json.Unmarshal(kv.Value, &hostMetadata); err != nil {
+				return nil, fmt.Errorf("parse host metadata for %s: %w", executorID, err)
+			}
+			execData.HostMetadata = &hostMetadata
 		}
 	}
 

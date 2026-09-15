@@ -147,6 +147,65 @@ func TestBuildExecutorID_LimitsHostnameLengthAndPreservesUUID(t *testing.T) {
 	assert.True(t, strings.HasSuffix(executorID, "@"+testUniqueID))
 }
 
+func TestSanitizeHostname(t *testing.T) {
+	tests := []struct {
+		name     string
+		hostname string
+		want     string
+	}{
+		{name: "plain", hostname: "executor-1", want: "executor-1"},
+		{name: "slashes are replaced", hostname: "executor/1", want: "executor_1"},
+		{name: "truncated", hostname: strings.Repeat("a", maxHostnameLength+1), want: strings.Repeat("a", maxHostnameLength)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, sanitizeHostname(tt.hostname))
+		})
+	}
+}
+
+func TestNewExecutor_HeartbeatHostIdentity(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	var got *types.ExecutorHeartbeatRequest
+	client := NewMockClient(ctrl)
+	client.EXPECT().
+		Heartbeat(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, request *types.ExecutorHeartbeatRequest, _ ...yarpc.CallOption) (*types.ExecutorHeartbeatResponse, error) {
+			got = request
+			return &types.ExecutorHeartbeatResponse{}, nil
+		})
+
+	params := Params[*MockShardProcessor]{
+		ExecutorClient:        client,
+		MetricsScope:          tally.NoopScope,
+		Logger:                zap.NewNop(),
+		ShardProcessorFactory: NewMockShardProcessorFactory[*MockShardProcessor](ctrl),
+		TimeSource:            clock.NewMockedTimeSource(),
+		Config: clientcommon.Config{
+			Namespaces: []clientcommon.NamespaceConfig{
+				{
+					Namespace:         "test-namespace",
+					HeartBeatInterval: 5 * time.Second,
+				},
+			},
+		},
+	}
+
+	executor, err := NewExecutor(params)
+	require.NoError(t, err)
+	require.NoError(t, executor.(*executorImpl[*MockShardProcessor]).heartbeater.DrainingHeartbeat())
+
+	require.NotNil(t, got)
+	require.NotNil(t, got.HostMetadata)
+	assert.NotEmpty(t, got.HostID)
+	assert.Equal(t, got.HostID, got.HostMetadata.HostName)
+	assert.True(t, strings.HasPrefix(got.ExecutorID, got.HostID+"@"))
+	assert.NotContains(t, got.HostID, "/")
+	assert.LessOrEqual(t, len(got.HostID), maxHostnameLength)
+}
+
 // Create distinct mock processor types for testing multiple namespaces
 type MockShardProcessor1 struct {
 	*MockShardProcessor

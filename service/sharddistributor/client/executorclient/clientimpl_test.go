@@ -95,6 +95,8 @@ func newTestExecutor(
 		client,
 		"test-namespace",
 		"test-executor-id",
+		"",
+		"",
 		executor,
 		tally.NoopScope,
 		executor.heartBeatInterval,

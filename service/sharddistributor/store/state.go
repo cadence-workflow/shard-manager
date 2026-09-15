@@ -12,6 +12,15 @@ type HeartbeatState struct {
 	Status         types.ExecutorStatus
 	ReportedShards map[string]*types.ShardStatusReport
 	Metadata       map[string]string
+	HostID         string
+	HostMetadata   *types.HostMetadata
+}
+
+func (h HeartbeatState) Hostname() string {
+	if h.HostMetadata == nil {
+		return ""
+	}
+	return h.HostMetadata.HostName
 }
 
 // ExecutorState contains the persisted state for one executor.

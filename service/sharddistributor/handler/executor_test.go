@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -201,6 +202,54 @@ func TestHeartbeat(t *testing.T) {
 		require.Contains(t, err.Error(), "invalid metadata: metadata has 33 keys, which exceeds the maximum of 32")
 	})
 
+	t.Run("RecordsHostIdentity", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStore := store.NewMockStore(ctrl)
+		mockTimeSource := clock.NewMockedTimeSourceAt(now)
+		handler := newTestExecutorHandler(t, mockStore, mockTimeSource)
+
+		req := &types.ExecutorHeartbeatRequest{
+			Namespace:  namespace,
+			ExecutorID: executorID,
+			Status:     types.ExecutorStatusACTIVE,
+			HostID:     "host-id",
+			HostMetadata: &types.HostMetadata{
+				HostName: "host-name",
+			},
+		}
+
+		mockStore.EXPECT().GetExecutorState(gomock.Any(), namespace, executorID).Return(store.ExecutorState{}, store.ErrExecutorNotFound)
+		mockStore.EXPECT().RecordHeartbeat(gomock.Any(), namespace, executorID, store.HeartbeatState{
+			LastHeartbeat: now,
+			Status:        types.ExecutorStatusACTIVE,
+			HostID:        "host-id",
+			HostMetadata:  &types.HostMetadata{HostName: "host-name"},
+		})
+
+		_, err := handler.Heartbeat(ctx, req)
+		require.NoError(t, err)
+	})
+
+	t.Run("RejectsInvalidHostName", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStore := store.NewMockStore(ctrl)
+		mockTimeSource := clock.NewMockedTimeSourceAt(now)
+		handler := newTestExecutorHandler(t, mockStore, mockTimeSource)
+
+		req := &types.ExecutorHeartbeatRequest{
+			Namespace:    namespace,
+			ExecutorID:   executorID,
+			Status:       types.ExecutorStatusACTIVE,
+			HostMetadata: &types.HostMetadata{HostName: "host/name"},
+		}
+
+		mockStore.EXPECT().GetExecutorState(gomock.Any(), namespace, executorID).Return(store.ExecutorState{}, store.ErrExecutorNotFound)
+
+		_, err := handler.Heartbeat(ctx, req)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid host_name")
+	})
+
 }
 
 func TestValidateMetadata(t *testing.T) {
@@ -300,6 +349,32 @@ func TestValidateMetadata(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestValidateHostName(t *testing.T) {
+	tests := []struct {
+		name     string
+		hostName string
+		wantErr  string
+	}{
+		{name: "empty", hostName: ""},
+		{name: "plain", hostName: "host-a"},
+		{name: "at sign", hostName: "host@name"},
+		{name: "slash", hostName: "host/name", wantErr: "must not contain '/'"},
+		{name: "too long", hostName: strings.Repeat("a", _maxHostNameLength+1), wantErr: "exceeds 128 bytes"},
+		{name: "max length", hostName: strings.Repeat("a", _maxHostNameLength)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateHostName(tt.hostName)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }

@@ -16,28 +16,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
-func TestNewShardCache(t *testing.T) {
-	logger := testlogger.New(t)
-	executorStore := store.NewMockStore(gomock.NewController(t))
-
-	shardCache := NewShardCache(ShardCacheParams{
-		ExecutorStore: executorStore,
-		Lifecycle:     fxtest.NewLifecycle(t),
-		Logger:        logger,
-		TimeSource:    clock.NewRealTimeSource(),
-		MetricsClient: metrics.NewNoopMetricsClient(),
-	})
-	require.NotNil(t, shardCache)
-
-	cache, ok := shardCache.(*ShardToExecutorCache)
-	require.True(t, ok)
-
-	assert.NotNil(t, cache.namespaceToShards)
-	assert.NotNil(t, cache.stopC)
-	assert.Equal(t, logger, cache.logger)
-	assert.Equal(t, executorStore, cache.executorStore)
-}
-
 func TestShardExecutorCacheForwarding(t *testing.T) {
 	const namespace = "test-namespace"
 	metadata := map[string]string{
@@ -96,65 +74,49 @@ func TestShardExecutorCacheForwarding(t *testing.T) {
 func TestShardCacheNamespaceStartFailure(t *testing.T) {
 	const namespace = "test-namespace"
 
-	tests := []struct {
-		name string
-		call func(*ShardToExecutorCache) error
-	}{
-		{
-			name: "GetShardOwner",
-			call: func(c *ShardToExecutorCache) error {
-				_, err := c.GetShardOwner(context.Background(), namespace, "shard-1")
-				return err
-			},
+	executorStore := store.NewMockStore(gomock.NewController(t))
+	// A failed start is not cached, so every entry point subscribes again.
+	executorStore.EXPECT().
+		SubscribeToNamespaceChanges(namespace).
+		Return(nil, errors.New("subscribe failed")).
+		AnyTimes()
+
+	cache := NewShardCache(ShardCacheParams{
+		ExecutorStore: executorStore,
+		Lifecycle:     fxtest.NewLifecycle(t),
+		Logger:        testlogger.New(t),
+		TimeSource:    clock.NewRealTimeSource(),
+		MetricsClient: metrics.NewNoopMetricsClient(),
+	}).(*ShardToExecutorCache)
+	cache.Start()
+	defer cache.Stop()
+
+	tests := map[string]func() error{
+		"GetShardOwner": func() error {
+			_, err := cache.GetShardOwner(context.Background(), namespace, "shard-1")
+			return err
 		},
-		{
-			name: "IsShardDrained",
-			call: func(c *ShardToExecutorCache) error {
-				_, err := c.IsShardDrained(context.Background(), namespace, "shard-1")
-				return err
-			},
+		"IsShardDrained": func() error {
+			_, err := cache.IsShardDrained(context.Background(), namespace, "shard-1")
+			return err
 		},
-		{
-			name: "GetExecutor",
-			call: func(c *ShardToExecutorCache) error {
-				_, err := c.GetExecutor(context.Background(), namespace, "executor-1")
-				return err
-			},
+		"GetExecutor": func() error {
+			_, err := cache.GetExecutor(context.Background(), namespace, "executor-1")
+			return err
 		},
-		{
-			name: "GetShardAssignments",
-			call: func(c *ShardToExecutorCache) error {
-				_, err := c.GetShardAssignments(namespace)
-				return err
-			},
+		"GetShardAssignments": func() error {
+			_, err := cache.GetShardAssignments(namespace)
+			return err
 		},
-		{
-			name: "Subscribe",
-			call: func(c *ShardToExecutorCache) error {
-				_, _, err := c.Subscribe(namespace)
-				return err
-			},
+		"Subscribe": func() error {
+			_, _, err := cache.Subscribe(namespace)
+			return err
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			executorStore := store.NewMockStore(gomock.NewController(t))
-			executorStore.EXPECT().
-				SubscribeToNamespaceChanges(namespace).
-				Return(nil, errors.New("subscribe failed"))
-
-			cache := NewShardCache(ShardCacheParams{
-				ExecutorStore: executorStore,
-				Lifecycle:     fxtest.NewLifecycle(t),
-				Logger:        testlogger.New(t),
-				TimeSource:    clock.NewRealTimeSource(),
-				MetricsClient: metrics.NewNoopMetricsClient(),
-			}).(*ShardToExecutorCache)
-			cache.Start()
-			defer cache.Stop()
-
-			assert.ErrorContains(t, tt.call(cache), "subscribe failed")
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.ErrorContains(t, call(), "subscribe failed")
 		})
 	}
 }

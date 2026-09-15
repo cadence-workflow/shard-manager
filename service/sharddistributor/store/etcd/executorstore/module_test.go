@@ -23,9 +23,7 @@ type namedClient struct {
 	Client etcdclient.Client `name:"executorstore"`
 }
 
-// The module is only built by the server, so a graph that no longer resolves would
-// otherwise surface at startup rather than here. The store is assembled from two
-// independently provided halves, which is the part worth holding still.
+// Tests that this part of the fx graph builds.
 func TestModule_ProvidesTheStore(t *testing.T) {
 	ctrl := gomock.NewController(t)
 

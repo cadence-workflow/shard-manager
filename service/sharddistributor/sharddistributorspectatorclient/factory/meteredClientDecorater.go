@@ -179,6 +179,57 @@ func (c *meteredShardDistributorClient) GetDrainedShards(ctx context.Context, re
 	return response, err
 }
 
+func (c *meteredShardDistributorClient) DrainHosts(ctx context.Context, request *types.DrainHostsRequest, opts ...yarpc.CallOption) error {
+	scope := c.metricsScope.Tagged(map[string]string{
+		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorDrainHostsOperationTagName,
+	})
+
+	scope.Counter(metricsconstants.ShardDistributorSpectatorClientRequests).Inc(1)
+
+	sw := scope.Timer(metricsconstants.ShardDistributorSpectatorClientLatency).Start()
+	err := c.client.DrainHosts(ctx, request, opts...)
+	sw.Stop()
+
+	if err != nil {
+		scope.Counter(metricsconstants.ShardDistributorSpectatorClientFailures).Inc(1)
+	}
+	return err
+}
+
+func (c *meteredShardDistributorClient) UndrainHosts(ctx context.Context, request *types.UndrainHostsRequest, opts ...yarpc.CallOption) (*types.UndrainHostsResponse, error) {
+	scope := c.metricsScope.Tagged(map[string]string{
+		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorUndrainHostsOperationTagName,
+	})
+
+	scope.Counter(metricsconstants.ShardDistributorSpectatorClientRequests).Inc(1)
+
+	sw := scope.Timer(metricsconstants.ShardDistributorSpectatorClientLatency).Start()
+	response, err := c.client.UndrainHosts(ctx, request, opts...)
+	sw.Stop()
+
+	if err != nil {
+		scope.Counter(metricsconstants.ShardDistributorSpectatorClientFailures).Inc(1)
+	}
+	return response, err
+}
+
+func (c *meteredShardDistributorClient) GetDrainedHosts(ctx context.Context, request *types.GetDrainedHostsRequest, opts ...yarpc.CallOption) (*types.GetDrainedHostsResponse, error) {
+	scope := c.metricsScope.Tagged(map[string]string{
+		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorGetDrainedHostsOperationTagName,
+	})
+
+	scope.Counter(metricsconstants.ShardDistributorSpectatorClientRequests).Inc(1)
+
+	sw := scope.Timer(metricsconstants.ShardDistributorSpectatorClientLatency).Start()
+	response, err := c.client.GetDrainedHosts(ctx, request, opts...)
+	sw.Stop()
+
+	if err != nil {
+		scope.Counter(metricsconstants.ShardDistributorSpectatorClientFailures).Inc(1)
+	}
+	return response, err
+}
+
 func (c *meteredShardDistributorClient) ForceResetNamespace(ctx context.Context, request *types.ForceResetNamespaceRequest, opts ...yarpc.CallOption) (*types.ForceResetNamespaceResponse, error) {
 	scope := c.metricsScope.Tagged(map[string]string{
 		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorForceResetNamespaceOperationTagName,

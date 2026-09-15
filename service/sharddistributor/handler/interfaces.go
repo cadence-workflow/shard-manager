@@ -57,6 +57,10 @@ type Handler interface {
 	UndrainShards(context.Context, *types.UndrainShardsRequest) (*types.UndrainShardsResponse, error)
 	GetDrainedShards(context.Context, *types.GetDrainedShardsRequest) (*types.GetDrainedShardsResponse, error)
 
+	DrainHosts(context.Context, *types.DrainHostsRequest) error
+	UndrainHosts(context.Context, *types.UndrainHostsRequest) (*types.UndrainHostsResponse, error)
+	GetDrainedHosts(context.Context, *types.GetDrainedHostsRequest) (*types.GetDrainedHostsResponse, error)
+
 	ForceResetNamespace(context.Context, *types.ForceResetNamespaceRequest) (*types.ForceResetNamespaceResponse, error)
 }
 

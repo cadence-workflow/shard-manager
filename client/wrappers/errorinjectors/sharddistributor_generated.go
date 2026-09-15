@@ -40,6 +40,26 @@ func NewShardDistributorClient(client sharddistributor.Client, errorRate float64
 	}
 }
 
+func (c *sharddistributorClient) DrainHosts(ctx context.Context, dp1 *types.DrainHostsRequest, p1 ...yarpc.CallOption) (err error) {
+	fakeErr := c.fakeErrFn(c.errorRate)
+	var forwardCall bool
+	if forwardCall = c.forwardCallFn(fakeErr); forwardCall {
+		err = c.client.DrainHosts(ctx, dp1, p1...)
+	}
+
+	if fakeErr != nil {
+		c.logger.Error(msgShardDistributorInjectedFakeErr,
+			tag.ShardDistributorClientOperationDrainHosts,
+			tag.Error(fakeErr),
+			tag.Bool(forwardCall),
+			tag.ClientError(err),
+		)
+		err = fakeErr
+		return
+	}
+	return
+}
+
 func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (err error) {
 	fakeErr := c.fakeErrFn(c.errorRate)
 	var forwardCall bool
@@ -70,6 +90,26 @@ func (c *sharddistributorClient) ForceResetNamespace(ctx context.Context, fp1 *t
 	if fakeErr != nil {
 		c.logger.Error(msgShardDistributorInjectedFakeErr,
 			tag.ShardDistributorClientOperationForceResetNamespace,
+			tag.Error(fakeErr),
+			tag.Bool(forwardCall),
+			tag.ClientError(err),
+		)
+		err = fakeErr
+		return
+	}
+	return
+}
+
+func (c *sharddistributorClient) GetDrainedHosts(ctx context.Context, gp1 *types.GetDrainedHostsRequest, p1 ...yarpc.CallOption) (gp2 *types.GetDrainedHostsResponse, err error) {
+	fakeErr := c.fakeErrFn(c.errorRate)
+	var forwardCall bool
+	if forwardCall = c.forwardCallFn(fakeErr); forwardCall {
+		gp2, err = c.client.GetDrainedHosts(ctx, gp1, p1...)
+	}
+
+	if fakeErr != nil {
+		c.logger.Error(msgShardDistributorInjectedFakeErr,
+			tag.ShardDistributorClientOperationGetDrainedHosts,
 			tag.Error(fakeErr),
 			tag.Bool(forwardCall),
 			tag.ClientError(err),
@@ -190,6 +230,26 @@ func (c *sharddistributorClient) ListNamespaces(ctx context.Context, lp1 *types.
 	if fakeErr != nil {
 		c.logger.Error(msgShardDistributorInjectedFakeErr,
 			tag.ShardDistributorClientOperationListNamespaces,
+			tag.Error(fakeErr),
+			tag.Bool(forwardCall),
+			tag.ClientError(err),
+		)
+		err = fakeErr
+		return
+	}
+	return
+}
+
+func (c *sharddistributorClient) UndrainHosts(ctx context.Context, up1 *types.UndrainHostsRequest, p1 ...yarpc.CallOption) (up2 *types.UndrainHostsResponse, err error) {
+	fakeErr := c.fakeErrFn(c.errorRate)
+	var forwardCall bool
+	if forwardCall = c.forwardCallFn(fakeErr); forwardCall {
+		up2, err = c.client.UndrainHosts(ctx, up1, p1...)
+	}
+
+	if fakeErr != nil {
+		c.logger.Error(msgShardDistributorInjectedFakeErr,
+			tag.ShardDistributorClientOperationUndrainHosts,
 			tag.Error(fakeErr),
 			tag.Bool(forwardCall),
 			tag.ClientError(err),

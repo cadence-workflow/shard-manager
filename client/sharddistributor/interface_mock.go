@@ -43,6 +43,25 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
+// DrainHosts mocks base method.
+func (m *MockClient) DrainHosts(arg0 context.Context, arg1 *types.DrainHostsRequest, arg2 ...yarpc.CallOption) error {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DrainHosts", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DrainHosts indicates an expected call of DrainHosts.
+func (mr *MockClientMockRecorder) DrainHosts(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DrainHosts", reflect.TypeOf((*MockClient)(nil).DrainHosts), varargs...)
+}
+
 // DrainShards mocks base method.
 func (m *MockClient) DrainShards(arg0 context.Context, arg1 *types.DrainShardsRequest, arg2 ...yarpc.CallOption) error {
 	m.ctrl.T.Helper()
@@ -80,6 +99,26 @@ func (mr *MockClientMockRecorder) ForceResetNamespace(arg0, arg1 any, arg2 ...an
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForceResetNamespace", reflect.TypeOf((*MockClient)(nil).ForceResetNamespace), varargs...)
+}
+
+// GetDrainedHosts mocks base method.
+func (m *MockClient) GetDrainedHosts(arg0 context.Context, arg1 *types.GetDrainedHostsRequest, arg2 ...yarpc.CallOption) (*types.GetDrainedHostsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetDrainedHosts", varargs...)
+	ret0, _ := ret[0].(*types.GetDrainedHostsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDrainedHosts indicates an expected call of GetDrainedHosts.
+func (mr *MockClientMockRecorder) GetDrainedHosts(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDrainedHosts", reflect.TypeOf((*MockClient)(nil).GetDrainedHosts), varargs...)
 }
 
 // GetDrainedShards mocks base method.
@@ -200,6 +239,26 @@ func (mr *MockClientMockRecorder) ListNamespaces(arg0, arg1 any, arg2 ...any) *g
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNamespaces", reflect.TypeOf((*MockClient)(nil).ListNamespaces), varargs...)
+}
+
+// UndrainHosts mocks base method.
+func (m *MockClient) UndrainHosts(arg0 context.Context, arg1 *types.UndrainHostsRequest, arg2 ...yarpc.CallOption) (*types.UndrainHostsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UndrainHosts", varargs...)
+	ret0, _ := ret[0].(*types.UndrainHostsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UndrainHosts indicates an expected call of UndrainHosts.
+func (mr *MockClientMockRecorder) UndrainHosts(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UndrainHosts", reflect.TypeOf((*MockClient)(nil).UndrainHosts), varargs...)
 }
 
 // UndrainShards mocks base method.

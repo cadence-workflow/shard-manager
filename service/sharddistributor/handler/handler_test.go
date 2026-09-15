@@ -25,6 +25,8 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1090,6 +1092,265 @@ func TestGetDrainedShards(t *testing.T) {
 			require.NotNil(t, resp)
 			require.Equal(t, _testNamespaceFixed, resp.Namespace)
 			require.Equal(t, tt.wantShardKeys, resp.ShardKeys)
+		})
+	}
+}
+
+func TestDrainHosts(t *testing.T) {
+	cfg := config.ShardDistribution{
+		Namespaces: []config.Namespace{{Name: _testNamespaceFixed, Type: config.NamespaceTypeFixed, ShardNum: 32}},
+	}
+
+	tests := []struct {
+		name            string
+		request         *types.DrainHostsRequest
+		setupMocks      func(*store.MockStore)
+		wantErr         error
+		wantErrContains string
+	}{
+		{
+			name:    "unknown namespace",
+			request: &types.DrainHostsRequest{Namespace: "missing", Hosts: []*types.DrainedHost{{Hostname: "host-a"}}},
+			wantErr: &types.NamespaceNotFoundError{Namespace: "missing"},
+		},
+		{
+			name:    "no hosts",
+			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed},
+			wantErr: &types.BadRequestError{Message: "hosts must not be empty"},
+		},
+		{
+			name:    "nil host",
+			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{nil}},
+			wantErr: &types.BadRequestError{Message: "hosts must not contain a nil entry"},
+		},
+		{
+			name:    "empty hostname",
+			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: ""}}},
+			wantErr: &types.BadRequestError{Message: `invalid hostname "": must be non-empty and must not contain '/' or '@'`},
+		},
+		{
+			name:    "hostname with separator",
+			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: "a/b"}}},
+			wantErr: &types.BadRequestError{Message: `invalid hostname "a/b": must be non-empty and must not contain '/' or '@'`},
+		},
+		{
+			name:    "hostname with at-sign",
+			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: "host@uuid"}}},
+			wantErr: &types.BadRequestError{Message: `invalid hostname "host@uuid": must be non-empty and must not contain '/' or '@'`},
+		},
+		{
+			name:    "hostname too long",
+			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: strings.Repeat("a", maxHostnameLength+1)}}},
+			wantErr: &types.BadRequestError{Message: fmt.Sprintf(`invalid hostname %q: exceeds %d bytes`, strings.Repeat("a", maxHostnameLength+1), maxHostnameLength)},
+		},
+		{
+			name:    "store error",
+			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: "host-a", Reason: "test"}}},
+			setupMocks: func(m *store.MockStore) {
+				m.EXPECT().DrainHosts(gomock.Any(), _testNamespaceFixed, []store.DrainedHost{
+					{Hostname: "host-a", Reason: "test"},
+				}).Return(errors.New("etcd is down"))
+			},
+			wantErrContains: "failed to drain hosts",
+		},
+		{
+			name: "success",
+			request: &types.DrainHostsRequest{
+				Namespace: _testNamespaceFixed,
+				Hosts: []*types.DrainedHost{
+					{Hostname: "host-a", DrainedBy: "gaziza", Reason: "test"},
+					{Hostname: "host-b"},
+				},
+			},
+			setupMocks: func(m *store.MockStore) {
+				m.EXPECT().DrainHosts(gomock.Any(), _testNamespaceFixed, []store.DrainedHost{
+					{Hostname: "host-a", DrainedBy: "gaziza", Reason: "test"},
+					{Hostname: "host-b"},
+				}).Return(nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockStorage := store.NewMockStore(ctrl)
+			if tt.setupMocks != nil {
+				tt.setupMocks(mockStorage)
+			}
+
+			h := newTestHandler(t, cfg, mockStorage)
+			err := h.DrainHosts(context.Background(), tt.request)
+
+			if tt.wantErr != nil {
+				require.Equal(t, tt.wantErr, err)
+				return
+			}
+			if tt.wantErrContains != "" {
+				require.ErrorContains(t, err, tt.wantErrContains)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestUndrainHosts(t *testing.T) {
+	cfg := config.ShardDistribution{
+		Namespaces: []config.Namespace{{Name: _testNamespaceFixed, Type: config.NamespaceTypeFixed, ShardNum: 32}},
+	}
+
+	tests := []struct {
+		name            string
+		request         *types.UndrainHostsRequest
+		setupMocks      func(*store.MockStore)
+		wantUndrained   []string
+		wantErr         error
+		wantErrContains string
+	}{
+		{
+			name:    "unknown namespace",
+			request: &types.UndrainHostsRequest{Namespace: "missing", Hostnames: []string{"host-a"}},
+			wantErr: &types.NamespaceNotFoundError{Namespace: "missing"},
+		},
+		{
+			name:    "no hostnames",
+			request: &types.UndrainHostsRequest{Namespace: _testNamespaceFixed},
+			wantErr: &types.BadRequestError{Message: "hostnames must not be empty"},
+		},
+		{
+			name:    "store error",
+			request: &types.UndrainHostsRequest{Namespace: _testNamespaceFixed, Hostnames: []string{"host-a"}},
+			setupMocks: func(m *store.MockStore) {
+				m.EXPECT().UndrainHosts(gomock.Any(), _testNamespaceFixed, []string{"host-a"}).
+					Return(nil, errors.New("etcd is down"))
+			},
+			wantErrContains: "failed to undrain hosts",
+		},
+		{
+			name:    "success reports only what was removed",
+			request: &types.UndrainHostsRequest{Namespace: _testNamespaceFixed, Hostnames: []string{"host-a", "host-b"}},
+			setupMocks: func(m *store.MockStore) {
+				m.EXPECT().UndrainHosts(gomock.Any(), _testNamespaceFixed, []string{"host-a", "host-b"}).
+					Return([]string{"host-a"}, nil)
+			},
+			wantUndrained: []string{"host-a"},
+		},
+		{
+			name:    "nothing was drained",
+			request: &types.UndrainHostsRequest{Namespace: _testNamespaceFixed, Hostnames: []string{"host-a"}},
+			setupMocks: func(m *store.MockStore) {
+				m.EXPECT().UndrainHosts(gomock.Any(), _testNamespaceFixed, []string{"host-a"}).
+					Return(nil, nil)
+			},
+			wantUndrained: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockStorage := store.NewMockStore(ctrl)
+			if tt.setupMocks != nil {
+				tt.setupMocks(mockStorage)
+			}
+
+			h := newTestHandler(t, cfg, mockStorage)
+			resp, err := h.UndrainHosts(context.Background(), tt.request)
+
+			if tt.wantErr != nil {
+				require.Nil(t, resp)
+				require.Equal(t, tt.wantErr, err)
+				return
+			}
+			if tt.wantErrContains != "" {
+				require.Nil(t, resp)
+				require.ErrorContains(t, err, tt.wantErrContains)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Equal(t, tt.wantUndrained, resp.UndrainedHostnames)
+		})
+	}
+}
+
+func TestGetDrainedHosts(t *testing.T) {
+	cfg := config.ShardDistribution{
+		Namespaces: []config.Namespace{{Name: _testNamespaceFixed, Type: config.NamespaceTypeFixed, ShardNum: 32}},
+	}
+	drainedAt := time.Date(2026, 8, 25, 7, 40, 0, 0, time.UTC)
+
+	tests := []struct {
+		name            string
+		request         *types.GetDrainedHostsRequest
+		setupMocks      func(*store.MockStore)
+		wantHosts       []*types.DrainedHost
+		wantErr         error
+		wantErrContains string
+	}{
+		{
+			name:    "unknown namespace",
+			request: &types.GetDrainedHostsRequest{Namespace: "missing"},
+			wantErr: &types.NamespaceNotFoundError{Namespace: "missing"},
+		},
+		{
+			name:    "store error",
+			request: &types.GetDrainedHostsRequest{Namespace: _testNamespaceFixed},
+			setupMocks: func(m *store.MockStore) {
+				m.EXPECT().GetDrainedHosts(gomock.Any(), _testNamespaceFixed).
+					Return(nil, errors.New("etcd is down"))
+			},
+			wantErrContains: "failed to get drained hosts",
+		},
+		{
+			name:    "nothing drained",
+			request: &types.GetDrainedHostsRequest{Namespace: _testNamespaceFixed},
+			setupMocks: func(m *store.MockStore) {
+				m.EXPECT().GetDrainedHosts(gomock.Any(), _testNamespaceFixed).Return(nil, nil)
+			},
+			wantHosts: nil,
+		},
+		{
+			name:    "success",
+			request: &types.GetDrainedHostsRequest{Namespace: _testNamespaceFixed},
+			setupMocks: func(m *store.MockStore) {
+				m.EXPECT().GetDrainedHosts(gomock.Any(), _testNamespaceFixed).
+					Return([]store.DrainedHost{
+						{Hostname: "host-a", DrainedAt: drainedAt, DrainedBy: "gaziza", Reason: "test"},
+					}, nil)
+			},
+			wantHosts: []*types.DrainedHost{
+				{Hostname: "host-a", DrainedAt: drainedAt, DrainedBy: "gaziza", Reason: "test"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockStorage := store.NewMockStore(ctrl)
+			if tt.setupMocks != nil {
+				tt.setupMocks(mockStorage)
+			}
+
+			h := newTestHandler(t, cfg, mockStorage)
+			resp, err := h.GetDrainedHosts(context.Background(), tt.request)
+
+			if tt.wantErr != nil {
+				require.Nil(t, resp)
+				require.Equal(t, tt.wantErr, err)
+				return
+			}
+			if tt.wantErrContains != "" {
+				require.Nil(t, resp)
+				require.ErrorContains(t, err, tt.wantErrContains)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			require.Equal(t, _testNamespaceFixed, resp.Namespace)
+			require.Equal(t, tt.wantHosts, resp.Hosts)
 		})
 	}
 }

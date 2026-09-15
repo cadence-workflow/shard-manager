@@ -920,6 +920,15 @@ const (
 	// ShardDistributorClientGetDrainedShardsScope tracks GetDrainedShards calls made by service to shard distributor
 	ShardDistributorClientGetDrainedShardsScope
 
+	// ShardDistributorClientDrainHostsScope tracks DrainHosts calls made by service to shard distributor
+	ShardDistributorClientDrainHostsScope
+
+	// ShardDistributorClientUndrainHostsScope tracks UndrainHosts calls made by service to shard distributor
+	ShardDistributorClientUndrainHostsScope
+
+	// ShardDistributorClientGetDrainedHostsScope tracks GetDrainedHosts calls made by service to shard distributor
+	ShardDistributorClientGetDrainedHostsScope
+
 	// ShardDistributorClientForceResetNamespaceScope tracks ForceResetNamespace calls made by service to shard distributor
 	ShardDistributorClientForceResetNamespaceScope
 
@@ -1547,6 +1556,13 @@ const (
 	// ShardDistributorEphemeralAssignmentScope tracks on-demand ephemeral assignment batches.
 	ShardDistributorEphemeralAssignmentScope
 
+	// ShardDistributorDrainHostsScope tracks DrainHosts API calls received by service
+	ShardDistributorDrainHostsScope
+	// ShardDistributorUndrainHostsScope tracks UndrainHosts API calls received by service
+	ShardDistributorUndrainHostsScope
+	// ShardDistributorGetDrainedHostsScope tracks GetDrainedHosts API calls received by service
+	ShardDistributorGetDrainedHostsScope
+
 	NumShardDistributorScopes
 )
 
@@ -1940,6 +1956,9 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorClientDrainShardsScope:         {operation: "ShardDistributorClientDrainShards"},
 		ShardDistributorClientUndrainShardsScope:       {operation: "ShardDistributorClientUndrainShards"},
 		ShardDistributorClientGetDrainedShardsScope:    {operation: "ShardDistributorClientGetDrainedShards"},
+		ShardDistributorClientDrainHostsScope:          {operation: "ShardDistributorClientDrainHosts"},
+		ShardDistributorClientUndrainHostsScope:        {operation: "ShardDistributorClientUndrainHosts"},
+		ShardDistributorClientGetDrainedHostsScope:     {operation: "ShardDistributorClientGetDrainedHosts"},
 		ShardDistributorClientForceResetNamespaceScope: {operation: "ShardDistributorClientForceResetNamespace"},
 		ShardDistributorExecutorClientHeartbeatScope:   {operation: "ShardDistributorExecutorHeartbeat"},
 
@@ -2262,6 +2281,9 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorInspectShardScope:                          {operation: "InspectShard"},
 		ShardDistributorForceResetNamespaceScope:                   {operation: "ForceResetNamespace"},
 		ShardDistributorEphemeralAssignmentScope:                   {operation: "EphemeralAssignment"},
+		ShardDistributorDrainHostsScope:                            {operation: "DrainHosts"},
+		ShardDistributorUndrainHostsScope:                          {operation: "UndrainHosts"},
+		ShardDistributorGetDrainedHostsScope:                       {operation: "GetDrainedHosts"},
 	},
 }
 

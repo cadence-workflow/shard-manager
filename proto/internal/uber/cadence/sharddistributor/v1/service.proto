@@ -65,6 +65,19 @@ service ShardDistributorAPI {
   // drained for the namespace.
   rpc GetDrainedShards(GetDrainedShardsRequest) returns (GetDrainedShardsResponse);
 
+  // DrainHosts marks the given hosts as drained for the namespace.
+  // Executors on a drained host are not eligible for assignment until
+  // UndrainHosts is called for the same hostnames.
+  rpc DrainHosts(DrainHostsRequest) returns (DrainHostsResponse);
+
+  // UndrainHosts removes the given hosts from the drained list for the
+  // namespace, making their executors eligible for assignment again.
+  rpc UndrainHosts(UndrainHostsRequest) returns (UndrainHostsResponse);
+
+  // GetDrainedHosts returns the hosts currently marked as drained for the
+  // namespace, including drain metadata.
+  rpc GetDrainedHosts(GetDrainedHostsRequest) returns (GetDrainedHostsResponse);
+
   // ForceResetNamespace deletes all etcd state for a namespace: leader key,
   // executor heartbeats/status/metadata, shard assignments, and shard
   // statistics. The namespace itself remains configured; executors will
@@ -209,6 +222,42 @@ message GetDrainedShardsRequest {
 message GetDrainedShardsResponse {
   string namespace = 1;
   repeated string shard_keys = 2;
+}
+
+// DrainedHost is the operator-visible metadata for a host drain.
+message DrainedHost {
+  string hostname = 1;
+  google.protobuf.Timestamp drained_at = 2;
+  string drained_by = 3;
+  string reason = 4;
+}
+
+message DrainHostsRequest {
+  string namespace = 1;
+  repeated DrainedHost hosts = 2;
+}
+
+// DrainHostsResponse is intentionally empty: a successful call is reported by
+// the absence of an error.
+message DrainHostsResponse {}
+
+message UndrainHostsRequest {
+  string namespace = 1;
+  repeated string hostnames = 2;
+}
+
+message UndrainHostsResponse {
+  // hostnames that were actually removed from the drained list by this call.
+  repeated string undrained_hostnames = 1;
+}
+
+message GetDrainedHostsRequest {
+  string namespace = 1;
+}
+
+message GetDrainedHostsResponse {
+  string namespace = 1;
+  repeated DrainedHost hosts = 2;
 }
 
 message ForceResetNamespaceRequest {

@@ -19,7 +19,9 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
-func TestNamespaceShardToExecutor_Lifecycle(t *testing.T) {
+// Every signal on the namespace subscription applies the state it reads, and a state
+// that changed notifies the subscribers.
+func TestNamespaceShardToExecutor_SignalAppliesStateAndNotifies(t *testing.T) {
 	tc := setupNamespaceShardToExecutorTestCase(t)
 	defer goleak.VerifyNone(t)
 
@@ -46,48 +48,9 @@ func TestNamespaceShardToExecutor_Lifecycle(t *testing.T) {
 	wg := sync.WaitGroup{}
 	require.NoError(t, tc.e.Start(&wg))
 
-	// Start subscribes, and every signal on the subscription applies the state it reads.
 	tc.changeCh <- struct{}{}
 	requireExecutorCached(t, tc.e, "executor-1", "shard-1")
 	verifyShardOwner(t, tc.e, "shard-1", "executor-1", executor1.metadata)
-
-	tc.changeCh <- struct{}{}
-	requireExecutorCached(t, tc.e, "executor-2", "shard-2")
-	verifyShardOwner(t, tc.e, "shard-2", "executor-2", executor2.metadata)
-
-	close(tc.stopCh)
-	wg.Wait()
-}
-
-func TestNamespaceShardToExecutor_Subscribe(t *testing.T) {
-	tc := setupNamespaceShardToExecutorTestCase(t)
-	defer goleak.VerifyNone(t)
-
-	executor1 := testExecutor{shards: []string{"shard-1"}, metadata: map[string]string{
-		"hostname": "executor-1-host",
-		"version":  "v1.0.0",
-	}}
-	executor2 := testExecutor{shards: []string{"shard-2"}, metadata: map[string]string{
-		"hostname": "executor-2-host",
-		"region":   "us-west",
-	}}
-
-	firstRead := tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
-		Return(namespaceState(1, map[string]testExecutor{"executor-1": executor1}), nil).
-		Times(1)
-
-	tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
-		Return(namespaceState(2, map[string]testExecutor{"executor-1": executor1, "executor-2": executor2}), nil).
-		After(firstRead).
-		AnyTimes()
-
-	wg := sync.WaitGroup{}
-	require.NoError(t, tc.e.Start(&wg))
-
-	tc.changeCh <- struct{}{}
-	requireExecutorCached(t, tc.e, "executor-1", "shard-1")
 
 	notifyCh, unSub := tc.e.Subscribe()
 	defer unSub()
@@ -109,6 +72,7 @@ func TestNamespaceShardToExecutor_Subscribe(t *testing.T) {
 	assert.Len(t, snapshot.ExecutorToShards, 2)
 	verifyExecutorInState(t, snapshot.ExecutorToShards, "executor-1", []string{"shard-1"}, executor1.metadata)
 	verifyExecutorInState(t, snapshot.ExecutorToShards, "executor-2", []string{"shard-2"}, executor2.metadata)
+	verifyShardOwner(t, tc.e, "shard-2", "executor-2", executor2.metadata)
 
 	close(tc.stopCh)
 	wg.Wait()
@@ -119,13 +83,7 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_HungRefreshDoesNotBlockSt
 	defer goleak.VerifyNone(t)
 	tc.e.refreshTimeout = 50 * time.Millisecond
 
-	tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
-		DoAndReturn(func(ctx context.Context, _ string) (*store.NamespaceState, error) {
-			<-ctx.Done()
-			return nil, ctx.Err()
-		}).
-		AnyTimes()
+	gatedGetState(tc, nil)
 
 	done := make(chan struct{})
 	go func() {
@@ -153,17 +111,8 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 
 	e := newNamespaceShardToExecutor("ns", store.NewMockStore(gomock.NewController(t)), stopCh, testlogger.New(t), clock.NewMockedTimeSource(), metrics.NewNoopMetricsClient())
 
-	ownerA := &store.ShardOwner{ExecutorID: "exec-a", Metadata: map[string]string{}}
-	ownerB := &store.ShardOwner{ExecutorID: "exec-b", Metadata: map[string]string{}}
-
 	// Apply revision 10
-	e.replaceNamespaceState(10,
-		map[string]*store.ShardOwner{"shard-1": ownerA},
-		map[*store.ShardOwner][]string{ownerA: {"shard-1"}},
-		map[string]int64{"exec-a": 10},
-		map[string]*store.ShardOwner{"exec-a": ownerA},
-		map[string]struct{}{"shard-1": {}},
-	)
+	seedState(e, 10, "exec-a", "shard-1")
 
 	got := e.GetShardAssignments()
 	require.Len(t, got.ExecutorToShards, 1)
@@ -171,13 +120,7 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 	assertShardDrained(t, e, "shard-1", true)
 
 	// Apply revision 5 (stale) — should be ignored
-	e.replaceNamespaceState(5,
-		map[string]*store.ShardOwner{"shard-2": ownerB},
-		map[*store.ShardOwner][]string{ownerB: {"shard-2"}},
-		map[string]int64{"exec-b": 5},
-		map[string]*store.ShardOwner{"exec-b": ownerB},
-		map[string]struct{}{"shard-2": {}},
-	)
+	seedState(e, 5, "exec-b", "shard-2")
 
 	got = e.GetShardAssignments()
 	require.Len(t, got.ExecutorToShards, 1)
@@ -190,13 +133,7 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 	assertShardDrained(t, e, "shard-2", false)
 
 	// Apply revision 20 (newer) — should be accepted
-	e.replaceNamespaceState(20,
-		map[string]*store.ShardOwner{"shard-2": ownerB},
-		map[*store.ShardOwner][]string{ownerB: {"shard-2"}},
-		map[string]int64{"exec-b": 20},
-		map[string]*store.ShardOwner{"exec-b": ownerB},
-		map[string]struct{}{"shard-2": {}},
-	)
+	seedState(e, 20, "exec-b", "shard-2")
 
 	got = e.GetShardAssignments()
 	require.Len(t, got.ExecutorToShards, 1)
@@ -207,6 +144,20 @@ func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *te
 	assert.Contains(t, got.DrainedShards, "shard-2")
 	assertShardDrained(t, e, "shard-1", false)
 	assertShardDrained(t, e, "shard-2", true)
+}
+
+// seedState applies a revision in which one executor owns one shard and that shard is
+// drained, which is the shape every caller here needs; replaceNamespaceState itself takes
+// five parallel maps.
+func seedState(e *namespaceShardToExecutor, revision int64, executorID, shardID string) {
+	owner := &store.ShardOwner{ExecutorID: executorID, Metadata: map[string]string{}}
+	e.replaceNamespaceState(revision,
+		map[string]*store.ShardOwner{shardID: owner},
+		map[*store.ShardOwner][]string{owner: {shardID}},
+		map[string]int64{executorID: revision},
+		map[string]*store.ShardOwner{executorID: owner},
+		map[string]struct{}{shardID: {}},
+	)
 }
 
 // assertShardDrained checks IsShardDrained without letting a cache miss reach the store; every
@@ -290,19 +241,11 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 	tc := setupNamespaceShardToExecutorTestCase(t)
 	defer close(tc.stopCh)
 
-	ownerA := &store.ShardOwner{ExecutorID: "exec-a", Metadata: map[string]string{}}
-
 	subCh, unsub := tc.e.pubSub.subscribe()
 	defer unsub()
 
 	// Apply the older state.
-	tc.e.replaceNamespaceState(5,
-		map[string]*store.ShardOwner{"shard-a": ownerA},
-		map[*store.ShardOwner][]string{ownerA: {"shard-a"}},
-		map[string]int64{"exec-a": 5},
-		map[string]*store.ShardOwner{"exec-a": ownerA},
-		map[string]struct{}{"shard-a": {}},
-	)
+	seedState(tc.e, 5, "exec-a", "shard-a")
 
 	// Hold the pubsub lock so the publish below queues behind it, simulating
 	// a slower refresh whose publish call loses the race for the lock.
@@ -319,15 +262,7 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 
 	// A concurrent, newer refresh applies its state while the notification above is
 	// still enqueued.
-	ownerB := &store.ShardOwner{ExecutorID: "exec-b", Metadata: map[string]string{}}
-
-	tc.e.replaceNamespaceState(10,
-		map[string]*store.ShardOwner{"shard-b": ownerB},
-		map[*store.ShardOwner][]string{ownerB: {"shard-b"}},
-		map[string]int64{"exec-b": 10},
-		map[string]*store.ShardOwner{"exec-b": ownerB},
-		map[string]struct{}{"shard-b": {}},
-	)
+	seedState(tc.e, 10, "exec-b", "shard-b")
 
 	tc.e.pubSub.Unlock()
 	<-publishDone
@@ -449,6 +384,28 @@ func requireExecutorCached(t *testing.T, e *namespaceShardToExecutor, executorID
 	}, time.Second, time.Millisecond, "expected %s to reach the cache", executorID)
 }
 
+// gatedGetState blocks every store read until release is closed, so concurrent callers pile
+// up in one singleflight; a nil release never unblocks, standing in for a hung store. The
+// counter is how many reads actually reached the store, and the expectation is AnyTimes so a
+// regression surfaces as a count mismatch rather than "unexpected call".
+func gatedGetState(tc *namespaceShardToExecutorTestCase, release <-chan struct{}) *atomic.Int32 {
+	calls := &atomic.Int32{}
+	tc.store.EXPECT().
+		GetState(gomock.Any(), tc.namespace).
+		DoAndReturn(func(ctx context.Context, _ string) (*store.NamespaceState, error) {
+			calls.Add(1)
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+			return tc.state(1, nil), nil
+		}).
+		AnyTimes()
+
+	return calls
+}
+
 // N concurrent cache-miss GetShardOwner calls must collapse into 1 store read.
 func TestNamespaceShardToExecutor_GetShardOwner_SingleFlightDedup(t *testing.T) {
 	tc := setupNamespaceShardToExecutorTestCase(t)
@@ -458,20 +415,7 @@ func TestNamespaceShardToExecutor_GetShardOwner_SingleFlightDedup(t *testing.T) 
 
 	// release gates the read so all callers pile up in singleflight first.
 	release := make(chan struct{})
-	var getCalls atomic.Int32
-	tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
-		DoAndReturn(func(ctx context.Context, _ string) (*store.NamespaceState, error) {
-			getCalls.Add(1)
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-			return tc.state(1, nil), nil
-		}).
-		// AnyTimes so a regression surfaces as a count mismatch, not "unexpected call".
-		AnyTimes()
+	getCalls := gatedGetState(tc, release)
 
 	var wg sync.WaitGroup
 	owners := make([]*store.ShardOwner, numCallers)
@@ -508,19 +452,7 @@ func TestNamespaceShardToExecutor_GetShardOwner_CallerCancelDoesNotPoisonFlight(
 	defer close(tc.stopCh)
 
 	release := make(chan struct{})
-	var getCalls atomic.Int32
-	tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
-		DoAndReturn(func(ctx context.Context, _ string) (*store.NamespaceState, error) {
-			getCalls.Add(1)
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-			return tc.state(1, nil), nil
-		}).
-		AnyTimes()
+	getCalls := gatedGetState(tc, release)
 
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	cancelledErrCh := make(chan error, 1)
@@ -571,15 +503,7 @@ func TestNamespaceShardToExecutor_GetShardOwner_RefreshContextHasBoundedTimeout(
 	defer close(tc.stopCh)
 	tc.e.refreshTimeout = 50 * time.Millisecond
 
-	var getCalls atomic.Int32
-	tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
-		DoAndReturn(func(ctx context.Context, _ string) (*store.NamespaceState, error) {
-			getCalls.Add(1)
-			<-ctx.Done()
-			return nil, ctx.Err()
-		}).
-		AnyTimes()
+	getCalls := gatedGetState(tc, nil)
 
 	// Use a generous caller deadline so the timeout we observe must come from
 	// the refresh's own bounded context, not the caller's.

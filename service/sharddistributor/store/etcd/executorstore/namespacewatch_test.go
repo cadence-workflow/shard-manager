@@ -285,9 +285,21 @@ func TestNamespaceWatcher_StopsOnLifecycleShutdown(t *testing.T) {
 	require.NoError(t, err)
 	lifecycle.RequireStart()
 
+	// Establishing the watch already signalled, so the channel has to be drained to
+	// reach the close that tells a subscriber the watcher is gone.
+	drained := make(chan struct{})
+	go func() {
+		defer close(drained)
+		for range changeChan {
+		}
+	}()
+
 	lifecycle.RequireStop()
 
-	for range changeChan {
+	select {
+	case <-drained:
+	case <-time.After(time.Second):
+		t.Fatal("stopping the app must close the subscription")
 	}
 }
 

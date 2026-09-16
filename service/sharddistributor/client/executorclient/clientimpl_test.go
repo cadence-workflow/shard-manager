@@ -121,6 +121,8 @@ func TestHeartBeatLoop(t *testing.T) {
 			Status:             types.ExecutorStatusACTIVE,
 			ShardStatusReports: make(map[string]*types.ShardStatusReport),
 			Metadata:           make(map[string]string),
+			HostID:             "test-hostID",
+			HostMetadata:       &types.HostMetadata{HostName: "test-hostname"},
 		}, gomock.Any()).
 		Return(&types.ExecutorHeartbeatResponse{
 			ShardAssignments: map[string]*types.ShardAssignment{
@@ -189,7 +191,9 @@ func TestHeartbeat(t *testing.T) {
 				"test-shard-id1": {Status: types.ShardStatusREADY, ShardLoad: 0.123},
 				"test-shard-id2": {Status: types.ShardStatusREADY, ShardLoad: 0.456},
 			},
-			Metadata: make(map[string]string),
+			Metadata:     make(map[string]string),
+			HostID:       "test-hostID",
+			HostMetadata: &types.HostMetadata{HostName: "test-hostname"},
 		}, gomock.Any()).Return(&types.ExecutorHeartbeatResponse{
 		ShardAssignments: map[string]*types.ShardAssignment{
 			"test-shard-id1": {Status: types.AssignmentStatusREADY},

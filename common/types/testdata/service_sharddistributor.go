@@ -144,4 +144,36 @@ var (
 	ShardDistributorForceResetNamespaceResponse = types.ForceResetNamespaceResponse{
 		DeletedKeys: 42,
 	}
+	ShardDistributorDrainHostsRequest = types.DrainHostsRequest{
+		Namespace: "namespace",
+		Hosts: []*types.DrainedHost{
+			{
+				Hostname:  "host-a",
+				DrainedAt: time.Date(2026, 8, 25, 7, 40, 0, 0, time.UTC),
+				DrainedBy: "gaziza",
+				Reason:    "maintenance",
+			},
+		},
+	}
+	ShardDistributorUndrainHostsRequest = types.UndrainHostsRequest{
+		Namespace: "namespace",
+		Hostnames: []string{"host-a", "host-b"},
+	}
+	ShardDistributorUndrainHostsResponse = types.UndrainHostsResponse{
+		UndrainedHostnames: []string{"host-a"},
+	}
+	ShardDistributorGetDrainedHostsRequest = types.GetDrainedHostsRequest{
+		Namespace: "namespace",
+	}
+	ShardDistributorGetDrainedHostsResponse = types.GetDrainedHostsResponse{
+		Namespace: "namespace",
+		Hosts: []*types.DrainedHost{
+			{
+				Hostname:  "host-a",
+				DrainedAt: time.Date(2026, 8, 25, 7, 40, 0, 0, time.UTC),
+				DrainedBy: "gaziza",
+				Reason:    "maintenance",
+			},
+		},
+	}
 )

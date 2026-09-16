@@ -28,6 +28,25 @@ func NewMetricsHandler(handler handler.Handler, logger log.Logger, metricsClient
 	}
 }
 
+func (h *metricsHandler) DrainHosts(ctx context.Context, dp1 *types.DrainHostsRequest) (err error) {
+	defer func() { log.CapturePanic(recover(), h.logger, &err) }()
+
+	scope := h.metricsClient.Scope(metrics.ShardDistributorDrainHostsScope)
+	scope = scope.Tagged(metrics.NamespaceTag(dp1.GetNamespace()))
+	scope.IncCounter(metrics.ShardDistributorRequests)
+	sw := scope.StartTimer(metrics.ShardDistributorLatency)
+	defer sw.Stop()
+	logger := h.logger.WithTags(tag.ShardNamespace(dp1.GetNamespace()))
+
+	err = h.handler.DrainHosts(ctx, dp1)
+
+	if err != nil {
+		handleErr(err, scope, logger)
+	}
+
+	return err
+}
+
 func (h *metricsHandler) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest) (err error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &err) }()
 
@@ -64,6 +83,25 @@ func (h *metricsHandler) ForceResetNamespace(ctx context.Context, fp1 *types.For
 	}
 
 	return fp2, err
+}
+
+func (h *metricsHandler) GetDrainedHosts(ctx context.Context, gp1 *types.GetDrainedHostsRequest) (gp2 *types.GetDrainedHostsResponse, err error) {
+	defer func() { log.CapturePanic(recover(), h.logger, &err) }()
+
+	scope := h.metricsClient.Scope(metrics.ShardDistributorGetDrainedHostsScope)
+	scope = scope.Tagged(metrics.NamespaceTag(gp1.GetNamespace()))
+	scope.IncCounter(metrics.ShardDistributorRequests)
+	sw := scope.StartTimer(metrics.ShardDistributorLatency)
+	defer sw.Stop()
+	logger := h.logger.WithTags(tag.ShardNamespace(gp1.GetNamespace()))
+
+	gp2, err = h.handler.GetDrainedHosts(ctx, gp1)
+
+	if err != nil {
+		handleErr(err, scope, logger)
+	}
+
+	return gp2, err
 }
 
 func (h *metricsHandler) GetDrainedShards(ctx context.Context, gp1 *types.GetDrainedShardsRequest) (gp2 *types.GetDrainedShardsResponse, err error) {
@@ -192,6 +230,25 @@ func (h *metricsHandler) Start() {
 func (h *metricsHandler) Stop() {
 	h.handler.Stop()
 	return
+}
+
+func (h *metricsHandler) UndrainHosts(ctx context.Context, up1 *types.UndrainHostsRequest) (up2 *types.UndrainHostsResponse, err error) {
+	defer func() { log.CapturePanic(recover(), h.logger, &err) }()
+
+	scope := h.metricsClient.Scope(metrics.ShardDistributorUndrainHostsScope)
+	scope = scope.Tagged(metrics.NamespaceTag(up1.GetNamespace()))
+	scope.IncCounter(metrics.ShardDistributorRequests)
+	sw := scope.StartTimer(metrics.ShardDistributorLatency)
+	defer sw.Stop()
+	logger := h.logger.WithTags(tag.ShardNamespace(up1.GetNamespace()))
+
+	up2, err = h.handler.UndrainHosts(ctx, up1)
+
+	if err != nil {
+		handleErr(err, scope, logger)
+	}
+
+	return up2, err
 }
 
 func (h *metricsHandler) UndrainShards(ctx context.Context, up1 *types.UndrainShardsRequest) (up2 *types.UndrainShardsResponse, err error) {

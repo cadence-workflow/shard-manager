@@ -28,6 +28,28 @@ func NewShardDistributorClient(client sharddistributor.Client, metricsClient met
 	}
 }
 
+func (c *sharddistributorClient) DrainHosts(ctx context.Context, dp1 *types.DrainHostsRequest, p1 ...yarpc.CallOption) (err error) {
+	retryCount := getRetryCountFromContext(ctx)
+
+	var scope metrics.Scope
+	if retryCount == -1 {
+		scope = c.metricsClient.Scope(metrics.ShardDistributorClientDrainHostsScope)
+	} else {
+		scope = c.metricsClient.Scope(metrics.ShardDistributorClientDrainHostsScope, metrics.IsRetryTag(retryCount > 0))
+	}
+
+	scope.IncCounter(metrics.CadenceClientRequests)
+
+	sw := scope.StartTimer(metrics.CadenceClientLatency)
+	err = c.client.DrainHosts(ctx, dp1, p1...)
+	sw.Stop()
+
+	if err != nil {
+		scope.IncCounter(metrics.CadenceClientFailures)
+	}
+	return err
+}
+
 func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (err error) {
 	retryCount := getRetryCountFromContext(ctx)
 
@@ -70,6 +92,28 @@ func (c *sharddistributorClient) ForceResetNamespace(ctx context.Context, fp1 *t
 		scope.IncCounter(metrics.CadenceClientFailures)
 	}
 	return fp2, err
+}
+
+func (c *sharddistributorClient) GetDrainedHosts(ctx context.Context, gp1 *types.GetDrainedHostsRequest, p1 ...yarpc.CallOption) (gp2 *types.GetDrainedHostsResponse, err error) {
+	retryCount := getRetryCountFromContext(ctx)
+
+	var scope metrics.Scope
+	if retryCount == -1 {
+		scope = c.metricsClient.Scope(metrics.ShardDistributorClientGetDrainedHostsScope)
+	} else {
+		scope = c.metricsClient.Scope(metrics.ShardDistributorClientGetDrainedHostsScope, metrics.IsRetryTag(retryCount > 0))
+	}
+
+	scope.IncCounter(metrics.CadenceClientRequests)
+
+	sw := scope.StartTimer(metrics.CadenceClientLatency)
+	gp2, err = c.client.GetDrainedHosts(ctx, gp1, p1...)
+	sw.Stop()
+
+	if err != nil {
+		scope.IncCounter(metrics.CadenceClientFailures)
+	}
+	return gp2, err
 }
 
 func (c *sharddistributorClient) GetDrainedShards(ctx context.Context, gp1 *types.GetDrainedShardsRequest, p1 ...yarpc.CallOption) (gp2 *types.GetDrainedShardsResponse, err error) {
@@ -202,6 +246,28 @@ func (c *sharddistributorClient) ListNamespaces(ctx context.Context, lp1 *types.
 		scope.IncCounter(metrics.CadenceClientFailures)
 	}
 	return lp2, err
+}
+
+func (c *sharddistributorClient) UndrainHosts(ctx context.Context, up1 *types.UndrainHostsRequest, p1 ...yarpc.CallOption) (up2 *types.UndrainHostsResponse, err error) {
+	retryCount := getRetryCountFromContext(ctx)
+
+	var scope metrics.Scope
+	if retryCount == -1 {
+		scope = c.metricsClient.Scope(metrics.ShardDistributorClientUndrainHostsScope)
+	} else {
+		scope = c.metricsClient.Scope(metrics.ShardDistributorClientUndrainHostsScope, metrics.IsRetryTag(retryCount > 0))
+	}
+
+	scope.IncCounter(metrics.CadenceClientRequests)
+
+	sw := scope.StartTimer(metrics.CadenceClientLatency)
+	up2, err = c.client.UndrainHosts(ctx, up1, p1...)
+	sw.Stop()
+
+	if err != nil {
+		scope.IncCounter(metrics.CadenceClientFailures)
+	}
+	return up2, err
 }
 
 func (c *sharddistributorClient) UndrainShards(ctx context.Context, up1 *types.UndrainShardsRequest, p1 ...yarpc.CallOption) (up2 *types.UndrainShardsResponse, err error) {

@@ -21,6 +21,11 @@ func NewGRPCHandler(h handler.Handler) GRPCHandler {
 	return GRPCHandler{h}
 }
 
+func (g GRPCHandler) DrainHosts(ctx context.Context, request *sharddistributorv1.DrainHostsRequest) (*sharddistributorv1.DrainHostsResponse, error) {
+	err := g.h.DrainHosts(ctx, proto.ToShardDistributorDrainHostsRequest(request))
+	return &sharddistributorv1.DrainHostsResponse{}, proto.FromError(err)
+}
+
 func (g GRPCHandler) DrainShards(ctx context.Context, request *sharddistributorv1.DrainShardsRequest) (*sharddistributorv1.DrainShardsResponse, error) {
 	err := g.h.DrainShards(ctx, proto.ToShardDistributorDrainShardsRequest(request))
 	return &sharddistributorv1.DrainShardsResponse{}, proto.FromError(err)
@@ -29,6 +34,11 @@ func (g GRPCHandler) DrainShards(ctx context.Context, request *sharddistributorv
 func (g GRPCHandler) ForceResetNamespace(ctx context.Context, request *sharddistributorv1.ForceResetNamespaceRequest) (*sharddistributorv1.ForceResetNamespaceResponse, error) {
 	response, err := g.h.ForceResetNamespace(ctx, proto.ToShardDistributorForceResetNamespaceRequest(request))
 	return proto.FromShardDistributorForceResetNamespaceResponse(response), proto.FromError(err)
+}
+
+func (g GRPCHandler) GetDrainedHosts(ctx context.Context, request *sharddistributorv1.GetDrainedHostsRequest) (*sharddistributorv1.GetDrainedHostsResponse, error) {
+	response, err := g.h.GetDrainedHosts(ctx, proto.ToShardDistributorGetDrainedHostsRequest(request))
+	return proto.FromShardDistributorGetDrainedHostsResponse(response), proto.FromError(err)
 }
 
 func (g GRPCHandler) GetDrainedShards(ctx context.Context, request *sharddistributorv1.GetDrainedShardsRequest) (*sharddistributorv1.GetDrainedShardsResponse, error) {
@@ -59,6 +69,11 @@ func (g GRPCHandler) InspectShard(ctx context.Context, request *sharddistributor
 func (g GRPCHandler) ListNamespaces(ctx context.Context, request *sharddistributorv1.ListNamespacesRequest) (*sharddistributorv1.ListNamespacesResponse, error) {
 	response, err := g.h.ListNamespaces(ctx, proto.ToShardDistributorListNamespacesRequest(request))
 	return proto.FromShardDistributorListNamespacesResponse(response), proto.FromError(err)
+}
+
+func (g GRPCHandler) UndrainHosts(ctx context.Context, request *sharddistributorv1.UndrainHostsRequest) (*sharddistributorv1.UndrainHostsResponse, error) {
+	response, err := g.h.UndrainHosts(ctx, proto.ToShardDistributorUndrainHostsRequest(request))
+	return proto.FromShardDistributorUndrainHostsResponse(response), proto.FromError(err)
 }
 
 func (g GRPCHandler) UndrainShards(ctx context.Context, request *sharddistributorv1.UndrainShardsRequest) (*sharddistributorv1.UndrainShardsResponse, error) {

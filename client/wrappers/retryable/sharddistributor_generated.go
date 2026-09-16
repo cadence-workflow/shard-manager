@@ -31,6 +31,13 @@ func NewShardDistributorClient(client sharddistributor.Client, policy backoff.Re
 	}
 }
 
+func (c *sharddistributorClient) DrainHosts(ctx context.Context, dp1 *types.DrainHostsRequest, p1 ...yarpc.CallOption) (err error) {
+	op := func(ctx context.Context) error {
+		return c.client.DrainHosts(ctx, dp1, p1...)
+	}
+	return c.throttleRetry.Do(ctx, op)
+}
+
 func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (err error) {
 	op := func(ctx context.Context) error {
 		return c.client.DrainShards(ctx, dp1, p1...)
@@ -43,6 +50,17 @@ func (c *sharddistributorClient) ForceResetNamespace(ctx context.Context, fp1 *t
 	op := func(ctx context.Context) error {
 		var err error
 		resp, err = c.client.ForceResetNamespace(ctx, fp1, p1...)
+		return err
+	}
+	err = c.throttleRetry.Do(ctx, op)
+	return resp, err
+}
+
+func (c *sharddistributorClient) GetDrainedHosts(ctx context.Context, gp1 *types.GetDrainedHostsRequest, p1 ...yarpc.CallOption) (gp2 *types.GetDrainedHostsResponse, err error) {
+	var resp *types.GetDrainedHostsResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.GetDrainedHosts(ctx, gp1, p1...)
 		return err
 	}
 	err = c.throttleRetry.Do(ctx, op)
@@ -109,6 +127,17 @@ func (c *sharddistributorClient) ListNamespaces(ctx context.Context, lp1 *types.
 	op := func(ctx context.Context) error {
 		var err error
 		resp, err = c.client.ListNamespaces(ctx, lp1, p1...)
+		return err
+	}
+	err = c.throttleRetry.Do(ctx, op)
+	return resp, err
+}
+
+func (c *sharddistributorClient) UndrainHosts(ctx context.Context, up1 *types.UndrainHostsRequest, p1 ...yarpc.CallOption) (up2 *types.UndrainHostsResponse, err error) {
+	var resp *types.UndrainHostsResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.UndrainHosts(ctx, up1, p1...)
 		return err
 	}
 	err = c.throttleRetry.Do(ctx, op)

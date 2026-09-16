@@ -129,6 +129,36 @@ func TestFromShardDistributorForceResetNamespaceResponse(t *testing.T) {
 	}
 }
 
+func TestFromShardDistributorDrainHostsRequest(t *testing.T) {
+	for _, item := range []*types.DrainHostsRequest{nil, {}, &testdata.ShardDistributorDrainHostsRequest} {
+		assert.Equal(t, item, ToShardDistributorDrainHostsRequest(FromShardDistributorDrainHostsRequest(item)))
+	}
+}
+
+func TestFromShardDistributorUndrainHostsRequest(t *testing.T) {
+	for _, item := range []*types.UndrainHostsRequest{nil, {}, &testdata.ShardDistributorUndrainHostsRequest} {
+		assert.Equal(t, item, ToShardDistributorUndrainHostsRequest(FromShardDistributorUndrainHostsRequest(item)))
+	}
+}
+
+func TestFromShardDistributorUndrainHostsResponse(t *testing.T) {
+	for _, item := range []*types.UndrainHostsResponse{nil, {}, &testdata.ShardDistributorUndrainHostsResponse} {
+		assert.Equal(t, item, ToShardDistributorUndrainHostsResponse(FromShardDistributorUndrainHostsResponse(item)))
+	}
+}
+
+func TestFromShardDistributorGetDrainedHostsRequest(t *testing.T) {
+	for _, item := range []*types.GetDrainedHostsRequest{nil, {}, &testdata.ShardDistributorGetDrainedHostsRequest} {
+		assert.Equal(t, item, ToShardDistributorGetDrainedHostsRequest(FromShardDistributorGetDrainedHostsRequest(item)))
+	}
+}
+
+func TestFromShardDistributorGetDrainedHostsResponse(t *testing.T) {
+	for _, item := range []*types.GetDrainedHostsResponse{nil, {}, &testdata.ShardDistributorGetDrainedHostsResponse} {
+		assert.Equal(t, item, ToShardDistributorGetDrainedHostsResponse(FromShardDistributorGetDrainedHostsResponse(item)))
+	}
+}
+
 // --- Fuzz tests for sharddistributor mapper functions ---
 
 // ExecutorStatusFuzzer generates valid ExecutorStatus enum values
@@ -331,4 +361,46 @@ func TestForceResetNamespaceRequestFuzz(t *testing.T) {
 
 func TestForceResetNamespaceResponseFuzz(t *testing.T) {
 	testutils.RunMapperFuzzTest(t, FromShardDistributorForceResetNamespaceResponse, ToShardDistributorForceResetNamespaceResponse)
+}
+
+func DrainHostsRequestFuzzer(r *types.DrainHostsRequest, c fuzz.Continue) {
+	c.FuzzNoCustom(r)
+	for i, host := range r.Hosts {
+		if host == nil {
+			r.Hosts[i] = &types.DrainedHost{}
+		}
+	}
+}
+
+func GetDrainedHostsResponseFuzzer(r *types.GetDrainedHostsResponse, c fuzz.Continue) {
+	c.FuzzNoCustom(r)
+	for i, host := range r.Hosts {
+		if host == nil {
+			r.Hosts[i] = &types.DrainedHost{}
+		}
+	}
+}
+
+func TestDrainHostsRequestFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorDrainHostsRequest, ToShardDistributorDrainHostsRequest,
+		testutils.WithCustomFuncs(DrainHostsRequestFuzzer),
+	)
+}
+
+func TestUndrainHostsRequestFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorUndrainHostsRequest, ToShardDistributorUndrainHostsRequest)
+}
+
+func TestUndrainHostsResponseFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorUndrainHostsResponse, ToShardDistributorUndrainHostsResponse)
+}
+
+func TestGetDrainedHostsRequestFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorGetDrainedHostsRequest, ToShardDistributorGetDrainedHostsRequest)
+}
+
+func TestGetDrainedHostsResponseFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorGetDrainedHostsResponse, ToShardDistributorGetDrainedHostsResponse,
+		testutils.WithCustomFuncs(GetDrainedHostsResponseFuzzer),
+	)
 }

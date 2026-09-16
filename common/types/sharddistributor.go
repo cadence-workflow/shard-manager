@@ -672,3 +672,119 @@ func (v *GetDrainedShardsResponse) GetShardKeys() (o []string) {
 	}
 	return
 }
+
+type DrainedHost struct {
+	Hostname  string
+	DrainedAt time.Time
+	DrainedBy string
+	Reason    string
+}
+
+func (v *DrainedHost) GetHostname() (o string) {
+	if v != nil {
+		return v.Hostname
+	}
+	return
+}
+
+func (v *DrainedHost) GetDrainedAt() (o time.Time) {
+	if v != nil {
+		return v.DrainedAt
+	}
+	return
+}
+
+func (v *DrainedHost) GetDrainedBy() (o string) {
+	if v != nil {
+		return v.DrainedBy
+	}
+	return
+}
+
+func (v *DrainedHost) GetReason() (o string) {
+	if v != nil {
+		return v.Reason
+	}
+	return
+}
+
+type DrainHostsRequest struct {
+	Namespace string
+	Hosts     []*DrainedHost
+}
+
+func (v *DrainHostsRequest) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+func (v *DrainHostsRequest) GetHosts() (o []*DrainedHost) {
+	if v != nil {
+		return v.Hosts
+	}
+	return
+}
+
+type UndrainHostsRequest struct {
+	Namespace string
+	Hostnames []string
+}
+
+func (v *UndrainHostsRequest) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+func (v *UndrainHostsRequest) GetHostnames() (o []string) {
+	if v != nil {
+		return v.Hostnames
+	}
+	return
+}
+
+type UndrainHostsResponse struct {
+	// UndrainedHostnames is the subset of the request hostnames that were
+	// actually removed from the drained list by this call.
+	UndrainedHostnames []string
+}
+
+func (v *UndrainHostsResponse) GetUndrainedHostnames() (o []string) {
+	if v != nil {
+		return v.UndrainedHostnames
+	}
+	return
+}
+
+type GetDrainedHostsRequest struct {
+	Namespace string
+}
+
+func (v *GetDrainedHostsRequest) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+type GetDrainedHostsResponse struct {
+	Namespace string
+	Hosts     []*DrainedHost
+}
+
+func (v *GetDrainedHostsResponse) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+func (v *GetDrainedHostsResponse) GetHosts() (o []*DrainedHost) {
+	if v != nil {
+		return v.Hosts
+	}
+	return
+}

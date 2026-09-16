@@ -46,6 +46,9 @@ type Client interface {
 	DrainShards(context.Context, *types.DrainShardsRequest, ...yarpc.CallOption) error
 	UndrainShards(context.Context, *types.UndrainShardsRequest, ...yarpc.CallOption) (*types.UndrainShardsResponse, error)
 	GetDrainedShards(context.Context, *types.GetDrainedShardsRequest, ...yarpc.CallOption) (*types.GetDrainedShardsResponse, error)
+	DrainHosts(context.Context, *types.DrainHostsRequest, ...yarpc.CallOption) error
+	UndrainHosts(context.Context, *types.UndrainHostsRequest, ...yarpc.CallOption) (*types.UndrainHostsResponse, error)
+	GetDrainedHosts(context.Context, *types.GetDrainedHostsRequest, ...yarpc.CallOption) (*types.GetDrainedHostsResponse, error)
 	ForceResetNamespace(context.Context, *types.ForceResetNamespaceRequest, ...yarpc.CallOption) (*types.ForceResetNamespaceResponse, error)
 	ListNamespaces(context.Context, *types.ListNamespacesRequest, ...yarpc.CallOption) (*types.ListNamespacesResponse, error)
 }

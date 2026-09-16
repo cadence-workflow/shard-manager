@@ -412,6 +412,161 @@ func TestAccessControlledHandler_GetDrainedShards(t *testing.T) {
 	}
 }
 
+func TestAccessControlledHandler_DrainHosts(t *testing.T) {
+	tests := []struct {
+		name              string
+		authorizeResult   authorization.Result
+		authorizeErr      error
+		expectInnerCalled bool
+		expectErr         error
+	}{
+		{name: "allow -> inner called", authorizeResult: authorization.Result{Decision: authorization.DecisionAllow}, expectInnerCalled: true},
+		{name: "deny -> AccessDeniedError", authorizeResult: authorization.Result{Decision: authorization.DecisionDeny}, expectErr: errUnauthorized},
+		{name: "authorizer error -> propagated", authorizeErr: errAuthorizerBoom, expectErr: errAuthorizerBoom},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			inner := handler.NewMockHandler(ctrl)
+			authz := authorization.NewMockAuthorizer(ctrl)
+
+			req := &types.DrainHostsRequest{Namespace: testNamespace, Hosts: []*types.DrainedHost{{Hostname: "host-a"}}}
+
+			authz.EXPECT().
+				Authorize(gomock.Any(), &authorization.Attributes{
+					APIName:    "DrainHosts",
+					Namespace:  testNamespace,
+					Permission: authorization.PermissionAdmin,
+				}).
+				Return(tc.authorizeResult, tc.authorizeErr).
+				Times(1)
+
+			if tc.expectInnerCalled {
+				inner.EXPECT().
+					DrainHosts(gomock.Any(), req).
+					Return(nil).
+					Times(1)
+			}
+
+			err := NewHandler(inner, authz).DrainHosts(context.Background(), req)
+
+			if tc.expectErr != nil {
+				assert.ErrorIs(t, err, tc.expectErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestAccessControlledHandler_UndrainHosts(t *testing.T) {
+	tests := []struct {
+		name              string
+		authorizeResult   authorization.Result
+		authorizeErr      error
+		expectInnerCalled bool
+		expectErr         error
+	}{
+		{name: "allow -> inner called", authorizeResult: authorization.Result{Decision: authorization.DecisionAllow}, expectInnerCalled: true},
+		{name: "deny -> AccessDeniedError", authorizeResult: authorization.Result{Decision: authorization.DecisionDeny}, expectErr: errUnauthorized},
+		{name: "authorizer error -> propagated", authorizeErr: errAuthorizerBoom, expectErr: errAuthorizerBoom},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			inner := handler.NewMockHandler(ctrl)
+			authz := authorization.NewMockAuthorizer(ctrl)
+
+			req := &types.UndrainHostsRequest{Namespace: testNamespace, Hostnames: []string{"host-a"}}
+
+			authz.EXPECT().
+				Authorize(gomock.Any(), &authorization.Attributes{
+					APIName:    "UndrainHosts",
+					Namespace:  testNamespace,
+					Permission: authorization.PermissionAdmin,
+				}).
+				Return(tc.authorizeResult, tc.authorizeErr).
+				Times(1)
+
+			if tc.expectInnerCalled {
+				inner.EXPECT().
+					UndrainHosts(gomock.Any(), req).
+					Return(&types.UndrainHostsResponse{UndrainedHostnames: []string{"host-a"}}, nil).
+					Times(1)
+			}
+
+			resp, err := NewHandler(inner, authz).UndrainHosts(context.Background(), req)
+
+			if tc.expectErr != nil {
+				assert.Nil(t, resp)
+				assert.ErrorIs(t, err, tc.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			assert.Equal(t, []string{"host-a"}, resp.UndrainedHostnames)
+		})
+	}
+}
+
+func TestAccessControlledHandler_GetDrainedHosts(t *testing.T) {
+	tests := []struct {
+		name              string
+		authorizeResult   authorization.Result
+		authorizeErr      error
+		expectInnerCalled bool
+		expectErr         error
+	}{
+		{name: "allow -> inner called", authorizeResult: authorization.Result{Decision: authorization.DecisionAllow}, expectInnerCalled: true},
+		{name: "deny -> AccessDeniedError", authorizeResult: authorization.Result{Decision: authorization.DecisionDeny}, expectErr: errUnauthorized},
+		{name: "authorizer error -> propagated", authorizeErr: errAuthorizerBoom, expectErr: errAuthorizerBoom},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			inner := handler.NewMockHandler(ctrl)
+			authz := authorization.NewMockAuthorizer(ctrl)
+
+			req := &types.GetDrainedHostsRequest{Namespace: testNamespace}
+
+			authz.EXPECT().
+				Authorize(gomock.Any(), &authorization.Attributes{
+					APIName:    "GetDrainedHosts",
+					Namespace:  testNamespace,
+					Permission: authorization.PermissionRead,
+				}).
+				Return(tc.authorizeResult, tc.authorizeErr).
+				Times(1)
+
+			if tc.expectInnerCalled {
+				inner.EXPECT().
+					GetDrainedHosts(gomock.Any(), req).
+					Return(&types.GetDrainedHostsResponse{
+						Namespace: testNamespace,
+						Hosts:     []*types.DrainedHost{{Hostname: "host-a"}},
+					}, nil).
+					Times(1)
+			}
+
+			resp, err := NewHandler(inner, authz).GetDrainedHosts(context.Background(), req)
+
+			if tc.expectErr != nil {
+				assert.Nil(t, resp)
+				assert.ErrorIs(t, err, tc.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			assert.Equal(t, testNamespace, resp.Namespace)
+			require.Len(t, resp.Hosts, 1)
+			assert.Equal(t, "host-a", resp.Hosts[0].Hostname)
+		})
+	}
+}
+
 func TestAccessControlledHandler_ListNamespaces(t *testing.T) {
 	tests := []struct {
 		name              string

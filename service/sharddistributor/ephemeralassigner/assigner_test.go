@@ -68,20 +68,21 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			shardKeys: []string{"NON-EXISTING-SHARD"},
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{
+							"owner1": {AssignedShards: map[string]*types.ShardAssignment{
+								"shard1": {Status: types.AssignmentStatusREADY},
+								"shard2": {Status: types.AssignmentStatusREADY},
+							}},
+							"owner2": {AssignedShards: map[string]*types.ShardAssignment{
+								"shard3": {Status: types.AssignmentStatusREADY},
+							}},
+						},
+					},
 					Executors: map[string]store.HeartbeatState{
 						"owner1": {Status: types.ExecutorStatusACTIVE},
 						"owner2": {Status: types.ExecutorStatusACTIVE},
-					},
-					ShardAssignments: map[string]store.AssignedState{
-						"owner1": {AssignedShards: map[string]*types.ShardAssignment{
-							"shard1": {Status: types.AssignmentStatusREADY},
-							"shard2": {Status: types.AssignmentStatusREADY},
-						}},
-						"owner2": {AssignedShards: map[string]*types.ShardAssignment{
-							"shard3": {Status: types.AssignmentStatusREADY},
-						}},
-					},
-				}, nil)
+					}}, nil)
 				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Do(
 					func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) {
 						require.Equal(t, map[string]struct{}{"owner2": {}}, request.ChangedExecutors)
@@ -115,16 +116,18 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				gomock.InOrder(
 					mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-						Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-						ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-					}, nil),
+						AssignmentState: store.AssignmentState{
+							ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+						},
+						Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}}}, nil),
 					mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(store.ErrVersionConflict),
 					mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-						Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-						ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{
-							"CONCURRENT-SHARD": {Status: types.AssignmentStatusREADY},
-						}}},
-					}, nil),
+						AssignmentState: store.AssignmentState{
+							ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{
+								"CONCURRENT-SHARD": {Status: types.AssignmentStatusREADY},
+							}}},
+						},
+						Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}}}, nil),
 					mockCache.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
 						ExecutorID: "owner1",
 						Metadata:   map[string]string{"ip": "127.0.0.1", "port": "1234"},
@@ -138,9 +141,10 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			shardKeys: []string{"NON-EXISTING-SHARD"},
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-					Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-					ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-				}, nil)
+					AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+					},
+					Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}}}, nil)
 				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(errors.New("assign shards failure"))
 			},
 			expectedError:  true,
@@ -165,16 +169,17 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			shardKeys: []string{"shard1"},
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{
+							"owner2": {AssignedShards: map[string]*types.ShardAssignment{
+								"shard1": {Status: types.AssignmentStatusREADY},
+							}},
+						},
+					},
 					Executors: map[string]store.HeartbeatState{
 						"owner1": {Status: types.ExecutorStatusACTIVE},
 						"owner2": {Status: types.ExecutorStatusACTIVE},
-					},
-					ShardAssignments: map[string]store.AssignedState{
-						"owner2": {AssignedShards: map[string]*types.ShardAssignment{
-							"shard1": {Status: types.AssignmentStatusREADY},
-						}},
-					},
-				}, nil)
+					}}, nil)
 				// No AssignShards expectation: re-assigning an already-owned shard
 				// would be the duplicate-ownership bug.
 				mockCache.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner2").Return(&store.ShardOwner{
@@ -192,16 +197,17 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			shardKeys: []string{"shard1", "shard1", "shard1"},
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{
+							"owner1": {AssignedShards: map[string]*types.ShardAssignment{
+								"shard1": {Status: types.AssignmentStatusREADY},
+							}},
+						},
+					},
 					Executors: map[string]store.HeartbeatState{
 						"owner1": {Status: types.ExecutorStatusACTIVE},
 						"owner2": {Status: types.ExecutorStatusACTIVE},
-					},
-					ShardAssignments: map[string]store.AssignedState{
-						"owner1": {AssignedShards: map[string]*types.ShardAssignment{
-							"shard1": {Status: types.AssignmentStatusREADY},
-						}},
-					},
-				}, nil)
+					}}, nil)
 				// GetExecutor is expected exactly once even though the key repeats,
 				// because metadata is fetched per unique executor, not per shard key.
 				mockCache.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
@@ -220,16 +226,17 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			shardKeys: []string{"shard1"},
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{
+							"draining-owner": {AssignedShards: map[string]*types.ShardAssignment{
+								"shard1": {Status: types.AssignmentStatusREADY},
+							}},
+						},
+					},
 					Executors: map[string]store.HeartbeatState{
 						"draining-owner": {Status: types.ExecutorStatusDRAINING},
 						"live-executor":  {Status: types.ExecutorStatusACTIVE},
-					},
-					ShardAssignments: map[string]store.AssignedState{
-						"draining-owner": {AssignedShards: map[string]*types.ShardAssignment{
-							"shard1": {Status: types.AssignmentStatusREADY},
-						}},
-					},
-				}, nil)
+					}}, nil)
 				// No AssignShards expectation: the owned shard must not be re-placed.
 				mockCache.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "draining-owner").Return(&store.ShardOwner{
 					ExecutorID: "draining-owner",
@@ -245,14 +252,15 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			shardKeys: []string{"drained-shard", "new-shard"},
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{
+							"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
+						},
+						DrainedShards: map[string]struct{}{"drained-shard": {}},
+					},
 					Executors: map[string]store.HeartbeatState{
 						"owner1": {Status: types.ExecutorStatusACTIVE},
-					},
-					ShardAssignments: map[string]store.AssignedState{
-						"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
-					},
-					DrainedShards: map[string]struct{}{"drained-shard": {}},
-				}, nil)
+					}}, nil)
 				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(nil)
 				mockCache.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
 					ExecutorID: "owner1",
@@ -269,16 +277,17 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			shardKeys: []string{"shard1"},
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{
+							"owner1": {AssignedShards: map[string]*types.ShardAssignment{
+								"shard1": {Status: types.AssignmentStatusREADY},
+							}},
+						},
+						DrainedShards: map[string]struct{}{"shard1": {}},
+					},
 					Executors: map[string]store.HeartbeatState{
 						"owner1": {Status: types.ExecutorStatusACTIVE},
-					},
-					ShardAssignments: map[string]store.AssignedState{
-						"owner1": {AssignedShards: map[string]*types.ShardAssignment{
-							"shard1": {Status: types.AssignmentStatusREADY},
-						}},
-					},
-					DrainedShards: map[string]struct{}{"shard1": {}},
-				}, nil)
+					}}, nil)
 				// No AssignShards or GetExecutor: nothing to place, no owner to report.
 			},
 			expectedDrained: []string{"shard1"},
@@ -288,14 +297,15 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			shardKeys: []string{"drained-shard"},
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
+					AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{
+							"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
+						},
+						DrainedShards: map[string]struct{}{"drained-shard": {}},
+					},
 					Executors: map[string]store.HeartbeatState{
 						"owner1": {Status: types.ExecutorStatusACTIVE},
-					},
-					ShardAssignments: map[string]store.AssignedState{
-						"owner1": {AssignedShards: map[string]*types.ShardAssignment{}},
-					},
-					DrainedShards: map[string]struct{}{"drained-shard": {}},
-				}, nil)
+					}}, nil)
 			},
 			expectedDrained: []string{"drained-shard"},
 		},
@@ -352,9 +362,10 @@ func TestAssignEphemeralBatch_InvalidLoadBalancingMode(t *testing.T) {
 	}
 
 	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-		Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-		ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-	}, nil)
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+		},
+		Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}}}, nil)
 
 	results, drained, err := a.assignEphemeralBatch(context.Background(), _testNamespaceEphemeral, []string{"new-shard-1"})
 	require.Error(t, err)
@@ -380,9 +391,10 @@ func TestAssignEphemeralBatch_RetriesWholeBatch(t *testing.T) {
 	shardKeys := []string{"shard-1", "shard-2", "shard-3"}
 	newState := func() *store.NamespaceState {
 		return &store.NamespaceState{
-			Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-			ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-		}
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+			},
+			Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}}}
 	}
 	assertWholeBatch := func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) {
 		require.Equal(t, map[string]struct{}{"owner1": {}}, request.ChangedExecutors)
@@ -433,9 +445,10 @@ func TestAssignEphemeralBatch_ExhaustsConflictRetries(t *testing.T) {
 
 	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).DoAndReturn(func(context.Context, string) (*store.NamespaceState, error) {
 		return &store.NamespaceState{
-			Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-			ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-		}, nil
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+			},
+			Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}}}, nil
 	}).Times(versionConflictRetryMaxAttempts + 1)
 	mockStorage.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(store.ErrVersionConflict).Times(versionConflictRetryMaxAttempts + 1)
 
@@ -461,10 +474,11 @@ func TestGetOrAssign_DrainedDuringBatchFlushReturnsShardDrainedError(t *testing.
 	defer a.Stop()
 
 	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-		Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-		ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-		DrainedShards:    map[string]struct{}{"shard-1": {}},
-	}, nil)
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+			DrainedShards:    map[string]struct{}{"shard-1": {}},
+		},
+		Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}}}, nil)
 
 	resp, err := a.GetOrAssign(context.Background(), &types.GetShardOwnerRequest{
 		Namespace: _testNamespaceEphemeral,

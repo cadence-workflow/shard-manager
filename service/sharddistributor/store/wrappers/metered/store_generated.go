@@ -99,6 +99,16 @@ func (c *meteredStore) DrainShards(ctx context.Context, namespace string, shardI
 	return
 }
 
+func (c *meteredStore) GetAssignmentState(ctx context.Context, namespace string) (ap1 *store.AssignmentState, err error) {
+	op := func() error {
+		ap1, err = c.wrapped.GetAssignmentState(ctx, namespace)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreGetAssignmentStateScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
 func (c *meteredStore) GetDrainedHosts(ctx context.Context, namespace string) (da1 []store.DrainedHost, err error) {
 	op := func() error {
 		da1, err = c.wrapped.GetDrainedHosts(ctx, namespace)

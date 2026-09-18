@@ -28,7 +28,7 @@ func TestShardExecutorCacheForwarding(t *testing.T) {
 		SubscribeToNamespaceChanges(namespace).
 		Return((<-chan struct{})(make(chan struct{})), nil)
 	executorStore.EXPECT().
-		GetState(gomock.Any(), namespace).
+		GetAssignmentState(gomock.Any(), namespace).
 		Return(namespaceState(1, map[string]testExecutor{
 			"executor-1": {shards: []string{"shard-1"}, metadata: metadata},
 		}), nil)

@@ -194,21 +194,21 @@ func (n *namespaceShardToExecutor) GetShardAssignments() store.AssignmentSnapsho
 // refreshNamespaceState reads every keyspace the cache tracks in one store call, so both
 // the executor state and the drained set advance together under a single store revision.
 func (n *namespaceShardToExecutor) refreshNamespaceState(ctx context.Context) (bool, error) {
-	state, err := n.executorStore.GetState(ctx, n.namespace)
+	state, err := n.executorStore.GetAssignmentState(ctx, n.namespace)
 	if err != nil {
-		return false, fmt.Errorf("get state for namespace %s: %w", n.namespace, err)
+		return false, fmt.Errorf("get assignment state for namespace %s: %w", n.namespace, err)
 	}
 
 	return n.applyNamespaceState(state), nil
 }
 
-func (n *namespaceShardToExecutor) applyNamespaceState(state *store.NamespaceState) bool {
+func (n *namespaceShardToExecutor) applyNamespaceState(state *store.AssignmentState) bool {
 	shardToExecutor := make(map[string]*store.ShardOwner)
 	executorState := make(map[*store.ShardOwner][]string)
 	executorRevision := make(map[string]int64)
 	shardOwners := make(map[string]*store.ShardOwner)
 
-	for executorID, executor := range state.Executors {
+	for executorID, executorMetadata := range state.ExecutorMetadata {
 		shardOwner := getOrCreateShardOwner(shardOwners, executorID)
 
 		if assigned, ok := state.ShardAssignments[executorID]; ok {
@@ -221,7 +221,7 @@ func (n *namespaceShardToExecutor) applyNamespaceState(state *store.NamespaceSta
 			executorRevision[executorID] = assigned.ModRevision
 		}
 
-		maps.Copy(shardOwner.Metadata, executor.Metadata)
+		maps.Copy(shardOwner.Metadata, executorMetadata)
 	}
 
 	return n.replaceNamespaceState(state.Revision, shardToExecutor, executorState, executorRevision, shardOwners, state.DrainedShards)

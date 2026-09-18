@@ -35,12 +35,12 @@ func TestNamespaceShardToExecutor_SignalAppliesStateAndNotifies(t *testing.T) {
 	}}
 
 	firstRead := tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
+		GetAssignmentState(gomock.Any(), tc.namespace).
 		Return(namespaceState(1, map[string]testExecutor{"executor-1": executor1}), nil).
 		Times(1)
 
 	tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
+		GetAssignmentState(gomock.Any(), tc.namespace).
 		Return(namespaceState(2, map[string]testExecutor{"executor-1": executor1, "executor-2": executor2}), nil).
 		After(firstRead).
 		AnyTimes()
@@ -181,12 +181,12 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_refreshesDrainedShards(t 
 	drainedState.DrainedShards = map[string]struct{}{shardID: {}}
 
 	drainedGet := tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
+		GetAssignmentState(gomock.Any(), tc.namespace).
 		Return(drainedState, nil).
 		Times(1)
 
 	tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
+		GetAssignmentState(gomock.Any(), tc.namespace).
 		Return(tc.state(6, nil), nil).
 		After(drainedGet).
 		Times(1)
@@ -223,7 +223,7 @@ func TestNamespaceShardToExecutor_IsShardDrained_loadsOnceWhenNothingIsDrained(t
 	defer close(tc.stopCh)
 
 	tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
+		GetAssignmentState(gomock.Any(), tc.namespace).
 		Return(tc.state(7, nil), nil).
 		Times(1)
 
@@ -339,7 +339,7 @@ func setupNamespaceShardToExecutorTestCase(t *testing.T) *namespaceShardToExecut
 }
 
 // state builds a namespace snapshot holding the test case's executor with shard-1 assigned.
-func (tc *namespaceShardToExecutorTestCase) state(revision int64, metadata map[string]string) *store.NamespaceState {
+func (tc *namespaceShardToExecutorTestCase) state(revision int64, metadata map[string]string) *store.AssignmentState {
 	return namespaceState(revision, map[string]testExecutor{
 		tc.executorID: {shards: []string{"shard-1"}, metadata: metadata},
 	})
@@ -350,10 +350,10 @@ type testExecutor struct {
 	metadata map[string]string
 }
 
-func namespaceState(revision int64, executors map[string]testExecutor) *store.NamespaceState {
-	state := &store.NamespaceState{
+func namespaceState(revision int64, executors map[string]testExecutor) *store.AssignmentState {
+	state := &store.AssignmentState{
 		Revision:         revision,
-		Executors:        make(map[string]store.HeartbeatState, len(executors)),
+		ExecutorMetadata: make(map[string]map[string]string, len(executors)),
 		ShardAssignments: make(map[string]store.AssignedState, len(executors)),
 	}
 	for executorID, executor := range executors {
@@ -361,8 +361,11 @@ func namespaceState(revision int64, executors map[string]testExecutor) *store.Na
 		for _, shardID := range executor.shards {
 			assigned[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
 		}
-		state.Executors[executorID] = store.HeartbeatState{Status: types.ExecutorStatusACTIVE, Metadata: executor.metadata}
-		state.ShardAssignments[executorID] = store.AssignedState{AssignedShards: assigned, ModRevision: revision}
+		state.ExecutorMetadata[executorID] = executor.metadata
+		state.ShardAssignments[executorID] = store.AssignedState{
+			AssignedShards: assigned,
+			ModRevision:    revision,
+		}
 	}
 	return state
 }
@@ -391,8 +394,8 @@ func requireExecutorCached(t *testing.T, e *namespaceShardToExecutor, executorID
 func gatedGetState(tc *namespaceShardToExecutorTestCase, release <-chan struct{}) *atomic.Int32 {
 	calls := &atomic.Int32{}
 	tc.store.EXPECT().
-		GetState(gomock.Any(), tc.namespace).
-		DoAndReturn(func(ctx context.Context, _ string) (*store.NamespaceState, error) {
+		GetAssignmentState(gomock.Any(), tc.namespace).
+		DoAndReturn(func(ctx context.Context, _ string) (*store.AssignmentState, error) {
 			calls.Add(1)
 			select {
 			case <-release:

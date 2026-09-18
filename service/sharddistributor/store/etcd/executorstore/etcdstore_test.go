@@ -103,7 +103,7 @@ func TestRecordHeartbeat(t *testing.T) {
 	assert.Equal(t, "value-2", string(resp.Kvs[0].Value))
 }
 
-func TestRecordHeartbeat_PersistsHostIdentity(t *testing.T) {
+func TestRecordHeartbeat_PersistsHostMetadata(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)
 
@@ -111,38 +111,29 @@ func TestRecordHeartbeat_PersistsHostIdentity(t *testing.T) {
 	defer cancel()
 
 	now := time.Now().UTC()
-	executorID := "executor-host-identity"
+	executorID := "executor-host-metadata"
 	req := store.HeartbeatState{
 		LastHeartbeat: now,
 		Status:        types.ExecutorStatusACTIVE,
-		HostID:        "host-id",
 		HostMetadata:  &types.HostMetadata{HostName: "host-name"},
 	}
 
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, req))
 
-	hostIDKey := etcdkeys.BuildExecutorKey(tc.EtcdPrefix, tc.Namespace, executorID, etcdkeys.ExecutorHostIDKey)
-	resp, err := tc.Client.Get(ctx, hostIDKey)
-	require.NoError(t, err)
-	require.Equal(t, int64(1), resp.Count)
-	assert.Equal(t, "host-id", string(resp.Kvs[0].Value))
-
 	hostMetadataKey := etcdkeys.BuildExecutorKey(tc.EtcdPrefix, tc.Namespace, executorID, etcdkeys.ExecutorHostMetadataKey)
-	resp, err = tc.Client.Get(ctx, hostMetadataKey)
+	resp, err := tc.Client.Get(ctx, hostMetadataKey)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), resp.Count)
 	assert.JSONEq(t, `{"host_name":"host-name"}`, string(resp.Kvs[0].Value))
 
 	executorState, err := executorStore.GetExecutorState(ctx, tc.Namespace, executorID)
 	require.NoError(t, err)
-	assert.Equal(t, "host-id", executorState.Heartbeat.HostID)
 	require.NotNil(t, executorState.Heartbeat.HostMetadata)
 	assert.Equal(t, "host-name", executorState.Heartbeat.HostMetadata.HostName)
 
 	state, err := executorStore.GetState(ctx, tc.Namespace)
 	require.NoError(t, err)
 	got := state.Executors[executorID]
-	assert.Equal(t, "host-id", got.HostID)
 	require.NotNil(t, got.HostMetadata)
 	assert.Equal(t, "host-name", got.HostMetadata.HostName)
 }

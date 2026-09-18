@@ -12,7 +12,6 @@ type HeartbeatState struct {
 	Status         types.ExecutorStatus
 	ReportedShards map[string]*types.ShardStatusReport
 	Metadata       map[string]string
-	HostID         string
 	HostMetadata   *types.HostMetadata
 }
 

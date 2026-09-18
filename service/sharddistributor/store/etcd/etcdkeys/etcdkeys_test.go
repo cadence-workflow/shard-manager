@@ -224,15 +224,9 @@ func TestValidateHostname(t *testing.T) {
 	}
 }
 
-func TestParseExecutorKey_HostIdentity(t *testing.T) {
-	hostIDKey := BuildExecutorKey("/cadence", "test-ns", "exec-1", ExecutorHostIDKey)
-	executorID, keyType, err := ParseExecutorKey("/cadence", "test-ns", hostIDKey)
-	assert.NoError(t, err)
-	assert.Equal(t, "exec-1", executorID)
-	assert.Equal(t, ExecutorHostIDKey, keyType)
-
+func TestParseExecutorKey_HostMetadata(t *testing.T) {
 	hostMetadataKey := BuildExecutorKey("/cadence", "test-ns", "exec-1", ExecutorHostMetadataKey)
-	executorID, keyType, err = ParseExecutorKey("/cadence", "test-ns", hostMetadataKey)
+	executorID, keyType, err := ParseExecutorKey("/cadence", "test-ns", hostMetadataKey)
 	assert.NoError(t, err)
 	assert.Equal(t, "exec-1", executorID)
 	assert.Equal(t, ExecutorHostMetadataKey, keyType)

@@ -37,7 +37,6 @@ message HeartbeatRequest {
   ExecutorStatus status = 3;
   map<string, ShardStatusReport> shard_status_reports = 4;
   map<string, string> metadata = 5;
-  string host_id = 6;
   HostMetadata host_metadata = 7;
 }
 

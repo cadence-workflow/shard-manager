@@ -202,7 +202,7 @@ func TestHeartbeat(t *testing.T) {
 		require.Contains(t, err.Error(), "invalid metadata: metadata has 33 keys, which exceeds the maximum of 32")
 	})
 
-	t.Run("RecordsHostIdentity", func(t *testing.T) {
+	t.Run("RecordsHostMetadata", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		mockStore := store.NewMockStore(ctrl)
 		mockTimeSource := clock.NewMockedTimeSourceAt(now)
@@ -212,7 +212,6 @@ func TestHeartbeat(t *testing.T) {
 			Namespace:  namespace,
 			ExecutorID: executorID,
 			Status:     types.ExecutorStatusACTIVE,
-			HostID:     "host-id",
 			HostMetadata: &types.HostMetadata{
 				HostName: "host-name",
 			},
@@ -222,7 +221,6 @@ func TestHeartbeat(t *testing.T) {
 		mockStore.EXPECT().RecordHeartbeat(gomock.Any(), namespace, executorID, store.HeartbeatState{
 			LastHeartbeat: now,
 			Status:        types.ExecutorStatusACTIVE,
-			HostID:        "host-id",
 			HostMetadata:  &types.HostMetadata{HostName: "host-name"},
 		})
 

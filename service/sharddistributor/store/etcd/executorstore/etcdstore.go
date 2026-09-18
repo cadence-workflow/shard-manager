@@ -133,10 +133,6 @@ func (s *executorStoreImpl) RecordHeartbeat(ctx context.Context, namespace, exec
 		metadataKey := etcdkeys.BuildMetadataKey(s.prefix, namespace, executorID, key)
 		ops = append(ops, clientv3.OpPut(metadataKey, value))
 	}
-	if request.HostID != "" {
-		hostIDKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorHostIDKey)
-		ops = append(ops, clientv3.OpPut(hostIDKey, request.HostID))
-	}
 	if request.HostMetadata != nil {
 		hostMetadataData, err := json.Marshal(request.HostMetadata)
 		if err != nil {
@@ -235,7 +231,6 @@ func heartbeatFromParsed(executorData *etcdtypes.ParsedExecutorData) store.Heart
 		Status:         executorData.Status,
 		ReportedShards: executorData.ReportedShards,
 		Metadata:       executorData.Metadata,
-		HostID:         executorData.HostID,
 		HostMetadata:   executorData.HostMetadata,
 	}
 }

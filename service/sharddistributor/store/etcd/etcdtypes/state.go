@@ -132,6 +132,5 @@ type ParsedExecutorData struct {
 	AssignedState  *AssignedState
 	Metadata       map[string]string
 	Statistics     map[string]ShardStatistics
-	HostID         string
 	HostMetadata   *types.HostMetadata
 }

@@ -165,7 +165,7 @@ func TestSanitizeHostname(t *testing.T) {
 	}
 }
 
-func TestNewExecutor_HeartbeatHostIdentity(t *testing.T) {
+func TestNewExecutor_HeartbeatHostMetadata(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	var got *types.ExecutorHeartbeatRequest
@@ -199,11 +199,10 @@ func TestNewExecutor_HeartbeatHostIdentity(t *testing.T) {
 
 	require.NotNil(t, got)
 	require.NotNil(t, got.HostMetadata)
-	assert.NotEmpty(t, got.HostID)
-	assert.Equal(t, got.HostID, got.HostMetadata.HostName)
-	assert.True(t, strings.HasPrefix(got.ExecutorID, got.HostID+"@"))
-	assert.NotContains(t, got.HostID, "/")
-	assert.LessOrEqual(t, len(got.HostID), maxHostnameLength)
+	assert.NotEmpty(t, got.HostMetadata.HostName)
+	assert.True(t, strings.HasPrefix(got.ExecutorID, got.HostMetadata.HostName+"@"))
+	assert.NotContains(t, got.HostMetadata.HostName, "/")
+	assert.LessOrEqual(t, len(got.HostMetadata.HostName), maxHostnameLength)
 }
 
 // Create distinct mock processor types for testing multiple namespaces

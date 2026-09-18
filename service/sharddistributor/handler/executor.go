@@ -62,7 +62,6 @@ func (h *executor) Heartbeat(ctx context.Context, request *types.ExecutorHeartbe
 		Status:         request.Status,
 		ReportedShards: request.ShardStatusReports,
 		Metadata:       request.GetMetadata(),
-		HostID:         request.GetHostID(),
 		HostMetadata:   request.GetHostMetadata(),
 	}
 

@@ -36,7 +36,6 @@ type Manager struct {
 	client      sharddistributorexecutor.Client
 	namespace   string
 	executorID  string
-	hostID      string
 	hostName    string
 	state       StateProvider
 	hostMetrics tally.Scope
@@ -51,7 +50,6 @@ func NewManager(
 	client sharddistributorexecutor.Client,
 	namespace string,
 	executorID string,
-	hostID string,
 	hostName string,
 	state StateProvider,
 	hostMetrics tally.Scope,
@@ -61,7 +59,6 @@ func NewManager(
 		client:                 client,
 		namespace:              namespace,
 		executorID:             executorID,
-		hostID:                 hostID,
 		hostName:               hostName,
 		state:                  state,
 		hostMetrics:            hostMetrics,
@@ -132,7 +129,6 @@ func (m *Manager) sendRPC(ctx context.Context, status types.ExecutorStatus) (map
 		Status:             status,
 		ShardStatusReports: reports,
 		Metadata:           m.state.GetMetadata(),
-		HostID:             m.hostID,
 	}
 	if m.hostName != "" {
 		request.HostMetadata = &types.HostMetadata{HostName: m.hostName}

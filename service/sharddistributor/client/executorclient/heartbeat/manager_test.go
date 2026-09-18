@@ -37,7 +37,6 @@ func newTestManager(t *testing.T, handler func(ctx context.Context, req *types.E
 		mockClient,
 		"test-namespace",
 		"test-executor",
-		"test-hostID",
 		"test-hostname",
 		mockState,
 		tally.NoopScope,
@@ -160,7 +159,7 @@ func TestManager_DrainingHeartbeat(t *testing.T) {
 	assert.Equal(t, types.ExecutorStatusDRAINING, gotStatus)
 }
 
-func TestManager_SendsHostIdentity(t *testing.T) {
+func TestManager_SendsHostMetadata(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	var got *types.ExecutorHeartbeatRequest
@@ -180,7 +179,6 @@ func TestManager_SendsHostIdentity(t *testing.T) {
 		mockClient,
 		"test-namespace",
 		"test-executor",
-		"host-id",
 		"host-name",
 		mockState,
 		tally.NoopScope,
@@ -190,7 +188,6 @@ func TestManager_SendsHostIdentity(t *testing.T) {
 	_, err := m.Heartbeat(context.Background(), "")
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.Equal(t, "host-id", got.HostID)
 	require.NotNil(t, got.HostMetadata)
 	assert.Equal(t, "host-name", got.HostMetadata.HostName)
 }

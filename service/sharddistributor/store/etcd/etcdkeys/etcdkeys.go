@@ -35,7 +35,6 @@ const (
 	ExecutorAssignedStateKey   ExecutorKeyType = "assigned_state"
 	ExecutorMetadataKey        ExecutorKeyType = "metadata"
 	ExecutorShardStatisticsKey ExecutorKeyType = "statistics"
-	ExecutorHostIDKey          ExecutorKeyType = "host_id"
 	ExecutorHostMetadataKey    ExecutorKeyType = "host_metadata"
 )
 
@@ -47,7 +46,6 @@ var validExecutorKeyTypes = map[ExecutorKeyType]struct{}{
 	ExecutorAssignedStateKey:   {},
 	ExecutorMetadataKey:        {},
 	ExecutorShardStatisticsKey: {},
-	ExecutorHostIDKey:          {},
 	ExecutorHostMetadataKey:    {},
 }
 

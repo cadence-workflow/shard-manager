@@ -2,64 +2,119 @@ package shardcache
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/testhelper"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
-func TestNewShardToExecutorCache(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	logger := testlogger.New(t)
-
-	client := etcdclient.NewMockClient(ctrl)
-	cache := NewShardToExecutorCache("some-prefix", client, logger, clock.NewRealTimeSource(), metrics.NewNoopMetricsClient())
-
-	assert.NotNil(t, cache)
-
-	assert.NotNil(t, cache.namespaceToShards)
-	assert.NotNil(t, cache.stopC)
-
-	assert.Equal(t, logger, cache.logger)
-	assert.Equal(t, "some-prefix", cache.prefix)
-	assert.Equal(t, client, cache.client)
-}
-
 func TestShardExecutorCacheForwarding(t *testing.T) {
-	testCluster := testhelper.SetupStoreTestCluster(t)
-	logger := testlogger.New(t)
-
-	// Setup: Create executor-1 with shard-1 and metadata
-	setupExecutorWithShards(t, testCluster, "executor-1", []string{"shard-1"}, map[string]string{
+	const namespace = "test-namespace"
+	metadata := map[string]string{
 		"datacenter": "dc1",
 		"rack":       "rack-42",
-	})
+	}
 
-	cache := NewShardToExecutorCache(testCluster.EtcdPrefix, testCluster.Client, logger, clock.NewRealTimeSource(), metrics.NewNoopMetricsClient())
-	cache.Start()
+	executorStore := store.NewMockStore(gomock.NewController(t))
+	executorStore.EXPECT().
+		SubscribeToNamespaceChanges(namespace).
+		Return((<-chan struct{})(make(chan struct{})), nil)
+	executorStore.EXPECT().
+		GetAssignmentState(gomock.Any(), namespace).
+		Return(namespaceState(1, map[string]testExecutor{
+			"executor-1": {shards: []string{"shard-1"}, metadata: metadata},
+		}), nil)
+
+	cache := NewShardCache(ShardCacheParams{
+		ExecutorStore: executorStore,
+		Lifecycle:     fxtest.NewLifecycle(t),
+		Logger:        testlogger.New(t),
+		TimeSource:    clock.NewRealTimeSource(),
+		MetricsClient: metrics.NewNoopMetricsClient(),
+	}).(*ShardToExecutorCache)
 	defer cache.Stop()
 
-	// This will read the namespace from the store as the cache is empty
-	owner, err := cache.GetShardOwner(context.Background(), testCluster.Namespace, "shard-1")
-	assert.NoError(t, err)
+	// The namespace is created on first use, and read through as the cache is empty
+	owner, err := cache.GetShardOwner(context.Background(), namespace, "shard-1")
+	require.NoError(t, err)
 	assert.Equal(t, "executor-1", owner.ExecutorID)
-	assert.Equal(t, "dc1", owner.Metadata["datacenter"])
-	assert.Equal(t, "rack-42", owner.Metadata["rack"])
+	assert.Equal(t, metadata, owner.Metadata)
 
 	// Check the cache is populated
-	assert.Greater(t, cache.namespaceToShards[testCluster.Namespace].executorRevision["executor-1"], int64(0))
-	assert.Equal(t, "executor-1", cache.namespaceToShards[testCluster.Namespace].shardToExecutor["shard-1"].ExecutorID)
+	assert.Equal(t, int64(1), cache.namespaceToShards[namespace].executorRevision["executor-1"])
+	assert.Equal(t, "executor-1", cache.namespaceToShards[namespace].shardToExecutor["shard-1"].ExecutorID)
 
 	// Check the executor is also cached
-	executor, err := cache.GetExecutor(context.Background(), testCluster.Namespace, "executor-1")
-	assert.NoError(t, err)
+	executor, err := cache.GetExecutor(context.Background(), namespace, "executor-1")
+	require.NoError(t, err)
 	assert.Equal(t, "executor-1", executor.ExecutorID)
-	assert.Equal(t, "dc1", executor.Metadata["datacenter"])
-	assert.Equal(t, "rack-42", executor.Metadata["rack"])
+	assert.Equal(t, metadata, executor.Metadata)
+
+	assignments, err := cache.GetShardAssignments(namespace)
+	require.NoError(t, err)
+	assert.Equal(t, map[*store.ShardOwner][]string{executor: {"shard-1"}}, assignments.ExecutorToShards)
+
+	notifyCh, unsubscribe, err := cache.Subscribe(namespace)
+	require.NoError(t, err)
+	require.NotNil(t, notifyCh)
+	unsubscribe()
+}
+
+// A namespace that cannot be started must surface the failure on every entry point
+// rather than serving an empty cache as if the namespace were simply unknown.
+func TestShardCacheNamespaceStartFailure(t *testing.T) {
+	const namespace = "test-namespace"
+
+	executorStore := store.NewMockStore(gomock.NewController(t))
+	// A failed start is not cached, so every entry point subscribes again.
+	executorStore.EXPECT().
+		SubscribeToNamespaceChanges(namespace).
+		Return(nil, errors.New("subscribe failed")).
+		AnyTimes()
+
+	cache := NewShardCache(ShardCacheParams{
+		ExecutorStore: executorStore,
+		Lifecycle:     fxtest.NewLifecycle(t),
+		Logger:        testlogger.New(t),
+		TimeSource:    clock.NewRealTimeSource(),
+		MetricsClient: metrics.NewNoopMetricsClient(),
+	}).(*ShardToExecutorCache)
+	defer cache.Stop()
+
+	tests := map[string]func() error{
+		"GetShardOwner": func() error {
+			_, err := cache.GetShardOwner(context.Background(), namespace, "shard-1")
+			return err
+		},
+		"IsShardDrained": func() error {
+			_, err := cache.IsShardDrained(context.Background(), namespace, "shard-1")
+			return err
+		},
+		"GetExecutor": func() error {
+			_, err := cache.GetExecutor(context.Background(), namespace, "executor-1")
+			return err
+		},
+		"GetShardAssignments": func() error {
+			_, err := cache.GetShardAssignments(namespace)
+			return err
+		},
+		"Subscribe": func() error {
+			_, _, err := cache.Subscribe(namespace)
+			return err
+		},
+	}
+
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.ErrorContains(t, call(), "subscribe failed")
+		})
+	}
 }

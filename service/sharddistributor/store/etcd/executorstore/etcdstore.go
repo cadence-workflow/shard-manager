@@ -1,7 +1,5 @@
 package executorstore
 
-//go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination=executorstore_mock.go ExecutorStore
-
 import (
 	"context"
 	"encoding/json"
@@ -13,7 +11,6 @@ import (
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.uber.org/fx"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
@@ -25,7 +22,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/common"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/shardcache"
 )
 
 const (
@@ -37,62 +33,34 @@ type executorStoreImpl struct {
 	client        etcdclient.Client
 	prefix        string
 	logger        log.Logger
-	shardCache    *shardcache.ShardToExecutorCache
 	timeSource    clock.TimeSource
 	recordWriter  *common.RecordWriter
 	cfg           *config.Config
 	metricsClient metrics.Client
 }
 
-// ExecutorStoreParams defines the dependencies for the etcd store, for use with fx.
-type ExecutorStoreParams struct {
-	fx.In
-
-	Client        etcdclient.Client `name:"executorstore"`
-	ETCDConfig    etcdclient.ExecutorStoreConfig
-	Lifecycle     fx.Lifecycle
-	Logger        log.Logger
-	TimeSource    clock.TimeSource
-	Config        *config.Config
-	MetricsClient metrics.Client
-}
-
-// NewStore creates a new etcd-backed store and provides it to the fx application.
-func NewStore(p ExecutorStoreParams) (store.Store, error) {
-	shardCache := shardcache.NewShardToExecutorCache(p.ETCDConfig.Prefix, p.Client, p.Logger, p.TimeSource, p.MetricsClient)
-
-	timeSource := p.TimeSource
-	if timeSource == nil {
-		timeSource = clock.NewRealTimeSource()
-	}
-
-	recordWriter, err := common.NewRecordWriter(p.ETCDConfig.Compression)
+func newExecutorStoreImpl(
+	client etcdclient.Client,
+	etcdCfg etcdclient.ExecutorStoreConfig,
+	logger log.Logger,
+	timeSource clock.TimeSource,
+	cfg *config.Config,
+	metricsClient metrics.Client,
+) (*executorStoreImpl, error) {
+	recordWriter, err := common.NewRecordWriter(etcdCfg.Compression)
 	if err != nil {
 		return nil, fmt.Errorf("create record writer: %w", err)
 	}
 
-	store := &executorStoreImpl{
-		client:        p.Client,
-		prefix:        p.ETCDConfig.Prefix,
-		logger:        p.Logger,
-		shardCache:    shardCache,
+	return &executorStoreImpl{
+		client:        client,
+		prefix:        etcdCfg.Prefix,
+		logger:        logger,
 		timeSource:    timeSource,
 		recordWriter:  recordWriter,
-		cfg:           p.Config,
-		metricsClient: p.MetricsClient,
-	}
-
-	p.Lifecycle.Append(fx.StartStopHook(store.Start, store.Stop))
-
-	return store, nil
-}
-
-func (s *executorStoreImpl) Start() {
-	s.shardCache.Start()
-}
-
-func (s *executorStoreImpl) Stop() {
-	s.shardCache.Stop()
+		cfg:           cfg,
+		metricsClient: metricsClient,
+	}, nil
 }
 
 // --- HeartbeatStore Implementation ---
@@ -226,6 +194,7 @@ func (s *executorStoreImpl) GetExecutorState(ctx context.Context, namespace stri
 
 func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*store.NamespaceState, error) {
 	heartbeatStates := make(map[string]store.HeartbeatState)
+	executorMetadata := make(map[string]map[string]string)
 	assignedStates := make(map[string]store.AssignedState)
 	shardStats := make(map[string]store.ShardStatistics)
 
@@ -260,6 +229,7 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 			ReportedShards: executorData.ReportedShards,
 			Metadata:       executorData.Metadata,
 		}
+		executorMetadata[executorID] = executorData.Metadata
 
 		if executorData.AssignedState != nil {
 			assignedStates[executorID] = *executorData.AssignedState.ToAssignedState()
@@ -271,11 +241,15 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 	}
 
 	return &store.NamespaceState{
-		Executors:        heartbeatStates,
-		ShardStats:       shardStats,
-		ShardAssignments: assignedStates,
-		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
-		DrainedHosts:     s.parseDrainedHostKVs(namespace, txnResp.Responses[2].GetResponseRange().Kvs),
+		AssignmentState: store.AssignmentState{
+			ExecutorMetadata: executorMetadata,
+			ShardAssignments: assignedStates,
+			DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+			Revision:         txnResp.Header.Revision,
+		},
+		Executors:    heartbeatStates,
+		ShardStats:   shardStats,
+		DrainedHosts: s.parseDrainedHostKVs(namespace, txnResp.Responses[2].GetResponseRange().Kvs),
 	}, nil
 }
 
@@ -288,6 +262,38 @@ func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace s
 		return nil, fmt.Errorf("get drained shards prefix: %w", err)
 	}
 	return s.parseDrainedShardKVs(namespace, resp.Kvs), nil
+}
+
+func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace string) (*store.AssignmentState, error) {
+	metricsScope := s.metricsClient.Scope(
+		metrics.ShardDistributorStoreGetAssignmentStateScope,
+		metrics.NamespaceTag(namespace),
+	)
+	txn := s.client.Txn(ctx).Then(
+		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+	)
+	start := s.timeSource.Now()
+	txnResp, err := txn.Commit()
+	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency, s.timeSource.Since(start))
+	if err != nil {
+		return nil, fmt.Errorf("get namespace assignment state: %w", err)
+	}
+	if len(txnResp.Responses) != 2 {
+		return nil, fmt.Errorf("get namespace assignment state: expected 2 responses, got %d", len(txnResp.Responses))
+	}
+
+	metadata, assignments, err := common.ParseExecutorAssignmentKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &store.AssignmentState{
+		ExecutorMetadata: metadata,
+		ShardAssignments: assignments,
+		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+		Revision:         txnResp.Header.Revision,
+	}, nil
 }
 
 // parseDrainedShardKVs turns drained-shard keys into a set of shard IDs.
@@ -349,14 +355,6 @@ func (s *executorStoreImpl) parseDrainedHostKVs(namespace string, kvs []*mvccpb.
 		drained[hostname] = record
 	}
 	return drained
-}
-
-func (s *executorStoreImpl) SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan struct{}, func(), error) {
-	return s.shardCache.Subscribe(namespace)
-}
-
-func (s *executorStoreImpl) GetShardAssignments(namespace string) (store.AssignmentSnapshot, error) {
-	return s.shardCache.GetShardAssignments(namespace)
 }
 
 func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {
@@ -717,20 +715,6 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 	return nil
 }
 
-// GetShardOwner returns the owner of the shard.
-// Drained shards return ErrShardDrained rather than the last assigned owner
-func (s *executorStoreImpl) GetShardOwner(ctx context.Context, namespace, shardID string) (*store.ShardOwner, error) {
-	drained, err := s.shardCache.IsShardDrained(ctx, namespace, shardID)
-	if err != nil {
-		return nil, fmt.Errorf("check shard drained: %w", err)
-	}
-	if drained {
-		return nil, store.ErrShardDrained
-	}
-
-	return s.shardCache.GetShardOwner(ctx, namespace, shardID)
-}
-
 // ResetNamespace deletes every key under <prefix>/<namespace>/ in a single
 // etcd op. This wipes the leader key, executor heartbeats/status/metadata,
 // shard assignments, shard statistics, drained shards, and drained hosts.
@@ -744,10 +728,6 @@ func (s *executorStoreImpl) ResetNamespace(ctx context.Context, namespace string
 		return 0, fmt.Errorf("delete namespace prefix %q: %w", prefix, err)
 	}
 	return resp.Deleted, nil
-}
-
-func (s *executorStoreImpl) GetExecutor(ctx context.Context, namespace string, executorID string) (*store.ShardOwner, error) {
-	return s.shardCache.GetExecutor(ctx, namespace, executorID)
 }
 
 // DrainShards writes one empty-valued key per shard under the namespace's drained

@@ -36,6 +36,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -47,14 +48,16 @@ func NewHandler(
 	shardDistributionCfg config.ShardDistribution,
 	cfg *config.Config,
 	storage store.Store,
+	shardCache cache.ShardCache,
 	metricsClient metrics.Client,
 ) Handler {
 	handler := &handlerImpl{
 		logger:               logger,
 		shardDistributionCfg: shardDistributionCfg,
 		storage:              storage,
+		shardCache:           shardCache,
 		timeSource:           timeSource,
-		assigner:             ephemeralassigner.New(timeSource, cfg, storage, metricsClient),
+		assigner:             ephemeralassigner.New(timeSource, cfg, storage, shardCache, metricsClient),
 	}
 	handler.stopCtx, handler.cancel = context.WithCancel(context.Background())
 
@@ -71,6 +74,7 @@ type handlerImpl struct {
 	cancel  context.CancelFunc
 
 	storage              store.Store
+	shardCache           cache.ShardCache
 	shardDistributionCfg config.ShardDistribution
 	timeSource           clock.TimeSource
 
@@ -108,7 +112,7 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 		}
 	}
 
-	shardOwner, err := h.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
+	shardOwner, err := h.shardCache.GetShardOwner(ctx, request.Namespace, request.ShardKey)
 
 	if errors.Is(err, store.ErrShardDrained) {
 		return nil, &types.ShardDrainedError{
@@ -150,7 +154,7 @@ func (h *handlerImpl) InspectShard(ctx context.Context, request *types.GetShardO
 		}
 	}
 
-	shardOwner, err := h.storage.GetShardOwner(ctx, request.Namespace, request.ShardKey)
+	shardOwner, err := h.shardCache.GetShardOwner(ctx, request.Namespace, request.ShardKey)
 	if errors.Is(err, store.ErrShardDrained) {
 		return nil, &types.ShardDrainedError{
 			Namespace: request.Namespace,
@@ -396,7 +400,7 @@ func (h *handlerImpl) ListNamespaces(_ context.Context, _ *types.ListNamespacesR
 }
 
 func (h *handlerImpl) sendWatchResponse(namespace string, server WatchNamespaceStateServer) error {
-	state, e := h.storage.GetShardAssignments(namespace)
+	state, e := h.shardCache.GetShardAssignments(namespace)
 	if e != nil {
 		return &types.InternalServiceError{Message: fmt.Sprintf("failed to get shard assignments: %v", e)}
 	}
@@ -428,7 +432,7 @@ func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequ
 	}
 
 	// Subscribe to state changes from storage
-	notifyCh, unSubscribe, err := h.storage.SubscribeToAssignmentChanges(server.Context(), request.Namespace)
+	notifyCh, unSubscribe, err := h.shardCache.Subscribe(request.Namespace)
 	if err != nil {
 		return &types.InternalServiceError{Message: fmt.Sprintf("failed to subscribe to namespace state: %v", err)}
 	}

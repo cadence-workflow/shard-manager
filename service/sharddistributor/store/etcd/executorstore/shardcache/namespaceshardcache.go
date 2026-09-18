@@ -5,31 +5,19 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
-	"go.etcd.io/etcd/api/v3/mvccpb"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/cadence-workflow/shard-manager/common/backoff"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/common"
 )
 
 const (
-	// RetryInterval for watch failures is between 50ms to 150ms
-	namespaceRefreshLoopWatchJitterCoeff   = 0.5
-	namespaceRefreshLoopWatchRetryInterval = 100 * time.Millisecond
-
 	// refreshSingleFlightKey is the shared singleflight key for cache-miss
 	// triggered full refreshes.
 	refreshSingleFlightKey = "refresh"
@@ -51,19 +39,12 @@ type namespaceShardToExecutor struct {
 	drainedShards    map[string]struct{} // set of shard IDs marked drained
 	lastRevision     int64               // etcd store revision of the last applied snapshot
 	namespace        string
-	etcdPrefix       string
 	stopCh           chan struct{}
 	logger           log.Logger
-	client           etcdclient.Client
+	executorStore    store.Store
 	timeSource       clock.TimeSource
 	pubSub           *executorStatePubSub
 	metricsClient    metrics.Client
-
-	// namespacePrefix is watched and read as one range, and the keyspaces below it are
-	// partitioned by the prefixes that follow
-	namespacePrefix     string
-	executorsPrefix     string
-	drainedShardsPrefix string
 
 	// refreshSF deduplicates concurrent cache-miss refreshes. When N callers
 	// simultaneously miss the cache, only one of them performs the etcd read;
@@ -74,34 +55,37 @@ type namespaceShardToExecutor struct {
 	refreshTimeout time.Duration
 }
 
-func newNamespaceShardToExecutor(etcdPrefix, namespace string, client etcdclient.Client, stopCh chan struct{}, logger log.Logger, timeSource clock.TimeSource, metricsClient metrics.Client) (*namespaceShardToExecutor, error) {
+func newNamespaceShardToExecutor(namespace string, executorStore store.Store, stopCh chan struct{}, logger log.Logger, timeSource clock.TimeSource, metricsClient metrics.Client) *namespaceShardToExecutor {
 	return &namespaceShardToExecutor{
-		shardToExecutor:     make(map[string]*store.ShardOwner),
-		executorToShards:    make(map[*store.ShardOwner][]string),
-		executorRevision:    make(map[string]int64),
-		shardOwners:         make(map[string]*store.ShardOwner),
-		drainedShards:       make(map[string]struct{}),
-		namespace:           namespace,
-		etcdPrefix:          etcdPrefix,
-		namespacePrefix:     etcdkeys.BuildNamespacePrefix(etcdPrefix, namespace),
-		executorsPrefix:     etcdkeys.BuildExecutorsPrefix(etcdPrefix, namespace),
-		drainedShardsPrefix: etcdkeys.BuildDrainedShardsPrefix(etcdPrefix, namespace),
-		stopCh:              stopCh,
-		logger:              logger.WithTags(tag.ShardNamespace(namespace)),
-		client:              client,
-		timeSource:          timeSource,
-		pubSub:              newExecutorStatePubSub(logger, namespace),
-		metricsClient:       metricsClient,
-		refreshTimeout:      refreshOperationTimeout,
-	}, nil
+		shardToExecutor:  make(map[string]*store.ShardOwner),
+		executorToShards: make(map[*store.ShardOwner][]string),
+		executorRevision: make(map[string]int64),
+		shardOwners:      make(map[string]*store.ShardOwner),
+		drainedShards:    make(map[string]struct{}),
+		namespace:        namespace,
+		stopCh:           stopCh,
+		logger:           logger.WithTags(tag.ShardNamespace(namespace)),
+		executorStore:    executorStore,
+		timeSource:       timeSource,
+		pubSub:           newExecutorStatePubSub(logger, namespace),
+		metricsClient:    metricsClient,
+		refreshTimeout:   refreshOperationTimeout,
+	}
 }
 
-func (n *namespaceShardToExecutor) Start(wg *sync.WaitGroup) {
+func (n *namespaceShardToExecutor) Start(wg *sync.WaitGroup) error {
+	changeCh, err := n.executorStore.SubscribeToNamespaceChanges(n.namespace)
+	if err != nil {
+		return fmt.Errorf("subscribe to namespace changes: %w", err)
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		n.namespaceRefreshLoop()
+		n.namespaceRefreshLoop(changeCh)
 	}()
+
+	return nil
 }
 
 func (n *namespaceShardToExecutor) GetShardOwner(ctx context.Context, shardID string) (*store.ShardOwner, error) {
@@ -152,37 +136,20 @@ func (n *namespaceShardToExecutor) GetExecutor(ctx context.Context, executorID s
 	return nil, store.ErrExecutorNotFound
 }
 
-func (n *namespaceShardToExecutor) GetExecutorModRevisionCmp() ([]clientv3.Cmp, error) {
-	n.RLock()
-	defer n.RUnlock()
-	comparisons := []clientv3.Cmp{}
-	for executor, revision := range n.executorRevision {
-		executorAssignedStateKey := etcdkeys.BuildExecutorKey(n.etcdPrefix, n.namespace, executor, etcdkeys.ExecutorAssignedStateKey)
-		comparisons = append(comparisons, clientv3.Compare(clientv3.ModRevision(executorAssignedStateKey), "=", revision))
-	}
-
-	return comparisons, nil
-}
-
 func (n *namespaceShardToExecutor) Subscribe() (<-chan struct{}, func()) {
 	return n.pubSub.subscribe()
 }
 
-func (n *namespaceShardToExecutor) namespaceRefreshLoop() {
-	triggerCh, watcherDone := n.runWatchLoop()
-
-	// Wait for the watcher owned by this loop before releasing the caller's WaitGroup.
-	defer func() { <-watcherDone }()
-
+func (n *namespaceShardToExecutor) namespaceRefreshLoop(changeCh <-chan struct{}) {
 	for {
 		select {
 		case <-n.stopCh:
 			n.logger.Info("stop channel closed, exiting namespaceRefreshLoop")
 			return
 
-		case _, ok := <-triggerCh:
+		case _, ok := <-changeCh:
 			if !ok {
-				n.logger.Info("trigger channel closed, exiting namespaceRefreshLoop")
+				n.logger.Info("namespace change channel closed, exiting namespaceRefreshLoop")
 				return
 			}
 
@@ -195,151 +162,6 @@ func (n *namespaceShardToExecutor) namespaceRefreshLoop() {
 			}
 		}
 	}
-}
-
-// runWatchLoop starts the watcher and returns the refresh trigger channel plus a
-// closed channel once the watcher has stopped
-func (n *namespaceShardToExecutor) runWatchLoop() (<-chan struct{}, <-chan struct{}) {
-	triggerCh := make(chan struct{}, 1)
-	watcherDone := make(chan struct{})
-
-	go func() {
-		defer close(watcherDone)
-		defer close(triggerCh)
-
-		for {
-			if err := n.watch(triggerCh); err != nil {
-				n.logger.Error("error watching in namespaceRefreshLoop, retrying...", tag.Error(err))
-
-				// The backoff observes stopCh so a pending retry interval cannot
-				// hold up shutdown, and cannot strand the watcher when the clock
-				// is mocked.
-				select {
-				case <-n.timeSource.After(backoff.JitDuration(
-					namespaceRefreshLoopWatchRetryInterval,
-					namespaceRefreshLoopWatchJitterCoeff,
-				)):
-					continue
-				case <-n.stopCh:
-					n.logger.Info("stop channel closed during watch retry backoff, exiting watch loop")
-					return
-				}
-			}
-
-			n.logger.Info("namespaceRefreshLoop is exiting")
-			return
-		}
-	}()
-
-	return triggerCh, watcherDone
-}
-
-func (n *namespaceShardToExecutor) watch(triggerCh chan<- struct{}) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	scope := n.metricsClient.Scope(metrics.ShardDistributorWatchScope).
-		Tagged(metrics.NamespaceTag(n.namespace)).
-		Tagged(metrics.ShardDistributorWatchTypeTag("cache_refresh"))
-
-	watchChan := n.client.Watch(
-		// WithRequireLeader ensures that the etcd cluster has a leader
-		clientv3.WithRequireLeader(ctx),
-		n.namespacePrefix,
-		clientv3.WithPrefix(),
-		clientv3.WithPrevKV(),
-	)
-
-	for {
-		select {
-		case <-n.stopCh:
-			n.logger.Info("stop channel closed, exiting watch loop")
-			return nil
-
-		case watchResp, ok := <-watchChan:
-			if err := watchResp.Err(); err != nil {
-				return fmt.Errorf("watch response: %w", err)
-			}
-			if !ok {
-				return fmt.Errorf("watch channel closed")
-			}
-
-			// Track watch metrics
-			sw := scope.StartTimer(metrics.ShardDistributorWatchProcessingLatency)
-			scope.AddCounter(metrics.ShardDistributorWatchEventsReceived, int64(len(watchResp.Events)))
-
-			if !n.needsRefresh(watchResp) {
-				sw.Stop()
-				continue
-			}
-
-			select {
-			case triggerCh <- struct{}{}:
-			default:
-				n.logger.Info("Cache is being refreshed, skipping trigger")
-			}
-			sw.Stop()
-		}
-	}
-}
-
-// needsRefresh checks whether a watch response over the namespace prefix requires a
-// cache refresh.
-func (n *namespaceShardToExecutor) needsRefresh(watchResp clientv3.WatchResponse) bool {
-	executorStateChanged := n.hasExecutorStateChanged(watchResp)
-	drainedShardsChanged := n.hasDrainedShardsChanged(watchResp)
-	return executorStateChanged || drainedShardsChanged
-}
-
-// hasDrainedShardsChanged checks whether any event touched the drained shards keyspace.
-// Every recognized key counts as a change: draining stores no value and an undrain arrives
-// as a tombstone with a nil value, so the previous-value comparison used for executor keys
-// sees "" on both sides and would count the undrain as an unchanged key.
-func (n *namespaceShardToExecutor) hasDrainedShardsChanged(watchResp clientv3.WatchResponse) bool {
-	changed := false
-	for _, event := range watchResp.Events {
-		key := string(event.Kv.Key)
-		if !strings.HasPrefix(key, n.drainedShardsPrefix) {
-			continue
-		}
-
-		if _, err := etcdkeys.ParseDrainedShardKey(n.etcdPrefix, n.namespace, key); err != nil {
-			n.logger.Warn("Received drained shards watch event with unrecognized key format", tag.Error(err))
-			continue
-		}
-		changed = true
-	}
-	return changed
-}
-
-// hasExecutorStateChanged checks if any of the events in the watch response indicate a change to executor assigned state or metadata,
-// and if the value actually changed (not just same value written again)
-func (n *namespaceShardToExecutor) hasExecutorStateChanged(watchResp clientv3.WatchResponse) bool {
-	needsRefresh := false
-	for _, event := range watchResp.Events {
-		// The watch spans the whole namespace, so events from sibling keyspaces such as
-		// drained shards and leader election arrive here and are not executor keys.
-		if !strings.HasPrefix(string(event.Kv.Key), n.executorsPrefix) {
-			continue
-		}
-
-		_, keyType, keyErr := etcdkeys.ParseExecutorKey(n.etcdPrefix, n.namespace, string(event.Kv.Key))
-		if keyErr != nil {
-			n.logger.Warn("Received watch event with unrecognized key format", tag.Value(keyErr))
-			continue
-		}
-
-		// Check if value actually changed (skip if same value written again)
-		if event.PrevKv != nil && string(event.Kv.Value) == string(event.PrevKv.Value) {
-			continue
-		}
-
-		switch keyType {
-		case etcdkeys.ExecutorAssignedStateKey, etcdkeys.ExecutorMetadataKey:
-			needsRefresh = true
-		}
-	}
-	return needsRefresh
 }
 
 func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
@@ -369,76 +191,40 @@ func (n *namespaceShardToExecutor) GetShardAssignments() store.AssignmentSnapsho
 	}
 }
 
-// refreshNamespaceState reads every keyspace the cache tracks in one range read, so both
-// the executor state and the drained set advance together under a single etcd revision.
+// refreshNamespaceState reads every keyspace the cache tracks in one store call, so both
+// the executor state and the drained set advance together under a single store revision.
 func (n *namespaceShardToExecutor) refreshNamespaceState(ctx context.Context) (bool, error) {
-	resp, err := n.client.Get(ctx, n.namespacePrefix, clientv3.WithPrefix())
+	state, err := n.executorStore.GetAssignmentState(ctx, n.namespace)
 	if err != nil {
-		return false, fmt.Errorf("get namespace prefix for namespace %s: %w", n.namespace, err)
+		return false, fmt.Errorf("get assignment state for namespace %s: %w", n.namespace, err)
 	}
 
-	executorKVs, drainedShards := n.partitionNamespaceKVs(resp.Kvs)
-
-	parsedData, err := common.ParseExecutorKVs(n.etcdPrefix, n.namespace, executorKVs)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse executor data: %w", err)
-	}
-
-	updated := n.applyNamespaceData(resp.Header.Revision, parsedData, drainedShards)
-	return updated, nil
+	return n.applyNamespaceState(state), nil
 }
 
-// partitionNamespaceKVs splits a namespace range read into the executor keys tracked by
-// this cache and the set of drained shard IDs. Other namespace keys are ignored.
-func (n *namespaceShardToExecutor) partitionNamespaceKVs(kvs []*mvccpb.KeyValue) ([]*mvccpb.KeyValue, map[string]struct{}) {
-	executorKVs := make([]*mvccpb.KeyValue, 0, len(kvs))
-	drainedShards := make(map[string]struct{})
-
-	for _, kv := range kvs {
-		key := string(kv.Key)
-
-		switch {
-		case strings.HasPrefix(key, n.executorsPrefix):
-			_, keyType, err := etcdkeys.ParseExecutorKey(n.etcdPrefix, n.namespace, key)
-			if err == nil && keyType == etcdkeys.ExecutorShardStatisticsKey {
-				continue
-			}
-			executorKVs = append(executorKVs, kv)
-		case strings.HasPrefix(key, n.drainedShardsPrefix):
-			shardID, err := etcdkeys.ParseDrainedShardKey(n.etcdPrefix, n.namespace, key)
-			if err != nil {
-				// A single malformed key must not fail every drain lookup in the namespace.
-				n.logger.Warn("Skipping drained shard key with unrecognized format", tag.Error(err))
-				continue
-			}
-			drainedShards[shardID] = struct{}{}
-		}
-	}
-
-	return executorKVs, drainedShards
-}
-
-func (n *namespaceShardToExecutor) applyNamespaceData(storeRevision int64, executors map[string]*etcdtypes.ParsedExecutorData, drainedShards map[string]struct{}) bool {
+func (n *namespaceShardToExecutor) applyNamespaceState(state *store.AssignmentState) bool {
 	shardToExecutor := make(map[string]*store.ShardOwner)
 	executorState := make(map[*store.ShardOwner][]string)
 	executorRevision := make(map[string]int64)
 	shardOwners := make(map[string]*store.ShardOwner)
-	for executorID, executorData := range executors {
+
+	for executorID, executorMetadata := range state.ExecutorMetadata {
 		shardOwner := getOrCreateShardOwner(shardOwners, executorID)
-		if executorData.AssignedState != nil {
-			shardIDs := make([]string, 0, len(executorData.AssignedState.AssignedShards))
-			for shardID := range executorData.AssignedState.AssignedShards {
+
+		if assigned, ok := state.ShardAssignments[executorID]; ok {
+			shardIDs := make([]string, 0, len(assigned.AssignedShards))
+			for shardID := range assigned.AssignedShards {
 				shardToExecutor[shardID] = shardOwner
 				shardIDs = append(shardIDs, shardID)
 			}
 			executorState[shardOwner] = shardIDs
-			executorRevision[executorID] = executorData.AssignedState.ModRevision
+			executorRevision[executorID] = assigned.ModRevision
 		}
 
-		maps.Copy(shardOwner.Metadata, executorData.Metadata)
+		maps.Copy(shardOwner.Metadata, executorMetadata)
 	}
 
-	return n.replaceNamespaceState(storeRevision, shardToExecutor, executorState, executorRevision, shardOwners, drainedShards)
+	return n.replaceNamespaceState(state.Revision, shardToExecutor, executorState, executorRevision, shardOwners, state.DrainedShards)
 }
 
 func (n *namespaceShardToExecutor) replaceNamespaceState(

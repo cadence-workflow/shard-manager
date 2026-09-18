@@ -48,7 +48,11 @@ type ShardHandoverStats struct {
 	HandoverType types.HandoverType
 }
 
+// NamespaceState is the full snapshot of a namespace: who owns which shards, plus the
+// heartbeats, statistics and host drains that only a rebalance needs.
 type NamespaceState struct {
+	AssignmentState
+
 	// Executors holds the heartbeat states of all executors in the namespace.
 	// Key: ExecutorID
 	Executors map[string]HeartbeatState
@@ -57,20 +61,28 @@ type NamespaceState struct {
 	// Key: ShardID
 	ShardStats map[string]ShardStatistics
 
-	// ShardAssignments holds the assignment states of all shards in the namespace.
-	// Key: ExecutorID
-	ShardAssignments map[string]AssignedState
-
-	// DrainedShards holds the shards that are drained for this namespace.
-	// A drained shard is not eligible for assignment until it is
-	// explicitly undrained.
-	// Key: ShardID
-	DrainedShards map[string]struct{}
-
 	// DrainedHosts holds host drains for this namespace.
 	// A drained host's executors are not eligible for assignment until
 	// the host is explicitly undrained
 	DrainedHosts map[string]DrainedHost
+}
+
+// AssignmentState is who owns which shards in a namespace, and which shards are
+// drained. More elaborate information is available in the NamespaceState.
+type AssignmentState struct {
+	// ExecutorMetadata holds every executor in the namespace, assigned or not.
+	// Key: ExecutorID, then metadata key
+	ExecutorMetadata map[string]map[string]string
+
+	// Key: ExecutorID
+	ShardAssignments map[string]AssignedState
+
+	// Key: ShardID
+	DrainedShards map[string]struct{}
+
+	// Revision is the store revision the snapshot was read at. Readers that cache the
+	// state use it to discard a snapshot older than the one they hold.
+	Revision int64
 }
 
 // DrainedHost is the persisted metadata for a host drain

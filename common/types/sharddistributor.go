@@ -551,7 +551,6 @@ type ExecutorHeartbeatRequest struct {
 	Status             ExecutorStatus
 	ShardStatusReports map[string]*ShardStatusReport
 	Metadata           map[string]string
-	HostID             string
 	HostMetadata       *HostMetadata
 }
 
@@ -591,13 +590,6 @@ func (v *ExecutorHeartbeatRequest) GetShardStatusReports() (o map[string]*ShardS
 func (v *ExecutorHeartbeatRequest) GetMetadata() (o map[string]string) {
 	if v != nil {
 		return v.Metadata
-	}
-	return
-}
-
-func (v *ExecutorHeartbeatRequest) GetHostID() (o string) {
-	if v != nil {
-		return v.HostID
 	}
 	return
 }

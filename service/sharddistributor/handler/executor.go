@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
@@ -13,6 +12,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
@@ -21,7 +21,6 @@ const (
 	_maxMetadataKeys      = 32
 	_maxMetadataKeyLength = 128
 	_maxMetadataValueSize = 512 * 1024 // 512KB
-	_maxHostNameLength    = 128
 )
 
 type executor struct {
@@ -68,8 +67,10 @@ func (h *executor) Heartbeat(ctx context.Context, request *types.ExecutorHeartbe
 	if err := validateMetadata(newHeartbeat.Metadata); err != nil {
 		return nil, types.BadRequestError{Message: fmt.Sprintf("invalid metadata: %s", err)}
 	}
-	if err := validateHostName(newHeartbeat.Hostname()); err != nil {
-		return nil, types.BadRequestError{Message: fmt.Sprintf("invalid host_name: %s", err)}
+	if hostName := newHeartbeat.Hostname(); hostName != "" {
+		if err := hostname.Validate(hostName); err != nil {
+			return nil, types.BadRequestError{Message: fmt.Sprintf("invalid host_name: %s", err)}
+		}
 	}
 
 	err = h.storage.RecordHeartbeat(ctx, request.Namespace, request.ExecutorID, newHeartbeat)
@@ -192,19 +193,6 @@ func validateMetadata(metadata map[string]string) error {
 		}
 	}
 
-	return nil
-}
-
-func validateHostName(hostName string) error {
-	if hostName == "" {
-		return nil
-	}
-	if len(hostName) > _maxHostNameLength {
-		return fmt.Errorf("host_name exceeds %d bytes", _maxHostNameLength)
-	}
-	if strings.Contains(hostName, "/") {
-		return fmt.Errorf("host_name %q must not contain '/'", hostName)
-	}
 	return nil
 }
 

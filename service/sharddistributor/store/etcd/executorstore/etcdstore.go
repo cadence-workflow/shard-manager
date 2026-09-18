@@ -20,6 +20,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
@@ -867,8 +868,8 @@ func (s *executorStoreImpl) UndrainHosts(ctx context.Context, namespace string, 
 		return nil, nil
 	}
 
-	for _, hostname := range hostnames {
-		if err := etcdkeys.ValidateHostname(hostname); err != nil {
+	for _, name := range hostnames {
+		if err := hostname.Validate(name); err != nil {
 			return nil, fmt.Errorf("undrain hosts: %w", err)
 		}
 	}
@@ -908,7 +909,7 @@ func (s *executorStoreImpl) GetDrainedHosts(ctx context.Context, namespace strin
 func validateDrainedHosts(hosts []store.DrainedHost, now time.Time) (map[string]store.DrainedHost, error) {
 	validated := make(map[string]store.DrainedHost, len(hosts))
 	for _, host := range hosts {
-		if err := etcdkeys.ValidateHostname(host.Hostname); err != nil {
+		if err := hostname.Validate(host.Hostname); err != nil {
 			return nil, err
 		}
 		if _, exists := validated[host.Hostname]; exists {

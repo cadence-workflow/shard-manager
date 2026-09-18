@@ -93,6 +93,18 @@ func TestFromShardDistributorGetNamespaceStateResponse(t *testing.T) {
 	}
 }
 
+func TestFromShardDistributorGetFullNamespaceStateRequest(t *testing.T) {
+	for _, item := range []*types.GetFullNamespaceStateRequest{nil, {}, &testdata.ShardDistributorGetFullNamespaceStateRequest} {
+		assert.Equal(t, item, ToShardDistributorGetFullNamespaceStateRequest(FromShardDistributorGetFullNamespaceStateRequest(item)))
+	}
+}
+
+func TestFromShardDistributorGetFullNamespaceStateResponse(t *testing.T) {
+	for _, item := range []*types.GetFullNamespaceStateResponse{nil, {}, &testdata.ShardDistributorGetFullNamespaceStateResponse} {
+		assert.Equal(t, item, ToShardDistributorGetFullNamespaceStateResponse(FromShardDistributorGetFullNamespaceStateResponse(item)))
+	}
+}
+
 func TestFromShardDistributorGetExecutorStateRequest(t *testing.T) {
 	for _, item := range []*types.GetExecutorStateRequest{nil, {}, &testdata.ShardDistributorGetExecutorStateRequest} {
 		assert.Equal(t, item, ToShardDistributorGetExecutorStateRequest(FromShardDistributorGetExecutorStateRequest(item)))

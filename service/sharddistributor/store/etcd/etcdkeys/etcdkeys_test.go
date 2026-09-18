@@ -198,32 +198,6 @@ func TestDrainedHostsPrefixIsDisjointFromSiblingPrefixes(t *testing.T) {
 	}
 }
 
-func TestValidateHostname(t *testing.T) {
-	tests := []struct {
-		name     string
-		hostname string
-		wantErr  string
-	}{
-		{name: "plain", hostname: "host-a"},
-		{name: "at sign", hostname: "host@name", wantErr: "must not contain '@'"},
-		{name: "empty", hostname: "", wantErr: "must not be empty"},
-		{name: "slash", hostname: "host/name", wantErr: "must not contain '/'"},
-		{name: "max length", hostname: strings.Repeat("a", 128)},
-		{name: "too long", hostname: strings.Repeat("a", 129), wantErr: "exceeds 128 bytes"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateHostname(tt.hostname)
-			if tt.wantErr != "" {
-				assert.ErrorContains(t, err, tt.wantErr)
-				return
-			}
-			assert.NoError(t, err)
-		})
-	}
-}
-
 func TestParseExecutorKey_HostMetadata(t *testing.T) {
 	hostMetadataKey := BuildExecutorKey("/cadence", "test-ns", "exec-1", ExecutorHostMetadataKey)
 	executorID, keyType, err := ParseExecutorKey("/cadence", "test-ns", hostMetadataKey)

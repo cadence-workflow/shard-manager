@@ -899,6 +899,9 @@ const (
 	// ShardDistributorClientGetNamespaceStateScope tracks GetNamespaceState calls made by service to shard distributor
 	ShardDistributorClientGetNamespaceStateScope
 
+	// ShardDistributorClientGetFullNamespaceStateScope tracks GetFullNamespaceState calls made by service to shard distributor
+	ShardDistributorClientGetFullNamespaceStateScope
+
 	// ShardDistributorClientGetExecutorStateScope tracks GetExecutorState calls made by service to shard distributor
 	ShardDistributorClientGetExecutorStateScope
 
@@ -1498,6 +1501,7 @@ const (
 	// ShardDistributorGetShardOwnerScope tracks GetShardOwner API calls received by service
 	ShardDistributorGetShardOwnerScope = iota + NumWorkerScopes
 	ShardDistributorGetNamespaceStateScope
+	ShardDistributorGetFullNamespaceStateScope
 	ShardDistributorGetExecutorStateScope
 	ShardDistributorListNamespacesScope
 	ShardDistributorWatchNamespaceStateScope
@@ -1931,17 +1935,18 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		P2PRPCPeerChooserScope:       {operation: "P2PRPCPeerChooser"},
 		PartitionConfigProviderScope: {operation: "PartitionConfigProvider"},
 
-		ShardDistributorClientGetShardOwnerScope:       {operation: "ShardDistributorClientGetShardOwner"},
-		ShardDistributorClientGetNamespaceStateScope:   {operation: "ShardDistributorClientGetNamespaceState"},
-		ShardDistributorClientGetExecutorStateScope:    {operation: "ShardDistributorClientGetExecutorState"},
-		ShardDistributorClientListNamespacesScope:      {operation: "ShardDistributorClientListNamespaces"},
-		ShardDistributorClientWatchNamespaceStateScope: {operation: "ShardDistributorClientWatchNamespaceState"},
-		ShardDistributorClientInspectShardScope:        {operation: "ShardDistributorClientInspectShard"},
-		ShardDistributorClientDrainShardsScope:         {operation: "ShardDistributorClientDrainShards"},
-		ShardDistributorClientUndrainShardsScope:       {operation: "ShardDistributorClientUndrainShards"},
-		ShardDistributorClientGetDrainedShardsScope:    {operation: "ShardDistributorClientGetDrainedShards"},
-		ShardDistributorClientForceResetNamespaceScope: {operation: "ShardDistributorClientForceResetNamespace"},
-		ShardDistributorExecutorClientHeartbeatScope:   {operation: "ShardDistributorExecutorHeartbeat"},
+		ShardDistributorClientGetShardOwnerScope:         {operation: "ShardDistributorClientGetShardOwner"},
+		ShardDistributorClientGetNamespaceStateScope:     {operation: "ShardDistributorClientGetNamespaceState"},
+		ShardDistributorClientGetFullNamespaceStateScope: {operation: "ShardDistributorClientGetFullNamespaceState"},
+		ShardDistributorClientGetExecutorStateScope:      {operation: "ShardDistributorClientGetExecutorState"},
+		ShardDistributorClientListNamespacesScope:        {operation: "ShardDistributorClientListNamespaces"},
+		ShardDistributorClientWatchNamespaceStateScope:   {operation: "ShardDistributorClientWatchNamespaceState"},
+		ShardDistributorClientInspectShardScope:          {operation: "ShardDistributorClientInspectShard"},
+		ShardDistributorClientDrainShardsScope:           {operation: "ShardDistributorClientDrainShards"},
+		ShardDistributorClientUndrainShardsScope:         {operation: "ShardDistributorClientUndrainShards"},
+		ShardDistributorClientGetDrainedShardsScope:      {operation: "ShardDistributorClientGetDrainedShards"},
+		ShardDistributorClientForceResetNamespaceScope:   {operation: "ShardDistributorClientForceResetNamespace"},
+		ShardDistributorExecutorClientHeartbeatScope:     {operation: "ShardDistributorExecutorHeartbeat"},
 
 		LoadBalancerScope: {operation: "RRLoadBalancer"},
 
@@ -2227,6 +2232,7 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 	ShardDistributor: {
 		ShardDistributorGetShardOwnerScope:                         {operation: "GetShardOwner"},
 		ShardDistributorGetNamespaceStateScope:                     {operation: "GetNamespaceState"},
+		ShardDistributorGetFullNamespaceStateScope:                 {operation: "GetFullNamespaceState"},
 		ShardDistributorGetExecutorStateScope:                      {operation: "GetExecutorState"},
 		ShardDistributorListNamespacesScope:                        {operation: "ListNamespaces"},
 		ShardDistributorWatchNamespaceStateScope:                   {operation: "WatchNamespaceState"},

@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -347,32 +346,6 @@ func TestValidateMetadata(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-		})
-	}
-}
-
-func TestValidateHostName(t *testing.T) {
-	tests := []struct {
-		name     string
-		hostName string
-		wantErr  string
-	}{
-		{name: "empty", hostName: ""},
-		{name: "plain", hostName: "host-a"},
-		{name: "at sign", hostName: "host@name"},
-		{name: "slash", hostName: "host/name", wantErr: "must not contain '/'"},
-		{name: "too long", hostName: strings.Repeat("a", _maxHostNameLength+1), wantErr: "exceeds 128 bytes"},
-		{name: "max length", hostName: strings.Repeat("a", _maxHostNameLength)},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateHostName(tt.hostName)
-			if tt.wantErr != "" {
-				require.ErrorContains(t, err, tt.wantErr)
-				return
-			}
-			require.NoError(t, err)
 		})
 	}
 }

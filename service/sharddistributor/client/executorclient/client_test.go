@@ -18,6 +18,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 )
 
 const testUniqueID = "00000000-0000-0000-0000-000000000001"
@@ -142,27 +143,9 @@ func TestBuildExecutorID(t *testing.T) {
 func TestBuildExecutorID_LimitsHostnameLengthAndPreservesUUID(t *testing.T) {
 	executorID := buildExecutorID(strings.Repeat("hostname/", 100), testUniqueID)
 
-	assert.Len(t, executorID, maxHostnameLength+len("@"+testUniqueID))
+	assert.Len(t, executorID, hostname.MaxLength+len("@"+testUniqueID))
 	assert.NotContains(t, executorID, "/")
 	assert.True(t, strings.HasSuffix(executorID, "@"+testUniqueID))
-}
-
-func TestSanitizeHostname(t *testing.T) {
-	tests := []struct {
-		name     string
-		hostname string
-		want     string
-	}{
-		{name: "plain", hostname: "executor-1", want: "executor-1"},
-		{name: "slashes are replaced", hostname: "executor/1", want: "executor_1"},
-		{name: "truncated", hostname: strings.Repeat("a", maxHostnameLength+1), want: strings.Repeat("a", maxHostnameLength)},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, sanitizeHostname(tt.hostname))
-		})
-	}
 }
 
 func TestNewExecutor_HeartbeatHostMetadata(t *testing.T) {
@@ -202,7 +185,7 @@ func TestNewExecutor_HeartbeatHostMetadata(t *testing.T) {
 	assert.NotEmpty(t, got.HostMetadata.HostName)
 	assert.True(t, strings.HasPrefix(got.ExecutorID, got.HostMetadata.HostName+"@"))
 	assert.NotContains(t, got.HostMetadata.HostName, "/")
-	assert.LessOrEqual(t, len(got.HostMetadata.HostName), maxHostnameLength)
+	assert.LessOrEqual(t, len(got.HostMetadata.HostName), hostname.MaxLength)
 }
 
 // Create distinct mock processor types for testing multiple namespaces

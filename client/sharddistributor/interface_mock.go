@@ -122,6 +122,26 @@ func (mr *MockClientMockRecorder) GetExecutorState(arg0, arg1 any, arg2 ...any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutorState", reflect.TypeOf((*MockClient)(nil).GetExecutorState), varargs...)
 }
 
+// GetFullNamespaceState mocks base method.
+func (m *MockClient) GetFullNamespaceState(arg0 context.Context, arg1 *types.GetFullNamespaceStateRequest, arg2 ...yarpc.CallOption) (*types.GetFullNamespaceStateResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetFullNamespaceState", varargs...)
+	ret0, _ := ret[0].(*types.GetFullNamespaceStateResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFullNamespaceState indicates an expected call of GetFullNamespaceState.
+func (mr *MockClientMockRecorder) GetFullNamespaceState(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFullNamespaceState", reflect.TypeOf((*MockClient)(nil).GetFullNamespaceState), varargs...)
+}
+
 // GetNamespaceState mocks base method.
 func (m *MockClient) GetNamespaceState(arg0 context.Context, arg1 *types.GetNamespaceStateRequest, arg2 ...yarpc.CallOption) (*types.GetNamespaceStateResponse, error) {
 	m.ctrl.T.Helper()

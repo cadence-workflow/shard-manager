@@ -146,6 +146,34 @@ func TestGetNamespaceState(t *testing.T) {
 			},
 		},
 		{
+			name: "--full returns the complete namespace state as JSON",
+			args: []string{"smctl", "-n", "ns-1", "namespace", "state", "--full"},
+			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
+				mc := sharddistributor.NewMockClient(ctrl)
+				mc.EXPECT().
+					GetFullNamespaceState(gomock.Any(), &types.GetFullNamespaceStateRequest{Namespace: "ns-1"}).
+					Return(&types.GetFullNamespaceStateResponse{
+						Namespace: "ns-1",
+						ShardStats: map[string]*types.ShardStatistics{
+							"shard-1": {SmoothedLoad: 42.5},
+						},
+					}, nil)
+				return setupResult{client: mc}
+			},
+			check: func(t *testing.T, stdout string) {
+				var resp types.GetFullNamespaceStateResponse
+				if err := json.Unmarshal([]byte(stdout), &resp); err != nil {
+					t.Fatalf("output is not valid JSON: %v\nout: %s", err, stdout)
+				}
+				if resp.Namespace != "ns-1" {
+					t.Errorf("namespace: got %q want %q", resp.Namespace, "ns-1")
+				}
+				if got := resp.ShardStats["shard-1"].SmoothedLoad; got != 42.5 {
+					t.Errorf("smoothed load: got %v want %v", got, 42.5)
+				}
+			},
+		},
+		{
 			name:    "missing --namespace fails with required-flag error",
 			args:    []string{"smctl", "namespace", "state"},
 			setup:   func(t *testing.T, ctrl *gomock.Controller) setupResult { return setupResult{} },
@@ -162,6 +190,18 @@ func TestGetNamespaceState(t *testing.T) {
 				return setupResult{client: mc}
 			},
 			wantErr: `namespace "missing" not found`,
+		},
+		{
+			name: "--full surfaces GetFullNamespaceState errors",
+			args: []string{"smctl", "-n", "ns-1", "namespace", "state", "--full"},
+			setup: func(t *testing.T, ctrl *gomock.Controller) setupResult {
+				mc := sharddistributor.NewMockClient(ctrl)
+				mc.EXPECT().
+					GetFullNamespaceState(gomock.Any(), &types.GetFullNamespaceStateRequest{Namespace: "ns-1"}).
+					Return(nil, errors.New("rpc unavailable"))
+				return setupResult{client: mc}
+			},
+			wantErr: "GetFullNamespaceState: rpc unavailable",
 		},
 		{
 			name: "factory error is propagated",

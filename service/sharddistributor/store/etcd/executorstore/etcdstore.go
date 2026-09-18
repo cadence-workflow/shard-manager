@@ -194,6 +194,7 @@ func (s *executorStoreImpl) GetExecutorState(ctx context.Context, namespace stri
 
 func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*store.NamespaceState, error) {
 	heartbeatStates := make(map[string]store.HeartbeatState)
+	executorMetadata := make(map[string]map[string]string)
 	assignedStates := make(map[string]store.AssignedState)
 	shardStats := make(map[string]store.ShardStatistics)
 
@@ -228,6 +229,7 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 			ReportedShards: executorData.ReportedShards,
 			Metadata:       executorData.Metadata,
 		}
+		executorMetadata[executorID] = executorData.Metadata
 
 		if executorData.AssignedState != nil {
 			assignedStates[executorID] = *executorData.AssignedState.ToAssignedState()
@@ -239,12 +241,15 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 	}
 
 	return &store.NamespaceState{
-		Executors:        heartbeatStates,
-		ShardStats:       shardStats,
-		ShardAssignments: assignedStates,
-		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
-		DrainedHosts:     s.parseDrainedHostKVs(namespace, txnResp.Responses[2].GetResponseRange().Kvs),
-		Revision:         txnResp.Header.Revision,
+		AssignmentState: store.AssignmentState{
+			ExecutorMetadata: executorMetadata,
+			ShardAssignments: assignedStates,
+			DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+			Revision:         txnResp.Header.Revision,
+		},
+		Executors:    heartbeatStates,
+		ShardStats:   shardStats,
+		DrainedHosts: s.parseDrainedHostKVs(namespace, txnResp.Responses[2].GetResponseRange().Kvs),
 	}, nil
 }
 
@@ -261,6 +266,38 @@ func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace s
 
 // parseDrainedShardKVs turns drained-shard keys into a set of shard IDs.
 // Malformed keys are skipped to not stall the rebalance loop.
+func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace string) (*store.AssignmentState, error) {
+	metricsScope := s.metricsClient.Scope(
+		metrics.ShardDistributorStoreGetAssignmentStateScope,
+		metrics.NamespaceTag(namespace),
+	)
+	txn := s.client.Txn(ctx).Then(
+		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+	)
+	start := s.timeSource.Now()
+	txnResp, err := txn.Commit()
+	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreGetStateETCDRoundTripLatency, s.timeSource.Since(start))
+	if err != nil {
+		return nil, fmt.Errorf("get namespace assignment state: %w", err)
+	}
+	if len(txnResp.Responses) != 2 {
+		return nil, fmt.Errorf("get namespace assignment state: expected 2 responses, got %d", len(txnResp.Responses))
+	}
+
+	metadata, assignments, err := common.ParseExecutorAssignmentKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &store.AssignmentState{
+		ExecutorMetadata: metadata,
+		ShardAssignments: assignments,
+		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+		Revision:         txnResp.Header.Revision,
+	}, nil
+}
+
 func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb.KeyValue) map[string]struct{} {
 	drained := make(map[string]struct{}, len(kvs))
 	for _, kv := range kvs {

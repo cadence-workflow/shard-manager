@@ -185,9 +185,10 @@ func TestGetShardOwner(t *testing.T) {
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
 				mockCache.EXPECT().GetShardOwner(gomock.Any(), _testNamespaceEphemeral, "NON-EXISTING-SHARD").Return(nil, store.ErrShardNotFound)
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
-					Executors:        map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}},
-					ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
-				}, nil)
+					AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{"owner1": {AssignedShards: map[string]*types.ShardAssignment{}}},
+					},
+					Executors: map[string]store.HeartbeatState{"owner1": {Status: types.ExecutorStatusACTIVE}}}, nil)
 				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Return(nil)
 				mockCache.EXPECT().GetExecutor(gomock.Any(), _testNamespaceEphemeral, "owner1").Return(&store.ShardOwner{
 					ExecutorID: "owner1",
@@ -540,26 +541,27 @@ func TestGetNamespaceState_successMultipleExecutors(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockStorage := store.NewMockStore(ctrl)
 	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceFixed).Return(&store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: map[string]store.AssignedState{
+				"executor1": {
+					AssignedShards: map[string]*types.ShardAssignment{
+						"shard1": {Status: types.AssignmentStatusREADY},
+						"shard2": {Status: types.AssignmentStatusREADY},
+					},
+					ModRevision: 42,
+				},
+				"executor2": {
+					AssignedShards: map[string]*types.ShardAssignment{
+						"shard3": nil,
+					},
+					ModRevision: 7,
+				},
+			},
+		},
 		Executors: map[string]store.HeartbeatState{
 			"executor1": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now, Metadata: map[string]string{"ip": "127.0.0.1", "port": "1234"}},
 			"executor2": {},
-		},
-		ShardAssignments: map[string]store.AssignedState{
-			"executor1": {
-				AssignedShards: map[string]*types.ShardAssignment{
-					"shard1": {Status: types.AssignmentStatusREADY},
-					"shard2": {Status: types.AssignmentStatusREADY},
-				},
-				ModRevision: 42,
-			},
-			"executor2": {
-				AssignedShards: map[string]*types.ShardAssignment{
-					"shard3": nil,
-				},
-				ModRevision: 7,
-			},
-		},
-	}, nil)
+		}}, nil)
 
 	h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 	resp, err := h.GetNamespaceState(context.Background(), &types.GetNamespaceStateRequest{Namespace: _testNamespaceFixed})
@@ -652,6 +654,27 @@ func TestGetFullNamespaceState_success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockStorage := store.NewMockStore(ctrl)
 	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceFixed).Return(&store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: map[string]store.AssignedState{
+				"executor1": {
+					AssignedShards: map[string]*types.ShardAssignment{
+						"shard1": {Status: types.AssignmentStatusREADY},
+					},
+					ShardHandoverStats: map[string]store.ShardHandoverStats{
+						"shard1": {
+							PreviousExecutorLastHeartbeatTime: previousHeartbeat,
+							HandoverType:                      types.HandoverTypeGRACEFUL,
+						},
+					},
+					LastUpdated: lastAssignmentUpdate,
+					ModRevision: 7,
+				},
+			},
+			DrainedShards: map[string]struct{}{
+				"shard3": {},
+				"shard2": {},
+			},
+		},
 		Executors: map[string]store.HeartbeatState{
 			"executor1": {
 				LastHeartbeat: lastHeartbeat,
@@ -669,25 +692,6 @@ func TestGetFullNamespaceState_success(t *testing.T) {
 				LastMoveTime:   lastMove,
 			},
 		},
-		ShardAssignments: map[string]store.AssignedState{
-			"executor1": {
-				AssignedShards: map[string]*types.ShardAssignment{
-					"shard1": {Status: types.AssignmentStatusREADY},
-				},
-				ShardHandoverStats: map[string]store.ShardHandoverStats{
-					"shard1": {
-						PreviousExecutorLastHeartbeatTime: previousHeartbeat,
-						HandoverType:                      types.HandoverTypeGRACEFUL,
-					},
-				},
-				LastUpdated: lastAssignmentUpdate,
-				ModRevision: 7,
-			},
-		},
-		DrainedShards: map[string]struct{}{
-			"shard3": {},
-			"shard2": {},
-		},
 		DrainedHosts: map[string]store.DrainedHost{
 			"host1": {
 				Hostname:  "host1",
@@ -695,8 +699,7 @@ func TestGetFullNamespaceState_success(t *testing.T) {
 				DrainedBy: "operator",
 				Reason:    "maintenance",
 			},
-		},
-	}, nil)
+		}}, nil)
 
 	h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 	actualResponse, err := h.GetFullNamespaceState(context.Background(), &types.GetFullNamespaceStateRequest{Namespace: _testNamespaceFixed})
@@ -820,15 +823,16 @@ func TestGetNamespaceState_heartbeatWithoutAssignments(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockStorage := store.NewMockStore(ctrl)
 	mockStorage.EXPECT().GetState(gomock.Any(), _testNamespaceFixed).Return(&store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: map[string]store.AssignedState{},
+		},
 		Executors: map[string]store.HeartbeatState{
 			"exec-heartbeat-only": {
 				Status:        types.ExecutorStatusDRAINING,
 				LastHeartbeat: now,
 				Metadata:      map[string]string{"ip": "127.0.0.1", "port": "1234"},
 			},
-		},
-		ShardAssignments: map[string]store.AssignedState{},
-	}, nil)
+		}}, nil)
 
 	h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 	resp, err := h.GetNamespaceState(context.Background(), &types.GetNamespaceStateRequest{Namespace: _testNamespaceFixed})

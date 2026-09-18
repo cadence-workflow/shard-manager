@@ -63,6 +63,10 @@ type Store interface {
 	// shard statistics, and shard assignments.
 	GetState(ctx context.Context, namespace string) (*NamespaceState, error)
 
+	// GetAssignmentState retrieves the assignment state of a namespace, which it
+	// skips the host drains, statistics and reported shards that GetState decodes.
+	GetAssignmentState(ctx context.Context, namespace string) (*AssignmentState, error)
+
 	// AssignShards assigns multiple shards to executors within a namespace and
 	// deletes specified executors.
 	// The operation is atomic and guarded by the provided GuardFunc.

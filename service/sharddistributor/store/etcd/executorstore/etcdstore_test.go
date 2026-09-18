@@ -254,7 +254,9 @@ func TestGetExecutorState(t *testing.T) {
 	}
 	require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
 		NewState: &store.NamespaceState{
-			ShardAssignments: assignState,
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: assignState,
+			},
 		},
 	}, store.NopGuard()))
 
@@ -293,9 +295,11 @@ func TestGetState(t *testing.T) {
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID2, store.HeartbeatState{Status: types.ExecutorStatusDRAINING}))
 	require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
 		NewState: &store.NamespaceState{
-			ShardAssignments: map[string]store.AssignedState{
-				executorID1: {AssignedShards: map[string]*types.ShardAssignment{shardID1: {}}},
-				executorID2: {AssignedShards: map[string]*types.ShardAssignment{shardID2: {}}},
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					executorID1: {AssignedShards: map[string]*types.ShardAssignment{shardID1: {}}},
+					executorID2: {AssignedShards: map[string]*types.ShardAssignment{shardID2: {}}},
+				},
 			},
 		},
 	}, store.NopGuard()))
@@ -367,8 +371,10 @@ func TestAssignShards_WithRevisions(t *testing.T) {
 
 		// Define a new state: assign shard1 to exec1
 		newState := &store.NamespaceState{
-			ShardAssignments: map[string]store.AssignedState{
-				executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
+				},
 			},
 		}
 
@@ -389,17 +395,21 @@ func TestAssignShards_WithRevisions(t *testing.T) {
 
 		// Process A defines its desired state: assign shard-new to exec1
 		processAState := &store.NamespaceState{
-			ShardAssignments: map[string]store.AssignedState{
-				executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
-				executorID2: {},
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
+					executorID2: {},
+				},
 			},
 		}
 
 		// Process B defines its desired state: assign shard-new to exec2
 		processBState := &store.NamespaceState{
-			ShardAssignments: map[string]store.AssignedState{
-				executorID1: {},
-				executorID2: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					executorID1: {},
+					executorID2: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
+				},
 			},
 		}
 
@@ -495,7 +505,11 @@ func TestGuardedOperations(t *testing.T) {
 
 	// 3. Use the valid guard to assign shards - should succeed
 	assignState := map[string]store.AssignedState{"exec-1": {}}
-	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{ShardAssignments: assignState}}, validGuard)
+	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignState,
+		},
+	}}, validGuard)
 	require.NoError(t, err, "Assigning shards with a valid leader guard should succeed")
 
 	// 4. First node resigns, second node becomes leader
@@ -503,7 +517,11 @@ func TestGuardedOperations(t *testing.T) {
 	require.NoError(t, election2.Campaign(ctx, "host-2"))
 
 	// 5. Use the now-invalid guard from the first leader - should fail
-	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{ShardAssignments: assignState}}, validGuard)
+	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignState,
+		},
+	}}, validGuard)
 	require.Error(t, err, "Assigning shards with a stale leader guard should fail")
 
 	// 6. Use the NopGuard to delete an executor - should succeed

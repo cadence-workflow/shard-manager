@@ -148,6 +148,21 @@ func (mr *MockStoreMockRecorder) DrainShards(ctx, namespace, shardIDs any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DrainShards", reflect.TypeOf((*MockStore)(nil).DrainShards), ctx, namespace, shardIDs)
 }
 
+// GetAssignmentState mocks base method.
+func (m *MockStore) GetAssignmentState(ctx context.Context, namespace string) (*AssignmentState, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAssignmentState", ctx, namespace)
+	ret0, _ := ret[0].(*AssignmentState)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAssignmentState indicates an expected call of GetAssignmentState.
+func (mr *MockStoreMockRecorder) GetAssignmentState(ctx, namespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAssignmentState", reflect.TypeOf((*MockStore)(nil).GetAssignmentState), ctx, namespace)
+}
+
 // GetDrainedHosts mocks base method.
 func (m *MockStore) GetDrainedHosts(ctx context.Context, namespace string) ([]DrainedHost, error) {
 	m.ctrl.T.Helper()

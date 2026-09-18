@@ -71,6 +71,10 @@ func TestParseExecutorKVs(t *testing.T) {
 			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorShardStatisticsKey)),
 			Value: marshal(stats),
 		},
+		{
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorHostMetadataKey)),
+			Value: []byte(`{"host_name":"host-name"}`),
+		},
 	}
 
 	result, err := ParseExecutorKVs(prefix, namespace, kvs)
@@ -89,4 +93,6 @@ func TestParseExecutorKVs(t *testing.T) {
 	assert.Equal(t, int64(123), data.AssignedState.ModRevision)
 	assert.Equal(t, map[string]string{"k1": "v1"}, data.Metadata)
 	assert.Equal(t, stats, data.Statistics)
+	require.NotNil(t, data.HostMetadata)
+	assert.Equal(t, "host-name", data.HostMetadata.HostName)
 }

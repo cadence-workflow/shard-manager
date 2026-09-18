@@ -198,7 +198,10 @@ func TestDrainedHostsPrefixIsDisjointFromSiblingPrefixes(t *testing.T) {
 	}
 }
 
-func TestValidateHostnameRejectsOverLength(t *testing.T) {
-	assert.NoError(t, ValidateHostname(strings.Repeat("a", 128)))
-	assert.ErrorContains(t, ValidateHostname(strings.Repeat("a", 129)), "exceeds 128 bytes")
+func TestParseExecutorKey_HostMetadata(t *testing.T) {
+	hostMetadataKey := BuildExecutorKey("/cadence", "test-ns", "exec-1", ExecutorHostMetadataKey)
+	executorID, keyType, err := ParseExecutorKey("/cadence", "test-ns", hostMetadataKey)
+	assert.NoError(t, err)
+	assert.Equal(t, "exec-1", executorID)
+	assert.Equal(t, ExecutorHostMetadataKey, keyType)
 }

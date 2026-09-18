@@ -556,7 +556,7 @@ type ExecutorHeartbeatRequest struct {
 
 // HostMetadata carries host-level attributes reported on each heartbeat
 type HostMetadata struct {
-	HostName string
+	HostName string `json:"host_name,omitempty"`
 }
 
 func (v *ExecutorHeartbeatRequest) GetNamespace() (o string) {

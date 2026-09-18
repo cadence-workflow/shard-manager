@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 )
 
 // BuildNamespacePrefix constructs the etcd key prefix for a given namespace.
@@ -35,6 +37,7 @@ const (
 	ExecutorAssignedStateKey   ExecutorKeyType = "assigned_state"
 	ExecutorMetadataKey        ExecutorKeyType = "metadata"
 	ExecutorShardStatisticsKey ExecutorKeyType = "statistics"
+	ExecutorHostMetadataKey    ExecutorKeyType = "host_metadata"
 )
 
 // validExecutorKeyTypes defines the set of valid executor key types.
@@ -45,6 +48,7 @@ var validExecutorKeyTypes = map[ExecutorKeyType]struct{}{
 	ExecutorAssignedStateKey:   {},
 	ExecutorMetadataKey:        {},
 	ExecutorShardStatisticsKey: {},
+	ExecutorHostMetadataKey:    {},
 }
 
 // IsValidExecutorKeyType checks if the provided key type is valid.
@@ -134,8 +138,6 @@ func ParseDrainedShardKey(prefix, namespace, key string) (shardID string, err er
 	return shardID, nil
 }
 
-const maxHostnameLength = 128
-
 // BuildDrainedHostsPrefix constructs the etcd key prefix for drained hosts within a given namespace
 // Expected format: <prefix>/<namespace>/drained_hosts/
 func BuildDrainedHostsPrefix(prefix, namespace string) string {
@@ -148,34 +150,16 @@ func BuildDrainedHostKey(prefix, namespace, hostname string) string {
 	return fmt.Sprintf("%s%s", BuildDrainedHostsPrefix(prefix, namespace), hostname)
 }
 
-// ValidateHostname rejects hostnames that cannot survive a key round trip or that
-// would break hostname@uuid matching.
-func ValidateHostname(hostname string) error {
-	if hostname == "" {
-		return errors.New("hostname must not be empty")
-	}
-	if len(hostname) > maxHostnameLength {
-		return fmt.Errorf("hostname exceeds %d bytes", maxHostnameLength)
-	}
-	if strings.Contains(hostname, "/") {
-		return fmt.Errorf("hostname '%s' must not contain '/'", hostname)
-	}
-	if strings.Contains(hostname, "@") {
-		return fmt.Errorf("hostname '%s' must not contain '@'", hostname)
-	}
-	return nil
-}
-
 // ParseDrainedHostKey extracts the hostname from a drained-host etcd key.
 // Expected format: <prefix>/<namespace>/drained_hosts/<hostname>
-func ParseDrainedHostKey(prefix, namespace, key string) (hostname string, err error) {
+func ParseDrainedHostKey(prefix, namespace, key string) (string, error) {
 	drainedPrefix := BuildDrainedHostsPrefix(prefix, namespace)
 	if !strings.HasPrefix(key, drainedPrefix) {
 		return "", fmt.Errorf("key '%s' does not have expected drained hosts prefix '%s'", key, drainedPrefix)
 	}
-	hostname = strings.TrimPrefix(key, drainedPrefix)
-	if err := ValidateHostname(hostname); err != nil {
+	parsed := strings.TrimPrefix(key, drainedPrefix)
+	if err := hostname.Validate(parsed); err != nil {
 		return "", fmt.Errorf("unexpected drained host key format '%s': %w", key, err)
 	}
-	return hostname, nil
+	return parsed, nil
 }

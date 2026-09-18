@@ -18,6 +18,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 )
 
 const testUniqueID = "00000000-0000-0000-0000-000000000001"
@@ -142,9 +143,49 @@ func TestBuildExecutorID(t *testing.T) {
 func TestBuildExecutorID_LimitsHostnameLengthAndPreservesUUID(t *testing.T) {
 	executorID := buildExecutorID(strings.Repeat("hostname/", 100), testUniqueID)
 
-	assert.Len(t, executorID, maxHostnameLength+len("@"+testUniqueID))
+	assert.Len(t, executorID, hostname.MaxLength+len("@"+testUniqueID))
 	assert.NotContains(t, executorID, "/")
 	assert.True(t, strings.HasSuffix(executorID, "@"+testUniqueID))
+}
+
+func TestNewExecutor_HeartbeatHostMetadata(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	var got *types.ExecutorHeartbeatRequest
+	client := NewMockClient(ctrl)
+	client.EXPECT().
+		Heartbeat(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, request *types.ExecutorHeartbeatRequest, _ ...yarpc.CallOption) (*types.ExecutorHeartbeatResponse, error) {
+			got = request
+			return &types.ExecutorHeartbeatResponse{}, nil
+		})
+
+	params := Params[*MockShardProcessor]{
+		ExecutorClient:        client,
+		MetricsScope:          tally.NoopScope,
+		Logger:                zap.NewNop(),
+		ShardProcessorFactory: NewMockShardProcessorFactory[*MockShardProcessor](ctrl),
+		TimeSource:            clock.NewMockedTimeSource(),
+		Config: clientcommon.Config{
+			Namespaces: []clientcommon.NamespaceConfig{
+				{
+					Namespace:         "test-namespace",
+					HeartBeatInterval: 5 * time.Second,
+				},
+			},
+		},
+	}
+
+	executor, err := NewExecutor(params)
+	require.NoError(t, err)
+	require.NoError(t, executor.(*executorImpl[*MockShardProcessor]).heartbeater.DrainingHeartbeat())
+
+	require.NotNil(t, got)
+	require.NotNil(t, got.HostMetadata)
+	assert.NotEmpty(t, got.HostMetadata.HostName)
+	assert.True(t, strings.HasPrefix(got.ExecutorID, got.HostMetadata.HostName+"@"))
+	assert.NotContains(t, got.HostMetadata.HostName, "/")
+	assert.LessOrEqual(t, len(got.HostMetadata.HostName), hostname.MaxLength)
 }
 
 // Create distinct mock processor types for testing multiple namespaces

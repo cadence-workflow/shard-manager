@@ -37,6 +37,7 @@ func newTestManager(t *testing.T, handler func(ctx context.Context, req *types.E
 		mockClient,
 		"test-namespace",
 		"test-executor",
+		"test-hostname",
 		mockState,
 		tally.NoopScope,
 		time.Second,
@@ -156,4 +157,37 @@ func TestManager_DrainingHeartbeat(t *testing.T) {
 	err := m.DrainingHeartbeat()
 	require.NoError(t, err)
 	assert.Equal(t, types.ExecutorStatusDRAINING, gotStatus)
+}
+
+func TestManager_SendsHostMetadata(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	var got *types.ExecutorHeartbeatRequest
+	mockClient := sharddistributorexecutor.NewMockClient(ctrl)
+	mockClient.EXPECT().
+		Heartbeat(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, req *types.ExecutorHeartbeatRequest, _ ...yarpc.CallOption) (*types.ExecutorHeartbeatResponse, error) {
+			got = req
+			return &types.ExecutorHeartbeatResponse{}, nil
+		})
+
+	mockState := NewMockStateProvider(ctrl)
+	mockState.EXPECT().GetShardStatusReports().Return(nil)
+	mockState.EXPECT().GetMetadata().Return(nil)
+
+	m := NewManager(
+		mockClient,
+		"test-namespace",
+		"test-executor",
+		"host-name",
+		mockState,
+		tally.NoopScope,
+		time.Second,
+	)
+
+	_, err := m.Heartbeat(context.Background(), "")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.NotNil(t, got.HostMetadata)
+	assert.Equal(t, "host-name", got.HostMetadata.HostName)
 }

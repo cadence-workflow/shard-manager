@@ -264,8 +264,6 @@ func (s *executorStoreImpl) loadDrainedShardSet(ctx context.Context, namespace s
 	return s.parseDrainedShardKVs(namespace, resp.Kvs), nil
 }
 
-// parseDrainedShardKVs turns drained-shard keys into a set of shard IDs.
-// Malformed keys are skipped to not stall the rebalance loop.
 func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace string) (*store.AssignmentState, error) {
 	metricsScope := s.metricsClient.Scope(
 		metrics.ShardDistributorStoreGetAssignmentStateScope,
@@ -277,7 +275,7 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 	)
 	start := s.timeSource.Now()
 	txnResp, err := txn.Commit()
-	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreGetStateETCDRoundTripLatency, s.timeSource.Since(start))
+	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency, s.timeSource.Since(start))
 	if err != nil {
 		return nil, fmt.Errorf("get namespace assignment state: %w", err)
 	}
@@ -298,6 +296,8 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 	}, nil
 }
 
+// parseDrainedShardKVs turns drained-shard keys into a set of shard IDs.
+// Malformed keys are skipped to not stall the rebalance loop.
 func (s *executorStoreImpl) parseDrainedShardKVs(namespace string, kvs []*mvccpb.KeyValue) map[string]struct{} {
 	drained := make(map[string]struct{}, len(kvs))
 	for _, kv := range kvs {

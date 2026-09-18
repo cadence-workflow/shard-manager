@@ -320,6 +320,47 @@ func TestGetState(t *testing.T) {
 	assert.Contains(t, namespaceState.ShardAssignments[executorID2].AssignedShards, shardID2)
 }
 
+// The assignment read covers two etcd ranges, and the drained set comes from the second
+// one, so a test that only checks assignments would not notice it going missing.
+func TestGetAssignmentState(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	assignedID := "exec-TestGetAssignmentState-assigned"
+	heartbeatOnlyID := "exec-TestGetAssignmentState-heartbeat-only"
+
+	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, assignedID, store.HeartbeatState{
+		Status:   types.ExecutorStatusACTIVE,
+		Metadata: map[string]string{"hostname": "host-1"},
+	}))
+	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, heartbeatOnlyID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
+	require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
+		NewState: &store.NamespaceState{
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					assignedID: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
+				},
+			},
+		},
+	}, store.NopGuard()))
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-2"}))
+
+	state, err := executorStore.GetAssignmentState(ctx, tc.Namespace)
+	require.NoError(t, err)
+
+	// An executor holding nothing still has to be visible, or the cache cannot resolve it.
+	require.Len(t, state.ExecutorMetadata, 2)
+	assert.Equal(t, map[string]string{"hostname": "host-1"}, state.ExecutorMetadata[assignedID])
+
+	require.Len(t, state.ShardAssignments, 1)
+	assert.Contains(t, state.ShardAssignments[assignedID].AssignedShards, "shard-1")
+
+	assert.Contains(t, state.DrainedShards, "shard-2")
+	assert.NotZero(t, state.Revision)
+}
+
 func TestGetStateRecordsETCDRoundTripLatencyOnError(t *testing.T) {
 	namespace := "test_namespace"
 	histogramName := "test.shard_distributor_store_get_state_etcd_round_trip_latency+namespace=test_namespace,operation=StoreGetState"

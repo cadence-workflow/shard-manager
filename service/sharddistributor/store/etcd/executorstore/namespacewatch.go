@@ -186,7 +186,8 @@ func (w *namespaceWatcher) hasNamespaceStateChanged(watchResp clientv3.WatchResp
 		case strings.HasPrefix(key, executorsPrefix):
 			_, keyType, err := etcdkeys.ParseExecutorKey(w.prefix, namespace, key)
 			if err != nil {
-				w.logger.Warn("Received watch event with unrecognized key format", tag.Key(key))
+				w.logger.Warn("Received watch event with unrecognized key format",
+					tag.ShardNamespace(namespace), tag.Key(key), tag.Error(err))
 				continue
 			}
 			if keyType != etcdkeys.ExecutorAssignedStateKey && keyType != etcdkeys.ExecutorMetadataKey {
@@ -203,7 +204,8 @@ func (w *namespaceWatcher) hasNamespaceStateChanged(watchResp clientv3.WatchResp
 			// and undraining arrives as a nil-valued tombstone, so a previous-value
 			// comparison would see "" on both sides and miss the undrain.
 			if _, err := etcdkeys.ParseDrainedShardKey(w.prefix, namespace, key); err != nil {
-				w.logger.Warn("Received drained shards watch event with unrecognized key format", tag.Error(err))
+				w.logger.Warn("Received drained shards watch event with unrecognized key format",
+					tag.ShardNamespace(namespace), tag.Key(key), tag.Error(err))
 				continue
 			}
 			return true

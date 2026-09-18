@@ -10,7 +10,7 @@ import (
 
 // ShardCache answers shard and executor lookups from a cached view of the namespace,
 // which it keeps current in the background from a Store. Lookups that miss the cache
-// trigger a refresh, so a caller never sees a shard purely because the cache is cold.
+// trigger a refresh, so a caller never misses a shard purely because the cache is cold.
 type ShardCache interface {
 	// GetShardOwner retrieves the owner of a specific shard within a namespace.
 	// It returns store.ErrShardNotFound if the shard does not exist, and store.ErrShardDrained
@@ -23,7 +23,7 @@ type ShardCache interface {
 	// GetShardAssignments returns a snapshot of assignments and drained shards.
 	GetShardAssignments(namespace string) (store.AssignmentSnapshot, error)
 
-	// Subscribe signals when the namespace's assignments change. The returned
-	// function unsubscribes.
+	// Subscribe signals when the namespace's assignments, executor metadata or
+	// drained shards change. The returned function unsubscribes.
 	Subscribe(namespace string) (<-chan struct{}, func(), error)
 }

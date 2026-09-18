@@ -40,7 +40,6 @@ func TestShardExecutorCacheForwarding(t *testing.T) {
 		TimeSource:    clock.NewRealTimeSource(),
 		MetricsClient: metrics.NewNoopMetricsClient(),
 	}).(*ShardToExecutorCache)
-	cache.Start()
 	defer cache.Stop()
 
 	// The namespace is created on first use, and read through as the cache is empty
@@ -88,7 +87,6 @@ func TestShardCacheNamespaceStartFailure(t *testing.T) {
 		TimeSource:    clock.NewRealTimeSource(),
 		MetricsClient: metrics.NewNoopMetricsClient(),
 	}).(*ShardToExecutorCache)
-	cache.Start()
 	defer cache.Stop()
 
 	tests := map[string]func() error{

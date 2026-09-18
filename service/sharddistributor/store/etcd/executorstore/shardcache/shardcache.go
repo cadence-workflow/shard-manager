@@ -53,12 +53,11 @@ func NewShardCache(p ShardCacheParams) cache.ShardCache {
 		metricsClient:     p.MetricsClient,
 	}
 
-	p.Lifecycle.Append(fx.StartStopHook(cache.Start, cache.Stop))
+	// Nothing to start: the per-namespace refresh loops begin lazily on first use.
+	p.Lifecycle.Append(fx.StopHook(cache.Stop))
 
 	return cache
 }
-
-func (s *ShardToExecutorCache) Start() {}
 
 func (s *ShardToExecutorCache) Stop() {
 	close(s.stopC)

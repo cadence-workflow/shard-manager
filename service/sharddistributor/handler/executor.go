@@ -61,16 +61,11 @@ func (h *executor) Heartbeat(ctx context.Context, request *types.ExecutorHeartbe
 		Status:         request.Status,
 		ReportedShards: request.ShardStatusReports,
 		Metadata:       request.GetMetadata(),
-		HostMetadata:   request.GetHostMetadata(),
+		HostMetadata:   normalizeHostMetadata(request.GetHostMetadata()),
 	}
 
 	if err := validateMetadata(newHeartbeat.Metadata); err != nil {
 		return nil, types.BadRequestError{Message: fmt.Sprintf("invalid metadata: %s", err)}
-	}
-	if hostName := newHeartbeat.Hostname(); hostName != "" {
-		if err := hostname.Validate(hostName); err != nil {
-			return nil, types.BadRequestError{Message: fmt.Sprintf("invalid host_name: %s", err)}
-		}
 	}
 
 	err = h.storage.RecordHeartbeat(ctx, request.Namespace, request.ExecutorID, newHeartbeat)
@@ -194,6 +189,13 @@ func validateMetadata(metadata map[string]string) error {
 	}
 
 	return nil
+}
+
+func normalizeHostMetadata(metadata *types.HostMetadata) *types.HostMetadata {
+	if metadata == nil {
+		return nil
+	}
+	return &types.HostMetadata{HostName: hostname.Normalize(metadata.HostName)}
 }
 
 func filterNewlyAssignedShardIDs(previousHeartbeat *store.HeartbeatState, assignedState *store.AssignedState) []string {

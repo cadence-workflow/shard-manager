@@ -835,8 +835,10 @@ func (p *namespaceProcessor) buildHandoverStats(
 
 		handoverType := types.HandoverTypeEMERGENCY
 		// Consider it a graceful handover if the previous executor was in DRAINING
-		// or DRAINED status. Otherwise, it is an emergency handover.
-		if previousExecutorHeartbeat.Status == types.ExecutorStatusDRAINING || previousExecutorHeartbeat.Status == types.ExecutorStatusDRAINED {
+		// or DRAINED status, or its host is drained.
+		if previousExecutorHeartbeat.Status == types.ExecutorStatusDRAINING ||
+			previousExecutorHeartbeat.Status == types.ExecutorStatusDRAINED ||
+			namespaceState.IsExecutorHostDrained(previousOwner) {
 			handoverType = types.HandoverTypeGRACEFUL
 		}
 		stats[shardID] = store.ShardHandoverStats{

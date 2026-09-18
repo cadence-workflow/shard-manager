@@ -624,7 +624,7 @@ func TestGetFullNamespaceState(t *testing.T) {
 				tt.setupMocks(mockStorage)
 			}
 
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			resp, err := h.GetFullNamespaceState(context.Background(), tt.request)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), tt.wantErrContains)
@@ -695,7 +695,7 @@ func TestGetFullNamespaceState_success(t *testing.T) {
 		},
 	}, nil)
 
-	h := newTestHandler(t, cfg, mockStorage)
+	h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 	actualResponse, err := h.GetFullNamespaceState(context.Background(), &types.GetFullNamespaceStateRequest{Namespace: _testNamespaceFixed})
 	require.NoError(t, err)
 	expectedResponse := &types.GetFullNamespaceStateResponse{

@@ -13,6 +13,7 @@ import (
 
 // ParseExecutorKVs parses a list of etcd key-value pairs into a map of ParsedExecutorData,
 // grouped by executor ID.
+// Unknown key types are ignored and do not create an executor.
 func ParseExecutorKVs(etcdPrefix, namespace string, kvs []*mvccpb.KeyValue) (map[string]*etcdtypes.ParsedExecutorData, error) {
 	data := make(map[string]*etcdtypes.ParsedExecutorData)
 
@@ -24,12 +25,7 @@ func ParseExecutorKVs(etcdPrefix, namespace string, kvs []*mvccpb.KeyValue) (map
 
 		execData, ok := data[executorID]
 		if !ok {
-			execData = &etcdtypes.ParsedExecutorData{
-				ReportedShards: make(map[string]*types.ShardStatusReport),
-				Metadata:       make(map[string]string),
-				Statistics:     make(map[string]etcdtypes.ShardStatistics),
-			}
-			data[executorID] = execData
+			execData = newParsedExecutorData()
 		}
 
 		switch keyType {
@@ -62,10 +58,20 @@ func ParseExecutorKVs(etcdPrefix, namespace string, kvs []*mvccpb.KeyValue) (map
 				return nil, fmt.Errorf("parse shard statistics for %s: %w", executorID, err)
 			}
 		default:
-			// Ignore unknown executor key types so a mixed-version fleet can
-			// introduce new keys without failing GetState on older binaries.
+			// Skip keys from newer binaries
+			continue
 		}
+
+		data[executorID] = execData
 	}
 
 	return data, nil
+}
+
+func newParsedExecutorData() *etcdtypes.ParsedExecutorData {
+	return &etcdtypes.ParsedExecutorData{
+		ReportedShards: make(map[string]*types.ShardStatusReport),
+		Metadata:       make(map[string]string),
+		Statistics:     make(map[string]etcdtypes.ShardStatistics),
+	}
 }

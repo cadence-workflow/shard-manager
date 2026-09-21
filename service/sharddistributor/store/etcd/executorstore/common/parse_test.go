@@ -94,16 +94,21 @@ func TestParseExecutorKVs(t *testing.T) {
 func TestParseExecutorKVs_SkipsUnknownKeyTypes(t *testing.T) {
 	prefix := "/test-prefix"
 	namespace := "test-ns"
-	executorID := "exec-1"
+	knownExecutorID := "exec-1"
+	unknownOnlyExecutorID := "exec-2"
 	heartbeatTime := time.Date(2025, 11, 18, 12, 0, 0, 0, time.UTC)
 
 	kvs := []*mvccpb.KeyValue{
 		{
-			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorHeartbeatKey)),
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, knownExecutorID, etcdkeys.ExecutorHeartbeatKey)),
 			Value: []byte(etcdtypes.FormatTime(heartbeatTime)),
 		},
 		{
-			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, "future_field")),
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, knownExecutorID, "future_field")),
+			Value: []byte("ignored"),
+		},
+		{
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, unknownOnlyExecutorID, "future_field")),
 			Value: []byte("ignored"),
 		},
 	}
@@ -111,5 +116,7 @@ func TestParseExecutorKVs_SkipsUnknownKeyTypes(t *testing.T) {
 	result, err := ParseExecutorKVs(prefix, namespace, kvs)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
-	assert.Equal(t, etcdtypes.Time(heartbeatTime), result[executorID].LastHeartbeat)
+	assert.Equal(t, etcdtypes.Time(heartbeatTime), result[knownExecutorID].LastHeartbeat)
+	_, found := result[unknownOnlyExecutorID]
+	assert.False(t, found)
 }

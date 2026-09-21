@@ -61,6 +61,9 @@ func ParseExecutorKVs(etcdPrefix, namespace string, kvs []*mvccpb.KeyValue) (map
 			if err := DecompressAndUnmarshal(kv.Value, &execData.Statistics); err != nil {
 				return nil, fmt.Errorf("parse shard statistics for %s: %w", executorID, err)
 			}
+		default:
+			// Ignore unknown executor key types so a mixed-version fleet can
+			// introduce new keys without failing GetState on older binaries.
 		}
 	}
 

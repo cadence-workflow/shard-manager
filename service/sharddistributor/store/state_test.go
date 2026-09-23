@@ -134,15 +134,40 @@ func TestNamespaceState_ShardOwners(t *testing.T) {
 	}
 }
 
+func TestExecutorHostname(t *testing.T) {
+	tests := []struct {
+		name       string
+		executorID string
+		want       string
+	}{
+		{name: "hostname@uuid", executorID: "host-a@abc", want: "host-a"},
+		{name: "no at-sign", executorID: "legacy-exec", want: ""},
+		{name: "empty", executorID: "", want: ""},
+		{name: "leading at-sign", executorID: "@uuid", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, executorHostname(tt.executorID))
+		})
+	}
+}
+
 func TestNamespaceState_IsExecutorAssignable(t *testing.T) {
 	staleExecutors := map[string]int64{"stale": 1}
 	state := &NamespaceState{
 		Executors: map[string]HeartbeatState{
-			"active":   {Status: types.ExecutorStatusACTIVE},
-			"draining": {Status: types.ExecutorStatusDRAINING},
-			"drained":  {Status: types.ExecutorStatusDRAINED},
-			"stale":    {Status: types.ExecutorStatusACTIVE},
-			"invalid":  {Status: types.ExecutorStatusINVALID},
+			"active":        {Status: types.ExecutorStatusACTIVE},
+			"draining":      {Status: types.ExecutorStatusDRAINING},
+			"drained":       {Status: types.ExecutorStatusDRAINED},
+			"stale":         {Status: types.ExecutorStatusACTIVE},
+			"invalid":       {Status: types.ExecutorStatusINVALID},
+			"host-a@uuid-1": {Status: types.ExecutorStatusACTIVE},
+			"host-b@uuid-1": {Status: types.ExecutorStatusACTIVE},
+			"legacy-host-a": {Status: types.ExecutorStatusACTIVE},
+		},
+		DrainedHosts: map[string]DrainedHost{
+			"host-a": {Hostname: "host-a"},
 		},
 	}
 
@@ -157,6 +182,9 @@ func TestNamespaceState_IsExecutorAssignable(t *testing.T) {
 		{name: "stale", executorID: "stale", want: false},
 		{name: "invalid status", executorID: "invalid", want: false},
 		{name: "absent executor", executorID: "missing", want: false},
+		{name: "active on drained host", executorID: "host-a@uuid-1", want: false},
+		{name: "active on other host", executorID: "host-b@uuid-1", want: true},
+		{name: "legacy id without at-sign ignores host drain", executorID: "legacy-host-a", want: true},
 	}
 
 	for _, tt := range tests {

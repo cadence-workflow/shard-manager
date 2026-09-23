@@ -21,7 +21,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
 	grpcClient "github.com/cadence-workflow/shard-manager/client/wrappers/grpc"
 	"github.com/cadence-workflow/shard-manager/common"
-	cc "github.com/cadence-workflow/shard-manager/common/client"
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
@@ -139,9 +138,6 @@ type versionMiddleware struct{}
 
 func (vm *versionMiddleware) Call(ctx context.Context, request *transport.Request, out transport.UnaryOutbound) (*transport.Response, error) {
 	request.Headers = request.Headers.
-		With(common.ClientImplHeaderName, cc.CLI).
-		With(common.FeatureVersionHeaderName, cc.SupportedCLIVersion).
-		With(common.ClientFeatureFlagsHeaderName, cc.FeatureFlagsHeader(cc.DefaultCLIFeatureFlags)).
 		With(common.CallerTypeHeaderName, types.CallerTypeCLI.String())
 	return out.Call(ctx, request)
 }

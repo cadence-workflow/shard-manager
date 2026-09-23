@@ -1,12 +1,3 @@
-admin.HeaderForwardingRules:
-- value:
-  - Add: true
-    Match: (?i)key
-  constraints: {}
-frontend.validSearchAttributes:
-- value:
-    DomainID: 1
-  constraints: {}
 testGetBoolPropertyKey:
 - value: false
   constraints: {}
@@ -47,9 +38,6 @@ testGetMapPropertyKey:
     - key4: true
       key5: 2.1
   constraints: {}
-- value: "1"
-  constraints:
-    taskListName: random tasklist
 testGetStringPropertyKey:
 - value: some random string
   constraints: {}

@@ -34,7 +34,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
 
-	"github.com/cadence-workflow/shard-manager/common/client"
 	"github.com/cadence-workflow/shard-manager/common/config"
 	"github.com/cadence-workflow/shard-manager/common/service"
 
@@ -57,12 +56,8 @@ func isValidService(in string) bool {
 // BuildCLI is the main entry point for the cadence server
 func BuildCLI(releaseVersion string, gitRevision string) *cli.App {
 	version := fmt.Sprintf(" Release version: %v \n"+
-		"   Build commit: %v\n"+
-		"   Max Support CLI feature version: %v \n"+
-		"   Max Support GoSDK feature version: %v \n"+
-		"   Max Support JavaSDK feature version: %v \n"+
-		"   Note:  Feature version is for compatibility checking between server and clients if enabled feature checking. Server is always backward compatible to older CLI versions, but not accepting newer than it can support.",
-		releaseVersion, gitRevision, client.SupportedCLIVersion, client.SupportedGoSDKVersion, client.SupportedJavaSDKVersion)
+		"   Build commit: %v",
+		releaseVersion, gitRevision)
 
 	app := cli.NewApp()
 	app.Name = "cadence"

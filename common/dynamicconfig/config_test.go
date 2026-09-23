@@ -101,7 +101,7 @@ func (s *configSuite) TestGetIntPropertyFilteredByShardID() {
 }
 
 func (s *configSuite) TestGetStringPropertyFnWithDomainFilter() {
-	key := dynamicproperties.DefaultEventEncoding
+	key := dynamicproperties.TestGetStringPropertyKey
 	domain := "testDomain"
 	value := s.cln.GetStringPropertyFilteredByDomain(key)
 	s.Equal(key.DefaultString(), value(domain))
@@ -110,7 +110,7 @@ func (s *configSuite) TestGetStringPropertyFnWithDomainFilter() {
 }
 
 func (s *configSuite) TestGetStringPropertyFnByTaskListInfo() {
-	key := dynamicproperties.TasklistLoadBalancerStrategy
+	key := dynamicproperties.TestGetStringPropertyKey
 	domain := "testDomain"
 	taskList := "testTaskList"
 	taskType := 0
@@ -130,7 +130,7 @@ func (s *configSuite) TestGetStringPropertyFnWithNamespaceFilter() {
 }
 
 func (s *configSuite) TestGetStringPropertyFilteredByRatelimitKey() {
-	key := dynamicproperties.FrontendGlobalRatelimiterMode
+	key := dynamicproperties.TestGetStringPropertyKey
 	ratelimitKey := "user:testDomain"
 	value := s.cln.GetStringPropertyFilteredByRatelimitKey(key)
 	s.Equal(key.DefaultString(), value(ratelimitKey))

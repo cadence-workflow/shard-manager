@@ -26,7 +26,7 @@ func Validate(name string) error {
 		return errors.New("hostname must not be empty")
 	}
 	if len(name) > MaxLength {
-		return fmt.Errorf("hostname exceeds %d bytes", MaxLength)
+		return fmt.Errorf("hostname %q exceeds %d bytes", name, MaxLength)
 	}
 	if strings.Contains(name, "/") {
 		return fmt.Errorf("hostname %q must not contain '/'", name)

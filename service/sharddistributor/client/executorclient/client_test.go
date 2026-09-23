@@ -116,36 +116,7 @@ func TestNewExecutor_ExecutorID(t *testing.T) {
 }
 
 func TestBuildExecutorID(t *testing.T) {
-	tests := []struct {
-		name     string
-		hostname string
-		want     string
-	}{
-		{
-			name:     "plain hostname",
-			hostname: "executor-1",
-			want:     "executor-1@" + testUniqueID,
-		},
-		{
-			name:     "slashes are replaced",
-			hostname: "executor/1",
-			want:     "executor_1@" + testUniqueID,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, buildExecutorID(tt.hostname, testUniqueID))
-		})
-	}
-}
-
-func TestBuildExecutorID_LimitsHostnameLengthAndPreservesUUID(t *testing.T) {
-	executorID := buildExecutorID(strings.Repeat("hostname/", 100), testUniqueID)
-
-	assert.Len(t, executorID, hostname.MaxLength+len("@"+testUniqueID))
-	assert.NotContains(t, executorID, "/")
-	assert.True(t, strings.HasSuffix(executorID, "@"+testUniqueID))
+	assert.Equal(t, "executor-1@"+testUniqueID, buildExecutorID("executor-1", testUniqueID))
 }
 
 func TestNewExecutor_HeartbeatHostMetadata(t *testing.T) {

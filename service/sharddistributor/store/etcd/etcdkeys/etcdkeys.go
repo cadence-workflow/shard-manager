@@ -40,23 +40,6 @@ const (
 	ExecutorHostMetadataKey    ExecutorKeyType = "host_metadata"
 )
 
-// validExecutorKeyTypes defines the set of valid executor key types.
-var validExecutorKeyTypes = map[ExecutorKeyType]struct{}{
-	ExecutorHeartbeatKey:       {},
-	ExecutorStatusKey:          {},
-	ExecutorReportedShardsKey:  {},
-	ExecutorAssignedStateKey:   {},
-	ExecutorMetadataKey:        {},
-	ExecutorShardStatisticsKey: {},
-	ExecutorHostMetadataKey:    {},
-}
-
-// IsValidExecutorKeyType checks if the provided key type is valid.
-func IsValidExecutorKeyType(keyType ExecutorKeyType) bool {
-	_, exist := validExecutorKeyTypes[keyType]
-	return exist
-}
-
 // BuildExecutorKey constructs the etcd key for a specific executor and key type.
 // result: <prefix>/<namespace>/executors/<executorID>/<keyType>
 func BuildExecutorKey(prefix, namespace, executorID string, keyType ExecutorKeyType) string {

@@ -229,6 +229,61 @@ func TestHeartbeat(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("SkipsUnchangedHostMetadata", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStore := store.NewMockStore(ctrl)
+		mockTimeSource := clock.NewMockedTimeSourceAt(now)
+		handler := newTestExecutorHandler(t, mockStore, mockTimeSource)
+
+		req := &types.ExecutorHeartbeatRequest{
+			Namespace:    namespace,
+			ExecutorID:   executorID,
+			Status:       types.ExecutorStatusACTIVE,
+			HostMetadata: &types.HostMetadata{HostName: "host-name"},
+		}
+
+		mockStore.EXPECT().GetExecutorState(gomock.Any(), namespace, executorID).Return(store.ExecutorState{
+			Heartbeat: &store.HeartbeatState{
+				HostMetadata: &types.HostMetadata{HostName: "host-name"},
+			},
+		}, nil)
+		mockStore.EXPECT().RecordHeartbeat(gomock.Any(), namespace, executorID, store.HeartbeatState{
+			LastHeartbeat: now,
+			Status:        types.ExecutorStatusACTIVE,
+		})
+
+		_, err := handler.Heartbeat(ctx, req)
+		require.NoError(t, err)
+	})
+
+	t.Run("RewritesChangedHostMetadata", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStore := store.NewMockStore(ctrl)
+		mockTimeSource := clock.NewMockedTimeSourceAt(now)
+		handler := newTestExecutorHandler(t, mockStore, mockTimeSource)
+
+		req := &types.ExecutorHeartbeatRequest{
+			Namespace:    namespace,
+			ExecutorID:   executorID,
+			Status:       types.ExecutorStatusACTIVE,
+			HostMetadata: &types.HostMetadata{HostName: "host-b"},
+		}
+
+		mockStore.EXPECT().GetExecutorState(gomock.Any(), namespace, executorID).Return(store.ExecutorState{
+			Heartbeat: &store.HeartbeatState{
+				HostMetadata: &types.HostMetadata{HostName: "host-a"},
+			},
+		}, nil)
+		mockStore.EXPECT().RecordHeartbeat(gomock.Any(), namespace, executorID, store.HeartbeatState{
+			LastHeartbeat: now,
+			Status:        types.ExecutorStatusACTIVE,
+			HostMetadata:  &types.HostMetadata{HostName: "host-b"},
+		})
+
+		_, err := handler.Heartbeat(ctx, req)
+		require.NoError(t, err)
+	})
+
 }
 
 func TestValidateMetadata(t *testing.T) {

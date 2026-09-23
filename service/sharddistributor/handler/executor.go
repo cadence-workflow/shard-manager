@@ -63,6 +63,11 @@ func (h *executor) Heartbeat(ctx context.Context, request *types.ExecutorHeartbe
 		Metadata:       request.GetMetadata(),
 		HostMetadata:   normalizeHostMetadata(request.GetHostMetadata()),
 	}
+	// Host metadata is stable for an executor. RecordHeartbeat leaves a nil
+	// value untouched, so omit it when the stored hostname already matches.
+	if executorState.Heartbeat != nil && executorState.Heartbeat.Hostname() == newHeartbeat.Hostname() {
+		newHeartbeat.HostMetadata = nil
+	}
 
 	if err := validateMetadata(newHeartbeat.Metadata); err != nil {
 		return nil, types.BadRequestError{Message: fmt.Sprintf("invalid metadata: %s", err)}

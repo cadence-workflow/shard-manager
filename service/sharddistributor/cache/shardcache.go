@@ -1,4 +1,4 @@
-package shardcache
+package cache
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -42,7 +41,7 @@ var Module = fx.Module("shardcache",
 	fx.Provide(NewShardCache),
 )
 
-func NewShardCache(p ShardCacheParams) cache.ShardCache {
+func NewShardCache(p ShardCacheParams) ShardCache {
 	cache := &ShardToExecutorCache{
 		namespaceToShards: make(NamespaceToShards),
 		timeSource:        p.TimeSource,

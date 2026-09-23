@@ -38,7 +38,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/namespace"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/process"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/shardcache"
 	meteredStore "github.com/cadence-workflow/shard-manager/service/sharddistributor/store/wrappers/metered"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/wrappers/accesscontrolled"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/wrappers/grpc"
@@ -51,7 +50,7 @@ var Module = fx.Module("sharddistributor",
 	namespace.Module,
 	election.Module,
 	process.Module,
-	shardcache.Module,
+	cache.Module,
 	fx.Provide(config.NewConfig),
 	fx.Decorate(func(s store.Store, metricsClient metrics.Client, logger log.Logger, timeSource clock.TimeSource) store.Store {
 		return meteredStore.NewStore(s, metricsClient, logger, timeSource)

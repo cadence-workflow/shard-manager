@@ -1386,7 +1386,7 @@ func TestFindExecutorsToUnassign(t *testing.T) {
 
 			namespaceState := &store.NamespaceState{
 				AssignmentState: store.AssignmentState{
-					ShardAssignments: map[string]store.AssignedState{"exec": tt.assignment},
+					ShardAssignments: map[string]store.AssignedState{tt.executorID: tt.assignment},
 				},
 				Executors:    map[string]store.HeartbeatState{tt.executorID: {Status: tt.status}},
 				DrainedHosts: tt.drainedHosts,

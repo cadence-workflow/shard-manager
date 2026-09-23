@@ -32,9 +32,9 @@ import (
 func BenchmarkGetIntProperty(b *testing.B) {
 	client := NewInMemoryClient()
 	cln := NewCollection(client, log.NewNoop())
-	key := dynamicproperties.MatchingMaxTaskBatchSize
+	key := dynamicproperties.TestGetIntPropertyKey
 	for i := 0; i < b.N; i++ {
 		size := cln.GetIntProperty(key)
-		assert.Equal(b, 100, size())
+		assert.Equal(b, 0, size())
 	}
 }

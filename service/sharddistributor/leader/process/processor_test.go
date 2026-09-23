@@ -1200,8 +1200,8 @@ func TestBuildHandoverStats(t *testing.T) {
 					AssignmentState: store.AssignmentState{
 						DrainedShards: drainedShards,
 					},
-					Executors: tc.executors,
-					DrainedHosts:  tc.drainedHosts,
+					Executors:    tc.executors,
+					DrainedHosts: tc.drainedHosts,
 				},
 				previousOwners,
 				newExecutorID,
@@ -1388,8 +1388,8 @@ func TestFindExecutorsToUnassign(t *testing.T) {
 				AssignmentState: store.AssignmentState{
 					ShardAssignments: map[string]store.AssignedState{"exec": tt.assignment},
 				},
-				Executors:        map[string]store.HeartbeatState{tt.executorID: {Status: tt.status}},
-				DrainedHosts:     tt.drainedHosts,
+				Executors:    map[string]store.HeartbeatState{tt.executorID: {Status: tt.status}},
+				DrainedHosts: tt.drainedHosts,
 			}
 
 			assert.Equal(t, tt.want, findExecutorsToUnassign(namespaceState, staleExecutors))

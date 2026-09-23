@@ -1,4 +1,4 @@
-package shardcache
+package cache
 
 import (
 	"context"

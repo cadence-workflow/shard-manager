@@ -55,10 +55,12 @@ func TestParseExecutorKey_MetadataKey(t *testing.T) {
 	assert.Equal(t, ExecutorMetadataKey, keyType)
 }
 
-func TestParseExecutorKey_InvalidKeyType(t *testing.T) {
-	key := BuildExecutorIDPrefix("/cadence", "test-ns", "exec-1") + "invalid_type"
-	_, _, err := ParseExecutorKey("/cadence", "test-ns", key)
-	assert.ErrorContains(t, err, "invalid executor key type: invalid_type")
+func TestParseExecutorKey_UnknownKeyType(t *testing.T) {
+	key := BuildExecutorIDPrefix("/cadence", "test-ns", "exec-1") + "future_field"
+	executorID, keyType, err := ParseExecutorKey("/cadence", "test-ns", key)
+	assert.NoError(t, err)
+	assert.Equal(t, "exec-1", executorID)
+	assert.Equal(t, ExecutorKeyType("future_field"), keyType)
 }
 
 func TestBuildDrainedShardsPrefix(t *testing.T) {

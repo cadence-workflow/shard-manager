@@ -63,8 +63,10 @@ func BuildExecutorKey(prefix, namespace, executorID string, keyType ExecutorKeyT
 	return fmt.Sprintf("%s%s", BuildExecutorIDPrefix(prefix, namespace, executorID), keyType)
 }
 
-// ParseExecutorKey parses an etcd key and extracts the executor ID and key type.
-// It returns an error if the key does not conform to the expected format.
+// ParseExecutorKey extracts the executor ID and key type from an etcd key.
+// Unknown key types are returned as-is
+// It errors only when the key is not under the executor prefix or
+// does not match executorID/keyType.
 // Expected format of key: <prefix>/<namespace>/executors/<executorID>/<keyType>
 func ParseExecutorKey(prefix, namespace, key string) (executorID string, keyType ExecutorKeyType, err error) {
 	prefix = BuildExecutorsPrefix(prefix, namespace)
@@ -85,9 +87,6 @@ func ParseExecutorKey(prefix, namespace, key string) (executorID string, keyType
 	}
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("unexpected key format: %s", key)
-	}
-	if !IsValidExecutorKeyType(ExecutorKeyType(parts[1])) {
-		return "", "", fmt.Errorf("invalid executor key type: %s", parts[1])
 	}
 	return parts[0], ExecutorKeyType(parts[1]), nil
 }

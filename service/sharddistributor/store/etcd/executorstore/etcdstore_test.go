@@ -3,7 +3,6 @@ package executorstore
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"github.com/uber-go/tally"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v2"
 
@@ -291,7 +289,9 @@ func TestGetExecutorState(t *testing.T) {
 	}
 	require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
 		NewState: &store.NamespaceState{
-			ShardAssignments: assignState,
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: assignState,
+			},
 		},
 	}, store.NopGuard()))
 
@@ -330,9 +330,11 @@ func TestGetState(t *testing.T) {
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID2, store.HeartbeatState{Status: types.ExecutorStatusDRAINING}))
 	require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
 		NewState: &store.NamespaceState{
-			ShardAssignments: map[string]store.AssignedState{
-				executorID1: {AssignedShards: map[string]*types.ShardAssignment{shardID1: {}}},
-				executorID2: {AssignedShards: map[string]*types.ShardAssignment{shardID2: {}}},
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					executorID1: {AssignedShards: map[string]*types.ShardAssignment{shardID1: {}}},
+					executorID2: {AssignedShards: map[string]*types.ShardAssignment{shardID2: {}}},
+				},
 			},
 		},
 	}, store.NopGuard()))
@@ -351,6 +353,47 @@ func TestGetState(t *testing.T) {
 	require.Len(t, namespaceState.ShardAssignments, 2, "Should retrieve two assignment states")
 	assert.Contains(t, namespaceState.ShardAssignments[executorID1].AssignedShards, shardID1)
 	assert.Contains(t, namespaceState.ShardAssignments[executorID2].AssignedShards, shardID2)
+}
+
+// The assignment read covers two etcd ranges, and the drained set comes from the second
+// one, so a test that only checks assignments would not notice it going missing.
+func TestGetAssignmentState(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	assignedID := "exec-TestGetAssignmentState-assigned"
+	heartbeatOnlyID := "exec-TestGetAssignmentState-heartbeat-only"
+
+	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, assignedID, store.HeartbeatState{
+		Status:   types.ExecutorStatusACTIVE,
+		Metadata: map[string]string{"hostname": "host-1"},
+	}))
+	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, heartbeatOnlyID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
+	require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
+		NewState: &store.NamespaceState{
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					assignedID: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
+				},
+			},
+		},
+	}, store.NopGuard()))
+	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-2"}))
+
+	state, err := executorStore.GetAssignmentState(ctx, tc.Namespace)
+	require.NoError(t, err)
+
+	// An executor holding nothing still has to be visible, or the cache cannot resolve it.
+	require.Len(t, state.ExecutorMetadata, 2)
+	assert.Equal(t, map[string]string{"hostname": "host-1"}, state.ExecutorMetadata[assignedID])
+
+	require.Len(t, state.ShardAssignments, 1)
+	assert.Contains(t, state.ShardAssignments[assignedID].AssignedShards, "shard-1")
+
+	assert.Contains(t, state.DrainedShards, "shard-2")
+	assert.NotZero(t, state.Revision)
 }
 
 func TestGetStateRecordsETCDRoundTripLatencyOnError(t *testing.T) {
@@ -404,8 +447,10 @@ func TestAssignShards_WithRevisions(t *testing.T) {
 
 		// Define a new state: assign shard1 to exec1
 		newState := &store.NamespaceState{
-			ShardAssignments: map[string]store.AssignedState{
-				executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
+				},
 			},
 		}
 
@@ -426,17 +471,21 @@ func TestAssignShards_WithRevisions(t *testing.T) {
 
 		// Process A defines its desired state: assign shard-new to exec1
 		processAState := &store.NamespaceState{
-			ShardAssignments: map[string]store.AssignedState{
-				executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
-				executorID2: {},
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
+					executorID2: {},
+				},
 			},
 		}
 
 		// Process B defines its desired state: assign shard-new to exec2
 		processBState := &store.NamespaceState{
-			ShardAssignments: map[string]store.AssignedState{
-				executorID1: {},
-				executorID2: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					executorID1: {},
+					executorID2: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
+				},
 			},
 		}
 
@@ -532,7 +581,11 @@ func TestGuardedOperations(t *testing.T) {
 
 	// 3. Use the valid guard to assign shards - should succeed
 	assignState := map[string]store.AssignedState{"exec-1": {}}
-	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{ShardAssignments: assignState}}, validGuard)
+	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignState,
+		},
+	}}, validGuard)
 	require.NoError(t, err, "Assigning shards with a valid leader guard should succeed")
 
 	// 4. First node resigns, second node becomes leader
@@ -540,7 +593,11 @@ func TestGuardedOperations(t *testing.T) {
 	require.NoError(t, election2.Campaign(ctx, "host-2"))
 
 	// 5. Use the now-invalid guard from the first leader - should fail
-	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{ShardAssignments: assignState}}, validGuard)
+	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignState,
+		},
+	}}, validGuard)
 	require.Error(t, err, "Assigning shards with a stale leader guard should fail")
 
 	// 6. Use the NopGuard to delete an executor - should succeed
@@ -849,7 +906,7 @@ func stringStatus(s types.ExecutorStatus) string {
 	return string(res)
 }
 
-func assignShardForTest(ctx context.Context, t *testing.T, executorStore store.Store, namespace, shardID, executorID string) {
+func assignShardForTest(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace, shardID, executorID string) {
 	t.Helper()
 
 	namespaceState, err := executorStore.GetState(ctx, namespace)
@@ -860,8 +917,7 @@ func assignShardForTest(ctx context.Context, t *testing.T, executorStore store.S
 		assignedState.AssignedShards = make(map[string]*types.ShardAssignment)
 	}
 	assignedState.AssignedShards[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
-	storeImpl := executorStore.(*executorStoreImpl)
-	assignedState.LastUpdated = storeImpl.timeSource.Now().UTC()
+	assignedState.LastUpdated = executorStore.timeSource.Now().UTC()
 	namespaceState.ShardAssignments[executorID] = assignedState
 
 	err = executorStore.AssignShards(
@@ -873,7 +929,7 @@ func assignShardForTest(ctx context.Context, t *testing.T, executorStore store.S
 	require.NoError(t, err)
 }
 
-func recordHeartbeats(ctx context.Context, t *testing.T, executorStore store.Store, namespace string, executorIDs ...string) {
+func recordHeartbeats(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace string, executorIDs ...string) {
 	t.Helper()
 
 	for _, executorID := range executorIDs {
@@ -881,12 +937,11 @@ func recordHeartbeats(ctx context.Context, t *testing.T, executorStore store.Sto
 	}
 }
 
-func setLoadBalancingMode(executorStore store.Store, mode string) {
-	impl := executorStore.(*executorStoreImpl)
-	if impl.cfg == nil {
-		impl.cfg = &config.Config{}
+func setLoadBalancingMode(executorStore *executorStoreImpl, mode string) {
+	if executorStore.cfg == nil {
+		executorStore.cfg = &config.Config{}
 	}
-	impl.cfg.LoadBalancingMode = func(string) string { return mode }
+	executorStore.cfg.LoadBalancingMode = func(string) string { return mode }
 }
 
 // trackingTxn implements clientv3.Txn to record operations per batch for testing.
@@ -1278,47 +1333,6 @@ func TestDrainShardsLifecycle(t *testing.T) {
 	assert.Equal(t, []string{"shard-C"}, drained)
 }
 
-func TestGetShardOwnerRefusesDrainedShards(t *testing.T) {
-	tc := testhelper.SetupStoreTestCluster(t)
-	executorStore := createStore(t, tc)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	executorID := "executor-drain-read-path"
-	shardID := "shard-drain-read-path"
-
-	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
-	assignShardForTest(ctx, t, executorStore, tc.Namespace, shardID, executorID)
-	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{shardID}))
-
-	require.Eventually(t, func() bool {
-		_, err := executorStore.GetShardOwner(ctx, tc.Namespace, shardID)
-		return errors.Is(err, store.ErrShardDrained)
-	}, 5*time.Second, 50*time.Millisecond)
-
-	_, err := executorStore.UndrainShards(ctx, tc.Namespace, []string{shardID})
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		owner, err := executorStore.GetShardOwner(ctx, tc.Namespace, shardID)
-		return err == nil && owner.ExecutorID == executorID
-	}, 5*time.Second, 50*time.Millisecond)
-}
-
-func TestGetShardOwnerReportsDrainedForUnassignedShard(t *testing.T) {
-	tc := testhelper.SetupStoreTestCluster(t)
-	executorStore := createStore(t, tc)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"never-assigned"}))
-
-	require.Eventually(t, func() bool {
-		_, err := executorStore.GetShardOwner(ctx, tc.Namespace, "never-assigned")
-		return errors.Is(err, store.ErrShardDrained)
-	}, 5*time.Second, 50*time.Millisecond)
-}
-
 // UndrainShards reports only the shards it actually removed. A shard that was never
 // drained, or that a previous call already removed, is excluded — that is what makes
 // the result meaningful to an operator rather than an echo of the request.
@@ -1337,59 +1351,6 @@ func TestUndrainShardsReportsOnlyActualRemovals(t *testing.T) {
 	removed, err = executorStore.UndrainShards(ctx, tc.Namespace, []string{"shard-A", "never-drained"})
 	require.NoError(t, err)
 	assert.Empty(t, removed, "repeating the same undrain removes nothing further")
-}
-
-// Spectators learn about drains through this subscription, so a drain has to
-// produce a notification on its own with no executor assignment change.
-func TestSubscribeToAssignmentChanges_NotifiesOnDrain(t *testing.T) {
-	tc := testhelper.SetupStoreTestCluster(t)
-	executorStore := createStore(t, tc)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	executorID := "executor-drain-subscribe"
-	shardID := "shard-drain-subscribe"
-
-	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
-	assignShardForTest(ctx, t, executorStore, tc.Namespace, shardID, executorID)
-	require.Eventually(t, func() bool {
-		owner, err := executorStore.GetShardOwner(ctx, tc.Namespace, shardID)
-		return err == nil && owner.ExecutorID == executorID
-	}, 5*time.Second, 50*time.Millisecond)
-
-	notifications, unsubscribe, err := executorStore.SubscribeToAssignmentChanges(ctx, tc.Namespace)
-	require.NoError(t, err)
-	defer unsubscribe()
-
-	// Drain a shard without touching the assigned_state
-	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{shardID}))
-
-	// Notifications are coalesced, so read the current cache after each wake-up.
-	var drainedSnapshot store.AssignmentSnapshot
-	deadline := time.After(10 * time.Second)
-	for {
-		var gotDrain bool
-		select {
-		case <-notifications:
-			drainedSnapshot, err = executorStore.GetShardAssignments(tc.Namespace)
-			require.NoError(t, err)
-			_, gotDrain = drainedSnapshot.DrainedShards[shardID]
-		case <-deadline:
-			t.Fatal("drain should notify the assignment subscribers")
-		}
-		if gotDrain {
-			break
-		}
-	}
-
-	// The assignment is read atomically with the drained set.
-	assignedShards := make([]string, 0)
-	for owner, shardIDs := range drainedSnapshot.ExecutorToShards {
-		if owner.ExecutorID == executorID {
-			assignedShards = append(assignedShards, shardIDs...)
-		}
-	}
-	assert.Equal(t, []string{shardID}, assignedShards)
 }
 
 // Draining must not leak across namespaces: the drained keyspace is per-namespace and
@@ -1694,27 +1655,21 @@ func hostnames(hosts []store.DrainedHost) []string {
 	return out
 }
 
-func createStore(t *testing.T, tc *testhelper.StoreTestCluster) store.Store {
+func createStore(t *testing.T, tc *testhelper.StoreTestCluster) *executorStoreImpl {
 	t.Helper()
 
 	etcdConfig, err := etcdclient.NewExecutorStoreConfig(tc.SDConfig)
 	require.NoError(t, err)
 
-	store, err := NewStore(ExecutorStoreParams{
-		Client:        tc.Client,
-		ETCDConfig:    etcdConfig,
-		Lifecycle:     fxtest.NewLifecycle(t),
-		Logger:        testlogger.New(t),
-		TimeSource:    clock.NewMockedTimeSourceAt(time.Now()),
-		MetricsClient: metrics.NewNoopMetricsClient(),
-		Config: &config.Config{
-			LoadBalancingMode: func(namespace string) string { return config.LoadBalancingModeNAIVE },
-			MaxEtcdTxnOps:     dynamicproperties.GetIntPropertyFn(128),
-			LoadBalancingGreedy: config.LoadBalancingGreedyConfig{
-				LoadSmoothingTimeConstant: func(string) time.Duration { return statistics.DefaultLoadSmoothingTimeConstant },
-			},
+	timeSource := clock.NewMockedTimeSourceAt(time.Now())
+	impl, err := newExecutorStoreImpl(tc.Client, etcdConfig, testlogger.New(t), timeSource, &config.Config{
+		LoadBalancingMode: func(namespace string) string { return config.LoadBalancingModeNAIVE },
+		MaxEtcdTxnOps:     dynamicproperties.GetIntPropertyFn(128),
+		LoadBalancingGreedy: config.LoadBalancingGreedyConfig{
+			LoadSmoothingTimeConstant: func(string) time.Duration { return statistics.DefaultLoadSmoothingTimeConstant },
 		},
-	})
+	}, metrics.NewNoopMetricsClient())
 	require.NoError(t, err)
-	return store
+
+	return impl
 }

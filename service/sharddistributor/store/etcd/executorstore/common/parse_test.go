@@ -96,3 +96,96 @@ func TestParseExecutorKVs(t *testing.T) {
 	require.NotNil(t, data.HostMetadata)
 	assert.Equal(t, "host-name", data.HostMetadata.HostName)
 }
+
+func TestParseExecutorKVs_SkipsUnknownKeyTypes(t *testing.T) {
+	prefix := "/test-prefix"
+	namespace := "test-ns"
+	knownExecutorID := "exec-1"
+	unknownOnlyExecutorID := "exec-2"
+	heartbeatTime := time.Date(2025, 11, 18, 12, 0, 0, 0, time.UTC)
+
+	kvs := []*mvccpb.KeyValue{
+		{
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, knownExecutorID, etcdkeys.ExecutorHeartbeatKey)),
+			Value: []byte(etcdtypes.FormatTime(heartbeatTime)),
+		},
+		{
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, knownExecutorID, "future_field")),
+			Value: []byte("ignored"),
+		},
+		{
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, unknownOnlyExecutorID, "future_field")),
+			Value: []byte("ignored"),
+		},
+	}
+
+	result, err := ParseExecutorKVs(prefix, namespace, kvs)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, etcdtypes.Time(heartbeatTime), result[knownExecutorID].LastHeartbeat)
+	_, found := result[unknownOnlyExecutorID]
+	assert.False(t, found)
+}
+
+// The point of the lean parse is what it does not decode, so the statistics and
+// reported shards here hold bytes that would fail to decompress if it did.
+func TestParseExecutorAssignmentKVs(t *testing.T) {
+	prefix := "/test-prefix"
+	namespace := "test-ns"
+	assignedID := "exec-assigned"
+	heartbeatOnlyID := "exec-heartbeat-only"
+	unknownOnlyID := "exec-unknown-only"
+
+	writer, err := NewRecordWriter(CompressionSnappy)
+	require.NoError(t, err)
+	assigned, err := json.Marshal(&etcdtypes.AssignedState{
+		AssignedShards: map[string]*types.ShardAssignment{
+			"shard-1": {Status: types.AssignmentStatusREADY},
+		},
+	})
+	require.NoError(t, err)
+	assignedValue, err := writer.Write(assigned)
+	require.NoError(t, err)
+
+	kvs := []*mvccpb.KeyValue{
+		{
+			Key:         []byte(etcdkeys.BuildExecutorKey(prefix, namespace, assignedID, etcdkeys.ExecutorAssignedStateKey)),
+			Value:       assignedValue,
+			ModRevision: 123,
+		},
+		{
+			Key:   []byte(etcdkeys.BuildMetadataKey(prefix, namespace, assignedID, "k1")),
+			Value: []byte("v1"),
+		},
+		{
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, assignedID, etcdkeys.ExecutorShardStatisticsKey)),
+			Value: []byte("not compressed json"),
+		},
+		{
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, assignedID, etcdkeys.ExecutorReportedShardsKey)),
+			Value: []byte("not compressed json"),
+		},
+		{
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, heartbeatOnlyID, etcdkeys.ExecutorHeartbeatKey)),
+			Value: []byte(etcdtypes.FormatTime(time.Now())),
+		},
+		{
+			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, unknownOnlyID, "future_field")),
+			Value: []byte("ignored"),
+		},
+	}
+
+	metadata, assignments, err := ParseExecutorAssignmentKVs(prefix, namespace, kvs)
+	require.NoError(t, err)
+
+	require.Len(t, metadata, 2)
+	assert.Equal(t, map[string]string{"k1": "v1"}, metadata[assignedID])
+	// An executor with no assignment record still has to be visible, but one known only
+	// by a key a newer binary writes must not be invented.
+	assert.Empty(t, metadata[heartbeatOnlyID])
+	assert.NotContains(t, metadata, unknownOnlyID)
+
+	require.Len(t, assignments, 1)
+	assert.Equal(t, map[string]*types.ShardAssignment{"shard-1": {Status: types.AssignmentStatusREADY}}, assignments[assignedID].AssignedShards)
+	assert.Equal(t, int64(123), assignments[assignedID].ModRevision)
+}

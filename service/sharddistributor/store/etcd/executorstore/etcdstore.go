@@ -17,6 +17,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
@@ -101,6 +102,14 @@ func (s *executorStoreImpl) RecordHeartbeat(ctx context.Context, namespace, exec
 		metadataKey := etcdkeys.BuildMetadataKey(s.prefix, namespace, executorID, key)
 		ops = append(ops, clientv3.OpPut(metadataKey, value))
 	}
+	if request.HostMetadata != nil {
+		hostMetadataData, err := json.Marshal(request.HostMetadata)
+		if err != nil {
+			return fmt.Errorf("marshal host metadata: %w", err)
+		}
+		hostMetadataKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorHostMetadataKey)
+		ops = append(ops, clientv3.OpPut(hostMetadataKey, string(hostMetadataData)))
+	}
 
 	// Atomically update both the timestamp and the state.
 	_, err = s.client.Txn(ctx).Then(ops...).Commit()
@@ -169,12 +178,7 @@ func (s *executorStoreImpl) GetExecutorState(ctx context.Context, namespace stri
 		return store.ExecutorState{}, store.ErrExecutorNotFound
 	}
 
-	heartbeatState := &store.HeartbeatState{
-		LastHeartbeat:  executorData.LastHeartbeat.ToTime(),
-		Status:         executorData.Status,
-		ReportedShards: executorData.ReportedShards,
-		Metadata:       executorData.Metadata,
-	}
+	heartbeatState := heartbeatFromParsed(executorData)
 
 	var assignedState *store.AssignedState
 	if executorData.AssignedState != nil {
@@ -184,10 +188,20 @@ func (s *executorStoreImpl) GetExecutorState(ctx context.Context, namespace stri
 	statistics := etcdtypes.ToShardStatisticsMap(executorData.Statistics)
 
 	return store.ExecutorState{
-		Heartbeat:  heartbeatState,
+		Heartbeat:  &heartbeatState,
 		Assignment: assignedState,
 		Statistics: statistics,
 	}, nil
+}
+
+func heartbeatFromParsed(executorData *etcdtypes.ParsedExecutorData) store.HeartbeatState {
+	return store.HeartbeatState{
+		LastHeartbeat:  executorData.LastHeartbeat.ToTime(),
+		Status:         executorData.Status,
+		ReportedShards: executorData.ReportedShards,
+		Metadata:       executorData.Metadata,
+		HostMetadata:   executorData.HostMetadata,
+	}
 }
 
 // --- ShardStore Implementation ---
@@ -223,12 +237,7 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 	}
 
 	for executorID, executorData := range parsedData {
-		heartbeatStates[executorID] = store.HeartbeatState{
-			LastHeartbeat:  executorData.LastHeartbeat.ToTime(),
-			Status:         executorData.Status,
-			ReportedShards: executorData.ReportedShards,
-			Metadata:       executorData.Metadata,
-		}
+		heartbeatStates[executorID] = heartbeatFromParsed(executorData)
 		executorMetadata[executorID] = executorData.Metadata
 
 		if executorData.AssignedState != nil {
@@ -839,8 +848,8 @@ func (s *executorStoreImpl) UndrainHosts(ctx context.Context, namespace string, 
 		return nil, nil
 	}
 
-	for _, hostname := range hostnames {
-		if err := etcdkeys.ValidateHostname(hostname); err != nil {
+	for _, name := range hostnames {
+		if err := hostname.Validate(name); err != nil {
 			return nil, fmt.Errorf("undrain hosts: %w", err)
 		}
 	}
@@ -880,7 +889,7 @@ func (s *executorStoreImpl) GetDrainedHosts(ctx context.Context, namespace strin
 func validateDrainedHosts(hosts []store.DrainedHost, now time.Time) (map[string]store.DrainedHost, error) {
 	validated := make(map[string]store.DrainedHost, len(hosts))
 	for _, host := range hosts {
-		if err := etcdkeys.ValidateHostname(host.Hostname); err != nil {
+		if err := hostname.Validate(host.Hostname); err != nil {
 			return nil, err
 		}
 		if _, exists := validated[host.Hostname]; exists {

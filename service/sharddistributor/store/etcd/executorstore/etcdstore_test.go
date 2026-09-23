@@ -101,6 +101,41 @@ func TestRecordHeartbeat(t *testing.T) {
 	assert.Equal(t, "value-2", string(resp.Kvs[0].Value))
 }
 
+func TestRecordHeartbeat_PersistsHostMetadata(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	now := time.Now().UTC()
+	executorID := "executor-host-metadata"
+	req := store.HeartbeatState{
+		LastHeartbeat: now,
+		Status:        types.ExecutorStatusACTIVE,
+		HostMetadata:  &types.HostMetadata{HostName: "host-name"},
+	}
+
+	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, req))
+
+	hostMetadataKey := etcdkeys.BuildExecutorKey(tc.EtcdPrefix, tc.Namespace, executorID, etcdkeys.ExecutorHostMetadataKey)
+	resp, err := tc.Client.Get(ctx, hostMetadataKey)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), resp.Count)
+	assert.JSONEq(t, `{"host_name":"host-name"}`, string(resp.Kvs[0].Value))
+
+	executorState, err := executorStore.GetExecutorState(ctx, tc.Namespace, executorID)
+	require.NoError(t, err)
+	require.NotNil(t, executorState.Heartbeat.HostMetadata)
+	assert.Equal(t, "host-name", executorState.Heartbeat.HostMetadata.HostName)
+
+	state, err := executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	got := state.Executors[executorID]
+	require.NotNil(t, got.HostMetadata)
+	assert.Equal(t, "host-name", got.HostMetadata.HostName)
+}
+
 func TestRecordHeartbeat_NoCompression(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 

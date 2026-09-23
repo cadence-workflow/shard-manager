@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -58,6 +59,12 @@ func ParseExecutorKVs(etcdPrefix, namespace string, kvs []*mvccpb.KeyValue) (map
 			if err := DecompressAndUnmarshal(kv.Value, &execData.Statistics); err != nil {
 				return nil, fmt.Errorf("parse shard statistics for %s: %w", executorID, err)
 			}
+		case etcdkeys.ExecutorHostMetadataKey:
+			var hostMetadata types.HostMetadata
+			if err := json.Unmarshal(kv.Value, &hostMetadata); err != nil {
+				return nil, fmt.Errorf("parse host metadata for %s: %w", executorID, err)
+			}
+			execData.HostMetadata = &hostMetadata
 		default:
 			// Skip keys from newer binaries
 			continue
@@ -106,7 +113,7 @@ func ParseExecutorAssignmentKVs(etcdPrefix, namespace string, kvs []*mvccpb.KeyV
 		case etcdkeys.ExecutorMetadataKey:
 			metadataKey := strings.TrimPrefix(string(kv.Key), etcdkeys.BuildMetadataKey(etcdPrefix, namespace, executorID, ""))
 			executorMetadata[metadataKey] = string(kv.Value)
-		case etcdkeys.ExecutorHeartbeatKey, etcdkeys.ExecutorStatusKey, etcdkeys.ExecutorReportedShardsKey, etcdkeys.ExecutorShardStatisticsKey:
+		case etcdkeys.ExecutorHeartbeatKey, etcdkeys.ExecutorStatusKey, etcdkeys.ExecutorReportedShardsKey, etcdkeys.ExecutorShardStatisticsKey, etcdkeys.ExecutorHostMetadataKey:
 			// Not read here, but the key still proves the executor exists.
 		default:
 			// Skip keys from newer binaries

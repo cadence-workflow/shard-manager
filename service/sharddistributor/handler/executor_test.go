@@ -38,12 +38,16 @@ func TestHeartbeat(t *testing.T) {
 			Namespace:  namespace,
 			ExecutorID: executorID,
 			Status:     types.ExecutorStatusACTIVE,
+			HostMetadata: &types.HostMetadata{
+				HostName: "host-name",
+			},
 		}
 
 		mockStore.EXPECT().GetExecutorState(gomock.Any(), namespace, executorID).Return(store.ExecutorState{}, store.ErrExecutorNotFound)
 		mockStore.EXPECT().RecordHeartbeat(gomock.Any(), namespace, executorID, store.HeartbeatState{
 			LastHeartbeat: now,
 			Status:        types.ExecutorStatusACTIVE,
+			HostMetadata:  &types.HostMetadata{HostName: "host-name"},
 		})
 		_, err := handler.Heartbeat(ctx, req)
 		require.NoError(t, err)
@@ -199,6 +203,85 @@ func TestHeartbeat(t *testing.T) {
 		_, err := handler.Heartbeat(ctx, req)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid metadata: metadata has 33 keys, which exceeds the maximum of 32")
+	})
+
+	t.Run("NormalizesHostName", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStore := store.NewMockStore(ctrl)
+		mockTimeSource := clock.NewMockedTimeSourceAt(now)
+		handler := newTestExecutorHandler(t, mockStore, mockTimeSource)
+
+		req := &types.ExecutorHeartbeatRequest{
+			Namespace:    namespace,
+			ExecutorID:   executorID,
+			Status:       types.ExecutorStatusACTIVE,
+			HostMetadata: &types.HostMetadata{HostName: "host/name@zone"},
+		}
+
+		mockStore.EXPECT().GetExecutorState(gomock.Any(), namespace, executorID).Return(store.ExecutorState{}, store.ErrExecutorNotFound)
+		mockStore.EXPECT().RecordHeartbeat(gomock.Any(), namespace, executorID, store.HeartbeatState{
+			LastHeartbeat: now,
+			Status:        types.ExecutorStatusACTIVE,
+			HostMetadata:  &types.HostMetadata{HostName: "host_name_zone"},
+		})
+
+		_, err := handler.Heartbeat(ctx, req)
+		require.NoError(t, err)
+	})
+
+	t.Run("SkipsUnchangedHostMetadata", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStore := store.NewMockStore(ctrl)
+		mockTimeSource := clock.NewMockedTimeSourceAt(now)
+		handler := newTestExecutorHandler(t, mockStore, mockTimeSource)
+
+		req := &types.ExecutorHeartbeatRequest{
+			Namespace:    namespace,
+			ExecutorID:   executorID,
+			Status:       types.ExecutorStatusACTIVE,
+			HostMetadata: &types.HostMetadata{HostName: "host-name"},
+		}
+
+		mockStore.EXPECT().GetExecutorState(gomock.Any(), namespace, executorID).Return(store.ExecutorState{
+			Heartbeat: &store.HeartbeatState{
+				HostMetadata: &types.HostMetadata{HostName: "host-name"},
+			},
+		}, nil)
+		mockStore.EXPECT().RecordHeartbeat(gomock.Any(), namespace, executorID, store.HeartbeatState{
+			LastHeartbeat: now,
+			Status:        types.ExecutorStatusACTIVE,
+		})
+
+		_, err := handler.Heartbeat(ctx, req)
+		require.NoError(t, err)
+	})
+
+	t.Run("RewritesChangedHostMetadata", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		mockStore := store.NewMockStore(ctrl)
+		mockTimeSource := clock.NewMockedTimeSourceAt(now)
+		handler := newTestExecutorHandler(t, mockStore, mockTimeSource)
+
+		req := &types.ExecutorHeartbeatRequest{
+			Namespace:    namespace,
+			ExecutorID:   executorID,
+			Status:       types.ExecutorStatusACTIVE,
+			HostMetadata: &types.HostMetadata{HostName: "host-b"},
+		}
+
+		mockStore.EXPECT().GetExecutorState(gomock.Any(), namespace, executorID).Return(store.ExecutorState{
+			Heartbeat: &store.HeartbeatState{
+				HostMetadata: &types.HostMetadata{HostName: "host-a"},
+			},
+		}, nil)
+		mockStore.EXPECT().RecordHeartbeat(gomock.Any(), namespace, executorID, store.HeartbeatState{
+			LastHeartbeat: now,
+			Status:        types.ExecutorStatusACTIVE,
+			HostMetadata:  &types.HostMetadata{HostName: "host-b"},
+		})
+
+		_, err := handler.Heartbeat(ctx, req)
+		require.NoError(t, err)
 	})
 
 }

@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"math/rand"
@@ -189,7 +190,7 @@ func (p *namespaceProcessor) runRebalancingLoop(ctx context.Context) {
 	// Perform an initial rebalance on startup.
 	err := p.rebalanceShards(ctx)
 	if err != nil {
-		p.logger.Error("initial rebalance failed", tag.Error(err))
+		p.logRebalanceError("initial rebalance failed", "initial rebalance version conflict", err)
 	}
 
 	if err := p.runRebalanceTriggeringLoop(ctx, triggerChan); err != nil {
@@ -214,7 +215,7 @@ func (p *namespaceProcessor) runRebalancingLoop(ctx context.Context) {
 
 			p.logger.Info("Rebalancing triggered", tag.Dynamic("triggerReason", triggerReason))
 			if err := p.rebalanceShards(ctx); err != nil {
-				p.logger.Error("rebalance failed", tag.Error(err))
+				p.logRebalanceError("rebalance failed", "rebalance version conflict", err)
 
 				// If rebalance fails, we want to trigger another rebalance ASAP,
 				// but with a cooldown to avoid rebalance storms if the underlying issue is persistent.
@@ -859,6 +860,14 @@ func (*namespaceProcessor) getActiveExecutors(namespaceState *store.NamespaceSta
 
 	sort.Strings(activeExecutors)
 	return activeExecutors
+}
+
+func (p *namespaceProcessor) logRebalanceError(failureMessage, conflictMessage string, err error) {
+	if errors.Is(err, store.ErrVersionConflict) {
+		p.logger.Info(conflictMessage, tag.Error(err))
+		return
+	}
+	p.logger.Error(failureMessage, tag.Error(err))
 }
 
 func assignShardsToEmptyExecutors(currentAssignments map[string][]string) bool {

@@ -57,6 +57,12 @@ func (c *sharddistributorClient) GetExecutorState(ctx context.Context, gp1 *type
 	return c.client.GetExecutorState(ctx, gp1, p1...)
 }
 
+func (c *sharddistributorClient) GetFullNamespaceState(ctx context.Context, gp1 *types.GetFullNamespaceStateRequest, p1 ...yarpc.CallOption) (gp2 *types.GetFullNamespaceStateResponse, err error) {
+	ctx, cancel := createContext(ctx, c.timeout)
+	defer cancel()
+	return c.client.GetFullNamespaceState(ctx, gp1, p1...)
+}
+
 func (c *sharddistributorClient) GetNamespaceState(ctx context.Context, gp1 *types.GetNamespaceStateRequest, p1 ...yarpc.CallOption) (gp2 *types.GetNamespaceStateResponse, err error) {
 	ctx, cancel := createContext(ctx, c.timeout)
 	defer cancel()

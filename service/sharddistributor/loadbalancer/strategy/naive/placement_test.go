@@ -15,17 +15,18 @@ import (
 func TestPlanInitialPlacement(t *testing.T) {
 	t.Run("picks fewest shards and increments after each pick", func(t *testing.T) {
 		state := &store.NamespaceState{
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					"a": {AssignedShards: map[string]*types.ShardAssignment{"s1": {}, "s2": {}}},
+					"b": {AssignedShards: map[string]*types.ShardAssignment{"s3": {}}},
+					"c": {AssignedShards: map[string]*types.ShardAssignment{"s4": {}}},
+				},
+			},
 			Executors: map[string]store.HeartbeatState{
 				"a": {Status: types.ExecutorStatusACTIVE},
 				"b": {Status: types.ExecutorStatusACTIVE},
 				"c": {Status: types.ExecutorStatusDRAINING},
-			},
-			ShardAssignments: map[string]store.AssignedState{
-				"a": {AssignedShards: map[string]*types.ShardAssignment{"s1": {}, "s2": {}}},
-				"b": {AssignedShards: map[string]*types.ShardAssignment{"s3": {}}},
-				"c": {AssignedShards: map[string]*types.ShardAssignment{"s4": {}}},
-			},
-		}
+			}}
 
 		placements, err := PlanInitialPlacement(state, []string{"new-1", "new-2", "new-3"})
 		require.NoError(t, err)

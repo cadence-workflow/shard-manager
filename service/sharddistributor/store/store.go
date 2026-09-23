@@ -63,6 +63,10 @@ type Store interface {
 	// shard statistics, and shard assignments.
 	GetState(ctx context.Context, namespace string) (*NamespaceState, error)
 
+	// GetAssignmentState retrieves the assignment state of a namespace, which it
+	// skips the host drains, statistics and reported shards that GetState decodes.
+	GetAssignmentState(ctx context.Context, namespace string) (*AssignmentState, error)
+
 	// AssignShards assigns multiple shards to executors within a namespace and
 	// deletes specified executors.
 	// The operation is atomic and guarded by the provided GuardFunc.
@@ -74,21 +78,15 @@ type Store interface {
 
 	// SubscribeToExecutorStatusChanges subscribes to changes of executors' status key within a namespace.
 	SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error)
+
+	// SubscribeToNamespaceChanges signals when executor assignments, executor metadata,
+	// or the drained shard set change. Sends are coalesced; unchanged rewrites are ignored.
+	// The channel is closed when the store stops.
+	SubscribeToNamespaceChanges(namespace string) (<-chan struct{}, error)
 	DeleteExecutors(ctx context.Context, namespace string, executorIDs []string, guard GuardFunc) error
 
 	// DeleteAssignedStates deletes the assigned states of multiple executors within a namespace.
 	DeleteAssignedStates(ctx context.Context, namespace string, executorIDs []string, guard GuardFunc) error
-
-	// GetShardOwner retrieves the owner of a specific shard within a namespace.
-	// It returns ErrShardNotFound if the shard does not exist, and ErrShardDrained
-	// if the shard is drained.
-	GetShardOwner(ctx context.Context, namespace, shardID string) (*ShardOwner, error)
-	SubscribeToAssignmentChanges(ctx context.Context, namespace string) (<-chan struct{}, func(), error)
-
-	// GetExecutor retrieves an executor within a namespace.
-	GetExecutor(ctx context.Context, namespace string, executorID string) (*ShardOwner, error)
-	// GetShardAssignments returns a snapshot of assignments and drained shards
-	GetShardAssignments(namespace string) (AssignmentSnapshot, error)
 
 	GetExecutorState(ctx context.Context, namespace string, executorID string) (ExecutorState, error)
 	RecordHeartbeat(ctx context.Context, namespace, executorID string, state HeartbeatState) error

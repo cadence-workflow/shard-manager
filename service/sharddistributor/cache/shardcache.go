@@ -1,61 +1,79 @@
-package shardcache
+package cache
 
 import (
 	"context"
 	"fmt"
 	"sync"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.uber.org/fx"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
 )
+
+// ShardCacheParams defines the dependencies for the shard cache, for use with fx.
+type ShardCacheParams struct {
+	fx.In
+
+	ExecutorStore store.Store
+	Lifecycle     fx.Lifecycle
+	Logger        log.Logger
+	TimeSource    clock.TimeSource
+	MetricsClient metrics.Client
+}
 
 type NamespaceToShards map[string]*namespaceShardToExecutor
 type ShardToExecutorCache struct {
 	sync.RWMutex
 	namespaceToShards NamespaceToShards
 	timeSource        clock.TimeSource
-	client            etcdclient.Client
+	executorStore     store.Store
 	stopC             chan struct{}
 	logger            log.Logger
-	prefix            string
 	wg                sync.WaitGroup
 	metricsClient     metrics.Client
 }
 
-func NewShardToExecutorCache(
-	prefix string,
-	client etcdclient.Client,
-	logger log.Logger,
-	timeSource clock.TimeSource,
-	metricsClient metrics.Client,
-) *ShardToExecutorCache {
-	shardCache := &ShardToExecutorCache{
+// Module provides the shard cache to the fx application.
+var Module = fx.Module("shardcache",
+	fx.Provide(NewShardCache),
+)
+
+func NewShardCache(p ShardCacheParams) ShardCache {
+	cache := &ShardToExecutorCache{
 		namespaceToShards: make(NamespaceToShards),
-		timeSource:        timeSource,
+		timeSource:        p.TimeSource,
+		executorStore:     p.ExecutorStore,
 		stopC:             make(chan struct{}),
-		logger:            logger,
-		prefix:            prefix,
-		client:            client,
+		logger:            p.Logger,
 		wg:                sync.WaitGroup{},
-		metricsClient:     metricsClient,
+		metricsClient:     p.MetricsClient,
 	}
 
-	return shardCache
-}
+	// Nothing to start: the per-namespace refresh loops begin lazily on first use.
+	p.Lifecycle.Append(fx.StopHook(cache.Stop))
 
-func (s *ShardToExecutorCache) Start() {}
+	return cache
+}
 
 func (s *ShardToExecutorCache) Stop() {
 	close(s.stopC)
 	s.wg.Wait()
 }
 
+// GetShardOwner returns the owner of the shard.
+// Drained shards return ErrShardDrained rather than the last assigned owner
 func (s *ShardToExecutorCache) GetShardOwner(ctx context.Context, namespace, shardID string) (*store.ShardOwner, error) {
+	drained, err := s.IsShardDrained(ctx, namespace, shardID)
+	if err != nil {
+		return nil, fmt.Errorf("check shard drained: %w", err)
+	}
+	if drained {
+		return nil, store.ErrShardDrained
+	}
+
 	namespaceShardToExecutor, err := s.getNamespaceShardToExecutor(namespace)
 	if err != nil {
 		return nil, fmt.Errorf("get namespace shard to executor: %w", err)
@@ -78,14 +96,6 @@ func (s *ShardToExecutorCache) GetExecutor(ctx context.Context, namespace, execu
 		return nil, fmt.Errorf("get namespace shard to executor: %w", err)
 	}
 	return namespaceShardToExecutor.GetExecutor(ctx, executorID)
-}
-
-func (s *ShardToExecutorCache) GetExecutorModRevisionCmp(namespace string) ([]clientv3.Cmp, error) {
-	namespaceShardToExecutor, err := s.getNamespaceShardToExecutor(namespace)
-	if err != nil {
-		return nil, fmt.Errorf("get namespace shard to executor: %w", err)
-	}
-	return namespaceShardToExecutor.GetExecutorModRevisionCmp()
 }
 
 func (s *ShardToExecutorCache) Subscribe(namespace string) (<-chan struct{}, func(), error) {
@@ -122,11 +132,10 @@ func (s *ShardToExecutorCache) getNamespaceShardToExecutor(namespace string) (*n
 		return namespaceShardToExecutor, nil
 	}
 
-	namespaceShardToExecutor, err := newNamespaceShardToExecutor(s.prefix, namespace, s.client, s.stopC, s.logger, s.timeSource, s.metricsClient)
-	if err != nil {
-		return nil, fmt.Errorf("new namespace shard to executor: %w", err)
+	namespaceShardToExecutor = newNamespaceShardToExecutor(namespace, s.executorStore, s.stopC, s.logger, s.timeSource, s.metricsClient)
+	if err := namespaceShardToExecutor.Start(&s.wg); err != nil {
+		return nil, fmt.Errorf("start namespace shard to executor: %w", err)
 	}
-	namespaceShardToExecutor.Start(&s.wg)
 
 	s.namespaceToShards[namespace] = namespaceShardToExecutor
 	return namespaceShardToExecutor, nil

@@ -72,26 +72,26 @@ func TestAccessControlledHandler_GetNamespaceState(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			inner := handler.NewMockHandler(ctrl)
 			authz := authorization.NewMockAuthorizer(ctrl)
+			request := &types.GetNamespaceStateRequest{Namespace: testNamespace}
 
-			expectedAttrs := &authorization.Attributes{
-				APIName:    "GetNamespaceState",
-				Namespace:  testNamespace,
-				Permission: authorization.PermissionRead,
-			}
 			authz.EXPECT().
-				Authorize(gomock.Any(), expectedAttrs).
+				Authorize(gomock.Any(), &authorization.Attributes{
+					APIName:    "GetNamespaceState",
+					Namespace:  testNamespace,
+					Permission: authorization.PermissionRead,
+				}).
 				Return(tc.authorizeResult, tc.authorizeErr).
 				Times(1)
 
 			if tc.expectInnerCalled {
 				inner.EXPECT().
-					GetNamespaceState(gomock.Any(), gomock.Any()).
+					GetNamespaceState(gomock.Any(), request).
 					Return(&types.GetNamespaceStateResponse{Namespace: testNamespace}, nil).
 					Times(1)
 			}
 
 			wrapped := NewHandler(inner, authz)
-			resp, err := wrapped.GetNamespaceState(context.Background(), &types.GetNamespaceStateRequest{Namespace: testNamespace})
+			resp, err := wrapped.GetNamespaceState(context.Background(), request)
 
 			if tc.expectErr != nil {
 				assert.Nil(t, resp)
@@ -99,7 +99,73 @@ func TestAccessControlledHandler_GetNamespaceState(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, testNamespace, resp.Namespace)
+			require.NotNil(t, resp)
+			assert.Equal(t, testNamespace, resp.GetNamespace())
+		})
+	}
+}
+
+func TestAccessControlledHandler_GetFullNamespaceState(t *testing.T) {
+	tests := []struct {
+		name              string
+		authorizeResult   authorization.Result
+		authorizeErr      error
+		expectInnerCalled bool
+		expectErr         error
+	}{
+		{
+			name:              "allow -> inner called",
+			authorizeResult:   authorization.Result{Decision: authorization.DecisionAllow},
+			expectInnerCalled: true,
+		},
+		{
+			name:              "deny -> AccessDeniedError",
+			authorizeResult:   authorization.Result{Decision: authorization.DecisionDeny},
+			expectInnerCalled: false,
+			expectErr:         errUnauthorized,
+		},
+		{
+			name:              "authorizer error -> propagated",
+			authorizeErr:      errAuthorizerBoom,
+			expectInnerCalled: false,
+			expectErr:         errAuthorizerBoom,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			inner := handler.NewMockHandler(ctrl)
+			authz := authorization.NewMockAuthorizer(ctrl)
+			request := &types.GetFullNamespaceStateRequest{Namespace: testNamespace}
+
+			authz.EXPECT().
+				Authorize(gomock.Any(), &authorization.Attributes{
+					APIName:    "GetFullNamespaceState",
+					Namespace:  testNamespace,
+					Permission: authorization.PermissionRead,
+				}).
+				Return(tc.authorizeResult, tc.authorizeErr).
+				Times(1)
+
+			if tc.expectInnerCalled {
+				inner.EXPECT().
+					GetFullNamespaceState(gomock.Any(), request).
+					Return(&types.GetFullNamespaceStateResponse{Namespace: testNamespace}, nil).
+					Times(1)
+			}
+
+			wrapped := NewHandler(inner, authz)
+			resp, err := wrapped.GetFullNamespaceState(context.Background(), request)
+
+			if tc.expectErr != nil {
+				assert.Nil(t, resp)
+				assert.ErrorIs(t, err, tc.expectErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, resp)
+			assert.Equal(t, testNamespace, resp.GetNamespace())
 		})
 	}
 }

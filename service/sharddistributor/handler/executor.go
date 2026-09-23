@@ -12,6 +12,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
@@ -60,6 +61,12 @@ func (h *executor) Heartbeat(ctx context.Context, request *types.ExecutorHeartbe
 		Status:         request.Status,
 		ReportedShards: request.ShardStatusReports,
 		Metadata:       request.GetMetadata(),
+		HostMetadata:   normalizeHostMetadata(request.GetHostMetadata()),
+	}
+	// Host metadata is stable for an executor. RecordHeartbeat leaves a nil
+	// value untouched, so omit it when the stored hostname already matches.
+	if executorState.Heartbeat != nil && executorState.Heartbeat.Hostname() == newHeartbeat.Hostname() {
+		newHeartbeat.HostMetadata = nil
 	}
 
 	if err := validateMetadata(newHeartbeat.Metadata); err != nil {
@@ -187,6 +194,13 @@ func validateMetadata(metadata map[string]string) error {
 	}
 
 	return nil
+}
+
+func normalizeHostMetadata(metadata *types.HostMetadata) *types.HostMetadata {
+	if metadata == nil {
+		return nil
+	}
+	return &types.HostMetadata{HostName: hostname.Normalize(metadata.HostName)}
 }
 
 func filterNewlyAssignedShardIDs(previousHeartbeat *store.HeartbeatState, assignedState *store.AssignedState) []string {

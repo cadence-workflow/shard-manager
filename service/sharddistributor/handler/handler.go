@@ -39,25 +39,26 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespace"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
 func NewHandler(
 	logger log.Logger,
 	timeSource clock.TimeSource,
-	shardDistributionCfg config.ShardDistribution,
+	namespaces namespace.Registry,
 	cfg *config.Config,
 	storage store.Store,
 	shardCache cache.ShardCache,
 	metricsClient metrics.Client,
 ) Handler {
 	handler := &handlerImpl{
-		logger:               logger,
-		shardDistributionCfg: shardDistributionCfg,
-		storage:              storage,
-		shardCache:           shardCache,
-		timeSource:           timeSource,
-		assigner:             ephemeralassigner.New(timeSource, cfg, storage, shardCache, metricsClient),
+		logger:            logger,
+		namespaceRegistry: namespaces,
+		storage:           storage,
+		shardCache:        shardCache,
+		timeSource:        timeSource,
+		assigner:          ephemeralassigner.New(timeSource, cfg, storage, shardCache, metricsClient),
 	}
 	handler.stopCtx, handler.cancel = context.WithCancel(context.Background())
 
@@ -73,10 +74,10 @@ type handlerImpl struct {
 	stopCtx context.Context
 	cancel  context.CancelFunc
 
-	storage              store.Store
-	shardCache           cache.ShardCache
-	shardDistributionCfg config.ShardDistribution
-	timeSource           clock.TimeSource
+	storage           store.Store
+	shardCache        cache.ShardCache
+	namespaceRegistry namespace.Registry
+	timeSource        clock.TimeSource
 
 	assigner *ephemeralassigner.Assigner
 }
@@ -103,10 +104,8 @@ func (h *handlerImpl) Health(ctx context.Context) (*types.HealthStatus, error) {
 func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShardOwnerRequest) (resp *types.GetShardOwnerResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 
-	namespaceIdx := slices.IndexFunc(h.shardDistributionCfg.Namespaces, func(namespace config.Namespace) bool {
-		return namespace.Name == request.Namespace
-	})
-	if namespaceIdx == -1 {
+	ns, ok := h.namespaceRegistry.Get(request.Namespace)
+	if !ok {
 		return nil, &types.NamespaceNotFoundError{
 			Namespace: request.Namespace,
 		}
@@ -121,7 +120,7 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 		}
 	}
 	if errors.Is(err, store.ErrShardNotFound) {
-		if h.shardDistributionCfg.Namespaces[namespaceIdx].Type == config.NamespaceTypeEphemeral {
+		if ns.Type == config.NamespaceTypeEphemeral {
 			return h.assigner.GetOrAssign(ctx, request)
 		}
 
@@ -145,13 +144,8 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 func (h *handlerImpl) InspectShard(ctx context.Context, request *types.GetShardOwnerRequest) (resp *types.GetShardOwnerResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 
-	namespaceIdx := slices.IndexFunc(h.shardDistributionCfg.Namespaces, func(namespace config.Namespace) bool {
-		return namespace.Name == request.Namespace
-	})
-	if namespaceIdx == -1 {
-		return nil, &types.NamespaceNotFoundError{
-			Namespace: request.Namespace,
-		}
+	if err := h.validateNamespace(request.Namespace); err != nil {
+		return nil, err
 	}
 
 	shardOwner, err := h.shardCache.GetShardOwner(ctx, request.Namespace, request.ShardKey)
@@ -305,13 +299,8 @@ func (h *handlerImpl) GetExecutorState(ctx context.Context, request *types.GetEx
 
 	h.startWG.Wait()
 
-	namespaceIdx := slices.IndexFunc(h.shardDistributionCfg.Namespaces, func(namespace config.Namespace) bool {
-		return namespace.Name == request.GetNamespace()
-	})
-	if namespaceIdx == -1 {
-		return nil, &types.NamespaceNotFoundError{
-			Namespace: request.GetNamespace(),
-		}
+	if err := h.validateNamespace(request.GetNamespace()); err != nil {
+		return nil, err
 	}
 
 	executorState, err := h.storage.GetExecutorState(ctx, request.GetNamespace(), request.GetExecutorID())
@@ -387,8 +376,9 @@ func (h *handlerImpl) ListNamespaces(_ context.Context, _ *types.ListNamespacesR
 
 	h.startWG.Wait()
 
-	namespaces := make([]*types.NamespaceConfig, 0, len(h.shardDistributionCfg.Namespaces))
-	for _, ns := range h.shardDistributionCfg.Namespaces {
+	all := h.namespaceRegistry.All()
+	namespaces := make([]*types.NamespaceConfig, 0, len(all))
+	for _, ns := range all {
 		namespaces = append(namespaces, &types.NamespaceConfig{
 			Name:     ns.Name,
 			Type:     ns.Type,
@@ -553,10 +543,7 @@ func (h *handlerImpl) GetDrainedShards(ctx context.Context, request *types.GetDr
 
 // validateNamespace rejects namespaces that are absent from the static service config
 func (h *handlerImpl) validateNamespace(namespace string) error {
-	found := slices.ContainsFunc(h.shardDistributionCfg.Namespaces, func(n config.Namespace) bool {
-		return n.Name == namespace
-	})
-	if !found {
+	if _, ok := h.namespaceRegistry.Get(namespace); !ok {
 		return &types.NamespaceNotFoundError{Namespace: namespace}
 	}
 	return nil

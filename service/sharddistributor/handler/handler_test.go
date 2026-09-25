@@ -40,6 +40,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespace"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -55,12 +56,12 @@ func newTestHandler(t *testing.T, cfg config.ShardDistribution, mockStore *store
 	t.Helper()
 	assigner := ephemeralassigner.New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStore, mockCache, metrics.NewNoopMetricsClient())
 	handler := &handlerImpl{
-		logger:               testlogger.New(t),
-		shardDistributionCfg: cfg,
-		storage:              mockStore,
-		shardCache:           mockCache,
-		timeSource:           clock.NewRealTimeSource(),
-		assigner:             assigner,
+		logger:            testlogger.New(t),
+		namespaceRegistry: namespace.NewRegistry(cfg.Namespaces),
+		storage:           mockStore,
+		shardCache:        mockCache,
+		timeSource:        clock.NewRealTimeSource(),
+		assigner:          assigner,
 	}
 	assigner.Start()
 	t.Cleanup(assigner.Stop)
@@ -365,11 +366,11 @@ func TestWatchNamespaceState(t *testing.T) {
 	}
 
 	handler := &handlerImpl{
-		logger:               logger,
-		shardDistributionCfg: cfg,
-		storage:              mockStorage,
-		shardCache:           mockCache,
-		startWG:              sync.WaitGroup{},
+		logger:            logger,
+		namespaceRegistry: namespace.NewRegistry(cfg.Namespaces),
+		storage:           mockStorage,
+		shardCache:        mockCache,
+		startWG:           sync.WaitGroup{},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -450,7 +451,7 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 		},
 	}
 
-	rawHandler := NewHandler(logger, clock.NewRealTimeSource(), cfg, newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage, mockCache, metrics.NewNoopMetricsClient())
+	rawHandler := NewHandler(logger, clock.NewRealTimeSource(), namespace.NewRegistry(cfg.Namespaces), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage, mockCache, metrics.NewNoopMetricsClient())
 	handler := rawHandler.(*handlerImpl)
 	handler.Start()
 

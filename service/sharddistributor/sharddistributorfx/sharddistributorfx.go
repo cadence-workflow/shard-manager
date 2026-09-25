@@ -35,8 +35,9 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/handler"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/election"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/namespace"
+	leadernamespace "github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/namespace"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/process"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespace"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	meteredStore "github.com/cadence-workflow/shard-manager/service/sharddistributor/store/wrappers/metered"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/wrappers/accesscontrolled"
@@ -47,11 +48,14 @@ import (
 // Module provides shard distributor YARPC server implementations.
 // The caller is responsible for registering procedures on the dispatcher.
 var Module = fx.Module("sharddistributor",
-	namespace.Module,
+	leadernamespace.Module,
 	election.Module,
 	process.Module,
 	cache.Module,
 	fx.Provide(config.NewConfig),
+	fx.Provide(func(cfg config.ShardDistribution) namespace.Registry {
+		return namespace.NewRegistry(cfg.Namespaces)
+	}),
 	fx.Decorate(func(s store.Store, metricsClient metrics.Client, logger log.Logger, timeSource clock.TimeSource) store.Store {
 		return meteredStore.NewStore(s, metricsClient, logger, timeSource)
 	}),
@@ -61,7 +65,7 @@ var Module = fx.Module("sharddistributor",
 type serversParams struct {
 	fx.In
 
-	ShardDistributionCfg config.ShardDistribution
+	NamespaceRegistry namespace.Registry
 
 	Logger        log.Logger
 	MetricsClient metrics.Client
@@ -88,7 +92,7 @@ type ServersResult struct {
 }
 
 func provideServers(params serversParams) ServersResult {
-	rawHandler := handler.NewHandler(params.Logger, params.TimeSource, params.ShardDistributionCfg, params.Config, params.Store, params.ShardCache, params.MetricsClient)
+	rawHandler := handler.NewHandler(params.Logger, params.TimeSource, params.NamespaceRegistry, params.Config, params.Store, params.ShardCache, params.MetricsClient)
 	wrappedHandler := metered.NewMetricsHandler(rawHandler, params.Logger, params.MetricsClient)
 	wrappedHandler = accesscontrolled.NewHandler(wrappedHandler, params.Authorizer)
 

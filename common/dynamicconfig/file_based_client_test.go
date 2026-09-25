@@ -69,9 +69,9 @@ func (s *fileBasedClientSuite) TestGetValue() {
 }
 
 func (s *fileBasedClientSuite) TestGetValue_NonExistKey() {
-	v, err := s.client.GetValue(dynamicproperties.EnableVisibilitySampling)
+	v, err := s.client.GetValue(dynamicproperties.ShardDistributorLoadBalancingMode)
 	s.Error(err)
-	s.Equal(dynamicproperties.EnableVisibilitySampling.DefaultBool(), v)
+	s.Equal(dynamicproperties.ShardDistributorLoadBalancingMode.DefaultString(), v)
 }
 
 func (s *fileBasedClientSuite) TestGetValueWithFilters() {
@@ -177,15 +177,6 @@ func (s *fileBasedClientSuite) TestGetMapValue() {
 		},
 	}
 	s.Equal(expectedVal, v)
-}
-
-func (s *fileBasedClientSuite) TestGetMapValue_WrongType() {
-	filters := map[dynamicproperties.Filter]interface{}{
-		dynamicproperties.TaskListName: "random tasklist",
-	}
-	v, err := s.client.GetMapValue(dynamicproperties.TestGetMapPropertyKey, filters)
-	s.Error(err)
-	s.Equal(dynamicproperties.TestGetMapPropertyKey.DefaultMap(), v)
 }
 
 func (s *fileBasedClientSuite) TestGetDurationValue() {
@@ -315,21 +306,21 @@ func (s *fileBasedClientSuite) TestMatch() {
 
 func (s *fileBasedClientSuite) TestUpdateConfig() {
 	client := s.client.(*fileBasedClient)
-	key := dynamicproperties.ValidSearchAttributes
+	key := dynamicproperties.TestGetMapPropertyKey
 
 	// pre-check existing config
 	current, err := client.GetMapValue(key, nil)
 	s.NoError(err)
-	currentDomainVal, ok := current["DomainID"]
+	currentValue, ok := current["key1"]
 	s.True(ok)
-	s.Equal(1, currentDomainVal)
-	_, ok = current["WorkflowID"]
+	s.Equal("1", currentValue)
+	_, ok = current["updated"]
 	s.False(ok)
 
 	// update config
 	v := map[string]interface{}{
-		"WorkflowID": 1,
-		"DomainID":   2,
+		"key1":    "2",
+		"updated": true,
 	}
 	err = client.UpdateValue(key, v)
 	s.NoError(err)
@@ -337,16 +328,24 @@ func (s *fileBasedClientSuite) TestUpdateConfig() {
 	// verify update result
 	current, err = client.GetMapValue(key, nil)
 	s.NoError(err)
-	currentDomainVal, ok = current["DomainID"]
+	currentValue, ok = current["key1"]
 	s.True(ok)
-	s.Equal(2, currentDomainVal)
-	currentWorkflowIDVal, ok := current["WorkflowID"]
+	s.Equal("2", currentValue)
+	updated, ok := current["updated"]
 	s.True(ok)
-	s.Equal(1, currentWorkflowIDVal)
+	s.Equal(true, updated)
 
 	// revert test file back
 	v = map[string]interface{}{
-		"DomainID": 1,
+		"key1": "1",
+		"key2": 1,
+		"key3": []interface{}{
+			false,
+			map[string]interface{}{
+				"key4": true,
+				"key5": 2.1,
+			},
+		},
 	}
 	err = client.UpdateValue(key, v)
 	s.NoError(err)

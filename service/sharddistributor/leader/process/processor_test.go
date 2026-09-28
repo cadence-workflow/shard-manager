@@ -213,8 +213,12 @@ func TestRebalanceShards_ClearsAssignmentOfLiveNonAssignableExecutor(t *testing.
 					},
 				},
 				Executors: map[string]store.HeartbeatState{
-					healthy:       {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
-					nonAssignable: {Status: tt.status, LastHeartbeat: now},
+					healthy: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+					nonAssignable: {
+						Status:        tt.status,
+						LastHeartbeat: now,
+						HostMetadata:  &types.HostMetadata{HostName: "host-a"},
+					},
 				},
 
 				DrainedHosts: tt.drainedHosts,
@@ -1175,6 +1179,7 @@ func TestBuildHandoverStats(t *testing.T) {
 				"host-a@uuid-1": {
 					Status:        types.ExecutorStatusACTIVE,
 					LastHeartbeat: now.Add(-10 * time.Second),
+					HostMetadata:  &types.HostMetadata{HostName: "host-a"},
 				},
 			},
 			expectShardStats: &store.ShardHandoverStats{
@@ -1384,11 +1389,15 @@ func TestFindExecutorsToUnassign(t *testing.T) {
 				staleExecutors[tt.executorID] = tt.assignment.ModRevision
 			}
 
+			heartbeat := store.HeartbeatState{Status: tt.status}
+			if tt.drainedHosts != nil {
+				heartbeat.HostMetadata = &types.HostMetadata{HostName: "host-a"}
+			}
 			namespaceState := &store.NamespaceState{
 				AssignmentState: store.AssignmentState{
 					ShardAssignments: map[string]store.AssignedState{tt.executorID: tt.assignment},
 				},
-				Executors:    map[string]store.HeartbeatState{tt.executorID: {Status: tt.status}},
+				Executors:    map[string]store.HeartbeatState{tt.executorID: heartbeat},
 				DrainedHosts: tt.drainedHosts,
 			}
 

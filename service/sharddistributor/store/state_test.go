@@ -136,19 +136,40 @@ func TestNamespaceState_ShardOwners(t *testing.T) {
 
 func TestExecutorHostname(t *testing.T) {
 	tests := []struct {
-		name       string
-		executorID string
-		want       string
+		name      string
+		executors map[string]HeartbeatState
+		id        string
+		want      string
 	}{
-		{name: "hostname@uuid", executorID: "host-a@abc", want: "host-a"},
-		{name: "no at-sign", executorID: "legacy-exec", want: ""},
-		{name: "empty", executorID: "", want: ""},
-		{name: "leading at-sign", executorID: "@uuid", want: ""},
+		{
+			name: "host metadata",
+			executors: map[string]HeartbeatState{
+				"any-id": {HostMetadata: &types.HostMetadata{HostName: "host-a"}},
+			},
+			id:   "any-id",
+			want: "host-a",
+		},
+		{
+			name: "executor id is ignored",
+			executors: map[string]HeartbeatState{
+				"host-b@uuid": {HostMetadata: &types.HostMetadata{HostName: "host-a"}},
+			},
+			id:   "host-b@uuid",
+			want: "host-a",
+		},
+		{name: "missing executor", id: "missing", want: ""},
+		{
+			name:      "no host metadata",
+			executors: map[string]HeartbeatState{"legacy-exec": {Status: types.ExecutorStatusACTIVE}},
+			id:        "legacy-exec",
+			want:      "",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, executorHostname(tt.executorID))
+			ns := &NamespaceState{Executors: tt.executors}
+			assert.Equal(t, tt.want, ns.executorHostname(tt.id))
 		})
 	}
 }
@@ -162,8 +183,8 @@ func TestNamespaceState_IsExecutorAssignable(t *testing.T) {
 			"drained":       {Status: types.ExecutorStatusDRAINED},
 			"stale":         {Status: types.ExecutorStatusACTIVE},
 			"invalid":       {Status: types.ExecutorStatusINVALID},
-			"host-a@uuid-1": {Status: types.ExecutorStatusACTIVE},
-			"host-b@uuid-1": {Status: types.ExecutorStatusACTIVE},
+			"host-a@uuid-1": {Status: types.ExecutorStatusACTIVE, HostMetadata: &types.HostMetadata{HostName: "host-a"}},
+			"host-b@uuid-1": {Status: types.ExecutorStatusACTIVE, HostMetadata: &types.HostMetadata{HostName: "host-b"}},
 			"legacy-host-a": {Status: types.ExecutorStatusACTIVE},
 		},
 		DrainedHosts: map[string]DrainedHost{
@@ -184,7 +205,7 @@ func TestNamespaceState_IsExecutorAssignable(t *testing.T) {
 		{name: "absent executor", executorID: "missing", want: false},
 		{name: "active on drained host", executorID: "host-a@uuid-1", want: false},
 		{name: "active on other host", executorID: "host-b@uuid-1", want: true},
-		{name: "legacy id without at-sign ignores host drain", executorID: "legacy-host-a", want: true},
+		{name: "missing host metadata ignores host drain", executorID: "legacy-host-a", want: true},
 	}
 
 	for _, tt := range tests {

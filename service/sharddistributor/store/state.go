@@ -1,7 +1,6 @@
 package store
 
 import (
-	"strings"
 	"time"
 
 	"github.com/cadence-workflow/shard-manager/common/types"
@@ -164,18 +163,13 @@ func (ns *NamespaceState) IsHostDrained(hostname string) bool {
 	return drained
 }
 
-// executorHostname extracts the host part of a "hostname@uuid" executor ID.
-func executorHostname(executorID string) string {
-	hostname, _, found := strings.Cut(executorID, "@")
-	if !found {
-		return ""
-	}
-	return hostname
+func (ns *NamespaceState) executorHostname(executorID string) string {
+	return ns.Executors[executorID].Hostname()
 }
 
 // IsExecutorHostDrained reports whether an executor runs on a drained host.
 func (ns *NamespaceState) IsExecutorHostDrained(executorID string) bool {
-	hostname := executorHostname(executorID)
+	hostname := ns.executorHostname(executorID)
 	if hostname == "" {
 		return false
 	}

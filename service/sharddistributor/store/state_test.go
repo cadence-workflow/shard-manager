@@ -185,6 +185,7 @@ func TestNamespaceState_IsExecutorAssignable(t *testing.T) {
 			"invalid":       {Status: types.ExecutorStatusINVALID},
 			"host-a@uuid-1": {Status: types.ExecutorStatusACTIVE, HostMetadata: &types.HostMetadata{HostName: "host-a"}},
 			"host-b@uuid-1": {Status: types.ExecutorStatusACTIVE, HostMetadata: &types.HostMetadata{HostName: "host-b"}},
+			"host-a@uuid-2": {Status: types.ExecutorStatusACTIVE, HostMetadata: &types.HostMetadata{HostName: "host-b"}},
 			"legacy-host-a": {Status: types.ExecutorStatusACTIVE},
 		},
 		DrainedHosts: map[string]DrainedHost{
@@ -205,6 +206,7 @@ func TestNamespaceState_IsExecutorAssignable(t *testing.T) {
 		{name: "absent executor", executorID: "missing", want: false},
 		{name: "active on drained host", executorID: "host-a@uuid-1", want: false},
 		{name: "active on other host", executorID: "host-b@uuid-1", want: true},
+		{name: "metadata host is used when executor id names a drained host", executorID: "host-a@uuid-2", want: true},
 		{name: "missing host metadata ignores host drain", executorID: "legacy-host-a", want: true},
 	}
 

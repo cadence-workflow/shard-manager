@@ -283,41 +283,6 @@ func (v *ShardHandoverStats) GetHandoverType() (o HandoverType) {
 	return
 }
 
-type DrainedHost struct {
-	Hostname  string
-	DrainedAt time.Time
-	DrainedBy string
-	Reason    string
-}
-
-func (v *DrainedHost) GetHostname() (o string) {
-	if v != nil {
-		return v.Hostname
-	}
-	return
-}
-
-func (v *DrainedHost) GetDrainedAt() (o time.Time) {
-	if v != nil {
-		return v.DrainedAt
-	}
-	return
-}
-
-func (v *DrainedHost) GetDrainedBy() (o string) {
-	if v != nil {
-		return v.DrainedBy
-	}
-	return
-}
-
-func (v *DrainedHost) GetReason() (o string) {
-	if v != nil {
-		return v.Reason
-	}
-	return
-}
-
 type GetExecutorStateRequest struct {
 	Namespace  string
 	ExecutorID string

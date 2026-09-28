@@ -1959,9 +1959,9 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorClientDrainShardsScope:           {operation: "ShardDistributorClientDrainShards"},
 		ShardDistributorClientUndrainShardsScope:         {operation: "ShardDistributorClientUndrainShards"},
 		ShardDistributorClientGetDrainedShardsScope:      {operation: "ShardDistributorClientGetDrainedShards"},
-		ShardDistributorClientDrainHostsScope:          {operation: "ShardDistributorClientDrainHosts"},
-		ShardDistributorClientUndrainHostsScope:        {operation: "ShardDistributorClientUndrainHosts"},
-		ShardDistributorClientGetDrainedHostsScope:     {operation: "ShardDistributorClientGetDrainedHosts"},
+		ShardDistributorClientDrainHostsScope:            {operation: "ShardDistributorClientDrainHosts"},
+		ShardDistributorClientUndrainHostsScope:          {operation: "ShardDistributorClientUndrainHosts"},
+		ShardDistributorClientGetDrainedHostsScope:       {operation: "ShardDistributorClientGetDrainedHosts"},
 		ShardDistributorClientForceResetNamespaceScope:   {operation: "ShardDistributorClientForceResetNamespace"},
 		ShardDistributorExecutorClientHeartbeatScope:     {operation: "ShardDistributorExecutorHeartbeat"},
 

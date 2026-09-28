@@ -193,13 +193,6 @@ enum HandoverType {
   HANDOVER_TYPE_EMERGENCY = 2;
 }
 
-message DrainedHost {
-  string hostname = 1;
-  google.protobuf.Timestamp drained_at = 2;
-  string drained_by = 3;
-  string reason = 4;
-}
-
 message GetExecutorStateRequest {
   string namespace = 1;
   string executor_id = 2;
@@ -278,7 +271,6 @@ message GetDrainedShardsResponse {
   repeated string shard_keys = 2;
 }
 
-// DrainedHost is the operator-visible metadata for a host drain.
 message DrainedHost {
   string hostname = 1;
   google.protobuf.Timestamp drained_at = 2;

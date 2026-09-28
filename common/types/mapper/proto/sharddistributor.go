@@ -711,19 +711,6 @@ func fromShardDistributorAssignedState(t *types.AssignedState) *sharddistributor
 	}
 }
 
-func fromShardDistributorDrainedHost(t *types.DrainedHost) *sharddistributorv1.DrainedHost {
-	if t == nil {
-		return nil
-	}
-	drainedAt := t.GetDrainedAt()
-	return &sharddistributorv1.DrainedHost{
-		Hostname:  t.GetHostname(),
-		DrainedAt: timeToTimestamp(&drainedAt),
-		DrainedBy: t.GetDrainedBy(),
-		Reason:    t.GetReason(),
-	}
-}
-
 // ToShardDistributorGetFullNamespaceStateResponse converts a sharddistributor GetFullNamespaceStateResponse to a types.GetFullNamespaceStateResponse.
 func ToShardDistributorGetFullNamespaceStateResponse(t *sharddistributorv1.GetFullNamespaceStateResponse) *types.GetFullNamespaceStateResponse {
 	if t == nil {
@@ -831,18 +818,6 @@ func toShardDistributorAssignedState(t *sharddistributorv1.AssignedState) *types
 		ShardHandoverStats: handoverStats,
 		LastUpdated:        timestampToTimeVal(t.GetLastUpdated()),
 		ModRevision:        t.GetModRevision(),
-	}
-}
-
-func toShardDistributorDrainedHost(t *sharddistributorv1.DrainedHost) *types.DrainedHost {
-	if t == nil {
-		return nil
-	}
-	return &types.DrainedHost{
-		Hostname:  t.GetHostname(),
-		DrainedAt: timestampToTimeVal(t.GetDrainedAt()),
-		DrainedBy: t.GetDrainedBy(),
-		Reason:    t.GetReason(),
 	}
 }
 

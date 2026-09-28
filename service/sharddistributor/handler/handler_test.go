@@ -1350,7 +1350,7 @@ func TestDrainHosts(t *testing.T) {
 				tt.setupMocks(mockStorage)
 			}
 
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			err := h.DrainHosts(context.Background(), tt.request)
 
 			if tt.wantErr != nil {
@@ -1426,7 +1426,7 @@ func TestUndrainHosts(t *testing.T) {
 				tt.setupMocks(mockStorage)
 			}
 
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			resp, err := h.UndrainHosts(context.Background(), tt.request)
 
 			if tt.wantErr != nil {
@@ -1505,7 +1505,7 @@ func TestGetDrainedHosts(t *testing.T) {
 				tt.setupMocks(mockStorage)
 			}
 
-			h := newTestHandler(t, cfg, mockStorage)
+			h := newTestHandler(t, cfg, mockStorage, cache.NewMockShardCache(ctrl))
 			resp, err := h.GetDrainedHosts(context.Background(), tt.request)
 
 			if tt.wantErr != nil {

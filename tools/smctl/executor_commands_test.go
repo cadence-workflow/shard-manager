@@ -26,7 +26,7 @@ func TestExecutorCommand_help_listsSubcommands(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"list", "state"} {
+	for _, want := range []string{"list", "state", "drain", "undrain", "list-drained"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("executor help should list %q subcommand:\n%s", want, out)
 		}

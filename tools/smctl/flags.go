@@ -19,6 +19,10 @@ const (
 	FlagNamespace  = "namespace"
 	FlagShardKey   = "shard-key"
 	FlagExecutorID = "executor-id"
+	FlagHostname   = "hostname"
+	FlagReason     = "reason"
+	FlagDrainedBy  = "drained-by"
+	FlagYes        = "yes"
 )
 
 // Connection defaults for talking to a locally-running shard-manager.

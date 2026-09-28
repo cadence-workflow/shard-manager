@@ -30,6 +30,9 @@ func executorCommand(cf ClientFactory) *cliv3.Command {
 		Commands: []*cliv3.Command{
 			executorListCommand(cf),
 			executorStateCommand(cf),
+			executorDrainCommand(cf),
+			executorUndrainCommand(cf),
+			executorListDrainedCommand(cf),
 		},
 	}
 }

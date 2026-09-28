@@ -60,6 +60,9 @@ make smctl
 ./smctl --address localhost:7943 --namespace shard-distributor-canary shard drain --shard-key 7
 ./smctl --address localhost:7943 --namespace shard-distributor-canary shard undrain --shard-key 7
 ./smctl --address localhost:7943 --namespace shard-distributor-canary shard list-drained
+./smctl --address localhost:7943 --namespace shard-distributor-canary executor drain --hostname host-1 --reason maintenance
+./smctl --address localhost:7943 --namespace shard-distributor-canary executor undrain --hostname host-1
+./smctl --address localhost:7943 --namespace shard-distributor-canary executor list-drained
 ```
 
 The root flags (`--namespace`, `--address`, `--transport`, `--tls-cert-path`, `--context-timeout`)

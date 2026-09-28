@@ -163,12 +163,28 @@ func (ns *NamespaceState) IsHostDrained(hostname string) bool {
 	return drained
 }
 
+func (ns *NamespaceState) executorHostname(executorID string) string {
+	return ns.Executors[executorID].Hostname()
+}
+
+// IsExecutorHostDrained reports whether an executor runs on a drained host.
+func (ns *NamespaceState) IsExecutorHostDrained(executorID string) bool {
+	hostname := ns.executorHostname(executorID)
+	if hostname == "" {
+		return false
+	}
+	return ns.IsHostDrained(hostname)
+}
+
 // IsExecutorAssignable reports whether an executor may hold shards
 func (ns *NamespaceState) IsExecutorAssignable(executorID string, staleExecutors map[string]int64) bool {
 	if ns.Executors[executorID].Status != types.ExecutorStatusACTIVE {
 		return false
 	}
 	if _, stale := staleExecutors[executorID]; stale {
+		return false
+	}
+	if ns.IsExecutorHostDrained(executorID) {
 		return false
 	}
 	return true

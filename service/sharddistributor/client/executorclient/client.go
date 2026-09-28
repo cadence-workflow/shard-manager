@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/uber-go/tally"
@@ -20,6 +19,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/heartbeat"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/metricsconstants"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 )
 
 //go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go . ShardProcessorFactory,ShardProcessor,Executor,Client,ExecutorInfo
@@ -28,8 +28,6 @@ import (
 // assigned the requested shard. Callers that interpret shard ownership should
 // treat this as an ownership-loss signal rather than an internal error.
 var ErrShardProcessNotFound = errors.New("shard process not found")
-
-const maxHostnameLength = 128
 
 type Client interface {
 	Heartbeat(context.Context, *types.ExecutorHeartbeatRequest, ...yarpc.CallOption) (*types.ExecutorHeartbeatResponse, error)
@@ -146,13 +144,14 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 		return nil, fmt.Errorf("create shard distributor executor client: %w", err)
 	}
 
-	hostname, err := os.Hostname()
+	rawHostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("get hostname: %w", err)
 	}
 
 	uniqueID := uuid.New().String()
-	executorID := buildExecutorID(hostname, uniqueID)
+	sanitizedHostname := hostname.Normalize(rawHostname)
+	executorID := buildExecutorID(sanitizedHostname, uniqueID)
 
 	metricsScope := params.MetricsScope.Tagged(map[string]string{
 		metrics.OperationTagName: metricsconstants.ShardDistributorExecutorOperationTagName,
@@ -160,7 +159,7 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 	})
 
 	hostMetricsScope := metricsScope.Tagged(map[string]string{
-		"host": hostname,
+		"host": sanitizedHostname,
 	})
 
 	enabled := params.Enabled
@@ -191,6 +190,7 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 		shardDistributorClient,
 		namespaceConfig.Namespace,
 		executorID,
+		sanitizedHostname,
 		executor,
 		hostMetricsScope,
 		namespaceConfig.HeartBeatInterval,
@@ -199,18 +199,8 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 	return executor, nil
 }
 
-func buildExecutorID(hostname, uniqueID string) string {
-	// Executor IDs are etcd path segments, so they cannot contain slashes.
-	hostname = strings.ReplaceAll(hostname, "/", "_")
-
-	// Trim the hostname to ensure it's not unbounded
-	if len(hostname) > maxHostnameLength {
-		hostname = hostname[:maxHostnameLength]
-	}
-
-	executorID := hostname + "@" + uniqueID
-
-	return executorID
+func buildExecutorID(normalizedHostname, uniqueID string) string {
+	return normalizedHostname + "@" + uniqueID
 }
 
 func createShardDistributorExecutorClient(client Client, metricsScope tally.Scope) (Client, error) {

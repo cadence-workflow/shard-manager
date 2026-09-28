@@ -35,8 +35,9 @@ import (
 type (
 	// Config represents configuration for shard manager service
 	Config struct {
-		LoadBalancingMode dynamicproperties.StringPropertyFnWithNamespaceFilters
-		MaxEtcdTxnOps     dynamicproperties.IntPropertyFn
+		LoadBalancingMode                   dynamicproperties.StringPropertyFnWithNamespaceFilters
+		MaxEtcdTxnOps                       dynamicproperties.IntPropertyFn
+		EphemeralAssignmentCoalescingWindow dynamicproperties.DurationPropertyFnWithNamespaceFilters
 
 		LoadBalancingNaive  LoadBalancingNaiveConfig
 		LoadBalancingGreedy LoadBalancingGreedyConfig
@@ -121,8 +122,9 @@ const (
 // NewConfig returns a new instance of Config
 func NewConfig(dc *dynamicconfig.Collection) *Config {
 	return &Config{
-		LoadBalancingMode: dc.GetStringPropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingMode),
-		MaxEtcdTxnOps:     dc.GetIntProperty(dynamicproperties.ShardDistributorMaxEtcdTxnOps),
+		LoadBalancingMode:                   dc.GetStringPropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingMode),
+		MaxEtcdTxnOps:                       dc.GetIntProperty(dynamicproperties.ShardDistributorMaxEtcdTxnOps),
+		EphemeralAssignmentCoalescingWindow: dc.GetDurationPropertyFilteredByNamespace(dynamicproperties.ShardDistributorEphemeralAssignmentCoalescingWindow),
 
 		LoadBalancingNaive: LoadBalancingNaiveConfig{
 			MaxDeviation: dc.GetFloat64PropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingNaiveMaxDeviation),

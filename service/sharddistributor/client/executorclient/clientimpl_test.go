@@ -95,6 +95,7 @@ func newTestExecutor(
 		client,
 		"test-namespace",
 		"test-executor-id",
+		"test-hostname",
 		executor,
 		tally.NoopScope,
 		executor.heartBeatInterval,
@@ -119,6 +120,7 @@ func TestHeartBeatLoop(t *testing.T) {
 			Status:             types.ExecutorStatusACTIVE,
 			ShardStatusReports: make(map[string]*types.ShardStatusReport),
 			Metadata:           make(map[string]string),
+			HostMetadata:       &types.HostMetadata{HostName: "test-hostname"},
 		}, gomock.Any()).
 		Return(&types.ExecutorHeartbeatResponse{
 			ShardAssignments: map[string]*types.ShardAssignment{
@@ -187,7 +189,8 @@ func TestHeartbeat(t *testing.T) {
 				"test-shard-id1": {Status: types.ShardStatusREADY, ShardLoad: 0.123},
 				"test-shard-id2": {Status: types.ShardStatusREADY, ShardLoad: 0.456},
 			},
-			Metadata: make(map[string]string),
+			Metadata:     make(map[string]string),
+			HostMetadata: &types.HostMetadata{HostName: "test-hostname"},
 		}, gomock.Any()).Return(&types.ExecutorHeartbeatResponse{
 		ShardAssignments: map[string]*types.ShardAssignment{
 			"test-shard-id1": {Status: types.AssignmentStatusREADY},

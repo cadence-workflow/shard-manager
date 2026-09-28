@@ -109,14 +109,19 @@ func renderNamespacesTable(out io.Writer, namespaces []*types.NamespaceConfig) e
 	return w.Flush()
 }
 
-// namespaceStateCommand prints the current state of a namespace by calling
-// shard-manager's GetNamespaceState API.
+// namespaceStateCommand prints the current state of a namespace.
 func namespaceStateCommand(cf ClientFactory) *cliv3.Command {
 	return &cliv3.Command{
 		Name:        "state",
 		Aliases:     []string{"st"},
 		Usage:       "Print the current state of a namespace",
 		Description: "Calls GetNamespaceState on shard-manager and prints the response as indented JSON.",
+		Flags: []cliv3.Flag{
+			&cliv3.BoolFlag{
+				Name:  "full",
+				Usage: "Call GetFullNamespaceState and print its response.",
+			},
+		},
 		Action: func(ctx context.Context, cmd *cliv3.Command) error {
 			return runGetNamespaceState(ctx, cmd, resolveWriter(cmd), cf)
 		},
@@ -141,6 +146,16 @@ func runGetNamespaceState(
 
 	callCtx, cancel := context.WithTimeout(ctx, cmd.Duration(FlagContextTimeout))
 	defer cancel()
+
+	if cmd.Bool("full") {
+		resp, err := client.GetFullNamespaceState(callCtx, &types.GetFullNamespaceStateRequest{
+			Namespace: namespace,
+		})
+		if err != nil {
+			return fmt.Errorf("GetFullNamespaceState: %w", err)
+		}
+		return writeIndentedJSON(out, resp)
+	}
 
 	resp, err := client.GetNamespaceState(callCtx, &types.GetNamespaceStateRequest{
 		Namespace: namespace,

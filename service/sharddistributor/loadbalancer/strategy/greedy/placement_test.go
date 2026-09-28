@@ -17,15 +17,17 @@ func TestPlanInitialPlacement(t *testing.T) {
 	t.Run("picks lowest smoothed load and bumps by average after each pick", func(t *testing.T) {
 		measuredAt := time.Now()
 		state := &store.NamespaceState{
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					"hot":  {AssignedShards: map[string]*types.ShardAssignment{"s1": {}}},
+					"warm": {AssignedShards: map[string]*types.ShardAssignment{"s2": {}, "s3": {}}},
+					"cold": {AssignedShards: map[string]*types.ShardAssignment{"s4": {}, "s5": {}}},
+				},
+			},
 			Executors: map[string]store.HeartbeatState{
 				"hot":  {Status: types.ExecutorStatusACTIVE},
 				"warm": {Status: types.ExecutorStatusACTIVE},
 				"cold": {Status: types.ExecutorStatusACTIVE},
-			},
-			ShardAssignments: map[string]store.AssignedState{
-				"hot":  {AssignedShards: map[string]*types.ShardAssignment{"s1": {}}},
-				"warm": {AssignedShards: map[string]*types.ShardAssignment{"s2": {}, "s3": {}}},
-				"cold": {AssignedShards: map[string]*types.ShardAssignment{"s4": {}, "s5": {}}},
 			},
 			ShardStats: map[string]store.ShardStatistics{
 				"s1": {SmoothedLoad: 100.0, LastUpdateTime: measuredAt},
@@ -33,8 +35,7 @@ func TestPlanInitialPlacement(t *testing.T) {
 				"s3": {SmoothedLoad: 1.5, LastUpdateTime: measuredAt},
 				"s4": {SmoothedLoad: 1.0, LastUpdateTime: measuredAt},
 				"s5": {SmoothedLoad: 1.0, LastUpdateTime: measuredAt},
-			},
-		}
+			}}
 
 		placements, err := PlanInitialPlacement(state, []string{"new-1", "new-2"})
 		require.NoError(t, err)
@@ -49,15 +50,16 @@ func TestPlanInitialPlacement(t *testing.T) {
 
 	t.Run("ties on smoothed load fall through to shard count", func(t *testing.T) {
 		state := &store.NamespaceState{
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{
+					"few":  {AssignedShards: map[string]*types.ShardAssignment{"s1": {}}},
+					"many": {AssignedShards: map[string]*types.ShardAssignment{"s2": {}, "s3": {}, "s4": {}}},
+				},
+			},
 			Executors: map[string]store.HeartbeatState{
 				"few":  {Status: types.ExecutorStatusACTIVE},
 				"many": {Status: types.ExecutorStatusACTIVE},
-			},
-			ShardAssignments: map[string]store.AssignedState{
-				"few":  {AssignedShards: map[string]*types.ShardAssignment{"s1": {}}},
-				"many": {AssignedShards: map[string]*types.ShardAssignment{"s2": {}, "s3": {}, "s4": {}}},
-			},
-		}
+			}}
 
 		placements, err := PlanInitialPlacement(state, []string{"new-1"})
 		require.NoError(t, err)
@@ -68,9 +70,10 @@ func TestPlanInitialPlacement(t *testing.T) {
 
 	t.Run("includes active executors with no assignments", func(t *testing.T) {
 		state := &store.NamespaceState{
-			Executors:        map[string]store.HeartbeatState{"new": {Status: types.ExecutorStatusACTIVE}},
-			ShardAssignments: map[string]store.AssignedState{},
-		}
+			AssignmentState: store.AssignmentState{
+				ShardAssignments: map[string]store.AssignedState{},
+			},
+			Executors: map[string]store.HeartbeatState{"new": {Status: types.ExecutorStatusACTIVE}}}
 
 		placements, err := PlanInitialPlacement(state, []string{"new-1"})
 		require.NoError(t, err)

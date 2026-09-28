@@ -899,6 +899,9 @@ const (
 	// ShardDistributorClientGetNamespaceStateScope tracks GetNamespaceState calls made by service to shard distributor
 	ShardDistributorClientGetNamespaceStateScope
 
+	// ShardDistributorClientGetFullNamespaceStateScope tracks GetFullNamespaceState calls made by service to shard distributor
+	ShardDistributorClientGetFullNamespaceStateScope
+
 	// ShardDistributorClientGetExecutorStateScope tracks GetExecutorState calls made by service to shard distributor
 	ShardDistributorClientGetExecutorStateScope
 
@@ -1507,6 +1510,7 @@ const (
 	// ShardDistributorGetShardOwnerScope tracks GetShardOwner API calls received by service
 	ShardDistributorGetShardOwnerScope = iota + NumWorkerScopes
 	ShardDistributorGetNamespaceStateScope
+	ShardDistributorGetFullNamespaceStateScope
 	ShardDistributorGetExecutorStateScope
 	ShardDistributorListNamespacesScope
 	ShardDistributorWatchNamespaceStateScope
@@ -1516,19 +1520,17 @@ const (
 	ShardDistributorUndrainShardsScope
 	ShardDistributorGetDrainedShardsScope
 
-	ShardDistributorStoreGetShardOwnerScope
 	ShardDistributorStoreAssignShardsScope
 	ShardDistributorStoreDeleteExecutorsScope
 	ShardDistributorStoreGetShardStatsScope
 	ShardDistributorStoreDeleteShardStatsScope
 	ShardDistributorStoreGetExecutorStateScope
-	ShardDistributorStoreGetExecutorScope
 	ShardDistributorStoreGetStateScope
+	ShardDistributorStoreGetAssignmentStateScope
 	ShardDistributorStoreRecordHeartbeatScope
 	ShardDistributorStoreRecordShardStatisticsScope
 	ShardDistributorStoreRecordShardStatisticsBatchScope
 	ShardDistributorStoreSubscribeToExecutorStatusChangesScope
-	ShardDistributorStoreSubscribeToAssignmentChangesScope
 	ShardDistributorStoreDeleteAssignedStatesScope
 	ShardDistributorStoreResetNamespaceScope
 	ShardDistributorStoreDrainShardsScope
@@ -1947,20 +1949,21 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		P2PRPCPeerChooserScope:       {operation: "P2PRPCPeerChooser"},
 		PartitionConfigProviderScope: {operation: "PartitionConfigProvider"},
 
-		ShardDistributorClientGetShardOwnerScope:       {operation: "ShardDistributorClientGetShardOwner"},
-		ShardDistributorClientGetNamespaceStateScope:   {operation: "ShardDistributorClientGetNamespaceState"},
-		ShardDistributorClientGetExecutorStateScope:    {operation: "ShardDistributorClientGetExecutorState"},
-		ShardDistributorClientListNamespacesScope:      {operation: "ShardDistributorClientListNamespaces"},
-		ShardDistributorClientWatchNamespaceStateScope: {operation: "ShardDistributorClientWatchNamespaceState"},
-		ShardDistributorClientInspectShardScope:        {operation: "ShardDistributorClientInspectShard"},
-		ShardDistributorClientDrainShardsScope:         {operation: "ShardDistributorClientDrainShards"},
-		ShardDistributorClientUndrainShardsScope:       {operation: "ShardDistributorClientUndrainShards"},
-		ShardDistributorClientGetDrainedShardsScope:    {operation: "ShardDistributorClientGetDrainedShards"},
+		ShardDistributorClientGetShardOwnerScope:         {operation: "ShardDistributorClientGetShardOwner"},
+		ShardDistributorClientGetNamespaceStateScope:     {operation: "ShardDistributorClientGetNamespaceState"},
+		ShardDistributorClientGetFullNamespaceStateScope: {operation: "ShardDistributorClientGetFullNamespaceState"},
+		ShardDistributorClientGetExecutorStateScope:      {operation: "ShardDistributorClientGetExecutorState"},
+		ShardDistributorClientListNamespacesScope:        {operation: "ShardDistributorClientListNamespaces"},
+		ShardDistributorClientWatchNamespaceStateScope:   {operation: "ShardDistributorClientWatchNamespaceState"},
+		ShardDistributorClientInspectShardScope:          {operation: "ShardDistributorClientInspectShard"},
+		ShardDistributorClientDrainShardsScope:           {operation: "ShardDistributorClientDrainShards"},
+		ShardDistributorClientUndrainShardsScope:         {operation: "ShardDistributorClientUndrainShards"},
+		ShardDistributorClientGetDrainedShardsScope:      {operation: "ShardDistributorClientGetDrainedShards"},
 		ShardDistributorClientDrainHostsScope:          {operation: "ShardDistributorClientDrainHosts"},
 		ShardDistributorClientUndrainHostsScope:        {operation: "ShardDistributorClientUndrainHosts"},
 		ShardDistributorClientGetDrainedHostsScope:     {operation: "ShardDistributorClientGetDrainedHosts"},
-		ShardDistributorClientForceResetNamespaceScope: {operation: "ShardDistributorClientForceResetNamespace"},
-		ShardDistributorExecutorClientHeartbeatScope:   {operation: "ShardDistributorExecutorHeartbeat"},
+		ShardDistributorClientForceResetNamespaceScope:   {operation: "ShardDistributorClientForceResetNamespace"},
+		ShardDistributorExecutorClientHeartbeatScope:     {operation: "ShardDistributorExecutorHeartbeat"},
 
 		LoadBalancerScope: {operation: "RRLoadBalancer"},
 
@@ -2246,6 +2249,7 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 	ShardDistributor: {
 		ShardDistributorGetShardOwnerScope:                         {operation: "GetShardOwner"},
 		ShardDistributorGetNamespaceStateScope:                     {operation: "GetNamespaceState"},
+		ShardDistributorGetFullNamespaceStateScope:                 {operation: "GetFullNamespaceState"},
 		ShardDistributorGetExecutorStateScope:                      {operation: "GetExecutorState"},
 		ShardDistributorListNamespacesScope:                        {operation: "ListNamespaces"},
 		ShardDistributorWatchNamespaceStateScope:                   {operation: "WatchNamespaceState"},
@@ -2255,19 +2259,17 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorUndrainShardsScope:                         {operation: "UndrainShards"},
 		ShardDistributorGetDrainedShardsScope:                      {operation: "GetDrainedShards"},
 		ShardDistributorExecutorScope:                              {operation: "Executor"},
-		ShardDistributorStoreGetShardOwnerScope:                    {operation: "StoreGetShardOwner"},
 		ShardDistributorStoreAssignShardsScope:                     {operation: "StoreAssignShards"},
 		ShardDistributorStoreDeleteExecutorsScope:                  {operation: "StoreDeleteExecutors"},
 		ShardDistributorStoreGetShardStatsScope:                    {operation: "StoreGetShardStats"},
 		ShardDistributorStoreDeleteShardStatsScope:                 {operation: "StoreDeleteShardStats"},
 		ShardDistributorStoreGetExecutorStateScope:                 {operation: "StoreGetExecutorState"},
-		ShardDistributorStoreGetExecutorScope:                      {operation: "StoreGetExecutor"},
 		ShardDistributorStoreGetStateScope:                         {operation: "StoreGetState"},
+		ShardDistributorStoreGetAssignmentStateScope:               {operation: "StoreGetAssignmentState"},
 		ShardDistributorStoreRecordHeartbeatScope:                  {operation: "StoreRecordHeartbeat"},
 		ShardDistributorStoreRecordShardStatisticsScope:            {operation: "StoreRecordShardStatistics"},
 		ShardDistributorStoreRecordShardStatisticsBatchScope:       {operation: "StoreRecordShardStatisticsBatch"},
 		ShardDistributorStoreSubscribeToExecutorStatusChangesScope: {operation: "StoreSubscribeToExecutorStatusChanges"},
-		ShardDistributorStoreSubscribeToAssignmentChangesScope:     {operation: "StoreSubscribeToAssignmentChanges"},
 		ShardDistributorStoreDeleteAssignedStatesScope:             {operation: "StoreDeleteAssignedStates"},
 		ShardDistributorStoreResetNamespaceScope:                   {operation: "StoreResetNamespace"},
 		ShardDistributorStoreDrainShardsScope:                      {operation: "StoreDrainShards"},
@@ -3110,6 +3112,7 @@ const (
 	ShardDistributorStoreRequestsPerNamespace
 	ShardDistributorStoreLatencyHistogramPerNamespace
 	ShardDistributorStoreGetStateETCDRoundTripLatency
+	ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency
 
 	ShardDistributorEphemeralAssignmentBatchSize
 	ShardDistributorEphemeralAssignmentWriteAttempts
@@ -3966,12 +3969,13 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ShardDistributorOldestExecutorHeartbeatLag: {metricName: "shard_distributor_oldest_executor_heartbeat_lag", metricType: Gauge},
 		ShardDistributorMaxExecutorsPerShard:       {metricName: "shard_distributor_max_executors_per_shard", metricType: Gauge},
 
-		ShardDistributorStoreExecutorNotFound:             {metricName: "shard_distributor_store_executor_not_found", metricType: Counter},
-		ShardDistributorStoreShardStatisticsSkipped:       {metricName: "shard_distributor_store_shard_statistics_skipped", metricType: Counter},
-		ShardDistributorStoreFailuresPerNamespace:         {metricName: "shard_distributor_store_failures_per_namespace", metricType: Counter},
-		ShardDistributorStoreRequestsPerNamespace:         {metricName: "shard_distributor_store_requests_per_namespace", metricType: Counter},
-		ShardDistributorStoreLatencyHistogramPerNamespace: {metricName: "shard_distributor_store_latency_histogram_per_namespace", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
-		ShardDistributorStoreGetStateETCDRoundTripLatency: {metricName: "shard_distributor_store_get_state_etcd_round_trip_latency", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
+		ShardDistributorStoreExecutorNotFound:                       {metricName: "shard_distributor_store_executor_not_found", metricType: Counter},
+		ShardDistributorStoreShardStatisticsSkipped:                 {metricName: "shard_distributor_store_shard_statistics_skipped", metricType: Counter},
+		ShardDistributorStoreFailuresPerNamespace:                   {metricName: "shard_distributor_store_failures_per_namespace", metricType: Counter},
+		ShardDistributorStoreRequestsPerNamespace:                   {metricName: "shard_distributor_store_requests_per_namespace", metricType: Counter},
+		ShardDistributorStoreLatencyHistogramPerNamespace:           {metricName: "shard_distributor_store_latency_histogram_per_namespace", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
+		ShardDistributorStoreGetStateETCDRoundTripLatency:           {metricName: "shard_distributor_store_get_state_etcd_round_trip_latency", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
+		ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency: {metricName: "shard_distributor_store_get_assignment_state_etcd_round_trip_latency", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
 
 		ShardDistributorEphemeralAssignmentBatchSize:     {metricName: "shard_distributor_ephemeral_assignment_batch_size", metricType: Histogram, buckets: ShardDistributorEphemeralAssignmentBatchSizeBuckets},
 		ShardDistributorEphemeralAssignmentWriteAttempts: {metricName: "shard_distributor_ephemeral_assignment_write_attempts", metricType: Counter},

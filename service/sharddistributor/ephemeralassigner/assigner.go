@@ -37,6 +37,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
@@ -48,8 +49,7 @@ const (
 	// Sized as a safety net rather than a target. It covers conflict retries and a
 	// cold-cache GetExecutor, whose namespace refresh is itself bounded by
 	// refreshOperationTimeout (5s).
-	ephemeralBatchTimeout          = 5 * time.Second
-	ephemeralBatchCoalescingWindow = 10 * time.Millisecond
+	ephemeralBatchTimeout = 5 * time.Second
 
 	// versionConflictRetryInitialInterval is the starting backoff for retries
 	// triggered when a concurrent shard assignment causes a version conflict.
@@ -68,20 +68,22 @@ type Assigner struct {
 	timeSource clock.TimeSource
 	cfg        *config.Config
 	storage    store.Store
+	shardCache cache.ShardCache
 	metrics    metrics.Scope
 
 	batcher *shardBatcher
 }
 
 // New builds an Assigner. Call Start before serving requests and Stop on shutdown.
-func New(timeSource clock.TimeSource, cfg *config.Config, storage store.Store, metricsClient metrics.Client) *Assigner {
+func New(timeSource clock.TimeSource, cfg *config.Config, storage store.Store, shardCache cache.ShardCache, metricsClient metrics.Client) *Assigner {
 	a := &Assigner{
 		timeSource: timeSource,
 		cfg:        cfg,
 		storage:    storage,
+		shardCache: shardCache,
 		metrics:    metricsClient.Scope(metrics.ShardDistributorEphemeralAssignmentScope),
 	}
-	a.batcher = newShardBatcher(timeSource, ephemeralBatchTimeout, ephemeralBatchCoalescingWindow, a.assignEphemeralBatch)
+	a.batcher = newShardBatcher(timeSource, ephemeralBatchTimeout, cfg.EphemeralAssignmentCoalescingWindow, a.assignEphemeralBatch)
 	return a
 }
 
@@ -269,7 +271,7 @@ func (a *Assigner) fetchExecutorMetadata(ctx context.Context, namespace string, 
 		if _, already := executorOwners[executorID]; already {
 			continue
 		}
-		owner, err := a.storage.GetExecutor(ctx, namespace, executorID)
+		owner, err := a.shardCache.GetExecutor(ctx, namespace, executorID)
 		if err != nil {
 			return nil, &types.InternalServiceError{Message: fmt.Sprintf("get executor %q: %v", executorID, err)}
 		}

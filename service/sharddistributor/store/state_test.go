@@ -125,9 +125,10 @@ func TestNamespaceState_ShardOwners(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ns := &NamespaceState{
-				Executors:        tt.executors,
-				ShardAssignments: tt.shardAssignments,
-			}
+				AssignmentState: AssignmentState{
+					ShardAssignments: tt.shardAssignments,
+				},
+				Executors: tt.executors}
 			assert.Equal(t, tt.expected, ns.ShardOwners())
 		})
 	}

@@ -80,14 +80,14 @@ type namespaceState struct {
 //
 // Usage:
 //
-//	b := newShardBatcher(timeSource, 5*time.Second, 10*time.Millisecond, processFn)
+//	b := newShardBatcher(timeSource, 5*time.Second, coalescingWindow, processFn)
 //	b.Start()
 //	defer b.Stop()
 //	resp, err := b.Submit(ctx, &types.GetShardOwnerRequest{Namespace: namespace, ShardKey: shardKey})
 type shardBatcher struct {
 	timeSource       clock.TimeSource
 	timeout          time.Duration
-	coalescingWindow time.Duration
+	coalescingWindow func(namespace string) time.Duration
 	processBatch     ephemeralAssignmentBatchFn
 
 	requestChan chan *batchRequest
@@ -97,7 +97,7 @@ type shardBatcher struct {
 	wg     sync.WaitGroup
 }
 
-func newShardBatcher(timeSource clock.TimeSource, timeout, coalescingWindow time.Duration, processBatch ephemeralAssignmentBatchFn) *shardBatcher {
+func newShardBatcher(timeSource clock.TimeSource, timeout time.Duration, coalescingWindow func(namespace string) time.Duration, processBatch ephemeralAssignmentBatchFn) *shardBatcher {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &shardBatcher{
 		timeSource:       timeSource,
@@ -204,7 +204,7 @@ func (b *shardBatcher) loop() {
 
 func (b *shardBatcher) scheduleFlush(namespace string, ready chan<- string) {
 	go func() {
-		timer := b.timeSource.NewTimer(b.coalescingWindow)
+		timer := b.timeSource.NewTimer(b.coalescingWindow(namespace))
 		defer timer.Stop()
 		select {
 		case <-timer.Chan():

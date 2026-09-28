@@ -70,13 +70,14 @@ func TestLoadBalance_Convergence(t *testing.T) {
 	}
 
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignments,
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
-		ShardAssignments: assignments,
-		ShardStats:       shardStats,
-	}
+		ShardStats: shardStats}
 
 	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
 	require.NoError(t, err)
@@ -101,20 +102,21 @@ func TestLoadBalance_SkipsNonBeneficialHotShard(t *testing.T) {
 		execB: {"b-1"},
 	}
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: map[string]store.AssignedState{
+				execA: {AssignedShards: map[string]*types.ShardAssignment{"hot": {}, "warm": {}}},
+				execB: {AssignedShards: map[string]*types.ShardAssignment{"b-1": {}}},
+			},
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
-		},
-		ShardAssignments: map[string]store.AssignedState{
-			execA: {AssignedShards: map[string]*types.ShardAssignment{"hot": {}, "warm": {}}},
-			execB: {AssignedShards: map[string]*types.ShardAssignment{"b-1": {}}},
 		},
 		ShardStats: map[string]store.ShardStatistics{
 			"hot":  {SmoothedLoad: 10, LastUpdateTime: now},
 			"warm": {SmoothedLoad: 2, LastUpdateTime: now},
 			"b-1":  {SmoothedLoad: 3, LastUpdateTime: now},
-		},
-	}
+		}}
 
 	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
 	require.NoError(t, err)
@@ -202,13 +204,14 @@ func TestLoadBalance_NoMoveNeeded(t *testing.T) {
 	}
 
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignments,
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
-		ShardAssignments: assignments,
-		ShardStats:       shardStats,
-	}
+		ShardStats: shardStats}
 
 	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
 	require.NoError(t, err)
@@ -263,6 +266,9 @@ func TestLoadBalance_SevereImbalance_AllowsMoveWithoutDestinations(t *testing.T)
 	}
 
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignments,
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
@@ -270,9 +276,7 @@ func TestLoadBalance_SevereImbalance_AllowsMoveWithoutDestinations(t *testing.T)
 			execD: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execE: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
-		ShardAssignments: assignments,
-		ShardStats:       shardStats,
-	}
+		ShardStats: shardStats}
 
 	initialA := len(currentAssignments[execA])
 	initialOther := len(currentAssignments[execB]) + len(currentAssignments[execC]) + len(currentAssignments[execD]) + len(currentAssignments[execE])
@@ -321,13 +325,14 @@ func TestLoadBalance_NoDestinations_NotSevere(t *testing.T) {
 	}
 
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignments,
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
-		ShardAssignments: assignments,
-		ShardStats:       shardStats,
-	}
+		ShardStats: shardStats}
 
 	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
 	require.NoError(t, err)
@@ -390,15 +395,16 @@ func TestLoadBalance_BudgetConstraint(t *testing.T) {
 	expectedDAfter := initialD + expectedBudget
 
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignments,
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execC: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execD: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
-		ShardAssignments: assignments,
-		ShardStats:       shardStats,
-	}
+		ShardStats: shardStats}
 
 	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
 	require.NoError(t, err)
@@ -455,13 +461,14 @@ func TestLoadBalance_MultiMovePerCycle(t *testing.T) {
 	expectedMovedLoad := int64(float64(expectedMoveCount) * reportedShardLoad)
 
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignments,
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now, ReportedShards: reportedShards},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
-		ShardAssignments: assignments,
-		ShardStats:       shardStats,
-	}
+		ShardStats: shardStats}
 
 	metricsScope := &metricsmocks.Scope{}
 	metricsScope.On("AddCounter", metrics.ShardDistributorAssignLoopLoadBasedMoves, int64(expectedMoveCount)).Once()
@@ -510,13 +517,14 @@ func TestLoadBalance_PerShardCooldownSkipsHotShard(t *testing.T) {
 	}
 
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignments,
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
-		ShardAssignments: assignments,
-		ShardStats:       shardStats,
-	}
+		ShardStats: shardStats}
 
 	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
 	require.NoError(t, err)
@@ -559,6 +567,9 @@ func TestLoadBalance_NoDestinations(t *testing.T) {
 	}
 
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignments,
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
@@ -566,9 +577,7 @@ func TestLoadBalance_NoDestinations(t *testing.T) {
 			execD: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execE: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
-		ShardAssignments: assignments,
-		ShardStats:       shardStats,
-	}
+		ShardStats: shardStats}
 
 	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
 	require.NoError(t, err)
@@ -616,15 +625,16 @@ func TestLoadBalance_ExecutorRemovedFromDestination(t *testing.T) {
 	}
 
 	namespaceState := &store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignments,
+		},
 		Executors: map[string]store.HeartbeatState{
 			execA: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execB: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execC: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 			execF: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
 		},
-		ShardAssignments: assignments,
-		ShardStats:       shardStats,
-	}
+		ShardStats: shardStats}
 
 	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metrics.NoopScope)
 	require.NoError(t, err)

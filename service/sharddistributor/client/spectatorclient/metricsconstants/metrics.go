@@ -2,20 +2,21 @@ package metricsconstants
 
 const (
 	// Operation tag names for ShardDistributorSpectator metrics
-	ShardDistributorSpectatorOperationTagName                    = "ShardDistributorSpectator"
-	ShardDistributorSpectatorGetShardOwnerOperationTagName       = "ShardDistributorSpectatorGetShardOwner"
-	ShardDistributorSpectatorInspectShardOperationTagName        = "ShardDistributorSpectatorInspectShard"
-	ShardDistributorSpectatorGetNamespaceStateOperationTagName   = "ShardDistributorSpectatorGetNamespaceState"
-	ShardDistributorSpectatorGetExecutorStateOperationTagName    = "ShardDistributorSpectatorGetExecutorState"
-	ShardDistributorSpectatorListNamespacesOperationTagName      = "ShardDistributorSpectatorListNamespaces"
-	ShardDistributorSpectatorWatchNamespaceStateOperationTagName = "ShardDistributorSpectatorWatchNamespaceState"
-	ShardDistributorSpectatorDrainShardsOperationTagName         = "ShardDistributorSpectatorDrainShards"
-	ShardDistributorSpectatorUndrainShardsOperationTagName       = "ShardDistributorSpectatorUndrainShards"
-	ShardDistributorSpectatorGetDrainedShardsOperationTagName    = "ShardDistributorSpectatorGetDrainedShards"
+	ShardDistributorSpectatorOperationTagName                      = "ShardDistributorSpectator"
+	ShardDistributorSpectatorGetShardOwnerOperationTagName         = "ShardDistributorSpectatorGetShardOwner"
+	ShardDistributorSpectatorInspectShardOperationTagName          = "ShardDistributorSpectatorInspectShard"
+	ShardDistributorSpectatorGetNamespaceStateOperationTagName     = "ShardDistributorSpectatorGetNamespaceState"
+	ShardDistributorSpectatorGetFullNamespaceStateOperationTagName = "ShardDistributorSpectatorGetFullNamespaceState"
+	ShardDistributorSpectatorGetExecutorStateOperationTagName      = "ShardDistributorSpectatorGetExecutorState"
+	ShardDistributorSpectatorListNamespacesOperationTagName        = "ShardDistributorSpectatorListNamespaces"
+	ShardDistributorSpectatorWatchNamespaceStateOperationTagName   = "ShardDistributorSpectatorWatchNamespaceState"
+	ShardDistributorSpectatorDrainShardsOperationTagName           = "ShardDistributorSpectatorDrainShards"
+	ShardDistributorSpectatorUndrainShardsOperationTagName         = "ShardDistributorSpectatorUndrainShards"
+	ShardDistributorSpectatorGetDrainedShardsOperationTagName      = "ShardDistributorSpectatorGetDrainedShards"
 	ShardDistributorSpectatorDrainHostsOperationTagName          = "ShardDistributorSpectatorDrainHosts"
 	ShardDistributorSpectatorUndrainHostsOperationTagName        = "ShardDistributorSpectatorUndrainHosts"
 	ShardDistributorSpectatorGetDrainedHostsOperationTagName     = "ShardDistributorSpectatorGetDrainedHosts"
-	ShardDistributorSpectatorForceResetNamespaceOperationTagName = "ShardDistributorSpectatorForceResetNamespace"
+	ShardDistributorSpectatorForceResetNamespaceOperationTagName   = "ShardDistributorSpectatorForceResetNamespace"
 
 	// Counter metrics
 	ShardDistributorSpectatorClientRequests   = "shard_distributor_spectator_client_requests"

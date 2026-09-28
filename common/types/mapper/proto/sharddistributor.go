@@ -523,6 +523,7 @@ func fromShardDistributorNamespaceExecutorState(ex *types.NamespaceExecutorState
 		LastHeartbeat:  timeToTimestamp(&lastHB),
 		Metadata:       ex.GetMetadata(),
 		AssignedShards: assigned,
+		HostMetadata:   fromShardDistributorHostMetadata(ex.GetHostMetadata()),
 	}
 }
 
@@ -573,6 +574,7 @@ func toShardDistributorNamespaceExecutorState(ex *sharddistributorv1.NamespaceEx
 		LastHeartbeat:  lastHB,
 		Metadata:       ex.GetMetadata(),
 		AssignedShards: assigned,
+		HostMetadata:   toShardDistributorHostMetadata(ex.GetHostMetadata()),
 	}
 }
 

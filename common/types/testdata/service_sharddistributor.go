@@ -102,6 +102,7 @@ var (
 				AssignedShards: []*types.ExecutorAssignedShardState{
 					{ShardKey: "a", AssignmentStatus: types.AssignmentStatusREADY, AssignedStateModRevision: 7},
 				},
+				HostMetadata: &types.HostMetadata{HostName: "host-1"},
 			},
 		},
 	}
@@ -166,6 +167,7 @@ var (
 			AssignedShards: []*types.ExecutorAssignedShardState{
 				{ShardKey: "a", AssignmentStatus: types.AssignmentStatusREADY, AssignedStateModRevision: 7},
 			},
+			HostMetadata: &types.HostMetadata{HostName: "host-1"},
 		},
 	}
 	ShardDistributorListNamespacesRequest  = types.ListNamespacesRequest{}

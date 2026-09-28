@@ -217,6 +217,7 @@ func (h *handlerImpl) GetNamespaceState(ctx context.Context, request *types.GetN
 			LastHeartbeat:  heartbeat.LastHeartbeat,
 			Metadata:       heartbeat.Metadata,
 			AssignedShards: assignedShards,
+			HostMetadata:   heartbeat.HostMetadata,
 		})
 	}
 
@@ -350,6 +351,7 @@ func (h *handlerImpl) GetExecutorState(ctx context.Context, request *types.GetEx
 			LastHeartbeat:  heartbeatState.LastHeartbeat,
 			Metadata:       heartbeatState.Metadata,
 			AssignedShards: assignedShards,
+			HostMetadata:   heartbeatState.HostMetadata,
 		},
 	}, nil
 }

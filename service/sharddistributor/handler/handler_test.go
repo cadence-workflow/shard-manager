@@ -561,7 +561,12 @@ func TestGetNamespaceState_successMultipleExecutors(t *testing.T) {
 			},
 		},
 		Executors: map[string]store.HeartbeatState{
-			"executor1": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now, Metadata: map[string]string{"ip": "127.0.0.1", "port": "1234"}},
+			"executor1": {
+				Status:        types.ExecutorStatusACTIVE,
+				LastHeartbeat: now,
+				Metadata:      map[string]string{"ip": "127.0.0.1", "port": "1234"},
+				HostMetadata:  &types.HostMetadata{HostName: "host-1"},
+			},
 			"executor2": {},
 		}}, nil)
 
@@ -579,6 +584,7 @@ func TestGetNamespaceState_successMultipleExecutors(t *testing.T) {
 	e1 := byID["executor1"]
 	require.NotNil(t, e1)
 	require.Equal(t, types.ExecutorStatusACTIVE, e1.Status)
+	require.Equal(t, &types.HostMetadata{HostName: "host-1"}, e1.HostMetadata)
 	require.Len(t, e1.AssignedShards, 2)
 	shardKeys := make([]string, 0, len(e1.AssignedShards))
 	for _, sh := range e1.AssignedShards {
@@ -590,6 +596,7 @@ func TestGetNamespaceState_successMultipleExecutors(t *testing.T) {
 
 	e2 := byID["executor2"]
 	require.NotNil(t, e2)
+	require.Nil(t, e2.HostMetadata)
 	require.Len(t, e2.AssignedShards, 1)
 	require.Equal(t, "shard3", e2.AssignedShards[0].ShardKey)
 	require.Equal(t, types.AssignmentStatusINVALID, e2.AssignedShards[0].AssignmentStatus)
@@ -917,6 +924,7 @@ func TestGetExecutorState_success(t *testing.T) {
 				Status:        types.ExecutorStatusACTIVE,
 				LastHeartbeat: now,
 				Metadata:      map[string]string{"ip": "127.0.0.1", "port": "1234"},
+				HostMetadata:  &types.HostMetadata{HostName: "host-1"},
 			},
 			Assignment: &store.AssignedState{
 				AssignedShards: map[string]*types.ShardAssignment{
@@ -942,6 +950,7 @@ func TestGetExecutorState_success(t *testing.T) {
 	require.Equal(t, types.ExecutorStatusACTIVE, resp.Executor.Status)
 	require.Equal(t, now, resp.Executor.LastHeartbeat)
 	require.Equal(t, map[string]string{"ip": "127.0.0.1", "port": "1234"}, resp.Executor.Metadata)
+	require.Equal(t, &types.HostMetadata{HostName: "host-1"}, resp.Executor.HostMetadata)
 	require.Len(t, resp.Executor.AssignedShards, 2)
 
 	byKey := make(map[string]*types.ExecutorAssignedShardState, len(resp.Executor.AssignedShards))

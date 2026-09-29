@@ -28,10 +28,7 @@ func PlanInitialPlacement(state *store.NamespaceState, shardIDs []string) ([]pla
 
 func assignmentCounts(state *store.NamespaceState) map[string]int {
 	counts := make(map[string]int, len(state.Executors))
-	for executorID := range state.Executors {
-		if !state.IsExecutorAssignable(executorID, nil) {
-			continue
-		}
+	for _, executorID := range state.AssignableExecutorIDs(nil) {
 		counts[executorID] = len(state.ShardAssignments[executorID].AssignedShards)
 	}
 	return counts

@@ -1326,82 +1326,53 @@ func TestFindExecutorsToUnassign(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		executorID   string
-		status       types.ExecutorStatus
-		assignment   store.AssignedState
-		stale        bool
-		drainedHosts map[string]store.DrainedHost
-		want         map[string]int64
+		name       string
+		assignment store.AssignedState
+		assignable bool
+		stale      bool
+		want       map[string]int64
 	}{
 		{
-			name:       "active executor keeps its shards",
-			executorID: "exec",
-			status:     types.ExecutorStatusACTIVE,
+			name:       "assignable executor keeps its shards",
 			assignment: assignment(7, "0"),
+			assignable: true,
 			want:       map[string]int64{},
 		},
 		{
-			name:       "draining executor is emptied at its current revision",
-			executorID: "exec",
-			status:     types.ExecutorStatusDRAINING,
-			assignment: assignment(7, "0"),
-			want:       map[string]int64{"exec": 7},
-		},
-		{
-			name:       "drained executor is emptied",
-			executorID: "exec",
-			status:     types.ExecutorStatusDRAINED,
+			name:       "non-assignable executor is emptied at its current revision",
 			assignment: assignment(7, "0"),
 			want:       map[string]int64{"exec": 7},
 		},
 		{
 			name:       "stale executor is deleted rather than emptied",
-			executorID: "exec",
-			status:     types.ExecutorStatusACTIVE,
 			assignment: assignment(7, "0"),
 			stale:      true,
 			want:       map[string]int64{},
 		},
 		{
 			name:       "already emptied record is not rewritten",
-			executorID: "exec",
-			status:     types.ExecutorStatusDRAINING,
 			assignment: assignment(7),
 			want:       map[string]int64{},
-		},
-		{
-			name:       "active executor on a drained host is emptied",
-			executorID: "host-a@uuid-1",
-			status:     types.ExecutorStatusACTIVE,
-			assignment: assignment(7, "0"),
-			drainedHosts: map[string]store.DrainedHost{
-				"host-a": {Hostname: "host-a"},
-			},
-			want: map[string]int64{"host-a@uuid-1": 7},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			assignableExecutors := map[string]struct{}{}
+			if tt.assignable {
+				assignableExecutors["exec"] = struct{}{}
+			}
 			staleExecutors := map[string]int64{}
 			if tt.stale {
-				staleExecutors[tt.executorID] = tt.assignment.ModRevision
-			}
-
-			heartbeat := store.HeartbeatState{Status: tt.status}
-			if tt.drainedHosts != nil {
-				heartbeat.HostMetadata = &types.HostMetadata{HostName: "host-a"}
+				staleExecutors["exec"] = tt.assignment.ModRevision
 			}
 			namespaceState := &store.NamespaceState{
 				AssignmentState: store.AssignmentState{
-					ShardAssignments: map[string]store.AssignedState{tt.executorID: tt.assignment},
+					ShardAssignments: map[string]store.AssignedState{"exec": tt.assignment},
 				},
-				Executors:    map[string]store.HeartbeatState{tt.executorID: heartbeat},
-				DrainedHosts: tt.drainedHosts,
 			}
 
-			assert.Equal(t, tt.want, findExecutorsToUnassign(namespaceState, staleExecutors))
+			assert.Equal(t, tt.want, findExecutorsToUnassign(namespaceState, assignableExecutors, staleExecutors))
 		})
 	}
 }

@@ -39,6 +39,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -553,8 +554,6 @@ func (h *handlerImpl) GetDrainedShards(ctx context.Context, request *types.GetDr
 	}, nil
 }
 
-const maxHostnameLength = 128
-
 // DrainHosts marks the requested hosts as drained for the namespace.
 // Executors on a drained host are ineligible for assignment until undrained.
 // The call is idempotent, so hosts that are already drained keep their original metadata.
@@ -567,20 +566,26 @@ func (h *handlerImpl) DrainHosts(ctx context.Context, request *types.DrainHostsR
 	if err := h.validateNamespace(namespace); err != nil {
 		return err
 	}
-	hosts, err := toStoreDrainedHosts(request.GetHosts())
-	if err != nil {
+	hosts := make([]store.DrainedHost, 0, len(request.GetHosts()))
+	hostnames := make([]string, 0, len(request.GetHosts()))
+	for _, host := range request.GetHosts() {
+		hosts = append(hosts, store.DrainedHost{
+			Hostname:  host.GetHostname(),
+			DrainedAt: host.GetDrainedAt(),
+			DrainedBy: host.GetDrainedBy(),
+			Reason:    host.GetReason(),
+		})
+		hostnames = append(hostnames, host.GetHostname())
+	}
+	if err := validateHostnames(hostnames); err != nil {
 		return err
 	}
 
-	err = h.storage.DrainHosts(ctx, namespace, hosts)
+	err := h.storage.DrainHosts(ctx, namespace, hosts)
 	if err != nil {
 		return &types.InternalServiceError{Message: fmt.Sprintf("failed to drain hosts: %v", err)}
 	}
 
-	hostnames := make([]string, 0, len(hosts))
-	for _, host := range hosts {
-		hostnames = append(hostnames, host.Hostname)
-	}
 	h.logger.Info("Drained hosts",
 		tag.ShardNamespace(namespace),
 		tag.Dynamic("requested_hosts_to_drain", hostnames),
@@ -635,9 +640,19 @@ func (h *handlerImpl) GetDrainedHosts(ctx context.Context, request *types.GetDra
 		return nil, &types.InternalServiceError{Message: fmt.Sprintf("failed to get drained hosts: %v", err)}
 	}
 
+	var drainedHosts []*types.DrainedHost
+	for _, host := range hosts {
+		drainedHosts = append(drainedHosts, &types.DrainedHost{
+			Hostname:  host.Hostname,
+			DrainedAt: host.DrainedAt,
+			DrainedBy: host.DrainedBy,
+			Reason:    host.Reason,
+		})
+	}
+
 	return &types.GetDrainedHostsResponse{
 		Namespace: namespace,
-		Hosts:     fromStoreDrainedHosts(hosts),
+		Hosts:     drainedHosts,
 	}, nil
 }
 
@@ -667,61 +682,14 @@ func validateShardKeys(shardKeys []string) error {
 	return nil
 }
 
-func toStoreDrainedHosts(hosts []*types.DrainedHost) ([]store.DrainedHost, error) {
-	if len(hosts) == 0 {
-		return nil, &types.BadRequestError{Message: "hosts must not be empty"}
-	}
-	out := make([]store.DrainedHost, 0, len(hosts))
-	hostnames := make([]string, 0, len(hosts))
-	for _, host := range hosts {
-		if host == nil {
-			return nil, &types.BadRequestError{Message: "hosts must not contain a nil entry"}
-		}
-		hostnames = append(hostnames, host.GetHostname())
-		out = append(out, store.DrainedHost{
-			Hostname:  host.GetHostname(),
-			DrainedAt: host.GetDrainedAt(),
-			DrainedBy: host.GetDrainedBy(),
-			Reason:    host.GetReason(),
-		})
-	}
-	if err := validateHostnames(hostnames); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func fromStoreDrainedHosts(hosts []store.DrainedHost) []*types.DrainedHost {
-	if hosts == nil {
-		return nil
-	}
-	out := make([]*types.DrainedHost, 0, len(hosts))
-	for _, host := range hosts {
-		out = append(out, &types.DrainedHost{
-			Hostname:  host.Hostname,
-			DrainedAt: host.DrainedAt,
-			DrainedBy: host.DrainedBy,
-			Reason:    host.Reason,
-		})
-	}
-	return out
-}
-
 // validateHostnames rejects drain and undrain requests that storage cannot represent.
 func validateHostnames(hostnames []string) error {
 	if len(hostnames) == 0 {
 		return &types.BadRequestError{Message: "hostnames must not be empty"}
 	}
-	for _, hostname := range hostnames {
-		if hostname == "" || strings.Contains(hostname, "/") || strings.Contains(hostname, "@") {
-			return &types.BadRequestError{
-				Message: fmt.Sprintf("invalid hostname %q: must be non-empty and must not contain '/' or '@'", hostname),
-			}
-		}
-		if len(hostname) > maxHostnameLength {
-			return &types.BadRequestError{
-				Message: fmt.Sprintf("invalid hostname %q: exceeds %d bytes", hostname, maxHostnameLength),
-			}
+	for _, name := range hostnames {
+		if err := hostname.Validate(name); err != nil {
+			return &types.BadRequestError{Message: err.Error()}
 		}
 	}
 	return nil

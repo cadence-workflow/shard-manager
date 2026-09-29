@@ -25,8 +25,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1296,32 +1294,12 @@ func TestDrainHosts(t *testing.T) {
 		{
 			name:    "no hosts",
 			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed},
-			wantErr: &types.BadRequestError{Message: "hosts must not be empty"},
+			wantErr: &types.BadRequestError{Message: "hostnames must not be empty"},
 		},
 		{
-			name:    "nil host",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{nil}},
-			wantErr: &types.BadRequestError{Message: "hosts must not contain a nil entry"},
-		},
-		{
-			name:    "empty hostname",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: ""}}},
-			wantErr: &types.BadRequestError{Message: `invalid hostname "": must be non-empty and must not contain '/' or '@'`},
-		},
-		{
-			name:    "hostname with separator",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: "a/b"}}},
-			wantErr: &types.BadRequestError{Message: `invalid hostname "a/b": must be non-empty and must not contain '/' or '@'`},
-		},
-		{
-			name:    "hostname with at-sign",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: "host@uuid"}}},
-			wantErr: &types.BadRequestError{Message: `invalid hostname "host@uuid": must be non-empty and must not contain '/' or '@'`},
-		},
-		{
-			name:    "hostname too long",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: strings.Repeat("a", maxHostnameLength+1)}}},
-			wantErr: &types.BadRequestError{Message: fmt.Sprintf(`invalid hostname %q: exceeds %d bytes`, strings.Repeat("a", maxHostnameLength+1), maxHostnameLength)},
+			name:    "invalid hostname",
+			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: "host-a"}, nil}},
+			wantErr: &types.BadRequestError{Message: "hostname must not be empty"},
 		},
 		{
 			name:    "store error",

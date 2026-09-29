@@ -140,6 +140,7 @@ message NamespaceExecutorState {
   google.protobuf.Timestamp last_heartbeat = 3;
   map<string, string> metadata = 4;
   repeated AssignedShardState assigned_shards = 5;
+  HostMetadata host_metadata = 6;
 }
 
 message AssignedShardState {

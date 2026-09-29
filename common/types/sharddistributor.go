@@ -327,6 +327,7 @@ type NamespaceExecutorState struct {
 	LastHeartbeat  time.Time
 	Metadata       map[string]string
 	AssignedShards []*ExecutorAssignedShardState
+	HostMetadata   *HostMetadata
 }
 
 func (v *NamespaceExecutorState) GetExecutorID() (o string) {
@@ -360,6 +361,13 @@ func (v *NamespaceExecutorState) GetMetadata() (o map[string]string) {
 func (v *NamespaceExecutorState) GetAssignedShards() (o []*ExecutorAssignedShardState) {
 	if v != nil {
 		return v.AssignedShards
+	}
+	return
+}
+
+func (v *NamespaceExecutorState) GetHostMetadata() (o *HostMetadata) {
+	if v != nil {
+		return v.HostMetadata
 	}
 	return
 }

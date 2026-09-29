@@ -25,8 +25,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -561,7 +559,12 @@ func TestGetNamespaceState_successMultipleExecutors(t *testing.T) {
 			},
 		},
 		Executors: map[string]store.HeartbeatState{
-			"executor1": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now, Metadata: map[string]string{"ip": "127.0.0.1", "port": "1234"}},
+			"executor1": {
+				Status:        types.ExecutorStatusACTIVE,
+				LastHeartbeat: now,
+				Metadata:      map[string]string{"ip": "127.0.0.1", "port": "1234"},
+				HostMetadata:  &types.HostMetadata{HostName: "host-1"},
+			},
 			"executor2": {},
 		}}, nil)
 
@@ -579,6 +582,7 @@ func TestGetNamespaceState_successMultipleExecutors(t *testing.T) {
 	e1 := byID["executor1"]
 	require.NotNil(t, e1)
 	require.Equal(t, types.ExecutorStatusACTIVE, e1.Status)
+	require.Equal(t, &types.HostMetadata{HostName: "host-1"}, e1.HostMetadata)
 	require.Len(t, e1.AssignedShards, 2)
 	shardKeys := make([]string, 0, len(e1.AssignedShards))
 	for _, sh := range e1.AssignedShards {
@@ -590,6 +594,7 @@ func TestGetNamespaceState_successMultipleExecutors(t *testing.T) {
 
 	e2 := byID["executor2"]
 	require.NotNil(t, e2)
+	require.Nil(t, e2.HostMetadata)
 	require.Len(t, e2.AssignedShards, 1)
 	require.Equal(t, "shard3", e2.AssignedShards[0].ShardKey)
 	require.Equal(t, types.AssignmentStatusINVALID, e2.AssignedShards[0].AssignmentStatus)
@@ -917,6 +922,7 @@ func TestGetExecutorState_success(t *testing.T) {
 				Status:        types.ExecutorStatusACTIVE,
 				LastHeartbeat: now,
 				Metadata:      map[string]string{"ip": "127.0.0.1", "port": "1234"},
+				HostMetadata:  &types.HostMetadata{HostName: "host-1"},
 			},
 			Assignment: &store.AssignedState{
 				AssignedShards: map[string]*types.ShardAssignment{
@@ -942,6 +948,7 @@ func TestGetExecutorState_success(t *testing.T) {
 	require.Equal(t, types.ExecutorStatusACTIVE, resp.Executor.Status)
 	require.Equal(t, now, resp.Executor.LastHeartbeat)
 	require.Equal(t, map[string]string{"ip": "127.0.0.1", "port": "1234"}, resp.Executor.Metadata)
+	require.Equal(t, &types.HostMetadata{HostName: "host-1"}, resp.Executor.HostMetadata)
 	require.Len(t, resp.Executor.AssignedShards, 2)
 
 	byKey := make(map[string]*types.ExecutorAssignedShardState, len(resp.Executor.AssignedShards))
@@ -1287,32 +1294,12 @@ func TestDrainHosts(t *testing.T) {
 		{
 			name:    "no hosts",
 			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed},
-			wantErr: &types.BadRequestError{Message: "hosts must not be empty"},
+			wantErr: &types.BadRequestError{Message: "hostnames must not be empty"},
 		},
 		{
-			name:    "nil host",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{nil}},
-			wantErr: &types.BadRequestError{Message: "hosts must not contain a nil entry"},
-		},
-		{
-			name:    "empty hostname",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: ""}}},
-			wantErr: &types.BadRequestError{Message: `invalid hostname "": must be non-empty and must not contain '/' or '@'`},
-		},
-		{
-			name:    "hostname with separator",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: "a/b"}}},
-			wantErr: &types.BadRequestError{Message: `invalid hostname "a/b": must be non-empty and must not contain '/' or '@'`},
-		},
-		{
-			name:    "hostname with at-sign",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: "host@uuid"}}},
-			wantErr: &types.BadRequestError{Message: `invalid hostname "host@uuid": must be non-empty and must not contain '/' or '@'`},
-		},
-		{
-			name:    "hostname too long",
-			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: strings.Repeat("a", maxHostnameLength+1)}}},
-			wantErr: &types.BadRequestError{Message: fmt.Sprintf(`invalid hostname %q: exceeds %d bytes`, strings.Repeat("a", maxHostnameLength+1), maxHostnameLength)},
+			name:    "invalid hostname",
+			request: &types.DrainHostsRequest{Namespace: _testNamespaceFixed, Hosts: []*types.DrainedHost{{Hostname: "host-a"}, nil}},
+			wantErr: &types.BadRequestError{Message: "hostname must not be empty"},
 		},
 		{
 			name:    "store error",

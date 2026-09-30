@@ -7,11 +7,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/mock/gomock"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
+	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
@@ -22,10 +24,16 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/testhelper"
 )
 
+// The client is consumed by name, so it has to be provided as one.
+type namedExecutorStoreClient struct {
+	fx.Out
+
+	Client etcdclient.Client `name:"executorstore"`
+}
+
 // TestRebalanceShards_DrainedHostUnassignsThroughEtcd shows that DrainHosts
-// only records the drain: shards stay assigned, and GetShardOwner still
-// returns the drained-host executor. The leader rebalance loop is what
-// empties that assignment and moves the shards.
+// only records the drain: shards stay assigned to the drained-host executor.
+// The leader rebalance loop is what empties that assignment and moves the shards.
 func TestRebalanceShards_DrainedHostUnassignsThroughEtcd(t *testing.T) {
 	const (
 		drainedHostExecutor = "host-a@uuid-1"
@@ -40,10 +48,12 @@ func TestRebalanceShards_DrainedHostUnassignsThroughEtcd(t *testing.T) {
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, drainedHostExecutor, store.HeartbeatState{
 		Status:        types.ExecutorStatusACTIVE,
 		LastHeartbeat: timeSource.Now(),
+		HostMetadata:  &types.HostMetadata{HostName: "host-a"},
 	}))
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, healthyHostExecutor, store.HeartbeatState{
 		Status:        types.ExecutorStatusACTIVE,
 		LastHeartbeat: timeSource.Now(),
+		HostMetadata:  &types.HostMetadata{HostName: "host-b"},
 	}))
 	assignShardsForTest(ctx, t, executorStore, tc.Namespace, drainedHostExecutor, "0", "1")
 
@@ -53,14 +63,17 @@ func TestRebalanceShards_DrainedHostUnassignsThroughEtcd(t *testing.T) {
 
 	state, err := executorStore.GetState(ctx, tc.Namespace)
 	require.NoError(t, err)
-	assert.False(t, state.IsExecutorAssignable(drainedHostExecutor, nil))
-	assert.True(t, state.IsExecutorAssignable(healthyHostExecutor, nil))
-	assert.Len(t, state.ShardAssignments[drainedHostExecutor].AssignedShards, 2, "DrainHosts must not itself unassign shards")
 
-	require.Eventually(t, func() bool {
-		owner, err := executorStore.GetShardOwner(ctx, tc.Namespace, "0")
-		return err == nil && owner.ExecutorID == drainedHostExecutor
-	}, 5*time.Second, 50*time.Millisecond, "read path keeps the drained-host owner until rebalance")
+	drained, ok := state.Executor(drainedHostExecutor)
+	require.True(t, ok)
+	assert.False(t, drained.IsAssignable(nil))
+
+	healthy, ok := state.Executor(healthyHostExecutor)
+	require.True(t, ok)
+	assert.True(t, healthy.IsAssignable(nil))
+
+	assert.Len(t, state.ShardAssignments[drainedHostExecutor].AssignedShards, 2, "DrainHosts must not itself unassign shards")
+	assert.Equal(t, drainedHostExecutor, state.ShardOwners()["0"], "assignment keeps the drained-host owner until rebalance")
 
 	processor := newEtcdProcessor(t, tc.Namespace, executorStore, timeSource)
 	require.NoError(t, processor.rebalanceShards(ctx))
@@ -69,11 +82,7 @@ func TestRebalanceShards_DrainedHostUnassignsThroughEtcd(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, state.ShardAssignments[drainedHostExecutor].AssignedShards)
 	assert.Len(t, state.ShardAssignments[healthyHostExecutor].AssignedShards, 2)
-
-	require.Eventually(t, func() bool {
-		owner, err := executorStore.GetShardOwner(ctx, tc.Namespace, "0")
-		return err == nil && owner.ExecutorID == healthyHostExecutor
-	}, 5*time.Second, 50*time.Millisecond)
+	assert.Equal(t, healthyHostExecutor, state.ShardOwners()["0"])
 }
 
 func newEtcdStore(t *testing.T, tc *testhelper.StoreTestCluster, timeSource clock.TimeSource) store.Store {
@@ -82,25 +91,28 @@ func newEtcdStore(t *testing.T, tc *testhelper.StoreTestCluster, timeSource cloc
 	etcdConfig, err := etcdclient.NewExecutorStoreConfig(tc.SDConfig)
 	require.NoError(t, err)
 
-	lc := fxtest.NewLifecycle(t)
-	s, err := executorstore.NewStore(executorstore.ExecutorStoreParams{
-		Client:        tc.Client,
-		ETCDConfig:    etcdConfig,
-		Lifecycle:     lc,
-		Logger:        testlogger.New(t),
-		TimeSource:    timeSource,
-		MetricsClient: metrics.NewNoopMetricsClient(),
-		Config: &config.Config{
-			LoadBalancingMode: func(namespace string) string { return config.LoadBalancingModeNAIVE },
-			MaxEtcdTxnOps:     dynamicproperties.GetIntPropertyFn(128),
-			LoadBalancingNaive: config.LoadBalancingNaiveConfig{
-				MaxDeviation: func(namespace string) float64 { return 2.0 },
-			},
-		},
-	})
-	require.NoError(t, err)
-	lc.RequireStart()
-	t.Cleanup(lc.RequireStop)
+	var s store.Store
+	app := fxtest.New(t,
+		executorstore.Module,
+		fx.Provide(func() namedExecutorStoreClient {
+			return namedExecutorStoreClient{Client: tc.Client}
+		}),
+		fx.Provide(func() etcdclient.ExecutorStoreConfig { return etcdConfig }),
+		fx.Provide(func() log.Logger { return testlogger.New(t) }),
+		fx.Provide(func() clock.TimeSource { return timeSource }),
+		fx.Provide(func() metrics.Client { return metrics.NewNoopMetricsClient() }),
+		fx.Provide(func() *config.Config {
+			return &config.Config{
+				LoadBalancingMode: func(namespace string) string { return config.LoadBalancingModeNAIVE },
+				MaxEtcdTxnOps:     dynamicproperties.GetIntPropertyFn(128),
+				LoadBalancingNaive: config.LoadBalancingNaiveConfig{
+					MaxDeviation: func(namespace string) float64 { return 2.0 },
+				},
+			}
+		}),
+		fx.Populate(&s),
+	)
+	app.RequireStart()
 	return s
 }
 

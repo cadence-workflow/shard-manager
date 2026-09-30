@@ -47,7 +47,7 @@ func executorDrainCommand(cf ClientFactory) *cliv3.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cliv3.Command) error {
-			return runDrainHosts(ctx, cmd, resolveWriter(cmd), resolveReader(cmd), cf)
+			return runDrainHosts(ctx, cmd, resolveReader(cmd), resolveWriter(cmd), cf)
 		},
 	}
 }
@@ -55,8 +55,8 @@ func executorDrainCommand(cf ClientFactory) *cliv3.Command {
 func runDrainHosts(
 	ctx context.Context,
 	cmd *cliv3.Command,
-	out io.Writer,
 	in io.Reader,
+	out io.Writer,
 	cf ClientFactory,
 ) error {
 	namespace, err := requiredStringFlag(cmd, FlagNamespace)

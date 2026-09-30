@@ -16,11 +16,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
-var (
-	colorYellow = color.New(color.FgYellow).SprintFunc()
-	colorRed    = color.New(color.FgRed).SprintFunc()
-)
-
 const drainTakesEffectNotice = "Note: Hosts are marked as drained immediately. " +
 	"Shards are moved off drained hosts during the next rebalance cycle, " +
 	"so it may take a short time before they are fully reassigned."
@@ -123,7 +118,7 @@ func runDrainHosts(
 		return fmt.Errorf("DrainHosts: %w", err)
 	}
 
-	fmt.Fprintln(out, colorYellow(drainTakesEffectNotice))
+	fmt.Fprintln(out, colorize(out, color.FgYellow, drainTakesEffectNotice))
 
 	echo := drainHostsEcho{Namespace: namespace, Hosts: make([]drainHostEcho, 0, len(hosts))}
 	for _, host := range hosts {
@@ -169,7 +164,7 @@ func confirmDrainHosts(
 	for _, hostname := range hostnames {
 		hostExecutors := executorsByHost[hostname]
 		if len(hostExecutors) == 0 {
-			fmt.Fprintln(out, colorYellow(fmt.Sprintf(
+			fmt.Fprintln(out, colorize(out, color.FgYellow, fmt.Sprintf(
 				"Hostname %q is not known in this namespace — it has no registered executors. "+
 					"If this is unexpected, check for a typo before proceeding.",
 				hostname,
@@ -190,7 +185,7 @@ func confirmDrainHosts(
 	}
 
 	if wouldLeaveNoAssignableExecutors(hostnames, executors, alreadyDrained) {
-		fmt.Fprintln(out, colorRed(lastAssignableExecutorsWarning))
+		fmt.Fprintln(out, colorize(out, color.FgRed, lastAssignableExecutorsWarning))
 	}
 
 	fmt.Fprint(out, "Proceed with draining? [y/N]: ")

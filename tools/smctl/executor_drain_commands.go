@@ -10,10 +10,23 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/fatih/color"
 	cliv3 "github.com/urfave/cli/v3"
 
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
+
+var (
+	colorYellow = color.New(color.FgYellow).SprintFunc()
+	colorRed    = color.New(color.FgRed).SprintFunc()
+)
+
+const drainTakesEffectNotice = "Note: Hosts are marked as drained immediately. " +
+	"Shards are moved off drained hosts during the next rebalance cycle, " +
+	"so it may take a short time before they are fully reassigned."
+
+const lastAssignableExecutorsWarning = "Warning: after this drain, no executors in this namespace would remain eligible for shard assignment. " +
+	"Existing shards may stay on the drained host(s) until another host is available or these hosts are undrained."
 
 // executorDrainCommand drains the hosts running executors so that every
 // executor reporting one of the hostnames becomes ineligible for assignment.
@@ -23,7 +36,8 @@ func executorDrainCommand(cf ClientFactory) *cliv3.Command {
 		Usage: "Drain executor hosts so their executors are no longer assigned shards",
 		Description: "Prints how many shards the executors on each host currently hold, asks for confirmation, " +
 			"then calls DrainHosts on shard-manager. Repeat --hostname for multiple hosts. " +
-			"The call is idempotent: an already drained host keeps its original drain metadata.",
+			"The call is idempotent: an already drained host keeps its original drain metadata. " +
+			"Hosts are marked drained immediately; shard reassignment takes effect on the next rebalance cycle.",
 		Flags: []cliv3.Flag{
 			&cliv3.StringSliceFlag{
 				Name:      FlagHostname,
@@ -34,17 +48,7 @@ func executorDrainCommand(cf ClientFactory) *cliv3.Command {
 			},
 			&cliv3.StringFlag{
 				Name:  FlagReason,
-				Usage: "reason for draining, stored with the drain record",
-			},
-			&cliv3.StringFlag{
-				Name:  FlagDrainedBy,
-				Usage: "operator recorded as having drained the hosts",
-				Value: currentUsername(),
-			},
-			&cliv3.BoolFlag{
-				Name:    FlagYes,
-				Aliases: []string{"y"},
-				Usage:   "skip the confirmation prompt",
+				Usage: "reason for draining",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cliv3.Command) error {
@@ -71,25 +75,39 @@ func runDrainHosts(
 		return err
 	}
 
-	if !cmd.Bool(FlagYes) {
-		stateCtx, cancel := context.WithTimeout(ctx, cmd.Duration(FlagContextTimeout))
-		state, err := client.GetNamespaceState(stateCtx, &types.GetNamespaceStateRequest{
-			Namespace: namespace,
-		})
-		cancel()
-		if err != nil {
-			return fmt.Errorf("GetNamespaceState: %w", err)
-		}
-		if err := confirmDrainHosts(out, in, hostnames, state.GetExecutors()); err != nil {
-			return err
-		}
+	stateCtx, cancel := context.WithTimeout(ctx, cmd.Duration(FlagContextTimeout))
+	state, err := client.GetNamespaceState(stateCtx, &types.GetNamespaceStateRequest{
+		Namespace: namespace,
+	})
+	cancel()
+	if err != nil {
+		return fmt.Errorf("GetNamespaceState: %w", err)
 	}
 
+	drainedCtx, cancel := context.WithTimeout(ctx, cmd.Duration(FlagContextTimeout))
+	drained, err := client.GetDrainedHosts(drainedCtx, &types.GetDrainedHostsRequest{
+		Namespace: namespace,
+	})
+	cancel()
+	if err != nil {
+		return fmt.Errorf("GetDrainedHosts: %w", err)
+	}
+
+	alreadyDrained := make(map[string]struct{}, len(drained.GetHosts()))
+	for _, host := range drained.GetHosts() {
+		alreadyDrained[host.GetHostname()] = struct{}{}
+	}
+
+	if err := confirmDrainHosts(out, in, hostnames, state.GetExecutors(), alreadyDrained); err != nil {
+		return err
+	}
+
+	drainedBy := currentUsername()
 	hosts := make([]*types.DrainedHost, 0, len(hostnames))
 	for _, hostname := range hostnames {
 		hosts = append(hosts, &types.DrainedHost{
 			Hostname:  hostname,
-			DrainedBy: cmd.String(FlagDrainedBy),
+			DrainedBy: drainedBy,
 			Reason:    cmd.String(FlagReason),
 		})
 	}
@@ -105,12 +123,40 @@ func runDrainHosts(
 		return fmt.Errorf("DrainHosts: %w", err)
 	}
 
-	return writeIndentedJSON(out, req)
+	fmt.Fprintln(out, colorYellow(drainTakesEffectNotice))
+
+	echo := drainHostsEcho{Namespace: namespace, Hosts: make([]drainHostEcho, 0, len(hosts))}
+	for _, host := range hosts {
+		echo.Hosts = append(echo.Hosts, drainHostEcho{
+			Hostname:  host.Hostname,
+			DrainedBy: host.DrainedBy,
+			Reason:    host.Reason,
+		})
+	}
+	return writeIndentedJSON(out, echo)
+}
+
+// drainHostsEcho is the JSON printed after a successful drain
+type drainHostsEcho struct {
+	Namespace string
+	Hosts     []drainHostEcho
+}
+
+type drainHostEcho struct {
+	Hostname  string
+	DrainedBy string `json:",omitempty"`
+	Reason    string `json:",omitempty"`
 }
 
 // confirmDrainHosts prints the shards currently held by executors on each
 // host and returns an error unless the operator answers yes.
-func confirmDrainHosts(out io.Writer, in io.Reader, hostnames []string, executors []*types.NamespaceExecutorState) error {
+func confirmDrainHosts(
+	out io.Writer,
+	in io.Reader,
+	hostnames []string,
+	executors []*types.NamespaceExecutorState,
+	alreadyDrained map[string]struct{},
+) error {
 	executorsByHost := make(map[string][]*types.NamespaceExecutorState)
 	for _, ex := range executors {
 		hostname := ex.GetHostMetadata().GetHostName()
@@ -123,7 +169,11 @@ func confirmDrainHosts(out io.Writer, in io.Reader, hostnames []string, executor
 	for _, hostname := range hostnames {
 		hostExecutors := executorsByHost[hostname]
 		if len(hostExecutors) == 0 {
-			fmt.Fprintf(out, "Host %q has no executors registered in this namespace.\n", hostname)
+			fmt.Fprintln(out, colorYellow(fmt.Sprintf(
+				"Hostname %q is not known in this namespace — it has no registered executors. "+
+					"If this is unexpected, check for a typo before proceeding.",
+				hostname,
+			)))
 			continue
 		}
 		sort.Slice(hostExecutors, func(i, j int) bool {
@@ -138,6 +188,11 @@ func confirmDrainHosts(out io.Writer, in io.Reader, hostnames []string, executor
 			fmt.Fprintf(out, "  executor %s: %d shard(s)\n", ex.GetExecutorID(), len(ex.GetAssignedShards()))
 		}
 	}
+
+	if wouldLeaveNoAssignableExecutors(hostnames, executors, alreadyDrained) {
+		fmt.Fprintln(out, colorRed(lastAssignableExecutorsWarning))
+	}
+
 	fmt.Fprint(out, "Proceed with draining? [y/N]: ")
 
 	scanner := bufio.NewScanner(in)
@@ -153,6 +208,34 @@ func confirmDrainHosts(out io.Writer, in io.Reader, hostnames []string, executor
 	default:
 		return fmt.Errorf("drain aborted")
 	}
+}
+
+func wouldLeaveNoAssignableExecutors(
+	hostnames []string,
+	executors []*types.NamespaceExecutorState,
+	alreadyDrained map[string]struct{},
+) bool {
+	draining := make(map[string]struct{}, len(hostnames)+len(alreadyDrained))
+	for hostname := range alreadyDrained {
+		draining[hostname] = struct{}{}
+	}
+	for _, hostname := range hostnames {
+		draining[hostname] = struct{}{}
+	}
+
+	for _, ex := range executors {
+		if ex.GetStatus() != types.ExecutorStatusACTIVE {
+			continue
+		}
+		hostname := ex.GetHostMetadata().GetHostName()
+		if hostname != "" {
+			if _, drained := draining[hostname]; drained {
+				continue
+			}
+		}
+		return false
+	}
+	return true
 }
 
 func currentUsername() string {

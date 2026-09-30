@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -72,21 +73,25 @@ func TestDrainHosts(t *testing.T) {
 		Executors: []*types.NamespaceExecutorState{
 			{
 				ExecutorID:     "executor-b",
+				Status:         types.ExecutorStatusACTIVE,
 				HostMetadata:   &types.HostMetadata{HostName: "host-1"},
 				AssignedShards: []*types.ExecutorAssignedShardState{{ShardKey: "shard-3"}},
 			},
 			{
 				ExecutorID:     "executor-a",
+				Status:         types.ExecutorStatusACTIVE,
 				HostMetadata:   &types.HostMetadata{HostName: "host-1"},
 				AssignedShards: []*types.ExecutorAssignedShardState{{ShardKey: "shard-1"}, {ShardKey: "shard-2"}},
 			},
 			{
 				ExecutorID:     "executor-c",
+				Status:         types.ExecutorStatusACTIVE,
 				HostMetadata:   &types.HostMetadata{HostName: "host-2"},
 				AssignedShards: []*types.ExecutorAssignedShardState{{ShardKey: "shard-4"}},
 			},
 			{
 				ExecutorID:     "executor-no-host",
+				Status:         types.ExecutorStatusACTIVE,
 				AssignedShards: []*types.ExecutorAssignedShardState{{ShardKey: "shard-5"}},
 			},
 		},
@@ -96,24 +101,46 @@ func TestDrainHosts(t *testing.T) {
 		"--" + FlagHostname, "host-1",
 		"--" + FlagHostname, "host-3",
 		"--" + FlagReason, "maintenance",
-		"--" + FlagDrainedBy, "operator",
 	}
 	prompt := "Host \"host-1\" currently holds 3 shard(s):\n" +
 		"  executor executor-a: 2 shard(s)\n" +
 		"  executor executor-b: 1 shard(s)\n" +
-		"Host \"host-3\" has no executors registered in this namespace.\n" +
+		"Hostname \"host-3\" is not known in this namespace — it has no registered executors. " +
+		"If this is unexpected, check for a typo before proceeding.\n" +
 		"Proceed with draining? [y/N]: "
-	drainReq := &types.DrainHostsRequest{
-		Namespace: "ns-1",
-		Hosts: []*types.DrainedHost{
-			{Hostname: "host-1", DrainedBy: "operator", Reason: "maintenance"},
-			{Hostname: "host-3", DrainedBy: "operator", Reason: "maintenance"},
-		},
-	}
+	drainReqMatcher := gomock.AssignableToTypeOf(&types.DrainHostsRequest{})
 	expectState := func(mc *sharddistributor.MockClient) {
 		mc.EXPECT().
 			GetNamespaceState(gomock.Any(), &types.GetNamespaceStateRequest{Namespace: "ns-1"}).
 			Return(namespaceState, nil)
+		mc.EXPECT().
+			GetDrainedHosts(gomock.Any(), &types.GetDrainedHostsRequest{Namespace: "ns-1"}).
+			Return(&types.GetDrainedHostsResponse{Namespace: "ns-1"}, nil)
+	}
+	expectDrainHosts := func(mc *sharddistributor.MockClient, hostnames []string, reason string) {
+		mc.EXPECT().DrainHosts(gomock.Any(), drainReqMatcher).DoAndReturn(
+			func(_ context.Context, req *types.DrainHostsRequest, _ ...any) error {
+				if req.GetNamespace() != "ns-1" {
+					return fmt.Errorf("unexpected namespace %q", req.GetNamespace())
+				}
+				if len(req.GetHosts()) != len(hostnames) {
+					return fmt.Errorf("unexpected host count %d", len(req.GetHosts()))
+				}
+				for i, hostname := range hostnames {
+					host := req.Hosts[i]
+					if host.Hostname != hostname {
+						return fmt.Errorf("host[%d]: got %q want %q", i, host.Hostname, hostname)
+					}
+					if host.Reason != reason {
+						return fmt.Errorf("host[%d] reason: got %q want %q", i, host.Reason, reason)
+					}
+					if host.DrainedBy == "" {
+						return fmt.Errorf("host[%d]: DrainedBy should be set from the local username", i)
+					}
+				}
+				return nil
+			},
+		)
 	}
 
 	runHostDrainCommandTests(t, []hostDrainCommandTest{
@@ -123,17 +150,27 @@ func TestDrainHosts(t *testing.T) {
 			stdin: "YES\n",
 			setup: func(mc *sharddistributor.MockClient) sharddistributor.Client {
 				expectState(mc)
-				mc.EXPECT().DrainHosts(gomock.Any(), drainReq).Return(nil)
+				expectDrainHosts(mc, []string{"host-1", "host-3"}, "maintenance")
 				return mc
 			},
 			wantPrompt: prompt,
 			check: func(t *testing.T, stdout string) {
-				var got types.DrainHostsRequest
-				if err := json.Unmarshal([]byte(stdout), &got); err != nil {
-					t.Fatalf("output is not valid JSON: %v\nout: %s", err, stdout)
+				if !strings.HasPrefix(stdout, drainTakesEffectNotice+"\n") {
+					t.Fatalf("missing rebalance notice:\n%s", stdout)
 				}
-				if len(got.Hosts) != 2 || got.Hosts[0].Hostname != "host-1" || got.Hosts[1].Hostname != "host-3" {
-					t.Errorf("unexpected hosts in output: %s", stdout)
+				jsonOut := strings.TrimPrefix(stdout, drainTakesEffectNotice+"\n")
+				var got drainHostsEcho
+				if err := json.Unmarshal([]byte(jsonOut), &got); err != nil {
+					t.Fatalf("output is not valid JSON: %v\nout: %s", err, jsonOut)
+				}
+				if got.Namespace != "ns-1" || len(got.Hosts) != 2 {
+					t.Errorf("unexpected echo: %s", jsonOut)
+				}
+				if got.Hosts[0].Hostname != "host-1" || got.Hosts[1].Hostname != "host-3" {
+					t.Errorf("unexpected hosts in output: %s", jsonOut)
+				}
+				if strings.Contains(jsonOut, "DrainedAt") || strings.Contains(jsonOut, "0001-01-01") {
+					t.Errorf("output should omit DrainedAt: %s", jsonOut)
 				}
 			},
 		},
@@ -159,17 +196,79 @@ func TestDrainHosts(t *testing.T) {
 			wantErr:    "drain aborted: no input received",
 		},
 		{
-			name: "--yes skips the prompt",
-			args: []string{"smctl", "-n", "ns-1", "executor", "drain", "--" + FlagHostname, "host-2", "--" + FlagDrainedBy, "operator", "-y"},
+			name:  "warns when drain would leave no assignable executors",
+			args:  []string{"smctl", "-n", "ns-1", "executor", "drain", "--" + FlagHostname, "host-1"},
+			stdin: "y\n",
 			setup: func(mc *sharddistributor.MockClient) sharddistributor.Client {
 				mc.EXPECT().
-					DrainHosts(gomock.Any(), &types.DrainHostsRequest{
+					GetNamespaceState(gomock.Any(), &types.GetNamespaceStateRequest{Namespace: "ns-1"}).
+					Return(&types.GetNamespaceStateResponse{
 						Namespace: "ns-1",
-						Hosts:     []*types.DrainedHost{{Hostname: "host-2", DrainedBy: "operator"}},
-					}).
-					Return(nil)
+						Executors: []*types.NamespaceExecutorState{
+							{
+								ExecutorID:     "executor-a",
+								Status:         types.ExecutorStatusACTIVE,
+								HostMetadata:   &types.HostMetadata{HostName: "host-1"},
+								AssignedShards: []*types.ExecutorAssignedShardState{{ShardKey: "shard-1"}},
+							},
+							{
+								ExecutorID:   "executor-draining",
+								Status:       types.ExecutorStatusDRAINING,
+								HostMetadata: &types.HostMetadata{HostName: "host-2"},
+							},
+						},
+					}, nil)
+				mc.EXPECT().
+					GetDrainedHosts(gomock.Any(), &types.GetDrainedHostsRequest{Namespace: "ns-1"}).
+					Return(&types.GetDrainedHostsResponse{Namespace: "ns-1"}, nil)
+				expectDrainHosts(mc, []string{"host-1"}, "")
 				return mc
 			},
+			wantPrompt: "Host \"host-1\" currently holds 1 shard(s):\n" +
+				"  executor executor-a: 1 shard(s)\n" +
+				lastAssignableExecutorsWarning + "\n" +
+				"Proceed with draining? [y/N]: ",
+			check: func(t *testing.T, stdout string) {
+				if !strings.Contains(stdout, drainTakesEffectNotice) {
+					t.Fatalf("missing rebalance notice:\n%s", stdout)
+				}
+			},
+		},
+		{
+			name:  "warns when remaining hosts are already drained",
+			args:  []string{"smctl", "-n", "ns-1", "executor", "drain", "--" + FlagHostname, "host-1"},
+			stdin: "yes\n",
+			setup: func(mc *sharddistributor.MockClient) sharddistributor.Client {
+				mc.EXPECT().
+					GetNamespaceState(gomock.Any(), &types.GetNamespaceStateRequest{Namespace: "ns-1"}).
+					Return(&types.GetNamespaceStateResponse{
+						Namespace: "ns-1",
+						Executors: []*types.NamespaceExecutorState{
+							{
+								ExecutorID:   "executor-a",
+								Status:       types.ExecutorStatusACTIVE,
+								HostMetadata: &types.HostMetadata{HostName: "host-1"},
+							},
+							{
+								ExecutorID:   "executor-b",
+								Status:       types.ExecutorStatusACTIVE,
+								HostMetadata: &types.HostMetadata{HostName: "host-2"},
+							},
+						},
+					}, nil)
+				mc.EXPECT().
+					GetDrainedHosts(gomock.Any(), &types.GetDrainedHostsRequest{Namespace: "ns-1"}).
+					Return(&types.GetDrainedHostsResponse{
+						Namespace: "ns-1",
+						Hosts:     []*types.DrainedHost{{Hostname: "host-2"}},
+					}, nil)
+				expectDrainHosts(mc, []string{"host-1"}, "")
+				return mc
+			},
+			wantPrompt: "Host \"host-1\" currently holds 0 shard(s):\n" +
+				"  executor executor-a: 0 shard(s)\n" +
+				lastAssignableExecutorsWarning + "\n" +
+				"Proceed with draining? [y/N]: ",
 		},
 		{
 			name: "GetNamespaceState error is propagated",
@@ -183,12 +282,27 @@ func TestDrainHosts(t *testing.T) {
 			wantErr: `GetNamespaceState: namespace "ns-1" not found`,
 		},
 		{
+			name: "GetDrainedHosts error is propagated",
+			args: drainArgs,
+			setup: func(mc *sharddistributor.MockClient) sharddistributor.Client {
+				mc.EXPECT().
+					GetNamespaceState(gomock.Any(), &types.GetNamespaceStateRequest{Namespace: "ns-1"}).
+					Return(namespaceState, nil)
+				mc.EXPECT().
+					GetDrainedHosts(gomock.Any(), gomock.Any()).
+					Return(nil, errors.New("boom"))
+				return mc
+			},
+			wantErr: "GetDrainedHosts: boom",
+		},
+		{
 			name:  "DrainHosts error is propagated",
 			args:  drainArgs,
 			stdin: "y\n",
 			setup: func(mc *sharddistributor.MockClient) sharddistributor.Client {
 				expectState(mc)
-				mc.EXPECT().DrainHosts(gomock.Any(), drainReq).Return(&types.BadRequestError{Message: "invalid hostname"})
+				mc.EXPECT().DrainHosts(gomock.Any(), drainReqMatcher).
+					Return(&types.BadRequestError{Message: "invalid hostname"})
 				return mc
 			},
 			wantPrompt: prompt,
@@ -200,6 +314,71 @@ func TestDrainHosts(t *testing.T) {
 			wantErr: `Required flag "` + FlagHostname + `" not set`,
 		},
 	})
+}
+
+func TestWouldLeaveNoAssignableExecutors(t *testing.T) {
+	active := func(id, hostname string) *types.NamespaceExecutorState {
+		ex := &types.NamespaceExecutorState{
+			ExecutorID: id,
+			Status:     types.ExecutorStatusACTIVE,
+		}
+		if hostname != "" {
+			ex.HostMetadata = &types.HostMetadata{HostName: hostname}
+		}
+		return ex
+	}
+
+	tests := []struct {
+		name           string
+		hostnames      []string
+		executors      []*types.NamespaceExecutorState
+		alreadyDrained map[string]struct{}
+		want           bool
+	}{
+		{
+			name:      "other active host remains",
+			hostnames: []string{"host-1"},
+			executors: []*types.NamespaceExecutorState{active("a", "host-1"), active("b", "host-2")},
+			want:      false,
+		},
+		{
+			name:      "draining the only active host",
+			hostnames: []string{"host-1"},
+			executors: []*types.NamespaceExecutorState{active("a", "host-1")},
+			want:      true,
+		},
+		{
+			name:           "remaining host already drained",
+			hostnames:      []string{"host-1"},
+			executors:      []*types.NamespaceExecutorState{active("a", "host-1"), active("b", "host-2")},
+			alreadyDrained: map[string]struct{}{"host-2": {}},
+			want:           true,
+		},
+		{
+			name:      "executor without hostname remains assignable",
+			hostnames: []string{"host-1"},
+			executors: []*types.NamespaceExecutorState{active("a", "host-1"), active("b", "")},
+			want:      false,
+		},
+		{
+			name:      "non-active executors do not count",
+			hostnames: []string{"host-1"},
+			executors: []*types.NamespaceExecutorState{
+				active("a", "host-1"),
+				{ExecutorID: "b", Status: types.ExecutorStatusDRAINING, HostMetadata: &types.HostMetadata{HostName: "host-2"}},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := wouldLeaveNoAssignableExecutors(tt.hostnames, tt.executors, tt.alreadyDrained)
+			if got != tt.want {
+				t.Errorf("wouldLeaveNoAssignableExecutors(...) = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestUndrainHosts(t *testing.T) {

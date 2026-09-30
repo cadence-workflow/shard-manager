@@ -202,7 +202,7 @@ func selectDestinationExecutor(
 		}
 		allAssignableExecutors := make([]string, 0, len(workingAssignments))
 		for executorID := range workingAssignments {
-			if namespaceState.IsExecutorAssignable(executorID, nil) {
+			if isAssignable(namespaceState, executorID) {
 				allAssignableExecutors = append(allAssignableExecutors, executorID)
 			}
 		}
@@ -267,14 +267,20 @@ func classifySourcesAndDestinations(
 		// Intentionally allow DRAINING executors as sources so they can shed shards.
 		// Staleness is already filtered out of executorLoads by the caller, so it
 		// does not need to be re-checked here.
-		if load > meanLoad*upperBand {
+		switch {
+		case load > meanLoad*upperBand:
 			sources = append(sources, executorID)
-		} else if state.IsExecutorAssignable(executorID, nil) && load < meanLoad*lowerBand {
+		case load < meanLoad*lowerBand && isAssignable(state, executorID):
 			destinations = append(destinations, executorID)
 		}
 	}
 
 	return sources, destinations
+}
+
+func isAssignable(state *store.NamespaceState, executorID string) bool {
+	executor, ok := state.Executor(executorID)
+	return ok && executor.IsAssignable(nil)
 }
 
 func isSevereImbalance(executorLoads map[string]float64, meanLoad, severeImbalanceRatio float64) bool {

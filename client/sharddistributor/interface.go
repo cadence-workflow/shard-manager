@@ -41,11 +41,15 @@ type Client interface {
 	GetShardOwner(context.Context, *types.GetShardOwnerRequest, ...yarpc.CallOption) (*types.GetShardOwnerResponse, error)
 	InspectShard(context.Context, *types.GetShardOwnerRequest, ...yarpc.CallOption) (*types.GetShardOwnerResponse, error)
 	GetNamespaceState(context.Context, *types.GetNamespaceStateRequest, ...yarpc.CallOption) (*types.GetNamespaceStateResponse, error)
+	GetFullNamespaceState(context.Context, *types.GetFullNamespaceStateRequest, ...yarpc.CallOption) (*types.GetFullNamespaceStateResponse, error)
 	GetExecutorState(context.Context, *types.GetExecutorStateRequest, ...yarpc.CallOption) (*types.GetExecutorStateResponse, error)
 	WatchNamespaceState(context.Context, *types.WatchNamespaceStateRequest, ...yarpc.CallOption) (WatchNamespaceStateClient, error)
 	DrainShards(context.Context, *types.DrainShardsRequest, ...yarpc.CallOption) error
 	UndrainShards(context.Context, *types.UndrainShardsRequest, ...yarpc.CallOption) (*types.UndrainShardsResponse, error)
 	GetDrainedShards(context.Context, *types.GetDrainedShardsRequest, ...yarpc.CallOption) (*types.GetDrainedShardsResponse, error)
+	DrainHosts(context.Context, *types.DrainHostsRequest, ...yarpc.CallOption) error
+	UndrainHosts(context.Context, *types.UndrainHostsRequest, ...yarpc.CallOption) (*types.UndrainHostsResponse, error)
+	GetDrainedHosts(context.Context, *types.GetDrainedHostsRequest, ...yarpc.CallOption) (*types.GetDrainedHostsResponse, error)
 	ForceResetNamespace(context.Context, *types.ForceResetNamespaceRequest, ...yarpc.CallOption) (*types.ForceResetNamespaceResponse, error)
 	ListNamespaces(context.Context, *types.ListNamespacesRequest, ...yarpc.CallOption) (*types.ListNamespacesResponse, error)
 }

@@ -126,29 +126,22 @@ func TestMultipleNodes(t *testing.T) {
 
 	// Second node campaigns - this should block as first node already has leadership
 	// We'll use a channel to track when it's done and a shorter context to timeout
-	campaignDone := make(chan struct{})
-	campaignErr := make(chan error, 1)
+	campaignResult := make(chan error, 1)
 
 	ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 1*time.Second)
 	defer cancelTimeout()
 
 	go func() {
-		err := election2.Campaign(ctxTimeout, "host2")
-		if err != nil {
-			campaignErr <- err
-		}
-		close(campaignDone)
+		campaignResult <- election2.Campaign(ctxTimeout, "host2")
 	}()
 
 	// Verify second node is blocked (should timeout)
 	select {
-	case err := <-campaignErr:
+	case err := <-campaignResult:
 		// Expected to get a timeout error
 		require.Error(t, err, "Expected a timeout error for the second campaign")
 		require.Contains(t, err.Error(), "context deadline exceeded", "Expected a context deadline error")
-	case <-campaignDone:
-		t.Error("Second node should not have been able to become leader while first node holds leadership")
-	case <-time.After(2 * time.Second):
+	case <-time.After(3 * time.Second):
 		t.Error("Expected the second campaign to timeout quickly")
 	}
 

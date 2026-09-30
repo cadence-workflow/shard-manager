@@ -15,6 +15,11 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/types/mapper/proto"
 )
 
+func (g sharddistributorClient) DrainHosts(ctx context.Context, dp1 *types.DrainHostsRequest, p1 ...yarpc.CallOption) (err error) {
+	_, err = g.c.DrainHosts(ctx, proto.FromShardDistributorDrainHostsRequest(dp1), p1...)
+	return proto.ToError(err)
+}
+
 func (g sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (err error) {
 	_, err = g.c.DrainShards(ctx, proto.FromShardDistributorDrainShardsRequest(dp1), p1...)
 	return proto.ToError(err)
@@ -25,6 +30,11 @@ func (g sharddistributorClient) ForceResetNamespace(ctx context.Context, fp1 *ty
 	return proto.ToShardDistributorForceResetNamespaceResponse(response), proto.ToError(err)
 }
 
+func (g sharddistributorClient) GetDrainedHosts(ctx context.Context, gp1 *types.GetDrainedHostsRequest, p1 ...yarpc.CallOption) (gp2 *types.GetDrainedHostsResponse, err error) {
+	response, err := g.c.GetDrainedHosts(ctx, proto.FromShardDistributorGetDrainedHostsRequest(gp1), p1...)
+	return proto.ToShardDistributorGetDrainedHostsResponse(response), proto.ToError(err)
+}
+
 func (g sharddistributorClient) GetDrainedShards(ctx context.Context, gp1 *types.GetDrainedShardsRequest, p1 ...yarpc.CallOption) (gp2 *types.GetDrainedShardsResponse, err error) {
 	response, err := g.c.GetDrainedShards(ctx, proto.FromShardDistributorGetDrainedShardsRequest(gp1), p1...)
 	return proto.ToShardDistributorGetDrainedShardsResponse(response), proto.ToError(err)
@@ -33,6 +43,11 @@ func (g sharddistributorClient) GetDrainedShards(ctx context.Context, gp1 *types
 func (g sharddistributorClient) GetExecutorState(ctx context.Context, gp1 *types.GetExecutorStateRequest, p1 ...yarpc.CallOption) (gp2 *types.GetExecutorStateResponse, err error) {
 	response, err := g.c.GetExecutorState(ctx, proto.FromShardDistributorGetExecutorStateRequest(gp1), p1...)
 	return proto.ToShardDistributorGetExecutorStateResponse(response), proto.ToError(err)
+}
+
+func (g sharddistributorClient) GetFullNamespaceState(ctx context.Context, gp1 *types.GetFullNamespaceStateRequest, p1 ...yarpc.CallOption) (gp2 *types.GetFullNamespaceStateResponse, err error) {
+	response, err := g.c.GetFullNamespaceState(ctx, proto.FromShardDistributorGetFullNamespaceStateRequest(gp1), p1...)
+	return proto.ToShardDistributorGetFullNamespaceStateResponse(response), proto.ToError(err)
 }
 
 func (g sharddistributorClient) GetNamespaceState(ctx context.Context, gp1 *types.GetNamespaceStateRequest, p1 ...yarpc.CallOption) (gp2 *types.GetNamespaceStateResponse, err error) {
@@ -53,6 +68,11 @@ func (g sharddistributorClient) InspectShard(ctx context.Context, gp1 *types.Get
 func (g sharddistributorClient) ListNamespaces(ctx context.Context, lp1 *types.ListNamespacesRequest, p1 ...yarpc.CallOption) (lp2 *types.ListNamespacesResponse, err error) {
 	response, err := g.c.ListNamespaces(ctx, proto.FromShardDistributorListNamespacesRequest(lp1), p1...)
 	return proto.ToShardDistributorListNamespacesResponse(response), proto.ToError(err)
+}
+
+func (g sharddistributorClient) UndrainHosts(ctx context.Context, up1 *types.UndrainHostsRequest, p1 ...yarpc.CallOption) (up2 *types.UndrainHostsResponse, err error) {
+	response, err := g.c.UndrainHosts(ctx, proto.FromShardDistributorUndrainHostsRequest(up1), p1...)
+	return proto.ToShardDistributorUndrainHostsResponse(response), proto.ToError(err)
 }
 
 func (g sharddistributorClient) UndrainShards(ctx context.Context, up1 *types.UndrainShardsRequest, p1 ...yarpc.CallOption) (up2 *types.UndrainShardsResponse, err error) {

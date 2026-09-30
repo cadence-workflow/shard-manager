@@ -41,6 +41,9 @@ service ShardDistributorAPI {
   // GetNamespaceState returns a snapshot of all executors in a namespace and their assigned shards
   rpc GetNamespaceState(GetNamespaceStateRequest) returns (GetNamespaceStateResponse);
 
+  // GetFullNamespaceState returns the complete persisted state for a namespace.
+  rpc GetFullNamespaceState(GetFullNamespaceStateRequest) returns (GetFullNamespaceStateResponse);
+
   // GetExecutorState returns the state of an executor within a namespace, looked up by executor id
   rpc GetExecutorState(GetExecutorStateRequest) returns (GetExecutorStateResponse);
 
@@ -64,6 +67,19 @@ service ShardDistributorAPI {
   // GetDrainedShards returns the list of shard keys currently marked as
   // drained for the namespace.
   rpc GetDrainedShards(GetDrainedShardsRequest) returns (GetDrainedShardsResponse);
+
+  // DrainHosts marks the given hosts as drained for the namespace.
+  // Executors on a drained host are not eligible for assignment until
+  // UndrainHosts is called for the same hostnames.
+  rpc DrainHosts(DrainHostsRequest) returns (DrainHostsResponse);
+
+  // UndrainHosts removes the given hosts from the drained list for the
+  // namespace, making their executors eligible for assignment again.
+  rpc UndrainHosts(UndrainHostsRequest) returns (UndrainHostsResponse);
+
+  // GetDrainedHosts returns the hosts currently marked as drained for the
+  // namespace, including drain metadata.
+  rpc GetDrainedHosts(GetDrainedHostsRequest) returns (GetDrainedHostsResponse);
 
   // ForceResetNamespace deletes all etcd state for a namespace: leader key,
   // executor heartbeats/status/metadata, shard assignments, and shard
@@ -124,6 +140,7 @@ message NamespaceExecutorState {
   google.protobuf.Timestamp last_heartbeat = 3;
   map<string, string> metadata = 4;
   repeated AssignedShardState assigned_shards = 5;
+  HostMetadata host_metadata = 6;
 }
 
 message AssignedShardState {
@@ -131,6 +148,50 @@ message AssignedShardState {
   AssignmentStatus assignment_status = 2;
   // Mod revision of the executor's assigned_state etcd key when this snapshot was read.
   int64 assigned_state_mod_revision = 3;
+}
+
+message GetFullNamespaceStateRequest {
+  string namespace = 1;
+}
+
+message GetFullNamespaceStateResponse {
+  string namespace = 1;
+  map<string, HeartbeatState> executors = 2;
+  map<string, ShardStatistics> shard_stats = 3;
+  map<string, AssignedState> shard_assignments = 4;
+  repeated string drained_shards = 5;
+  map<string, DrainedHost> drained_hosts = 6;
+}
+
+message HeartbeatState {
+  google.protobuf.Timestamp last_heartbeat = 1;
+  ExecutorStatus status = 2;
+  map<string, ShardStatusReport> reported_shards = 3;
+  map<string, string> metadata = 4;
+}
+
+message ShardStatistics {
+  double smoothed_load = 1;
+  google.protobuf.Timestamp last_update_time = 2;
+  google.protobuf.Timestamp last_move_time = 3;
+}
+
+message AssignedState {
+  map<string, ShardAssignment> assigned_shards = 1;
+  map<string, ShardHandoverStats> shard_handover_stats = 2;
+  google.protobuf.Timestamp last_updated = 3;
+  int64 mod_revision = 4;
+}
+
+message ShardHandoverStats {
+  google.protobuf.Timestamp previous_executor_last_heartbeat_time = 1;
+  HandoverType handover_type = 2;
+}
+
+enum HandoverType {
+  HANDOVER_TYPE_INVALID = 0;
+  HANDOVER_TYPE_GRACEFUL = 1;
+  HANDOVER_TYPE_EMERGENCY = 2;
 }
 
 message GetExecutorStateRequest {
@@ -209,6 +270,41 @@ message GetDrainedShardsRequest {
 message GetDrainedShardsResponse {
   string namespace = 1;
   repeated string shard_keys = 2;
+}
+
+message DrainedHost {
+  string hostname = 1;
+  google.protobuf.Timestamp drained_at = 2;
+  string drained_by = 3;
+  string reason = 4;
+}
+
+message DrainHostsRequest {
+  string namespace = 1;
+  repeated DrainedHost hosts = 2;
+}
+
+// DrainHostsResponse is intentionally empty: a successful call is reported by
+// the absence of an error.
+message DrainHostsResponse {}
+
+message UndrainHostsRequest {
+  string namespace = 1;
+  repeated string hostnames = 2;
+}
+
+message UndrainHostsResponse {
+  // hostnames that were actually removed from the drained list by this call.
+  repeated string undrained_hostnames = 1;
+}
+
+message GetDrainedHostsRequest {
+  string namespace = 1;
+}
+
+message GetDrainedHostsResponse {
+  string namespace = 1;
+  repeated DrainedHost hosts = 2;
 }
 
 message ForceResetNamespaceRequest {

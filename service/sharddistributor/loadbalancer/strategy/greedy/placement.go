@@ -48,10 +48,7 @@ func executorLoads(state *store.NamespaceState) (map[string]executorLoad, float6
 
 func activeExecutorAssignments(state *store.NamespaceState) map[string][]string {
 	assignments := make(map[string][]string)
-	for executorID := range state.Executors {
-		if !state.IsExecutorAssignable(executorID, nil) {
-			continue
-		}
+	for _, executorID := range state.AssignableExecutorIDs(nil) {
 		shards := make([]string, 0, len(state.ShardAssignments[executorID].AssignedShards))
 		for shardID := range state.ShardAssignments[executorID].AssignedShards {
 			shards = append(shards, shardID)

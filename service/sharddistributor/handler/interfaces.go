@@ -47,6 +47,8 @@ type Handler interface {
 
 	GetNamespaceState(context.Context, *types.GetNamespaceStateRequest) (*types.GetNamespaceStateResponse, error)
 
+	GetFullNamespaceState(context.Context, *types.GetFullNamespaceStateRequest) (*types.GetFullNamespaceStateResponse, error)
+
 	GetExecutorState(context.Context, *types.GetExecutorStateRequest) (*types.GetExecutorStateResponse, error)
 
 	WatchNamespaceState(*types.WatchNamespaceStateRequest, WatchNamespaceStateServer) error
@@ -56,6 +58,10 @@ type Handler interface {
 	DrainShards(context.Context, *types.DrainShardsRequest) error
 	UndrainShards(context.Context, *types.UndrainShardsRequest) (*types.UndrainShardsResponse, error)
 	GetDrainedShards(context.Context, *types.GetDrainedShardsRequest) (*types.GetDrainedShardsResponse, error)
+
+	DrainHosts(context.Context, *types.DrainHostsRequest) error
+	UndrainHosts(context.Context, *types.UndrainHostsRequest) (*types.UndrainHostsResponse, error)
+	GetDrainedHosts(context.Context, *types.GetDrainedHostsRequest) (*types.GetDrainedHostsResponse, error)
 
 	ForceResetNamespace(context.Context, *types.ForceResetNamespaceRequest) (*types.ForceResetNamespaceResponse, error)
 }

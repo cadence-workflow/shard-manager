@@ -77,6 +77,23 @@ func (c *meteredShardDistributorClient) GetNamespaceState(ctx context.Context, r
 	return response, err
 }
 
+func (c *meteredShardDistributorClient) GetFullNamespaceState(ctx context.Context, request *types.GetFullNamespaceStateRequest, opts ...yarpc.CallOption) (*types.GetFullNamespaceStateResponse, error) {
+	scope := c.metricsScope.Tagged(map[string]string{
+		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorGetFullNamespaceStateOperationTagName,
+	})
+
+	scope.Counter(metricsconstants.ShardDistributorSpectatorClientRequests).Inc(1)
+
+	sw := scope.Timer(metricsconstants.ShardDistributorSpectatorClientLatency).Start()
+	response, err := c.client.GetFullNamespaceState(ctx, request, opts...)
+	sw.Stop()
+
+	if err != nil {
+		scope.Counter(metricsconstants.ShardDistributorSpectatorClientFailures).Inc(1)
+	}
+	return response, err
+}
+
 func (c *meteredShardDistributorClient) GetExecutorState(ctx context.Context, request *types.GetExecutorStateRequest, opts ...yarpc.CallOption) (*types.GetExecutorStateResponse, error) {
 	scope := c.metricsScope.Tagged(map[string]string{
 		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorGetExecutorStateOperationTagName,
@@ -171,6 +188,57 @@ func (c *meteredShardDistributorClient) GetDrainedShards(ctx context.Context, re
 
 	sw := scope.Timer(metricsconstants.ShardDistributorSpectatorClientLatency).Start()
 	response, err := c.client.GetDrainedShards(ctx, request, opts...)
+	sw.Stop()
+
+	if err != nil {
+		scope.Counter(metricsconstants.ShardDistributorSpectatorClientFailures).Inc(1)
+	}
+	return response, err
+}
+
+func (c *meteredShardDistributorClient) DrainHosts(ctx context.Context, request *types.DrainHostsRequest, opts ...yarpc.CallOption) error {
+	scope := c.metricsScope.Tagged(map[string]string{
+		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorDrainHostsOperationTagName,
+	})
+
+	scope.Counter(metricsconstants.ShardDistributorSpectatorClientRequests).Inc(1)
+
+	sw := scope.Timer(metricsconstants.ShardDistributorSpectatorClientLatency).Start()
+	err := c.client.DrainHosts(ctx, request, opts...)
+	sw.Stop()
+
+	if err != nil {
+		scope.Counter(metricsconstants.ShardDistributorSpectatorClientFailures).Inc(1)
+	}
+	return err
+}
+
+func (c *meteredShardDistributorClient) UndrainHosts(ctx context.Context, request *types.UndrainHostsRequest, opts ...yarpc.CallOption) (*types.UndrainHostsResponse, error) {
+	scope := c.metricsScope.Tagged(map[string]string{
+		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorUndrainHostsOperationTagName,
+	})
+
+	scope.Counter(metricsconstants.ShardDistributorSpectatorClientRequests).Inc(1)
+
+	sw := scope.Timer(metricsconstants.ShardDistributorSpectatorClientLatency).Start()
+	response, err := c.client.UndrainHosts(ctx, request, opts...)
+	sw.Stop()
+
+	if err != nil {
+		scope.Counter(metricsconstants.ShardDistributorSpectatorClientFailures).Inc(1)
+	}
+	return response, err
+}
+
+func (c *meteredShardDistributorClient) GetDrainedHosts(ctx context.Context, request *types.GetDrainedHostsRequest, opts ...yarpc.CallOption) (*types.GetDrainedHostsResponse, error) {
+	scope := c.metricsScope.Tagged(map[string]string{
+		metrics.OperationTagName: metricsconstants.ShardDistributorSpectatorGetDrainedHostsOperationTagName,
+	})
+
+	scope.Counter(metricsconstants.ShardDistributorSpectatorClientRequests).Inc(1)
+
+	sw := scope.Timer(metricsconstants.ShardDistributorSpectatorClientLatency).Start()
+	response, err := c.client.GetDrainedHosts(ctx, request, opts...)
 	sw.Stop()
 
 	if err != nil {

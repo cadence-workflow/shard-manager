@@ -93,6 +93,18 @@ func TestFromShardDistributorGetNamespaceStateResponse(t *testing.T) {
 	}
 }
 
+func TestFromShardDistributorGetFullNamespaceStateRequest(t *testing.T) {
+	for _, item := range []*types.GetFullNamespaceStateRequest{nil, {}, &testdata.ShardDistributorGetFullNamespaceStateRequest} {
+		assert.Equal(t, item, ToShardDistributorGetFullNamespaceStateRequest(FromShardDistributorGetFullNamespaceStateRequest(item)))
+	}
+}
+
+func TestFromShardDistributorGetFullNamespaceStateResponse(t *testing.T) {
+	for _, item := range []*types.GetFullNamespaceStateResponse{nil, {}, &testdata.ShardDistributorGetFullNamespaceStateResponse} {
+		assert.Equal(t, item, ToShardDistributorGetFullNamespaceStateResponse(FromShardDistributorGetFullNamespaceStateResponse(item)))
+	}
+}
+
 func TestFromShardDistributorGetExecutorStateRequest(t *testing.T) {
 	for _, item := range []*types.GetExecutorStateRequest{nil, {}, &testdata.ShardDistributorGetExecutorStateRequest} {
 		assert.Equal(t, item, ToShardDistributorGetExecutorStateRequest(FromShardDistributorGetExecutorStateRequest(item)))
@@ -126,6 +138,36 @@ func TestFromShardDistributorForceResetNamespaceRequest(t *testing.T) {
 func TestFromShardDistributorForceResetNamespaceResponse(t *testing.T) {
 	for _, item := range []*types.ForceResetNamespaceResponse{nil, {}, &testdata.ShardDistributorForceResetNamespaceResponse} {
 		assert.Equal(t, item, ToShardDistributorForceResetNamespaceResponse(FromShardDistributorForceResetNamespaceResponse(item)))
+	}
+}
+
+func TestFromShardDistributorDrainHostsRequest(t *testing.T) {
+	for _, item := range []*types.DrainHostsRequest{nil, {}, &testdata.ShardDistributorDrainHostsRequest} {
+		assert.Equal(t, item, ToShardDistributorDrainHostsRequest(FromShardDistributorDrainHostsRequest(item)))
+	}
+}
+
+func TestFromShardDistributorUndrainHostsRequest(t *testing.T) {
+	for _, item := range []*types.UndrainHostsRequest{nil, {}, &testdata.ShardDistributorUndrainHostsRequest} {
+		assert.Equal(t, item, ToShardDistributorUndrainHostsRequest(FromShardDistributorUndrainHostsRequest(item)))
+	}
+}
+
+func TestFromShardDistributorUndrainHostsResponse(t *testing.T) {
+	for _, item := range []*types.UndrainHostsResponse{nil, {}, &testdata.ShardDistributorUndrainHostsResponse} {
+		assert.Equal(t, item, ToShardDistributorUndrainHostsResponse(FromShardDistributorUndrainHostsResponse(item)))
+	}
+}
+
+func TestFromShardDistributorGetDrainedHostsRequest(t *testing.T) {
+	for _, item := range []*types.GetDrainedHostsRequest{nil, {}, &testdata.ShardDistributorGetDrainedHostsRequest} {
+		assert.Equal(t, item, ToShardDistributorGetDrainedHostsRequest(FromShardDistributorGetDrainedHostsRequest(item)))
+	}
+}
+
+func TestFromShardDistributorGetDrainedHostsResponse(t *testing.T) {
+	for _, item := range []*types.GetDrainedHostsResponse{nil, {}, &testdata.ShardDistributorGetDrainedHostsResponse} {
+		assert.Equal(t, item, ToShardDistributorGetDrainedHostsResponse(FromShardDistributorGetDrainedHostsResponse(item)))
 	}
 }
 
@@ -331,4 +373,46 @@ func TestForceResetNamespaceRequestFuzz(t *testing.T) {
 
 func TestForceResetNamespaceResponseFuzz(t *testing.T) {
 	testutils.RunMapperFuzzTest(t, FromShardDistributorForceResetNamespaceResponse, ToShardDistributorForceResetNamespaceResponse)
+}
+
+func DrainHostsRequestFuzzer(r *types.DrainHostsRequest, c fuzz.Continue) {
+	c.FuzzNoCustom(r)
+	for i, host := range r.Hosts {
+		if host == nil {
+			r.Hosts[i] = &types.DrainedHost{}
+		}
+	}
+}
+
+func GetDrainedHostsResponseFuzzer(r *types.GetDrainedHostsResponse, c fuzz.Continue) {
+	c.FuzzNoCustom(r)
+	for i, host := range r.Hosts {
+		if host == nil {
+			r.Hosts[i] = &types.DrainedHost{}
+		}
+	}
+}
+
+func TestDrainHostsRequestFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorDrainHostsRequest, ToShardDistributorDrainHostsRequest,
+		testutils.WithCustomFuncs(DrainHostsRequestFuzzer),
+	)
+}
+
+func TestUndrainHostsRequestFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorUndrainHostsRequest, ToShardDistributorUndrainHostsRequest)
+}
+
+func TestUndrainHostsResponseFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorUndrainHostsResponse, ToShardDistributorUndrainHostsResponse)
+}
+
+func TestGetDrainedHostsRequestFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorGetDrainedHostsRequest, ToShardDistributorGetDrainedHostsRequest)
+}
+
+func TestGetDrainedHostsResponseFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorGetDrainedHostsResponse, ToShardDistributorGetDrainedHostsResponse,
+		testutils.WithCustomFuncs(GetDrainedHostsResponseFuzzer),
+	)
 }

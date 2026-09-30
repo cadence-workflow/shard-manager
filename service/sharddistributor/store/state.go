@@ -1,7 +1,7 @@
 package store
 
 import (
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/cadence-workflow/shard-manager/common/types"
@@ -13,6 +13,43 @@ type HeartbeatState struct {
 	Status         types.ExecutorStatus
 	ReportedShards map[string]*types.ShardStatusReport
 	Metadata       map[string]string
+	HostMetadata   *types.HostMetadata
+}
+
+func (h HeartbeatState) Hostname() string {
+	if h.HostMetadata == nil {
+		return ""
+	}
+	return h.HostMetadata.HostName
+}
+
+// Executor is a read-only view of one executor, derived from a NamespaceState
+type Executor struct {
+	ID          string
+	Heartbeat   HeartbeatState
+	HostDrained bool
+}
+
+// Status returns the executor status from its last heartbeat
+func (e Executor) Status() types.ExecutorStatus {
+	return e.Heartbeat.Status
+}
+
+func (e Executor) Hostname() string {
+	return e.Heartbeat.Hostname()
+}
+
+func (e Executor) IsAssignable(staleExecutors map[string]int64) bool {
+	if e.Status() != types.ExecutorStatusACTIVE || e.HostDrained {
+		return false
+	}
+	_, stale := staleExecutors[e.ID]
+	return !stale
+}
+
+func (e Executor) IsDraining() bool {
+	status := e.Status()
+	return status == types.ExecutorStatusDRAINING || status == types.ExecutorStatusDRAINED || e.HostDrained
 }
 
 // ExecutorState contains the persisted state for one executor.
@@ -49,7 +86,11 @@ type ShardHandoverStats struct {
 	HandoverType types.HandoverType
 }
 
+// NamespaceState is the full snapshot of a namespace: who owns which shards, plus the
+// heartbeats, statistics and host drains that only a rebalance needs.
 type NamespaceState struct {
+	AssignmentState
+
 	// Executors holds the heartbeat states of all executors in the namespace.
 	// Key: ExecutorID
 	Executors map[string]HeartbeatState
@@ -58,20 +99,28 @@ type NamespaceState struct {
 	// Key: ShardID
 	ShardStats map[string]ShardStatistics
 
-	// ShardAssignments holds the assignment states of all shards in the namespace.
-	// Key: ExecutorID
-	ShardAssignments map[string]AssignedState
-
-	// DrainedShards holds the shards that are drained for this namespace.
-	// A drained shard is not eligible for assignment until it is
-	// explicitly undrained.
-	// Key: ShardID
-	DrainedShards map[string]struct{}
-
 	// DrainedHosts holds host drains for this namespace.
 	// A drained host's executors are not eligible for assignment until
 	// the host is explicitly undrained
 	DrainedHosts map[string]DrainedHost
+}
+
+// AssignmentState is who owns which shards in a namespace, and which shards are
+// drained. More elaborate information is available in the NamespaceState.
+type AssignmentState struct {
+	// ExecutorMetadata holds every executor in the namespace, assigned or not.
+	// Key: ExecutorID, then metadata key
+	ExecutorMetadata map[string]map[string]string
+
+	// Key: ExecutorID
+	ShardAssignments map[string]AssignedState
+
+	// Key: ShardID
+	DrainedShards map[string]struct{}
+
+	// Revision is the store revision the snapshot was read at. Readers that cache the
+	// state use it to discard a snapshot older than the one they hold.
+	Revision int64
 }
 
 // DrainedHost is the persisted metadata for a host drain
@@ -144,34 +193,33 @@ func (ns *NamespaceState) IsHostDrained(hostname string) bool {
 	return drained
 }
 
-// executorHostname extracts the host part of a "hostname@uuid" executor ID.
-func executorHostname(executorID string) string {
-	hostname, _, found := strings.Cut(executorID, "@")
-	if !found {
-		return ""
+// Executor returns the view of an executor.
+// It reports false if the executor has no heartbeat.
+func (ns *NamespaceState) Executor(executorID string) (Executor, bool) {
+	heartbeat, ok := ns.Executors[executorID]
+	if !ok {
+		return Executor{}, false
 	}
-	return hostname
+	return ns.newExecutor(executorID, heartbeat), true
 }
 
-// IsExecutorHostDrained reports whether an executor runs on a drained host.
-func (ns *NamespaceState) IsExecutorHostDrained(executorID string) bool {
-	hostname := executorHostname(executorID)
-	if hostname == "" {
-		return false
+// AssignableExecutorIDs returns the IDs of the executors that may hold shards
+func (ns *NamespaceState) AssignableExecutorIDs(staleExecutors map[string]int64) []string {
+	var ids []string
+	for executorID, heartbeat := range ns.Executors {
+		if ns.newExecutor(executorID, heartbeat).IsAssignable(staleExecutors) {
+			ids = append(ids, executorID)
+		}
 	}
-	return ns.IsHostDrained(hostname)
+	slices.Sort(ids)
+	return ids
 }
 
-// IsExecutorAssignable reports whether an executor may hold shards
-func (ns *NamespaceState) IsExecutorAssignable(executorID string, staleExecutors map[string]int64) bool {
-	if ns.Executors[executorID].Status != types.ExecutorStatusACTIVE {
-		return false
+func (ns *NamespaceState) newExecutor(executorID string, heartbeat HeartbeatState) Executor {
+	hostname := heartbeat.Hostname()
+	return Executor{
+		ID:          executorID,
+		Heartbeat:   heartbeat,
+		HostDrained: hostname != "" && ns.IsHostDrained(hostname),
 	}
-	if _, stale := staleExecutors[executorID]; stale {
-		return false
-	}
-	if ns.IsExecutorHostDrained(executorID) {
-		return false
-	}
-	return true
 }

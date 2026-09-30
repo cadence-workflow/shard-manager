@@ -3219,6 +3219,14 @@ const (
 	// Allowed filters: namespace
 	ShardDistributorLoadBalancingGreedyLoadSmoothingTimeConstant
 
+	// ShardDistributorEphemeralAssignmentCoalescingWindow is how long the shard
+	// distributor collects initial-assignment requests before processing a batch.
+	// KeyName: shardDistributor.ephemeralAssignment.coalescingWindow
+	// Value type: Duration
+	// Default value: 10 milliseconds
+	// Allowed filters: namespace
+	ShardDistributorEphemeralAssignmentCoalescingWindow
+
 	// LastDurationKey must be the last one in this const group
 	LastDurationKey
 )
@@ -5804,6 +5812,12 @@ var DurationKeys = map[DurationKey]DynamicDuration{
 		Filters:      []Filter{Namespace},
 		Description:  "ShardDistributorLoadBalancingGreedyLoadSmoothingTimeConstant is the time constant for exponential smoothing of shard load in greedy load balancing mode",
 		DefaultValue: time.Minute,
+	},
+	ShardDistributorEphemeralAssignmentCoalescingWindow: {
+		KeyName:      "shardDistributor.ephemeralAssignment.coalescingWindow",
+		Filters:      []Filter{Namespace},
+		Description:  "ShardDistributorEphemeralAssignmentCoalescingWindow is how long the shard distributor collects initial-assignment requests before processing a batch",
+		DefaultValue: 10 * time.Millisecond,
 	},
 }
 

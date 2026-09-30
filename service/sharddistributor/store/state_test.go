@@ -125,70 +125,127 @@ func TestNamespaceState_ShardOwners(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ns := &NamespaceState{
-				Executors:        tt.executors,
-				ShardAssignments: tt.shardAssignments,
-			}
+				AssignmentState: AssignmentState{
+					ShardAssignments: tt.shardAssignments,
+				},
+				Executors: tt.executors}
 			assert.Equal(t, tt.expected, ns.ShardOwners())
 		})
 	}
 }
 
-func TestExecutorHostname(t *testing.T) {
+func TestNamespaceState_Executor(t *testing.T) {
+	heartbeat := HeartbeatState{
+		Status:       types.ExecutorStatusACTIVE,
+		HostMetadata: &types.HostMetadata{HostName: "host-a"},
+	}
+	otherHost := HeartbeatState{
+		Status:       types.ExecutorStatusACTIVE,
+		HostMetadata: &types.HostMetadata{HostName: "host-b"},
+	}
+	ns := &NamespaceState{
+		AssignmentState: AssignmentState{
+			ShardAssignments: map[string]AssignedState{
+				"assigned-only": {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
+			},
+		},
+		Executors: map[string]HeartbeatState{
+			"host-b@uuid": heartbeat,
+			"host-a@uuid": otherHost,
+		},
+		DrainedHosts: map[string]DrainedHost{"host-a": {Hostname: "host-a"}},
+	}
+
 	tests := []struct {
-		name       string
-		executorID string
-		want       string
+		name         string
+		id           string
+		want         Executor
+		wantOK       bool
+		wantHostname string
 	}{
-		{name: "hostname@uuid", executorID: "host-a@abc", want: "host-a"},
-		{name: "no at-sign", executorID: "legacy-exec", want: ""},
-		{name: "empty", executorID: "", want: ""},
-		{name: "leading at-sign", executorID: "@uuid", want: ""},
+		{
+			name:         "hostname comes from host metadata, not executor id",
+			id:           "host-b@uuid",
+			want:         Executor{ID: "host-b@uuid", Heartbeat: heartbeat, HostDrained: true},
+			wantOK:       true,
+			wantHostname: "host-a",
+		},
+		{
+			name:         "executor id naming a drained host is ignored",
+			id:           "host-a@uuid",
+			want:         Executor{ID: "host-a@uuid", Heartbeat: otherHost},
+			wantOK:       true,
+			wantHostname: "host-b",
+		},
+		{name: "no heartbeat", id: "assigned-only"},
+		{name: "missing", id: "missing"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, executorHostname(tt.executorID))
+			got, ok := ns.Executor(tt.id)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.wantHostname, got.Hostname())
 		})
 	}
 }
 
-func TestNamespaceState_IsExecutorAssignable(t *testing.T) {
-	staleExecutors := map[string]int64{"stale": 1}
+func TestNamespaceState_AssignableExecutorIDs(t *testing.T) {
 	state := &NamespaceState{
 		Executors: map[string]HeartbeatState{
-			"active":        {Status: types.ExecutorStatusACTIVE},
+			"exec-c":        {Status: types.ExecutorStatusACTIVE},
+			"exec-a":        {Status: types.ExecutorStatusACTIVE},
+			"exec-b":        {Status: types.ExecutorStatusACTIVE},
 			"draining":      {Status: types.ExecutorStatusDRAINING},
-			"drained":       {Status: types.ExecutorStatusDRAINED},
 			"stale":         {Status: types.ExecutorStatusACTIVE},
-			"invalid":       {Status: types.ExecutorStatusINVALID},
-			"host-a@uuid-1": {Status: types.ExecutorStatusACTIVE},
-			"host-b@uuid-1": {Status: types.ExecutorStatusACTIVE},
-			"legacy-host-a": {Status: types.ExecutorStatusACTIVE},
+			"host-a@uuid-1": {Status: types.ExecutorStatusACTIVE, HostMetadata: &types.HostMetadata{HostName: "host-a"}},
 		},
-		DrainedHosts: map[string]DrainedHost{
-			"host-a": {Hostname: "host-a"},
-		},
+		DrainedHosts: map[string]DrainedHost{"host-a": {Hostname: "host-a"}},
 	}
 
+	assert.Equal(t, []string{"exec-a", "exec-b", "exec-c"}, state.AssignableExecutorIDs(map[string]int64{"stale": 1}))
+}
+
+func TestExecutor_IsAssignable(t *testing.T) {
+	staleExecutors := map[string]int64{"stale": 1}
+
 	tests := []struct {
-		name       string
-		executorID string
-		want       bool
+		name     string
+		executor Executor
+		want     bool
 	}{
-		{name: "active", executorID: "active", want: true},
-		{name: "draining", executorID: "draining", want: false},
-		{name: "drained", executorID: "drained", want: false},
-		{name: "stale", executorID: "stale", want: false},
-		{name: "invalid status", executorID: "invalid", want: false},
-		{name: "absent executor", executorID: "missing", want: false},
-		{name: "active on drained host", executorID: "host-a@uuid-1", want: false},
-		{name: "active on other host", executorID: "host-b@uuid-1", want: true},
-		{name: "legacy id without at-sign ignores host drain", executorID: "legacy-host-a", want: true},
+		{name: "active", executor: Executor{ID: "active", Heartbeat: HeartbeatState{Status: types.ExecutorStatusACTIVE}}, want: true},
+		{name: "draining", executor: Executor{ID: "draining", Heartbeat: HeartbeatState{Status: types.ExecutorStatusDRAINING}}, want: false},
+		{name: "drained", executor: Executor{ID: "drained", Heartbeat: HeartbeatState{Status: types.ExecutorStatusDRAINED}}, want: false},
+		{name: "invalid status", executor: Executor{ID: "invalid"}, want: false},
+		{name: "stale", executor: Executor{ID: "stale", Heartbeat: HeartbeatState{Status: types.ExecutorStatusACTIVE}}, want: false},
+		{name: "active on drained host", executor: Executor{ID: "active", Heartbeat: HeartbeatState{Status: types.ExecutorStatusACTIVE}, HostDrained: true}, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, state.IsExecutorAssignable(tt.executorID, staleExecutors))
+			assert.Equal(t, tt.want, tt.executor.IsAssignable(staleExecutors))
+		})
+	}
+}
+
+func TestExecutor_IsDraining(t *testing.T) {
+	tests := []struct {
+		name     string
+		executor Executor
+		want     bool
+	}{
+		{name: "active", executor: Executor{Heartbeat: HeartbeatState{Status: types.ExecutorStatusACTIVE}}, want: false},
+		{name: "draining", executor: Executor{Heartbeat: HeartbeatState{Status: types.ExecutorStatusDRAINING}}, want: true},
+		{name: "drained", executor: Executor{Heartbeat: HeartbeatState{Status: types.ExecutorStatusDRAINED}}, want: true},
+		{name: "invalid status", executor: Executor{}, want: false},
+		{name: "active on drained host", executor: Executor{Heartbeat: HeartbeatState{Status: types.ExecutorStatusACTIVE}, HostDrained: true}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.executor.IsDraining())
 		})
 	}
 }

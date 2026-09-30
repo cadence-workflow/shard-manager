@@ -22,9 +22,9 @@
 
 // Package accesscontrolled wraps a handler.Handler with per-RPC permission checks
 // using authorization.Authorizer. Only RPCs that need a permission check are
-// overridden: the read APIs (GetNamespaceState, GetExecutorState, InspectShard and
-// GetDrainedShards) require PermissionRead, and the administrative APIs
-// (ListNamespaces, ForceResetNamespace, DrainShards and UndrainShards) require
+// overridden: the read APIs (GetNamespaceState, GetFullNamespaceState, GetExecutorState, InspectShard and
+// GetDrainedShards and GetDrainedHosts) require PermissionRead, and the administrative APIs
+// (ListNamespaces, ForceResetNamespace, DrainShards, UndrainShards, DrainHosts and UndrainHosts) require
 // PermissionAdmin. The remaining methods (Health, lifecycle Start/Stop, the
 // executor hot-path GetShardOwner, and WatchNamespaceState) flow through the
 // embedded handler.Handler unchecked.
@@ -73,6 +73,13 @@ func (a *accessControlledHandler) GetNamespaceState(ctx context.Context, req *ty
 	return a.Handler.GetNamespaceState(ctx, req)
 }
 
+func (a *accessControlledHandler) GetFullNamespaceState(ctx context.Context, req *types.GetFullNamespaceStateRequest) (*types.GetFullNamespaceStateResponse, error) {
+	if err := a.authorize(ctx, "GetFullNamespaceState", req.GetNamespace(), authorization.PermissionRead); err != nil {
+		return nil, err
+	}
+	return a.Handler.GetFullNamespaceState(ctx, req)
+}
+
 func (a *accessControlledHandler) GetExecutorState(ctx context.Context, req *types.GetExecutorStateRequest) (*types.GetExecutorStateResponse, error) {
 	if err := a.authorize(ctx, "GetExecutorState", req.GetNamespace(), authorization.PermissionRead); err != nil {
 		return nil, err
@@ -113,6 +120,27 @@ func (a *accessControlledHandler) GetDrainedShards(ctx context.Context, req *typ
 		return nil, err
 	}
 	return a.Handler.GetDrainedShards(ctx, req)
+}
+
+func (a *accessControlledHandler) DrainHosts(ctx context.Context, req *types.DrainHostsRequest) error {
+	if err := a.authorize(ctx, "DrainHosts", req.GetNamespace(), authorization.PermissionAdmin); err != nil {
+		return err
+	}
+	return a.Handler.DrainHosts(ctx, req)
+}
+
+func (a *accessControlledHandler) UndrainHosts(ctx context.Context, req *types.UndrainHostsRequest) (*types.UndrainHostsResponse, error) {
+	if err := a.authorize(ctx, "UndrainHosts", req.GetNamespace(), authorization.PermissionAdmin); err != nil {
+		return nil, err
+	}
+	return a.Handler.UndrainHosts(ctx, req)
+}
+
+func (a *accessControlledHandler) GetDrainedHosts(ctx context.Context, req *types.GetDrainedHostsRequest) (*types.GetDrainedHostsResponse, error) {
+	if err := a.authorize(ctx, "GetDrainedHosts", req.GetNamespace(), authorization.PermissionRead); err != nil {
+		return nil, err
+	}
+	return a.Handler.GetDrainedHosts(ctx, req)
 }
 
 func (a *accessControlledHandler) authorize(ctx context.Context, apiName, namespace string, permission authorization.Permission) error {

@@ -31,6 +31,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/handler"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/election"
@@ -49,6 +50,7 @@ var Module = fx.Module("sharddistributor",
 	namespace.Module,
 	election.Module,
 	process.Module,
+	cache.Module,
 	fx.Provide(config.NewConfig),
 	fx.Decorate(func(s store.Store, metricsClient metrics.Client, logger log.Logger, timeSource clock.TimeSource) store.Store {
 		return meteredStore.NewStore(s, metricsClient, logger, timeSource)
@@ -67,6 +69,7 @@ type serversParams struct {
 
 	TimeSource clock.TimeSource
 	Store      store.Store
+	ShardCache cache.ShardCache
 	// DispatcherOrdering enforces lifecycle ordering so handler.Stop runs before
 	// dispatcher.Stop. Typed as ClientConfig so yarpcfx-style apps, which expose
 	// their dispatcher only as one, can satisfy it.
@@ -85,7 +88,7 @@ type ServersResult struct {
 }
 
 func provideServers(params serversParams) ServersResult {
-	rawHandler := handler.NewHandler(params.Logger, params.TimeSource, params.ShardDistributionCfg, params.Config, params.Store, params.MetricsClient)
+	rawHandler := handler.NewHandler(params.Logger, params.TimeSource, params.ShardDistributionCfg, params.Config, params.Store, params.ShardCache, params.MetricsClient)
 	wrappedHandler := metered.NewMetricsHandler(rawHandler, params.Logger, params.MetricsClient)
 	wrappedHandler = accesscontrolled.NewHandler(wrappedHandler, params.Authorizer)
 

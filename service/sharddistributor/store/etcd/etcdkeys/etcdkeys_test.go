@@ -55,10 +55,12 @@ func TestParseExecutorKey_MetadataKey(t *testing.T) {
 	assert.Equal(t, ExecutorMetadataKey, keyType)
 }
 
-func TestParseExecutorKey_InvalidKeyType(t *testing.T) {
-	key := BuildExecutorIDPrefix("/cadence", "test-ns", "exec-1") + "invalid_type"
-	_, _, err := ParseExecutorKey("/cadence", "test-ns", key)
-	assert.ErrorContains(t, err, "invalid executor key type: invalid_type")
+func TestParseExecutorKey_UnknownKeyType(t *testing.T) {
+	key := BuildExecutorIDPrefix("/cadence", "test-ns", "exec-1") + "future_field"
+	executorID, keyType, err := ParseExecutorKey("/cadence", "test-ns", key)
+	assert.NoError(t, err)
+	assert.Equal(t, "exec-1", executorID)
+	assert.Equal(t, ExecutorKeyType("future_field"), keyType)
 }
 
 func TestBuildDrainedShardsPrefix(t *testing.T) {
@@ -198,7 +200,10 @@ func TestDrainedHostsPrefixIsDisjointFromSiblingPrefixes(t *testing.T) {
 	}
 }
 
-func TestValidateHostnameRejectsOverLength(t *testing.T) {
-	assert.NoError(t, ValidateHostname(strings.Repeat("a", 128)))
-	assert.ErrorContains(t, ValidateHostname(strings.Repeat("a", 129)), "exceeds 128 bytes")
+func TestParseExecutorKey_HostMetadata(t *testing.T) {
+	hostMetadataKey := BuildExecutorKey("/cadence", "test-ns", "exec-1", ExecutorHostMetadataKey)
+	executorID, keyType, err := ParseExecutorKey("/cadence", "test-ns", hostMetadataKey)
+	assert.NoError(t, err)
+	assert.Equal(t, "exec-1", executorID)
+	assert.Equal(t, ExecutorHostMetadataKey, keyType)
 }

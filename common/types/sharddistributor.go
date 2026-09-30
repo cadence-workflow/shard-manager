@@ -105,6 +105,184 @@ func (v *GetNamespaceStateResponse) GetExecutors() (o []*NamespaceExecutorState)
 	return
 }
 
+type GetFullNamespaceStateRequest struct {
+	Namespace string
+}
+
+func (v *GetFullNamespaceStateRequest) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+type GetFullNamespaceStateResponse struct {
+	Namespace        string
+	Executors        map[string]*HeartbeatState
+	ShardStats       map[string]*ShardStatistics
+	ShardAssignments map[string]*AssignedState
+	DrainedShards    []string
+	DrainedHosts     map[string]*DrainedHost
+}
+
+func (v *GetFullNamespaceStateResponse) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+func (v *GetFullNamespaceStateResponse) GetExecutors() (o map[string]*HeartbeatState) {
+	if v != nil {
+		return v.Executors
+	}
+	return
+}
+
+func (v *GetFullNamespaceStateResponse) GetShardStats() (o map[string]*ShardStatistics) {
+	if v != nil {
+		return v.ShardStats
+	}
+	return
+}
+
+func (v *GetFullNamespaceStateResponse) GetShardAssignments() (o map[string]*AssignedState) {
+	if v != nil {
+		return v.ShardAssignments
+	}
+	return
+}
+
+func (v *GetFullNamespaceStateResponse) GetDrainedShards() (o []string) {
+	if v != nil {
+		return v.DrainedShards
+	}
+	return
+}
+
+func (v *GetFullNamespaceStateResponse) GetDrainedHosts() (o map[string]*DrainedHost) {
+	if v != nil {
+		return v.DrainedHosts
+	}
+	return
+}
+
+type HeartbeatState struct {
+	LastHeartbeat  time.Time
+	Status         ExecutorStatus
+	ReportedShards map[string]*ShardStatusReport
+	Metadata       map[string]string
+}
+
+func (v *HeartbeatState) GetLastHeartbeat() (o time.Time) {
+	if v != nil {
+		return v.LastHeartbeat
+	}
+	return
+}
+
+func (v *HeartbeatState) GetStatus() (o ExecutorStatus) {
+	if v != nil {
+		return v.Status
+	}
+	return
+}
+
+func (v *HeartbeatState) GetReportedShards() (o map[string]*ShardStatusReport) {
+	if v != nil {
+		return v.ReportedShards
+	}
+	return
+}
+
+func (v *HeartbeatState) GetMetadata() (o map[string]string) {
+	if v != nil {
+		return v.Metadata
+	}
+	return
+}
+
+type ShardStatistics struct {
+	SmoothedLoad   float64
+	LastUpdateTime time.Time
+	LastMoveTime   time.Time
+}
+
+func (v *ShardStatistics) GetSmoothedLoad() (o float64) {
+	if v != nil {
+		return v.SmoothedLoad
+	}
+	return
+}
+
+func (v *ShardStatistics) GetLastUpdateTime() (o time.Time) {
+	if v != nil {
+		return v.LastUpdateTime
+	}
+	return
+}
+
+func (v *ShardStatistics) GetLastMoveTime() (o time.Time) {
+	if v != nil {
+		return v.LastMoveTime
+	}
+	return
+}
+
+type AssignedState struct {
+	AssignedShards     map[string]*ShardAssignment
+	ShardHandoverStats map[string]*ShardHandoverStats
+	LastUpdated        time.Time
+	ModRevision        int64
+}
+
+func (v *AssignedState) GetAssignedShards() (o map[string]*ShardAssignment) {
+	if v != nil {
+		return v.AssignedShards
+	}
+	return
+}
+
+func (v *AssignedState) GetShardHandoverStats() (o map[string]*ShardHandoverStats) {
+	if v != nil {
+		return v.ShardHandoverStats
+	}
+	return
+}
+
+func (v *AssignedState) GetLastUpdated() (o time.Time) {
+	if v != nil {
+		return v.LastUpdated
+	}
+	return
+}
+
+func (v *AssignedState) GetModRevision() (o int64) {
+	if v != nil {
+		return v.ModRevision
+	}
+	return
+}
+
+type ShardHandoverStats struct {
+	PreviousExecutorLastHeartbeatTime time.Time
+	HandoverType                      HandoverType
+}
+
+func (v *ShardHandoverStats) GetPreviousExecutorLastHeartbeatTime() (o time.Time) {
+	if v != nil {
+		return v.PreviousExecutorLastHeartbeatTime
+	}
+	return
+}
+
+func (v *ShardHandoverStats) GetHandoverType() (o HandoverType) {
+	if v != nil {
+		return v.HandoverType
+	}
+	return
+}
+
 type GetExecutorStateRequest struct {
 	Namespace  string
 	ExecutorID string
@@ -149,6 +327,7 @@ type NamespaceExecutorState struct {
 	LastHeartbeat  time.Time
 	Metadata       map[string]string
 	AssignedShards []*ExecutorAssignedShardState
+	HostMetadata   *HostMetadata
 }
 
 func (v *NamespaceExecutorState) GetExecutorID() (o string) {
@@ -182,6 +361,13 @@ func (v *NamespaceExecutorState) GetMetadata() (o map[string]string) {
 func (v *NamespaceExecutorState) GetAssignedShards() (o []*ExecutorAssignedShardState) {
 	if v != nil {
 		return v.AssignedShards
+	}
+	return
+}
+
+func (v *NamespaceExecutorState) GetHostMetadata() (o *HostMetadata) {
+	if v != nil {
+		return v.HostMetadata
 	}
 	return
 }
@@ -338,6 +524,12 @@ type ExecutorHeartbeatRequest struct {
 	Status             ExecutorStatus
 	ShardStatusReports map[string]*ShardStatusReport
 	Metadata           map[string]string
+	HostMetadata       *HostMetadata
+}
+
+// HostMetadata carries host-level attributes reported on each heartbeat
+type HostMetadata struct {
+	HostName string `json:"host_name,omitempty"`
 }
 
 func (v *ExecutorHeartbeatRequest) GetNamespace() (o string) {
@@ -371,6 +563,20 @@ func (v *ExecutorHeartbeatRequest) GetShardStatusReports() (o map[string]*ShardS
 func (v *ExecutorHeartbeatRequest) GetMetadata() (o map[string]string) {
 	if v != nil {
 		return v.Metadata
+	}
+	return
+}
+
+func (v *ExecutorHeartbeatRequest) GetHostMetadata() (o *HostMetadata) {
+	if v != nil {
+		return v.HostMetadata
+	}
+	return
+}
+
+func (v *HostMetadata) GetHostName() (o string) {
+	if v != nil {
+		return v.HostName
 	}
 	return
 }
@@ -641,6 +847,122 @@ func (v *GetDrainedShardsResponse) GetNamespace() (o string) {
 func (v *GetDrainedShardsResponse) GetShardKeys() (o []string) {
 	if v != nil {
 		return v.ShardKeys
+	}
+	return
+}
+
+type DrainedHost struct {
+	Hostname  string
+	DrainedAt time.Time
+	DrainedBy string
+	Reason    string
+}
+
+func (v *DrainedHost) GetHostname() (o string) {
+	if v != nil {
+		return v.Hostname
+	}
+	return
+}
+
+func (v *DrainedHost) GetDrainedAt() (o time.Time) {
+	if v != nil {
+		return v.DrainedAt
+	}
+	return
+}
+
+func (v *DrainedHost) GetDrainedBy() (o string) {
+	if v != nil {
+		return v.DrainedBy
+	}
+	return
+}
+
+func (v *DrainedHost) GetReason() (o string) {
+	if v != nil {
+		return v.Reason
+	}
+	return
+}
+
+type DrainHostsRequest struct {
+	Namespace string
+	Hosts     []*DrainedHost
+}
+
+func (v *DrainHostsRequest) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+func (v *DrainHostsRequest) GetHosts() (o []*DrainedHost) {
+	if v != nil {
+		return v.Hosts
+	}
+	return
+}
+
+type UndrainHostsRequest struct {
+	Namespace string
+	Hostnames []string
+}
+
+func (v *UndrainHostsRequest) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+func (v *UndrainHostsRequest) GetHostnames() (o []string) {
+	if v != nil {
+		return v.Hostnames
+	}
+	return
+}
+
+type UndrainHostsResponse struct {
+	// UndrainedHostnames is the subset of the request hostnames that were
+	// actually removed from the drained list by this call.
+	UndrainedHostnames []string
+}
+
+func (v *UndrainHostsResponse) GetUndrainedHostnames() (o []string) {
+	if v != nil {
+		return v.UndrainedHostnames
+	}
+	return
+}
+
+type GetDrainedHostsRequest struct {
+	Namespace string
+}
+
+func (v *GetDrainedHostsRequest) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+type GetDrainedHostsResponse struct {
+	Namespace string
+	Hosts     []*DrainedHost
+}
+
+func (v *GetDrainedHostsResponse) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+func (v *GetDrainedHostsResponse) GetHosts() (o []*DrainedHost) {
+	if v != nil {
+		return v.Hosts
 	}
 	return
 }

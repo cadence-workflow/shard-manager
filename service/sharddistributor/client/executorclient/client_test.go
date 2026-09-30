@@ -18,6 +18,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 )
 
 const testUniqueID = "00000000-0000-0000-0000-000000000001"
@@ -115,36 +116,47 @@ func TestNewExecutor_ExecutorID(t *testing.T) {
 }
 
 func TestBuildExecutorID(t *testing.T) {
-	tests := []struct {
-		name     string
-		hostname string
-		want     string
-	}{
-		{
-			name:     "plain hostname",
-			hostname: "executor-1",
-			want:     "executor-1@" + testUniqueID,
-		},
-		{
-			name:     "slashes are replaced",
-			hostname: "executor/1",
-			want:     "executor_1@" + testUniqueID,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, buildExecutorID(tt.hostname, testUniqueID))
-		})
-	}
+	assert.Equal(t, "executor-1@"+testUniqueID, buildExecutorID("executor-1", testUniqueID))
 }
 
-func TestBuildExecutorID_LimitsHostnameLengthAndPreservesUUID(t *testing.T) {
-	executorID := buildExecutorID(strings.Repeat("hostname/", 100), testUniqueID)
+func TestNewExecutor_HeartbeatHostMetadata(t *testing.T) {
+	ctrl := gomock.NewController(t)
 
-	assert.Len(t, executorID, maxHostnameLength+len("@"+testUniqueID))
-	assert.NotContains(t, executorID, "/")
-	assert.True(t, strings.HasSuffix(executorID, "@"+testUniqueID))
+	var got *types.ExecutorHeartbeatRequest
+	client := NewMockClient(ctrl)
+	client.EXPECT().
+		Heartbeat(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, request *types.ExecutorHeartbeatRequest, _ ...yarpc.CallOption) (*types.ExecutorHeartbeatResponse, error) {
+			got = request
+			return &types.ExecutorHeartbeatResponse{}, nil
+		})
+
+	params := Params[*MockShardProcessor]{
+		ExecutorClient:        client,
+		MetricsScope:          tally.NoopScope,
+		Logger:                zap.NewNop(),
+		ShardProcessorFactory: NewMockShardProcessorFactory[*MockShardProcessor](ctrl),
+		TimeSource:            clock.NewMockedTimeSource(),
+		Config: clientcommon.Config{
+			Namespaces: []clientcommon.NamespaceConfig{
+				{
+					Namespace:         "test-namespace",
+					HeartBeatInterval: 5 * time.Second,
+				},
+			},
+		},
+	}
+
+	executor, err := NewExecutor(params)
+	require.NoError(t, err)
+	require.NoError(t, executor.(*executorImpl[*MockShardProcessor]).heartbeater.DrainingHeartbeat())
+
+	require.NotNil(t, got)
+	require.NotNil(t, got.HostMetadata)
+	assert.NotEmpty(t, got.HostMetadata.HostName)
+	assert.True(t, strings.HasPrefix(got.ExecutorID, got.HostMetadata.HostName+"@"))
+	assert.NotContains(t, got.HostMetadata.HostName, "/")
+	assert.LessOrEqual(t, len(got.HostMetadata.HostName), hostname.MaxLength)
 }
 
 // Create distinct mock processor types for testing multiple namespaces

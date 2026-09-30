@@ -33,6 +33,12 @@ func NewShardDistributorClient(
 	}
 }
 
+func (c *sharddistributorClient) DrainHosts(ctx context.Context, dp1 *types.DrainHostsRequest, p1 ...yarpc.CallOption) (err error) {
+	ctx, cancel := createContext(ctx, c.timeout)
+	defer cancel()
+	return c.client.DrainHosts(ctx, dp1, p1...)
+}
+
 func (c *sharddistributorClient) DrainShards(ctx context.Context, dp1 *types.DrainShardsRequest, p1 ...yarpc.CallOption) (err error) {
 	ctx, cancel := createContext(ctx, c.timeout)
 	defer cancel()
@@ -45,6 +51,12 @@ func (c *sharddistributorClient) ForceResetNamespace(ctx context.Context, fp1 *t
 	return c.client.ForceResetNamespace(ctx, fp1, p1...)
 }
 
+func (c *sharddistributorClient) GetDrainedHosts(ctx context.Context, gp1 *types.GetDrainedHostsRequest, p1 ...yarpc.CallOption) (gp2 *types.GetDrainedHostsResponse, err error) {
+	ctx, cancel := createContext(ctx, c.timeout)
+	defer cancel()
+	return c.client.GetDrainedHosts(ctx, gp1, p1...)
+}
+
 func (c *sharddistributorClient) GetDrainedShards(ctx context.Context, gp1 *types.GetDrainedShardsRequest, p1 ...yarpc.CallOption) (gp2 *types.GetDrainedShardsResponse, err error) {
 	ctx, cancel := createContext(ctx, c.timeout)
 	defer cancel()
@@ -55,6 +67,12 @@ func (c *sharddistributorClient) GetExecutorState(ctx context.Context, gp1 *type
 	ctx, cancel := createContext(ctx, c.timeout)
 	defer cancel()
 	return c.client.GetExecutorState(ctx, gp1, p1...)
+}
+
+func (c *sharddistributorClient) GetFullNamespaceState(ctx context.Context, gp1 *types.GetFullNamespaceStateRequest, p1 ...yarpc.CallOption) (gp2 *types.GetFullNamespaceStateResponse, err error) {
+	ctx, cancel := createContext(ctx, c.timeout)
+	defer cancel()
+	return c.client.GetFullNamespaceState(ctx, gp1, p1...)
 }
 
 func (c *sharddistributorClient) GetNamespaceState(ctx context.Context, gp1 *types.GetNamespaceStateRequest, p1 ...yarpc.CallOption) (gp2 *types.GetNamespaceStateResponse, err error) {
@@ -79,6 +97,12 @@ func (c *sharddistributorClient) ListNamespaces(ctx context.Context, lp1 *types.
 	ctx, cancel := createContext(ctx, c.timeout)
 	defer cancel()
 	return c.client.ListNamespaces(ctx, lp1, p1...)
+}
+
+func (c *sharddistributorClient) UndrainHosts(ctx context.Context, up1 *types.UndrainHostsRequest, p1 ...yarpc.CallOption) (up2 *types.UndrainHostsResponse, err error) {
+	ctx, cancel := createContext(ctx, c.timeout)
+	defer cancel()
+	return c.client.UndrainHosts(ctx, up1, p1...)
 }
 
 func (c *sharddistributorClient) UndrainShards(ctx context.Context, up1 *types.UndrainShardsRequest, p1 ...yarpc.CallOption) (up2 *types.UndrainShardsResponse, err error) {

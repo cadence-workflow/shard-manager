@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"math/rand"
@@ -189,7 +190,7 @@ func (p *namespaceProcessor) runRebalancingLoop(ctx context.Context) {
 	// Perform an initial rebalance on startup.
 	err := p.rebalanceShards(ctx)
 	if err != nil {
-		p.logger.Error("initial rebalance failed", tag.Error(err))
+		p.logRebalanceError("initial rebalance failed", "initial rebalance version conflict", err)
 	}
 
 	if err := p.runRebalanceTriggeringLoop(ctx, triggerChan); err != nil {
@@ -214,7 +215,7 @@ func (p *namespaceProcessor) runRebalancingLoop(ctx context.Context) {
 
 			p.logger.Info("Rebalancing triggered", tag.Dynamic("triggerReason", triggerReason))
 			if err := p.rebalanceShards(ctx); err != nil {
-				p.logger.Error("rebalance failed", tag.Error(err))
+				p.logRebalanceError("rebalance failed", "rebalance version conflict", err)
 
 				// If rebalance fails, we want to trigger another rebalance ASAP,
 				// but with a cooldown to avoid rebalance storms if the underlying issue is persistent.
@@ -428,7 +429,7 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 		p.logger.Info("Identified stale executors for removal", tag.ShardExecutors(slices.Collect(maps.Keys(staleExecutors))))
 	}
 
-	activeExecutors := p.getActiveExecutors(namespaceState, staleExecutors)
+	activeExecutors := namespaceState.AssignableExecutorIDs(staleExecutors)
 	if len(activeExecutors) == 0 {
 		p.logger.Debug("No active executors found. Cannot assign shards.")
 		metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopNoActiveExecutors, 1)
@@ -450,9 +451,14 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 	}
 	metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopDeletedShards, int64(len(deletedShards)))
 
-	shardsToReassign, currentAssignments := p.findShardsToReassign(activeExecutors, namespaceState, deletedShards, staleExecutors)
+	assignableExecutors := make(map[string]struct{}, len(activeExecutors))
+	for _, executorID := range activeExecutors {
+		assignableExecutors[executorID] = struct{}{}
+	}
 
-	executorsToUnassign := findExecutorsToUnassign(namespaceState, staleExecutors)
+	shardsToReassign, currentAssignments := p.findShardsToReassign(assignableExecutors, namespaceState, deletedShards)
+
+	executorsToUnassign := findExecutorsToUnassign(namespaceState, assignableExecutors, staleExecutors)
 	if len(executorsToUnassign) > 0 {
 		p.logger.Info("Emptying assignments of non-assignable executors", tag.ShardExecutors(slices.Collect(maps.Keys(executorsToUnassign))))
 	}
@@ -634,10 +640,9 @@ func findDrainedAssignedShards(namespaceState *store.NamespaceState, executors [
 }
 
 func (p *namespaceProcessor) findShardsToReassign(
-	activeExecutors []string,
+	assignableExecutors map[string]struct{},
 	namespaceState *store.NamespaceState,
 	deletedShards map[string]store.ShardState,
-	staleExecutors map[string]int64,
 ) ([]string, map[string][]string) {
 	allAvailableShards := make(map[string]struct{})
 	for _, shardID := range getShards(p.namespaceCfg, namespaceState, deletedShards) {
@@ -650,12 +655,12 @@ func (p *namespaceProcessor) findShardsToReassign(
 	shardsToReassign := make([]string, 0)
 	currentAssignments := make(map[string][]string)
 
-	for _, executorID := range activeExecutors {
+	for executorID := range assignableExecutors {
 		currentAssignments[executorID] = []string{}
 	}
 
 	for executorID, state := range namespaceState.ShardAssignments {
-		isAssignable := namespaceState.IsExecutorAssignable(executorID, staleExecutors)
+		_, isAssignable := assignableExecutors[executorID]
 
 		for shardID := range state.AssignedShards {
 			if _, ok := allAvailableShards[shardID]; ok {
@@ -676,7 +681,7 @@ func (p *namespaceProcessor) findShardsToReassign(
 }
 
 // findExecutorsToUnassign returns the executors whose stored assignment must be cleared
-func findExecutorsToUnassign(namespaceState *store.NamespaceState, staleExecutors map[string]int64) map[string]int64 {
+func findExecutorsToUnassign(namespaceState *store.NamespaceState, assignableExecutors map[string]struct{}, staleExecutors map[string]int64) map[string]int64 {
 	executorsToUnassign := make(map[string]int64)
 
 	for executorID, state := range namespaceState.ShardAssignments {
@@ -685,7 +690,7 @@ func findExecutorsToUnassign(namespaceState *store.NamespaceState, staleExecutor
 		if len(state.AssignedShards) == 0 {
 			continue
 		}
-		if namespaceState.IsExecutorAssignable(executorID, staleExecutors) {
+		if _, isAssignable := assignableExecutors[executorID]; isAssignable {
 			continue
 		}
 
@@ -823,7 +828,7 @@ func (p *namespaceProcessor) buildHandoverStats(
 		// previous executor heartbeat is not found in namespace state
 		// meaning the executor has already been cleaned up
 		// skip updating handover stats
-		previousExecutorHeartbeat, exists := namespaceState.Executors[previousOwner]
+		previousExecutor, exists := namespaceState.Executor(previousOwner)
 		if !exists {
 			p.logger.WithTags(
 				tag.ShardNamespace(p.namespaceCfg.Name),
@@ -836,29 +841,23 @@ func (p *namespaceProcessor) buildHandoverStats(
 		handoverType := types.HandoverTypeEMERGENCY
 		// Consider it a graceful handover if the previous executor was in DRAINING
 		// or DRAINED status, or its host is drained.
-		if previousExecutorHeartbeat.Status == types.ExecutorStatusDRAINING ||
-			previousExecutorHeartbeat.Status == types.ExecutorStatusDRAINED ||
-			namespaceState.IsExecutorHostDrained(previousOwner) {
+		if previousExecutor.IsDraining() {
 			handoverType = types.HandoverTypeGRACEFUL
 		}
 		stats[shardID] = store.ShardHandoverStats{
 			HandoverType:                      handoverType,
-			PreviousExecutorLastHeartbeatTime: previousExecutorHeartbeat.LastHeartbeat,
+			PreviousExecutorLastHeartbeatTime: previousExecutor.Heartbeat.LastHeartbeat,
 		}
 	}
 	return stats
 }
 
-func (*namespaceProcessor) getActiveExecutors(namespaceState *store.NamespaceState, staleExecutors map[string]int64) []string {
-	var activeExecutors []string
-	for id := range namespaceState.Executors {
-		if namespaceState.IsExecutorAssignable(id, staleExecutors) {
-			activeExecutors = append(activeExecutors, id)
-		}
+func (p *namespaceProcessor) logRebalanceError(failureMessage, conflictMessage string, err error) {
+	if errors.Is(err, store.ErrVersionConflict) {
+		p.logger.Info(conflictMessage, tag.Error(err))
+		return
 	}
-
-	sort.Strings(activeExecutors)
-	return activeExecutors
+	p.logger.Error(failureMessage, tag.Error(err))
 }
 
 func assignShardsToEmptyExecutors(currentAssignments map[string][]string) bool {

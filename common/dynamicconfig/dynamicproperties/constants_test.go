@@ -1,7 +1,5 @@
-// The MIT License (MIT)
-
-// Copyright (c) 2017-2020 Uber Technologies Inc.
-
+// Copyright (c) 2017 Uber Technologies, Inc.
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
@@ -9,371 +7,132 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
 
 package dynamicproperties
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-
-	"github.com/cadence-workflow/shard-manager/common/constants"
 )
 
-type constantSuite struct {
-	suite.Suite
+func TestListAllProductionKeys(t *testing.T) {
+	keys := ListAllProductionKeys()
+	require.Len(t, keys, 12)
+	for _, key := range keys {
+		assert.Contains(t, strings.ToLower(key.String()), "sharddistributor")
+	}
 }
 
-func TestConstantSuite(t *testing.T) {
-	suite.Run(t, new(constantSuite))
+func TestGetKeyFromKeyName(t *testing.T) {
+	key, err := GetKeyFromKeyName("shardDistributor.maxEtcdTxnOps")
+	require.NoError(t, err)
+	assert.Equal(t, ShardDistributorMaxEtcdTxnOps, key)
+
+	key, err = GetKeyFromKeyName("not-a-key")
+	assert.Error(t, err)
+	assert.Nil(t, key)
 }
 
-func (s *constantSuite) TestListAllProductionKeys() {
-	// check if we given enough capacity
-	testResult := ListAllProductionKeys()
-	s.GreaterOrEqual(len(IntKeys)+len(BoolKeys)+len(FloatKeys)+len(StringKeys)+len(DurationKeys)+len(MapKeys), len(testResult))
-	s.Equal(TestGetIntPropertyFilteredByTaskListInfoKey+1, testResult[0])
-}
-
-func (s *constantSuite) TestGetKeyFromKeyName() {
-	okKeyName := "system.transactionSizeLimit"
-	okResult, err := GetKeyFromKeyName(okKeyName)
-	s.NoError(err)
-	s.Equal(TransactionSizeLimit, okResult)
-
-	notOkKeyName := "system.transactionSizeLimit1"
-	notOkResult, err := GetKeyFromKeyName(notOkKeyName)
-	s.Error(err)
-	s.Nil(notOkResult)
-}
-
-func (s *constantSuite) TestGetAllKeys() {
-	testResult := GetAllKeys()
-	s.Equal(len(IntKeys)+len(BoolKeys)+len(FloatKeys)+len(StringKeys)+len(DurationKeys)+len(MapKeys)+len(ListKeys), len(testResult))
-	s.Equal(_keyNames["testGetIntPropertyKey"], testResult["testGetIntPropertyKey"])
-	s.NotEqual(_keyNames["testGetIntPropertyKey"], testResult["testGetIntPropertyFilteredByTaskListInfoKey"])
+func TestGetAllKeys(t *testing.T) {
+	keys := GetAllKeys()
+	assert.Len(t, keys, len(IntKeys)+len(BoolKeys)+len(FloatKeys)+len(StringKeys)+len(DurationKeys)+len(MapKeys)+len(ListKeys))
+	assert.Equal(t, TestGetIntPropertyKey, keys["testGetIntPropertyKey"])
+	assert.Equal(t, ShardDistributorLoadBalancingMode, keys["shardDistributor.loadBalancingMode"])
 }
 
 type NewKey int
 
-func (k NewKey) String() string {
-	return "NewKey"
-}
+func (k NewKey) String() string            { return "NewKey" }
+func (k NewKey) Description() string       { return "NewKey is a new key" }
+func (k NewKey) DefaultValue() interface{} { return 0 }
+func (k NewKey) Filters() []Filter         { return nil }
 
-func (k NewKey) Description() string {
-	return "NewKey is a new key"
-}
-
-func (k NewKey) DefaultValue() interface{} {
-	return 0
-}
-
-func (k NewKey) Filters() []Filter {
-	return nil
-}
-
-func (s *constantSuite) TestValidateKeyValuePair() {
-	newKeyError := ValidateKeyValuePair(NewKey(0), 0)
-	s.Error(newKeyError)
-	intKeyError := ValidateKeyValuePair(TestGetIntPropertyKey, "0")
-	s.Error(intKeyError)
-	boolKeyError := ValidateKeyValuePair(TestGetBoolPropertyKey, 0)
-	s.Error(boolKeyError)
-	floatKeyError := ValidateKeyValuePair(TestGetFloat64PropertyKey, 0)
-	s.Error(floatKeyError)
-	stringKeyError := ValidateKeyValuePair(TestGetStringPropertyKey, 0)
-	s.Error(stringKeyError)
-	durationKeyError := ValidateKeyValuePair(TestGetDurationPropertyKey, 0)
-	s.Error(durationKeyError)
-	mapKeyError := ValidateKeyValuePair(TestGetMapPropertyKey, 0)
-	s.Error(mapKeyError)
-	listKeyError := ValidateKeyValuePair(TestGetListPropertyKey, 0)
-	s.Error(listKeyError)
-}
-
-func (s *constantSuite) TestIntKey() {
-	testIntKeys := map[string]struct {
-		key                  IntKey
-		expectedString       string
-		expectedDefaultValue int
-		expectedDescription  string
-		expectedFilters      []Filter
+func TestValidateKeyValuePair(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   Key
+		value interface{}
 	}{
-		"TestGetIntPropertyKey": {
-			key:                  TestGetIntPropertyKey,
-			expectedString:       "testGetIntPropertyKey",
-			expectedDescription:  "",
-			expectedDefaultValue: 0,
-			expectedFilters:      nil,
-		},
-		"TransactionSizeLimit": {
-			key:                  TransactionSizeLimit,
-			expectedString:       "system.transactionSizeLimit",
-			expectedDescription:  "TransactionSizeLimit is the largest allowed transaction size to persistence",
-			expectedDefaultValue: 14680064,
-		},
-		"BlobSizeLimitWarn": {
-			key:                  BlobSizeLimitWarn,
-			expectedString:       "limit.blobSize.warn",
-			expectedDescription:  "BlobSizeLimitWarn is the per event blob size limit for warning",
-			expectedDefaultValue: 256 * 1024,
-			expectedFilters:      []Filter{DomainName},
-		},
+		{name: "unknown key", key: NewKey(0), value: 0},
+		{name: "int", key: TestGetIntPropertyKey, value: "0"},
+		{name: "bool", key: TestGetBoolPropertyKey, value: 0},
+		{name: "float", key: TestGetFloat64PropertyKey, value: 0},
+		{name: "string", key: TestGetStringPropertyKey, value: 0},
+		{name: "duration", key: TestGetDurationPropertyKey, value: 0},
+		{name: "map", key: TestGetMapPropertyKey, value: 0},
+		{name: "list", key: TestGetListPropertyKey, value: 0},
 	}
 
-	for _, value := range testIntKeys {
-		s.Equal(value.expectedString, value.key.String())
-		s.Equal(value.expectedDefaultValue, value.key.DefaultValue())
-		s.Equal(value.expectedDescription, value.key.Description())
-		s.Equal(value.expectedFilters, value.key.Filters())
-		s.Equal(value.expectedDefaultValue, value.key.DefaultInt())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Error(t, ValidateKeyValuePair(tt.key, tt.value))
+		})
 	}
 }
 
-func (s *constantSuite) TestBoolKey() {
-	testBoolKeys := map[string]struct {
-		key                  BoolKey
-		expectedString       string
-		expectedDefaultValue bool
-		expectedDescription  string
-		expectedFilters      []Filter
+func TestShardDistributorKeys(t *testing.T) {
+	tests := []struct {
+		name         string
+		key          Key
+		keyName      string
+		defaultValue interface{}
+		filters      []Filter
 	}{
-		"TestGetBoolPropertyKey": {
-			key:                  TestGetBoolPropertyKey,
-			expectedString:       "testGetBoolPropertyKey",
-			expectedDescription:  "",
-			expectedDefaultValue: false,
-			expectedFilters:      nil,
+		{
+			name:         "max etcd transaction operations",
+			key:          ShardDistributorMaxEtcdTxnOps,
+			keyName:      "shardDistributor.maxEtcdTxnOps",
+			defaultValue: 128,
 		},
-		"FrontendEmitSignalNameMetricsTag": {
-			key:                  FrontendEmitSignalNameMetricsTag,
-			expectedString:       "frontend.emitSignalNameMetricsTag",
-			expectedDescription:  "FrontendEmitSignalNameMetricsTag enables emitting signal name tag in metrics in frontend client",
-			expectedDefaultValue: false,
-			expectedFilters:      []Filter{DomainName},
+		{
+			name:         "load balancing mode",
+			key:          ShardDistributorLoadBalancingMode,
+			keyName:      "shardDistributor.loadBalancingMode",
+			defaultValue: "naive",
 		},
-	}
-
-	for _, value := range testBoolKeys {
-		s.Equal(value.expectedString, value.key.String())
-		s.Equal(value.expectedDefaultValue, value.key.DefaultValue())
-		s.Equal(value.expectedDescription, value.key.Description())
-		s.Equal(value.expectedFilters, value.key.Filters())
-		s.Equal(value.expectedDefaultValue, value.key.DefaultBool())
-	}
-}
-
-func (s *constantSuite) TestFloatKey() {
-	testFloatKeys := map[string]struct {
-		key          FloatKey
-		KeyName      string
-		Filters      []Filter
-		Description  string
-		DefaultValue float64
-	}{
-		"TestGetFloat64PropertyKey": {
-			key:          TestGetFloat64PropertyKey,
-			KeyName:      "testGetFloat64PropertyKey",
-			Description:  "",
-			DefaultValue: 0,
+		{
+			name:         "naive max deviation",
+			key:          ShardDistributorLoadBalancingNaiveMaxDeviation,
+			keyName:      "shardDistributor.loadBalancingNaive.maxDeviation",
+			defaultValue: 2.0,
+			filters:      []Filter{Namespace},
 		},
-		"DomainFailoverRefreshTimerJitterCoefficient": {
-			key:          DomainFailoverRefreshTimerJitterCoefficient,
-			KeyName:      "frontend.domainFailoverRefreshTimerJitterCoefficient",
-			Description:  "DomainFailoverRefreshTimerJitterCoefficient is the jitter for domain failover refresh timer jitter",
-			DefaultValue: 0.1,
+		{
+			name:         "greedy per-shard cooldown",
+			key:          ShardDistributorLoadBalancingGreedyPerShardCooldown,
+			keyName:      "shardDistributor.loadBalancingGreedy.perShardCooldown",
+			defaultValue: time.Minute,
+			filters:      []Filter{Namespace},
 		},
-		"ReplicationTaskProcessorStartWaitJitterCoefficient": {
-			key:          ReplicationTaskProcessorStartWaitJitterCoefficient,
-			KeyName:      "history.ReplicationTaskProcessorStartWaitJitterCoefficient",
-			Filters:      []Filter{ShardID},
-			Description:  "ReplicationTaskProcessorStartWaitJitterCoefficient is the jitter for batch start wait timer",
-			DefaultValue: 0.9,
+		{
+			name:         "ephemeral assignment coalescing window",
+			key:          ShardDistributorEphemeralAssignmentCoalescingWindow,
+			keyName:      "shardDistributor.ephemeralAssignment.coalescingWindow",
+			defaultValue: 10 * time.Millisecond,
+			filters:      []Filter{Namespace},
 		},
 	}
 
-	for _, value := range testFloatKeys {
-		s.Equal(value.KeyName, value.key.String())
-		s.Equal(value.DefaultValue, value.key.DefaultValue())
-		s.Equal(value.Description, value.key.Description())
-		s.Equal(value.Filters, value.key.Filters())
-		s.Equal(value.DefaultValue, value.key.DefaultFloat())
-	}
-}
-
-func (s *constantSuite) TestStringKey() {
-	testStringKeys := map[string]struct {
-		Key          StringKey
-		KeyName      string
-		Filters      []Filter
-		Description  string
-		DefaultValue string
-	}{
-		"TestGetStringPropertyKey": {
-			Key:          TestGetStringPropertyKey,
-			KeyName:      "testGetStringPropertyKey",
-			Description:  "",
-			DefaultValue: "",
-		},
-		"HistoryArchivalStatus": {
-			Key:          HistoryArchivalStatus,
-			KeyName:      "system.historyArchivalStatus",
-			Description:  "HistoryArchivalStatus is key for the status of history archival to override the value from static config.",
-			DefaultValue: "enabled",
-		},
-		"DefaultEventEncoding": {
-			Key:          DefaultEventEncoding,
-			KeyName:      "history.defaultEventEncoding",
-			Filters:      []Filter{DomainName},
-			Description:  "DefaultEventEncoding is the encoding type for history events",
-			DefaultValue: string(constants.EncodingTypeThriftRW),
-		},
-		"ReadVisibilityStoreName": {
-			Key:          ReadVisibilityStoreName,
-			KeyName:      "system.readVisibilityStoreName",
-			Filters:      []Filter{DomainName},
-			Description:  "ReadVisibilityStoreName is key to identify which store to read visibility data from",
-			DefaultValue: "es",
-		},
-	}
-
-	for _, value := range testStringKeys {
-		s.Equal(value.KeyName, value.Key.String())
-		s.Equal(value.DefaultValue, value.Key.DefaultValue())
-		s.Equal(value.Description, value.Key.Description())
-		s.Equal(value.Filters, value.Key.Filters())
-		s.Equal(value.DefaultValue, value.Key.DefaultString())
-	}
-}
-
-func (s *constantSuite) TestDurationKey() {
-	testDurationKeys := map[string]struct {
-		Key          DurationKey
-		KeyName      string
-		Filters      []Filter
-		Description  string
-		DefaultValue time.Duration
-	}{
-		"TestGetDurationPropertyKey": {
-			Key:          TestGetDurationPropertyKey,
-			KeyName:      "testGetDurationPropertyKey",
-			Description:  "",
-			DefaultValue: 0,
-		},
-		"FrontendFailoverCoolDown": {
-			Key:          FrontendFailoverCoolDown,
-			KeyName:      "frontend.failoverCoolDown",
-			Filters:      []Filter{DomainName},
-			Description:  "FrontendFailoverCoolDown is duration between two domain failvoers",
-			DefaultValue: time.Minute,
-		},
-		"MatchingIdleTasklistCheckInterval": {
-			Key:          MatchingIdleTasklistCheckInterval,
-			KeyName:      "matching.idleTasklistCheckInterval",
-			Filters:      []Filter{DomainName, TaskListName, TaskType},
-			Description:  "MatchingIdleTasklistCheckInterval is the IdleTasklistCheckInterval",
-			DefaultValue: time.Minute * 5,
-		},
-	}
-
-	for _, value := range testDurationKeys {
-		s.Equal(value.KeyName, value.Key.String())
-		s.Equal(value.DefaultValue, value.Key.DefaultValue())
-		s.Equal(value.Description, value.Key.Description())
-		s.Equal(value.Filters, value.Key.Filters())
-		s.Equal(value.DefaultValue, value.Key.DefaultDuration())
-	}
-}
-
-func (s *constantSuite) TestMapKey() {
-	testMapKeys := map[string]struct {
-		Key          MapKey
-		KeyName      string
-		Filters      []Filter
-		Description  string
-		DefaultValue map[string]interface{}
-	}{
-		"TestGetMapPropertyKey": {
-			Key:          TestGetMapPropertyKey,
-			KeyName:      "testGetMapPropertyKey",
-			Description:  "",
-			DefaultValue: nil,
-		},
-		"TaskSchedulerRoundRobinWeights": {
-			Key:         TaskSchedulerRoundRobinWeights,
-			KeyName:     "history.taskSchedulerRoundRobinWeight",
-			Description: "TaskSchedulerRoundRobinWeights is the priority weight for weighted round robin task scheduler",
-			DefaultValue: ConvertIntMapToDynamicConfigMapProperty(map[int]int{
-				constants.GetTaskPriority(constants.HighPriorityClass, constants.DefaultPrioritySubclass):    500,
-				constants.GetTaskPriority(constants.DefaultPriorityClass, constants.DefaultPrioritySubclass): 20,
-				constants.GetTaskPriority(constants.LowPriorityClass, constants.DefaultPrioritySubclass):     5,
-			}),
-		},
-		"QueueProcessorStuckTaskSplitThreshold": {
-			Key:          QueueProcessorStuckTaskSplitThreshold,
-			KeyName:      "history.queueProcessorStuckTaskSplitThreshold",
-			Description:  "QueueProcessorStuckTaskSplitThreshold is the threshold for the number of attempts of a task",
-			DefaultValue: ConvertIntMapToDynamicConfigMapProperty(map[int]int{0: 100, 1: 10000}),
-		},
-	}
-
-	for _, value := range testMapKeys {
-		s.Equal(value.KeyName, value.Key.String())
-		s.Equal(value.DefaultValue, value.Key.DefaultValue())
-		s.Equal(value.Description, value.Key.Description())
-		s.Equal(value.Filters, value.Key.Filters())
-		s.Equal(value.DefaultValue, value.Key.DefaultMap())
-	}
-}
-
-func (s *constantSuite) TestListKey() {
-	testListKeys := map[string]struct {
-		Key          ListKey
-		KeyName      string
-		Filters      []Filter
-		Description  string
-		DefaultValue []interface{}
-	}{
-		"DefaultIsolationGroupConfigStoreManagerGlobalMapping": {
-			Key:     DefaultIsolationGroupConfigStoreManagerGlobalMapping,
-			KeyName: "system.defaultIsolationGroupConfigStoreManagerGlobalMapping",
-			Description: "A configuration store for global isolation groups - used in isolation-group config only, not normal dynamic config." +
-				"Not intended for use in normal dynamic config",
-		},
-		"HeaderForwardingRules": {
-			Key:     HeaderForwardingRules,
-			KeyName: "admin.HeaderForwardingRules",
-			Description: "Only loaded at startup.  " +
-				"A list of rpc.HeaderRule values that define which headers to include or exclude for all requests, applied in order.  " +
-				"Regexes and header names are used as-is, you are strongly encouraged to use `(?i)` to make your regex case-insensitive.",
-			DefaultValue: []interface{}{
-				map[string]interface{}{
-					"Add":   true,
-					"Match": "",
-				},
-			},
-		},
-	}
-
-	for _, value := range testListKeys {
-		s.Equal(value.KeyName, value.Key.String())
-		s.Equal(value.DefaultValue, value.Key.DefaultValue())
-		s.Equal(value.Description, value.Key.Description())
-		s.Equal(value.Filters, value.Key.Filters())
-		s.Equal(value.DefaultValue, value.Key.DefaultList())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.keyName, tt.key.String())
+			assert.Equal(t, tt.defaultValue, tt.key.DefaultValue())
+			assert.Equal(t, tt.filters, tt.key.Filters())
+		})
 	}
 }
 
@@ -386,33 +145,26 @@ func TestDynamicConfigFilterTypeIsMapped(t *testing.T) {
 
 func TestDynamicConfigFilterTypeIsParseable(t *testing.T) {
 	allFilters := map[Filter]int{}
-	for idx, filterString := range filters { // TestDynamicConfigFilterTypeIsMapped ensures this is a complete list
-		// all filter-strings must parse to unique filters
+	for idx, filterString := range filters {
 		parsed := ParseFilter(filterString)
 		prev, ok := allFilters[parsed]
 		assert.False(t, ok, "%q is already mapped to the same filter type as %q", filterString, filters[prev])
 		allFilters[parsed] = idx
 
-		// otherwise, only "unknown" should map to "unknown".
-		// ParseFilter should probably be re-implemented to simply use a map that is shared with the definitions
-		// so values cannot get out of sync, but for now this is just asserting what is currently built.
 		if idx == 0 {
-			assert.Equalf(t, UnknownFilter, ParseFilter(filterString), "first filter string should have parsed as unknown: %v", filterString)
-			// unknown filter string is likely safe to change and then should be updated here, but otherwise this ensures the logic isn't entirely position-dependent.
-			require.Equalf(t, "unknownFilter", filterString, "expected first filter to be 'unknownFilter', but it was %v", filterString)
+			assert.Equal(t, UnknownFilter, parsed)
+			require.Equal(t, "unknownFilter", filterString)
 		} else {
-			assert.NotEqualf(t, UnknownFilter, ParseFilter(filterString), "failed to parse filter: %s, make sure it is in ParseFilter's switch statement", filterString)
+			assert.NotEqual(t, UnknownFilter, parsed)
 		}
 	}
 }
 
 func TestDynamicConfigFilterStringsCorrectly(t *testing.T) {
 	for _, filterString := range filters {
-		// filter-string-parsing and the resulting filter's String() must match
 		parsed := ParseFilter(filterString)
-		assert.Equal(t, filterString, parsed.String(), "filters need to String() correctly as some impls rely on it")
+		assert.Equal(t, filterString, parsed.String())
 	}
-	// should not be possible normally, but improper casting could trigger it
 	badFilter := Filter(len(filters))
-	assert.Equal(t, UnknownFilter.String(), badFilter.String(), "filters with indexes outside the list of known strings should String() to the unknown filter type")
+	assert.Equal(t, UnknownFilter.String(), badFilter.String())
 }

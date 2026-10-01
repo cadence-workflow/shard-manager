@@ -33,6 +33,14 @@ const (
 	processorAsyncOperationTimeout = 10 * time.Second //  maximum time allowed for a shard processor Start or Stop call.
 )
 
+// Messages logged when a shard processor exceeds processorAsyncOperationTimeout.
+// Exported because canary stall Start/Stop on purpose for tests. Canary matches on
+// the strings to downgrade the log level (since it's expected to timeout).
+const (
+	MsgProcessorStartTimedOut = "shard processor start timed out"
+	MsgProcessorStopTimedOut  = "shard processor stop timed out"
+)
+
 type managedProcessor[SP ShardProcessor] struct {
 	processor SP
 	state     atomic.Int32
@@ -351,7 +359,7 @@ func (e *executorImpl[SP]) addManagerProcessor(ctx context.Context, shardID stri
 		select {
 		case <-done:
 		case <-timer.Chan():
-			e.logger.Error("shard processor start timed out", zap.String(tag.ShardKey, shardID))
+			e.logger.Error(MsgProcessorStartTimedOut, zap.String(tag.ShardKey, shardID))
 			e.metrics.Counter(metricsconstants.ShardDistributorExecutorProcessorStartTimeout).Inc(1)
 		}
 	}()
@@ -384,7 +392,7 @@ func (e *executorImpl[SP]) stopManagerProcessor(shardID string) <-chan struct{} 
 		select {
 		case <-done:
 		case <-timer.Chan():
-			e.logger.Error("shard processor stop timed out", zap.String(tag.ShardKey, shardID))
+			e.logger.Error(MsgProcessorStopTimedOut, zap.String(tag.ShardKey, shardID))
 			e.metrics.Counter(metricsconstants.ShardDistributorExecutorProcessorStopTimeout).Inc(1)
 		}
 	}()

@@ -422,6 +422,7 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 	}
 	p.emitActiveShardMetric(namespaceState.ShardAssignments, metricsLoopScope)
 	p.emitOldestExecutorHeartbeatLag(namespaceState, metricsLoopScope)
+	metricsLoopScope.UpdateGauge(metrics.ShardDistributorDrainedHosts, float64(len(namespaceState.DrainedHosts)))
 
 	// Identify stale executors that need to be removed
 	staleExecutors := p.identifyStaleExecutors(namespaceState)

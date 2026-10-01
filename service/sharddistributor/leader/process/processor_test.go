@@ -302,6 +302,69 @@ func TestRebalanceShards_NoActiveExecutors(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRebalanceShards_EmitsDrainedHostsGauge(t *testing.T) {
+	drainedHosts := map[string]store.DrainedHost{
+		"host-a": {Hostname: "host-a"},
+		"host-b": {Hostname: "host-b"},
+	}
+
+	tests := []struct {
+		name         string
+		executorHost string
+		drainedHosts map[string]store.DrainedHost
+		want         float64
+	}{
+		{
+			name:         "no drained hosts",
+			executorHost: "host-c",
+			want:         0,
+		},
+		{
+			name:         "assignable executors remain",
+			executorHost: "host-c",
+			drainedHosts: drainedHosts,
+			want:         2,
+		},
+		{
+			name:         "every executor is on a drained host",
+			executorHost: "host-a",
+			drainedHosts: drainedHosts,
+			want:         2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+			defer mocks.ctrl.Finish()
+			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+			testScope := tally.NewTestScope("test", nil)
+			processor.metricsClient = metrics.NewClient(testScope, metrics.ShardDistributor, metrics.MigrationConfig{})
+
+			mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+				AssignmentState: store.AssignmentState{
+					ShardAssignments: assignmentsFor("exec-1", "0", "1"),
+				},
+				Executors: map[string]store.HeartbeatState{
+					"exec-1": {
+						Status:        types.ExecutorStatusACTIVE,
+						LastHeartbeat: mocks.timeSource.Now(),
+						HostMetadata:  &types.HostMetadata{HostName: tt.executorHost},
+					},
+				},
+				DrainedHosts: tt.drainedHosts,
+			}, nil)
+
+			err := processor.rebalanceShards(context.Background())
+			require.NoError(t, err)
+
+			gauges := testScope.Snapshot().Gauges()
+			metricTags := "namespace=test-ns,namespace_type=fixed,operation=ShardAssignLoop"
+			assert.Equal(t, tt.want, gauges["test.shard_distributor_drained_hosts+"+metricTags].Value())
+		})
+	}
+}
+
 func TestRebalanceShards_NoActiveExecutors_WithStaleExecutors(t *testing.T) {
 	t.Run("one stale executor", func(t *testing.T) {
 		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)

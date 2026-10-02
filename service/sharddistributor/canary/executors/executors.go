@@ -4,6 +4,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/faultlog"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processorephemeral"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
@@ -105,6 +106,10 @@ func NewExecutorsModule(params ExecutorsParams) {
 
 func Module(fixedNamespace, ephemeralNamespace string) fx.Option {
 	return fx.Module("Executors",
+		// The canary stalls Start/Stop on purpose, so the framework's lifecycle
+		// timeouts are expected output here rather than actionable failures.
+		fx.Decorate(faultlog.WrapLogger),
+
 		// Executor that is used for testing a namespace with fixed shards
 		fx.Provide(func(cfg config.Config, params executorclient.Params[*processor.ShardProcessor]) (ExecutorsResult, error) {
 			return NewExecutorsWithFixedNamespace(params, fixedNamespace, cfg.Canary.NumFixedExecutors)

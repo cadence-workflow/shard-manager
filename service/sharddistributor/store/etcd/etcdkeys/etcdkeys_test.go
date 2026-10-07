@@ -1,6 +1,7 @@
 package etcdkeys
 
 import (
+	"encoding/hex"
 	"strings"
 	"testing"
 
@@ -206,4 +207,136 @@ func TestParseExecutorKey_HostMetadata(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "exec-1", executorID)
 	assert.Equal(t, ExecutorHostMetadataKey, keyType)
+}
+
+func TestBuildRangesPrefix(t *testing.T) {
+	got := BuildRangesPrefix("/cadence", "test-ns")
+	assert.Equal(t, "/cadence/test-ns/ranges/", got)
+}
+
+func TestBuildRangeKey(t *testing.T) {
+	got := BuildRangeKey("/cadence", "test-ns", []byte{0x83, 0xee, 0x86, 0x1a, 0xac, 0x65, 0x53, 0x62})
+	assert.Equal(t, "/cadence/test-ns/ranges/83ee861aac655362", got)
+}
+
+// The ranges keyspace must not collide with the executor, drained-shard, or
+// drained-host keyspaces, otherwise a prefix scan for one would pick up keys
+// belonging to another.
+func TestRangesPrefixIsDisjointFromSiblingPrefixes(t *testing.T) {
+	ranges := BuildRangesPrefix("/cadence", "test-ns")
+	siblings := []string{
+		BuildExecutorsPrefix("/cadence", "test-ns"),
+		BuildDrainedShardsPrefix("/cadence", "test-ns"),
+		BuildDrainedHostsPrefix("/cadence", "test-ns"),
+	}
+
+	for _, sibling := range siblings {
+		assert.NotEqual(t, ranges, sibling)
+		assert.False(t, strings.HasPrefix(ranges, sibling))
+		assert.False(t, strings.HasPrefix(sibling, ranges))
+	}
+}
+
+// Hex encoding must preserve lexicographic ordering of the bounds. If it did
+// not, etcd prefix scans would return ranges out of order, breaking the range
+// cache and cover validation.
+func TestRangeKeyHexPreservesOrdering(t *testing.T) {
+	lower := []byte{0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	upper := []byte{0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+
+	lowerKey := BuildRangeKey("/cadence", "test-ns", lower)
+	upperKey := BuildRangeKey("/cadence", "test-ns", upper)
+
+	assert.True(t, lowerKey < upperKey, "lower bound key must sort before upper bound key")
+}
+
+func TestParseRangeKey(t *testing.T) {
+	tests := []struct {
+		name      string
+		key       string
+		wantBound []byte
+		wantErr   string
+	}{
+		{
+			name:      "valid",
+			key:       "/cadence/test-ns/ranges/83ee861aac655362",
+			wantBound: []byte{0x83, 0xee, 0x86, 0x1a, 0xac, 0x65, 0x53, 0x62},
+		},
+		{
+			name:      "min bound",
+			key:       "/cadence/test-ns/ranges/0000000000000000",
+			wantBound: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:      "max bound",
+			key:       "/cadence/test-ns/ranges/ffffffffffffffff",
+			wantBound: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		},
+		{
+			name:    "wrong prefix",
+			key:     "/wrong/prefix/ranges/83ee861aac655362",
+			wantErr: "does not have expected ranges prefix",
+		},
+		{
+			name:    "different namespace",
+			key:     "/cadence/other-ns/ranges/83ee861aac655362",
+			wantErr: "does not have expected ranges prefix",
+		},
+		{
+			name:    "missing lower bound",
+			key:     "/cadence/test-ns/ranges/",
+			wantErr: "missing lower bound",
+		},
+		{
+			name:    "invalid hex",
+			key:     "/cadence/test-ns/ranges/zzzz",
+			wantErr: "invalid hex lower bound",
+		},
+		{
+			name:    "odd hex length",
+			key:     "/cadence/test-ns/ranges/abc",
+			wantErr: "invalid hex lower bound",
+		},
+		{
+			name:    "wrong byte length",
+			key:     "/cadence/test-ns/ranges/83ee861aac65536200",
+			wantErr: "must be 8 bytes",
+		},
+		{
+			name:    "extra path segment",
+			key:     "/cadence/test-ns/ranges/83ee861aac655362/extra",
+			wantErr: "invalid hex lower bound",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bound, err := ParseRangeKey("/cadence", "test-ns", tc.key)
+			if tc.wantErr != "" {
+				assert.ErrorContains(t, err, tc.wantErr)
+				assert.Nil(t, bound)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantBound, bound)
+		})
+	}
+}
+
+func TestRangeKeyRoundTrip(t *testing.T) {
+	bounds := [][]byte{
+		{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		{0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		{0x83, 0xee, 0x86, 0x1a, 0xac, 0x65, 0x53, 0x62},
+		{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+	}
+
+	for _, bound := range bounds {
+		t.Run(strings.ToUpper(hex.EncodeToString(bound)), func(t *testing.T) {
+			key := BuildRangeKey("/cadence", "test-ns", bound)
+			got, err := ParseRangeKey("/cadence", "test-ns", key)
+			require.NoError(t, err)
+			assert.Equal(t, bound, got)
+		})
+	}
 }

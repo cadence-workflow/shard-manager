@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -503,5 +504,93 @@ func TestRange_String(t *testing.T) {
 				t.Errorf("String() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRangeUpperBoundInfinity(t *testing.T) {
+	maxFingerprint := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+
+	// The sentinel must be longer than a fingerprint so that it sorts after the
+	// maximum fingerprint.
+	if len(RangeUpperBoundInfinity) <= len(maxFingerprint) {
+		t.Errorf("RangeUpperBoundInfinity length = %d, want greater than %d", len(RangeUpperBoundInfinity), len(maxFingerprint))
+	}
+
+	// The maximum fingerprint must sort before the sentinel.
+	if bytes.Compare(maxFingerprint, RangeUpperBoundInfinity) >= 0 {
+		t.Errorf("max fingerprint %x must sort before sentinel %x", maxFingerprint, RangeUpperBoundInfinity)
+	}
+}
+
+func TestNewFinalRange(t *testing.T) {
+	tests := []struct {
+		name         string
+		lowInclusive []byte
+		wantErr      bool
+		errType      error
+	}{
+		{
+			name:         "valid",
+			lowInclusive: []byte{0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:    "nil low bound",
+			wantErr: true,
+			errType: ErrRangeNilBounds,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewFinalRange(tt.lowInclusive)
+
+			if tt.wantErr {
+				if err != tt.errType {
+					t.Errorf("NewFinalRange() error = %v, want %v", err, tt.errType)
+				}
+				if got != nil {
+					t.Errorf("NewFinalRange() expected nil on error, got %v", got)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("NewFinalRange() unexpected error: %v", err)
+			}
+			if !got.IsValid() {
+				t.Error("NewFinalRange() produced an invalid range")
+			}
+			if !got.IsFinalRange() {
+				t.Error("NewFinalRange() produced a range that is not final")
+			}
+			// The final range must contain the maximum fingerprint, which no
+			// finite upper bound can cover.
+			if !got.Contains([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
+				t.Error("final range must contain the maximum fingerprint")
+			}
+		})
+	}
+}
+
+func TestRange_IsFinalRange(t *testing.T) {
+	final, err := NewFinalRange([]byte{0x00})
+	if err != nil {
+		t.Fatalf("NewFinalRange() error: %v", err)
+	}
+	if !final.IsFinalRange() {
+		t.Error("final range must report IsFinalRange() == true")
+	}
+
+	finite, err := NewRange([]byte{0x00}, []byte{0x40})
+	if err != nil {
+		t.Fatalf("NewRange() error: %v", err)
+	}
+	if finite.IsFinalRange() {
+		t.Error("finite range must report IsFinalRange() == false")
+	}
+
+	var nilRange *Range
+	if nilRange.IsFinalRange() {
+		t.Error("nil range must report IsFinalRange() == false")
 	}
 }

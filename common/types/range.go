@@ -45,6 +45,31 @@ func NewRange(lowInclusive, highExclusive []byte) (*Range, error) {
 	return r, nil
 }
 
+// RangeUpperBoundInfinity is the exclusive upper bound of a final range, which
+// extends to the end of the key space. It is one byte longer than a fingerprint
+// (9 versus 8) so that byte comparison orders it after every finite fingerprint
+// while it remains a valid upper bound for the half-open interval.
+var RangeUpperBoundInfinity = bytes.Repeat([]byte{0xFF}, 9)
+
+// NewFinalRange creates the final range [lowInclusive, infinity), covering every
+// key greater than or equal to lowInclusive.
+func NewFinalRange(lowInclusive []byte) (*Range, error) {
+	if lowInclusive == nil {
+		return nil, ErrRangeNilBounds
+	}
+
+	r := &Range{
+		LowInclusive:  bytes.Clone(lowInclusive),
+		HighExclusive: bytes.Clone(RangeUpperBoundInfinity),
+	}
+
+	if !r.IsValid() {
+		return nil, ErrRangeInvalid
+	}
+
+	return r, nil
+}
+
 func (r *Range) IsValid() bool {
 	if r == nil || r.LowInclusive == nil || r.HighExclusive == nil {
 		return false
@@ -87,6 +112,11 @@ func (r *Range) Compare(other *Range) int {
 		return 0
 	}
 	return bytes.Compare(r.LowInclusive, other.LowInclusive)
+}
+
+// IsFinalRange reports whether the range extends to the end of the key space.
+func (r *Range) IsFinalRange() bool {
+	return r != nil && bytes.Equal(r.HighExclusive, RangeUpperBoundInfinity)
 }
 
 // String returns a bounded hexadecimal representation used for logs.

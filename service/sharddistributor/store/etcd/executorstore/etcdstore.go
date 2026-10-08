@@ -40,6 +40,9 @@ type executorStoreImpl struct {
 	metricsClient metrics.Client
 }
 
+// The etcd store implements RangeStore in addition to store.Store.
+var _ store.RangeStore = (*executorStoreImpl)(nil)
+
 func newExecutorStoreImpl(
 	client etcdclient.Client,
 	etcdCfg etcdclient.ExecutorStoreConfig,
@@ -918,4 +921,83 @@ func (s *executorStoreImpl) RecordShardStatisticsBatch(ctx context.Context, name
 		}
 	}
 	return multiError
+}
+
+// --- RangeStore Implementation ---
+
+// PutRange stores a single range assignment at the key derived from its lower bound.
+func (s *executorStoreImpl) PutRange(ctx context.Context, namespace string, assignment *store.RangeAssignment) error {
+	if assignment == nil || assignment.Range == nil {
+		return fmt.Errorf("put range: assignment and its Range must not be nil")
+	}
+
+	value, err := json.Marshal(etcdtypes.FromRangeAssignment(assignment))
+	if err != nil {
+		return fmt.Errorf("marshal range assignment: %w", err)
+	}
+
+	key := etcdkeys.BuildRangeKey(s.prefix, namespace, assignment.Range.LowInclusive)
+	if _, err := s.client.Put(ctx, key, string(value)); err != nil {
+		return fmt.Errorf("put range: %w", err)
+	}
+	return nil
+}
+
+// GetRange retrieves the range whose lower bound is lowInclusive.
+func (s *executorStoreImpl) GetRange(ctx context.Context, namespace string, lowInclusive []byte) (*store.RangeAssignment, error) {
+	resp, err := s.client.Get(ctx, etcdkeys.BuildRangeKey(s.prefix, namespace, lowInclusive))
+	if err != nil {
+		return nil, fmt.Errorf("get range: %w", err)
+	}
+	if resp.Count == 0 {
+		return nil, store.ErrRangeNotFound
+	}
+
+	var stored etcdtypes.RangeAssignment
+	if err := json.Unmarshal(resp.Kvs[0].Value, &stored); err != nil {
+		return nil, fmt.Errorf("unmarshal range assignment: %w", err)
+	}
+	return stored.ToRangeAssignment(lowInclusive)
+}
+
+// DeleteRange removes the range whose lower bound is lowInclusive.
+func (s *executorStoreImpl) DeleteRange(ctx context.Context, namespace string, lowInclusive []byte) error {
+	if _, err := s.client.Delete(ctx, etcdkeys.BuildRangeKey(s.prefix, namespace, lowInclusive)); err != nil {
+		return fmt.Errorf("delete range: %w", err)
+	}
+	return nil
+}
+
+// ListRanges returns every range in a namespace, sorted by lower bound. etcd
+// returns keys in lexicographic order and the hex-encoded lower bounds preserve
+// that ordering, so the result is already sorted.
+func (s *executorStoreImpl) ListRanges(ctx context.Context, namespace string) ([]*store.RangeAssignment, error) {
+	resp, err := s.client.Get(ctx, etcdkeys.BuildRangesPrefix(s.prefix, namespace), clientv3.WithPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("list ranges: %w", err)
+	}
+
+	assignments := make([]*store.RangeAssignment, 0, len(resp.Kvs))
+	for _, kv := range resp.Kvs {
+		lowInclusive, err := etcdkeys.ParseRangeKey(s.prefix, namespace, string(kv.Key))
+		if err != nil {
+			return nil, fmt.Errorf("parse range key %q: %w", string(kv.Key), err)
+		}
+
+		var stored etcdtypes.RangeAssignment
+		if err := json.Unmarshal(kv.Value, &stored); err != nil {
+			return nil, fmt.Errorf("unmarshal range assignment for key %q: %w", string(kv.Key), err)
+		}
+
+		assignment, err := stored.ToRangeAssignment(lowInclusive)
+		if err != nil {
+			return nil, fmt.Errorf("decode range assignment for key %q: %w", string(kv.Key), err)
+		}
+		assignments = append(assignments, assignment)
+	}
+	return assignments, nil
+}
+
+func (s *executorStoreImpl) AssignRanges(ctx context.Context, namespace string, assignments []*store.RangeAssignment) error {
+	panic("not implemented: needed for Phase 2 split/merge")
 }

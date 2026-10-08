@@ -20,8 +20,9 @@ Namespaces are the unit of configuration. A namespace is either:
 * `fixed` — a static set of shards (`shardNum`), distributed across the executors of that namespace.
 * `ephemeral` — shards are created on demand, the first time someone asks for a shard key.
 
-Rebalancing is pluggable per namespace via the `naive` or `greedy` load balancer (see
-`service/sharddistributor/loadbalancer`), tunable through dynamic config.
+Rebalancing is pluggable per namespace via the `naive` or `greedy` load balancer,
+tunable through dynamic config. See [Greedy load balancing](docs/greedy-load-balancing.md)
+for setup, configuration, tuning, and trade-offs.
 
 ## Getting Started
 

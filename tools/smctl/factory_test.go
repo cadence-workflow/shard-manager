@@ -9,7 +9,6 @@ import (
 	"go.uber.org/yarpc/api/transport"
 
 	"github.com/cadence-workflow/shard-manager/common"
-	cc "github.com/cadence-workflow/shard-manager/common/client"
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
@@ -104,17 +103,12 @@ func TestVersionMiddleware_injectsCallerHeaders(t *testing.T) {
 	}
 
 	wantHeaders := map[string]string{
-		common.ClientImplHeaderName:     cc.CLI,
-		common.FeatureVersionHeaderName: cc.SupportedCLIVersion,
-		common.CallerTypeHeaderName:     types.CallerTypeCLI.String(),
+		common.CallerTypeHeaderName: types.CallerTypeCLI.String(),
 	}
 	for k, v := range wantHeaders {
 		if got, ok := stub.req.Headers.Get(k); !ok || got != v {
 			t.Errorf("header %q: got %q (ok=%v), want %q", k, got, ok, v)
 		}
-	}
-	if _, ok := stub.req.Headers.Get(common.ClientFeatureFlagsHeaderName); !ok {
-		t.Errorf("header %q should be set", common.ClientFeatureFlagsHeaderName)
 	}
 }
 

@@ -25,14 +25,6 @@ import "strings"
 const (
 	_servicePrefix = "cadence-"
 
-	// Frontend is the name of the frontend service (unused by shard-manager, kept for config compatibility)
-	Frontend = "cadence-frontend"
-	// History is the name of the history service (unused by shard-manager, kept for config compatibility)
-	History = "cadence-history"
-	// Matching is the name of the matching service (unused by shard-manager, kept for config compatibility)
-	Matching = "cadence-matching"
-	// Worker is the name of the worker service (unused by shard-manager, kept for config compatibility)
-	Worker = "cadence-worker"
 	// ShardDistributor is the name of the shard distributor service
 	ShardDistributor = "shard-distributor"
 )

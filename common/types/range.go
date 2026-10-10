@@ -8,12 +8,6 @@ import (
 
 // Range represents a contiguous interval of the key space [LowInclusive, HighExclusive).
 // Ranges are the unit of ownership in the range-based model, replacing discrete shard assignments.
-//
-// Invariants:
-// - LowInclusive < HighExclusive (lexicographic comparison)
-// - Empty ranges are not allowed (validated by IsValid)
-// - Ranges must not overlap (enforced by storage layer)
-// - Complete coverage of key space required (enforced by storage layer)
 type Range struct {
 	// LowInclusive is the inclusive lower bound in the ordered key space.
 	LowInclusive []byte
@@ -47,7 +41,7 @@ func NewRange(lowInclusive, highExclusive []byte) (*Range, error) {
 
 // RangeUpperBoundInfinity is the exclusive upper bound of a final range, which
 // extends to the end of the key space. It is one byte longer than a fingerprint
-// (9 versus 8) so that byte comparison orders it after every finite fingerprint
+// so that byte comparison orders it after every finite fingerprint
 // while it remains a valid upper bound for the half-open interval.
 var RangeUpperBoundInfinity = bytes.Repeat([]byte{0xFF}, 9)
 
@@ -92,8 +86,6 @@ func (r *Range) Overlaps(other *Range) bool {
 		bytes.Compare(other.LowInclusive, r.HighExclusive) < 0
 }
 
-// Adjacent reports whether this range and other meet at one boundary without
-// requiring either range to be ordered before the other.
 func (r *Range) Adjacent(other *Range) bool {
 	if !r.IsValid() || !other.IsValid() {
 		return false

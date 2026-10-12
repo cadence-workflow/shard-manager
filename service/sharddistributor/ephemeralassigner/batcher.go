@@ -66,6 +66,7 @@ type flushResult struct {
 
 // namespaceState tracks inflight and pending requests for a single namespace.
 // Only accessed from the loop goroutine — no synchronization needed.
+// inflight is nil exactly when no flush is running for the namespace.
 type namespaceState struct {
 	inflight  []*batchRequest
 	pending   []*batchRequest
@@ -80,7 +81,7 @@ type namespaceState struct {
 //
 // Usage:
 //
-//	b := newShardBatcher(timeSource, 5*time.Second, coalescingWindow, processFn)
+//	b := newShardBatcher(namespaceNames, timeSource, 5*time.Second, coalescingWindow, processFn)
 //	b.Start()
 //	defer b.Stop()
 //	resp, err := b.Submit(ctx, &types.GetShardOwnerRequest{Namespace: namespace, ShardKey: shardKey})
@@ -90,6 +91,10 @@ type shardBatcher struct {
 	coalescingWindow func(namespace string) time.Duration
 	processBatch     ephemeralAssignmentBatchFn
 
+	// namespaces holds the state of every namespace the batcher serves. Its key
+	// set is fixed at construction, so Submit may look up keys concurrently
+	// with the loop goroutine updating the values.
+	namespaces  map[string]*namespaceState
 	requestChan chan *batchRequest
 
 	ctx    context.Context
@@ -97,13 +102,19 @@ type shardBatcher struct {
 	wg     sync.WaitGroup
 }
 
-func newShardBatcher(timeSource clock.TimeSource, timeout time.Duration, coalescingWindow func(namespace string) time.Duration, processBatch ephemeralAssignmentBatchFn) *shardBatcher {
+func newShardBatcher(namespaceNames []string, timeSource clock.TimeSource, timeout time.Duration, coalescingWindow func(namespace string) time.Duration, processBatch ephemeralAssignmentBatchFn) *shardBatcher {
+	namespaces := make(map[string]*namespaceState, len(namespaceNames))
+	for _, name := range namespaceNames {
+		namespaces[name] = &namespaceState{}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	return &shardBatcher{
 		timeSource:       timeSource,
 		timeout:          timeout,
 		coalescingWindow: coalescingWindow,
 		processBatch:     processBatch,
+		namespaces:       namespaces,
 		requestChan:      make(chan *batchRequest, _requestsChannelLimit),
 		ctx:              ctx,
 		cancel:           cancel,
@@ -127,6 +138,10 @@ func (b *shardBatcher) Stop() {
 // Submit enqueues a single GetShardOwner request and blocks until the batcher
 // has processed the batch that contains it, or until ctx is cancelled.
 func (b *shardBatcher) Submit(ctx context.Context, request *types.GetShardOwnerRequest) (*types.GetShardOwnerResponse, error) {
+	if _, ok := b.namespaces[request.Namespace]; !ok {
+		return nil, &types.NamespaceNotFoundError{Namespace: request.Namespace}
+	}
+
 	req := &batchRequest{
 		namespace: request.Namespace,
 		shardKey:  request.ShardKey,
@@ -154,19 +169,13 @@ func (b *shardBatcher) Submit(ctx context.Context, request *types.GetShardOwnerR
 func (b *shardBatcher) loop() {
 	defer b.wg.Done()
 
-	namespaces := make(map[string]*namespaceState)
 	flushDone := make(chan flushResult, _requestsChannelLimit)
 	flushReady := make(chan string, _requestsChannelLimit)
 
 	for {
 		select {
 		case req := <-b.requestChan:
-			ns := namespaces[req.namespace]
-			if ns == nil {
-				ns = &namespaceState{}
-				namespaces[req.namespace] = ns
-			}
-
+			ns := b.namespaces[req.namespace]
 			ns.pending = append(ns.pending, req)
 			if ns.inflight == nil && !ns.scheduled {
 				ns.scheduled = true
@@ -174,8 +183,8 @@ func (b *shardBatcher) loop() {
 			}
 
 		case namespace := <-flushReady:
-			ns := namespaces[namespace]
-			if ns == nil || !ns.scheduled {
+			ns := b.namespaces[namespace]
+			if !ns.scheduled {
 				continue
 			}
 			ns.scheduled = false
@@ -184,19 +193,18 @@ func (b *shardBatcher) loop() {
 			b.startFlush(namespace, ns.inflight, flushDone)
 
 		case res := <-flushDone:
-			ns := namespaces[res.namespace]
+			ns := b.namespaces[res.namespace]
 			b.deliverResults(ns.inflight, res.results, res.drained, res.err)
 
+			ns.inflight = nil
 			if len(ns.pending) > 0 {
 				ns.inflight = ns.pending
 				ns.pending = nil
 				b.startFlush(res.namespace, ns.inflight, flushDone)
-			} else {
-				delete(namespaces, res.namespace)
 			}
 
 		case <-b.ctx.Done():
-			b.drainAndCancel(namespaces, flushDone)
+			b.drainAndCancel(flushDone)
 			return
 		}
 	}
@@ -265,22 +273,22 @@ func toBatchResponse(results map[string]*types.GetShardOwnerResponse, drained ma
 	return batchResponse{resp: resp}
 }
 
-func (b *shardBatcher) drainAndCancel(namespaces map[string]*namespaceState, flushDone chan flushResult) {
+func (b *shardBatcher) drainAndCancel(flushDone chan flushResult) {
 	// Wait for any in-flight flushes to complete and deliver their results.
 	inflightCount := 0
-	for _, ns := range namespaces {
+	for _, ns := range b.namespaces {
 		if ns.inflight != nil {
 			inflightCount++
 		}
 	}
 	for range inflightCount {
 		res := <-flushDone
-		ns := namespaces[res.namespace]
+		ns := b.namespaces[res.namespace]
 		b.deliverResults(ns.inflight, res.results, res.drained, res.err)
 	}
 
 	// Cancel all pending requests that never got flushed.
-	for _, ns := range namespaces {
+	for _, ns := range b.namespaces {
 		for _, req := range ns.pending {
 			req.respChan <- batchResponse{err: b.ctx.Err()}
 		}

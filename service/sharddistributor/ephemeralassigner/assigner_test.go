@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
 	"go.uber.org/mock/gomock"
@@ -37,10 +38,14 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
-const _testNamespaceEphemeral = "test-ephemeral"
+const (
+	_testNamespaceEphemeral = "test-ephemeral"
+	_testNamespaceFixed     = "test-fixed"
+)
 
 func newTestShardDistributorConfig(mode string) *config.Config {
 	return &config.Config{
@@ -473,7 +478,7 @@ func TestGetOrAssign_DrainedDuringBatchFlushReturnsShardDrainedError(t *testing.
 	ctrl := gomock.NewController(t)
 	mockStorage := store.NewMockStore(ctrl)
 
-	a := New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage, cache.NewMockShardCache(ctrl), metrics.NewNoopMetricsClient())
+	a := newTestAssigner(mockStorage, cache.NewMockShardCache(ctrl))
 	a.Start()
 	defer a.Stop()
 
@@ -490,6 +495,30 @@ func TestGetOrAssign_DrainedDuringBatchFlushReturnsShardDrainedError(t *testing.
 	})
 	require.Nil(t, resp)
 	require.Equal(t, &types.ShardDrainedError{Namespace: _testNamespaceEphemeral, ShardKey: "shard-1"}, err)
+}
+
+// Only ephemeral namespaces are served; the rejection happens before storage is touched.
+func TestGetOrAssign_NonEphemeralNamespace(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	a := newTestAssigner(store.NewMockStore(ctrl), cache.NewMockShardCache(ctrl))
+	a.Start()
+	defer a.Stop()
+
+	for _, namespace := range []string{_testNamespaceFixed, "unknown"} {
+		t.Run(namespace, func(t *testing.T) {
+			resp, err := a.GetOrAssign(context.Background(), &types.GetShardOwnerRequest{Namespace: namespace, ShardKey: "shard-1"})
+			require.Equal(t, &types.NamespaceNotFoundError{Namespace: namespace}, err)
+			assert.Nil(t, resp)
+		})
+	}
+}
+
+func newTestAssigner(storage store.Store, shardCache cache.ShardCache) *Assigner {
+	registry := namespaces.MustNewRegistry(config.ShardDistribution{Namespaces: []config.Namespace{
+		{Name: _testNamespaceEphemeral, Type: config.NamespaceTypeEphemeral},
+		{Name: _testNamespaceFixed, Type: config.NamespaceTypeFixed, ShardNum: 1},
+	}})
+	return New(clock.NewRealTimeSource(), registry, newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), storage, shardCache, metrics.NewNoopMetricsClient())
 }
 
 func drainedKeys(drained map[string]struct{}) []string {

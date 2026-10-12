@@ -39,6 +39,9 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
+// _testBatcherNamespaces are the namespaces every test batcher serves.
+var _testBatcherNamespaces = []string{"ns", "ns1", "ns2"}
+
 // processFnFromMap returns an ephemeralAssignmentBatchFn that resolves shard keys from a
 // fixed map, returning an empty map (and no error) for any key not present.
 func processFnFromMap(results map[string]*types.GetShardOwnerResponse) ephemeralAssignmentBatchFn {
@@ -129,7 +132,7 @@ func TestShardBatcher_Submit(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), tc.batchFn)
+			b := newShardBatcher(_testBatcherNamespaces, clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), tc.batchFn)
 			b.Start()
 			defer b.Stop()
 
@@ -245,7 +248,7 @@ func TestShardBatcher_MultipleNamespacesIsolated(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), processFnFromMap(tc.results))
+			b := newShardBatcher(_testBatcherNamespaces, clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), processFnFromMap(tc.results))
 			b.Start()
 			defer b.Stop()
 
@@ -301,7 +304,7 @@ func TestShardBatcher_ErrorPropagatedToAllCallers(t *testing.T) {
 				return nil, nil, tc.batchErr
 			}
 
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+			b := newShardBatcher(_testBatcherNamespaces, clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 			b.Start()
 			defer b.Stop()
 
@@ -355,7 +358,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 		}
 
 		timeSource := clock.NewMockedTimeSource()
-		b := newShardBatcher(timeSource, time.Second, fixedCoalescingWindow(100*time.Millisecond), batchFn)
+		b := newShardBatcher(_testBatcherNamespaces, timeSource, time.Second, fixedCoalescingWindow(100*time.Millisecond), batchFn)
 		for _, key := range []string{"shard-1", "shard-2"} {
 			b.requestChan <- &batchRequest{
 				namespace: "ns",
@@ -398,7 +401,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 			return out, nil, nil
 		}
 
-		b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+		b := newShardBatcher(_testBatcherNamespaces, clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 		b.Start()
 		defer b.Stop()
 
@@ -452,7 +455,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 			return out, nil, nil
 		}
 
-		b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+		b := newShardBatcher(_testBatcherNamespaces, clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 		b.Start()
 		defer b.Stop()
 
@@ -513,7 +516,7 @@ func TestShardBatcher_ConcurrentRequestsBatchedTogether(t *testing.T) {
 				return out, nil, nil
 			}
 
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+			b := newShardBatcher(_testBatcherNamespaces, clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 			b.Start()
 			defer b.Stop()
 
@@ -562,7 +565,7 @@ func TestShardBatcher_StopDrainsAndCancelsRemainingRequests(t *testing.T) {
 				return nil, nil, nil
 			}
 
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+			b := newShardBatcher(_testBatcherNamespaces, clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 			b.Start()
 
 			errCh := make(chan error, 1)

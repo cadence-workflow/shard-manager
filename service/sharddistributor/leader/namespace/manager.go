@@ -15,6 +15,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/election"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 )
 
 // Module provides namespace manager component for an fx app.
@@ -30,7 +31,7 @@ var Module = fx.Module(
 type stateFn func(ctx context.Context) stateFn
 
 type Manager struct {
-	cfg             config.ShardDistribution
+	registry        *namespaces.Registry
 	logger          log.Logger
 	metricsClient   metrics.Client
 	electionFactory election.Factory
@@ -52,7 +53,7 @@ type namespaceHandler struct {
 type ManagerParams struct {
 	fx.In
 
-	Cfg             config.ShardDistribution
+	Namespaces      *namespaces.Registry
 	Logger          log.Logger
 	MetricsClient   metrics.Client
 	ElectionFactory election.Factory
@@ -67,7 +68,7 @@ type ManagerParams struct {
 // NewManager creates a new namespace manager
 func NewManager(p ManagerParams) *Manager {
 	manager := &Manager{
-		cfg:             p.Cfg,
+		registry:        p.Namespaces,
 		logger:          p.Logger.WithTags(tag.ComponentNamespaceManager),
 		metricsClient:   p.MetricsClient,
 		electionFactory: p.ElectionFactory,
@@ -84,7 +85,7 @@ func NewManager(p ManagerParams) *Manager {
 func (m *Manager) Start() error {
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 
-	for _, ns := range m.cfg.Namespaces {
+	for _, ns := range m.registry.List() {
 		m.logger.Info("Starting namespace handler", tag.ShardNamespace(ns.Name))
 		if err := m.handleNamespace(ns); err != nil {
 			return err

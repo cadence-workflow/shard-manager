@@ -59,7 +59,7 @@ func NewHandler(
 		storage:    storage,
 		shardCache: shardCache,
 		timeSource: timeSource,
-		assigner:   ephemeralassigner.New(timeSource, cfg, storage, shardCache, metricsClient),
+		assigner:   ephemeralassigner.New(timeSource, namespaceRegistry, cfg, storage, shardCache, metricsClient),
 	}
 	handler.stopCtx, handler.cancel = context.WithCancel(context.Background())
 

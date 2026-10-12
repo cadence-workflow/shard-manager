@@ -54,10 +54,11 @@ const (
 // ready to use; callers should call Stop() when done.
 func newTestHandler(t *testing.T, cfg config.ShardDistribution, mockStore *store.MockStore, mockCache *cache.MockShardCache) *handlerImpl {
 	t.Helper()
-	assigner := ephemeralassigner.New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStore, mockCache, metrics.NewNoopMetricsClient())
+	registry := namespaces.MustNewRegistry(cfg)
+	assigner := ephemeralassigner.New(clock.NewRealTimeSource(), registry, newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStore, mockCache, metrics.NewNoopMetricsClient())
 	handler := &handlerImpl{
 		logger:     testlogger.New(t),
-		namespaces: namespaces.MustNewRegistry(cfg),
+		namespaces: registry,
 		storage:    mockStore,
 		shardCache: mockCache,
 		timeSource: clock.NewRealTimeSource(),

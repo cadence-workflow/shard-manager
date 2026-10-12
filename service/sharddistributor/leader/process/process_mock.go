@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	config "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	namespaces "github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	store "github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -96,7 +96,7 @@ func (m *MockFactory) EXPECT() *MockFactoryMockRecorder {
 }
 
 // CreateProcessor mocks base method.
-func (m *MockFactory) CreateProcessor(cfg config.Namespace, storage store.Store, election store.Election) Processor {
+func (m *MockFactory) CreateProcessor(cfg namespaces.Namespace, storage store.Store, election store.Election) Processor {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateProcessor", cfg, storage, election)
 	ret0, _ := ret[0].(Processor)

@@ -16,6 +16,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/process"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -24,7 +25,7 @@ const (
 )
 
 var (
-	_testNamespace = config.Namespace{Name: "test-namespace"}
+	_testNamespace = namespaces.Namespace{Name: "test-namespace"}
 )
 
 var (

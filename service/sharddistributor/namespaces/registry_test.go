@@ -12,15 +12,20 @@ import (
 
 func TestNewRegistryValidation(t *testing.T) {
 	tests := []struct {
-		name    string
-		cfg     []config.Namespace
-		wantErr string
+		name     string
+		cfg      []config.Namespace
+		wantList []Namespace
+		wantErr  string
 	}{
 		{
 			name: "valid",
 			cfg: []config.Namespace{
 				{Name: "fixed", Type: config.NamespaceTypeFixed, ShardNum: 4},
 				{Name: "ephemeral", Type: config.NamespaceTypeEphemeral},
+			},
+			wantList: []Namespace{
+				{Name: "fixed", Type: TypeFixed, ShardNum: 4},
+				{Name: "ephemeral", Type: TypeEphemeral},
 			},
 		},
 		{
@@ -57,23 +62,24 @@ func TestNewRegistryValidation(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.cfg, r.List())
+			assert.Equal(t, tt.wantList, r.List())
 		})
 	}
 }
 
 func TestRegistryGet(t *testing.T) {
-	fixed := config.Namespace{Name: "fixed", Type: config.NamespaceTypeFixed, ShardNum: 4}
-	ephemeral := config.Namespace{Name: "ephemeral", Type: config.NamespaceTypeEphemeral}
-	r := MustNewRegistry(config.ShardDistribution{Namespaces: []config.Namespace{fixed, ephemeral}})
+	r := MustNewRegistry(config.ShardDistribution{Namespaces: []config.Namespace{
+		{Name: "fixed", Type: config.NamespaceTypeFixed, ShardNum: 4},
+		{Name: "ephemeral", Type: config.NamespaceTypeEphemeral},
+	}})
 
 	tests := []struct {
 		name    string
 		lookup  string
-		wantNS  config.Namespace
+		wantNS  Namespace
 		wantErr error
 	}{
-		{name: "found", lookup: "ephemeral", wantNS: ephemeral},
+		{name: "found", lookup: "ephemeral", wantNS: Namespace{Name: "ephemeral", Type: TypeEphemeral}},
 		{name: "not found", lookup: "unknown", wantErr: &types.NamespaceNotFoundError{Namespace: "unknown"}},
 	}
 

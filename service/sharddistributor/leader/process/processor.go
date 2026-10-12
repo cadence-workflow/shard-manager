@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"slices"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -43,7 +43,7 @@ type Processor interface {
 type Factory interface {
 	// CreateProcessor creates a new processor, it takes the generic store
 	// and the election object which provides the transactional guard.
-	CreateProcessor(cfg config.Namespace, storage store.Store, election store.Election) Processor
+	CreateProcessor(cfg namespaces.Namespace, storage store.Store, election store.Election) Processor
 }
 
 const (
@@ -62,7 +62,7 @@ type processorFactory struct {
 }
 
 type namespaceProcessor struct {
-	namespaceCfg  config.Namespace
+	namespaceCfg  namespaces.Namespace
 	logger        log.Logger
 	metricsClient metrics.Client
 	timeSource    clock.TimeSource
@@ -106,7 +106,7 @@ func NewProcessorFactory(
 }
 
 // CreateProcessor creates a new processor for the given namespace
-func (f *processorFactory) CreateProcessor(cfg config.Namespace, shardStore store.Store, election store.Election) Processor {
+func (f *processorFactory) CreateProcessor(cfg namespaces.Namespace, shardStore store.Store, election store.Election) Processor {
 	return &namespaceProcessor{
 		namespaceCfg:  cfg,
 		logger:        f.logger.WithTags(tag.ComponentLeaderProcessor, tag.ShardNamespace(cfg.Name)),
@@ -392,7 +392,7 @@ func (p *namespaceProcessor) rebalanceShards(ctx context.Context) (err error) {
 	metricsLoopScope := p.metricsClient.Scope(
 		metrics.ShardDistributorAssignLoopScope,
 		metrics.NamespaceTag(p.namespaceCfg.Name),
-		metrics.NamespaceTypeTag(p.namespaceCfg.Type),
+		metrics.NamespaceTypeTag(p.namespaceCfg.Type.String()),
 	)
 
 	metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopAttempts, 1)
@@ -913,10 +913,11 @@ func assignShardsToEmptyExecutors(currentAssignments map[string][]string) bool {
 	return true
 }
 
-func getShards(cfg config.Namespace, namespaceState *store.NamespaceState, deletedShards map[string]store.ShardState) []string {
-	if cfg.Type == config.NamespaceTypeFixed {
-		return makeShards(cfg.ShardNum)
-	} else if cfg.Type == config.NamespaceTypeEphemeral {
+func getShards(cfg namespaces.Namespace, namespaceState *store.NamespaceState, deletedShards map[string]store.ShardState) []string {
+	switch cfg.Type {
+	case namespaces.TypeFixed:
+		return cfg.FixedShards()
+	case namespaces.TypeEphemeral:
 		shards := make([]string, 0)
 		for _, state := range namespaceState.ShardAssignments {
 			for shardID := range state.AssignedShards {
@@ -929,12 +930,4 @@ func getShards(cfg config.Namespace, namespaceState *store.NamespaceState, delet
 		return shards
 	}
 	return nil
-}
-
-func makeShards(num int64) []string {
-	shards := make([]string, num)
-	for i := range num {
-		shards[i] = strconv.FormatInt(i, 10)
-	}
-	return shards
 }

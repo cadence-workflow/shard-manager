@@ -94,7 +94,7 @@ type lifecycleTestElectionFactory struct {
 	managerStopped chan struct{}
 }
 
-func (f *lifecycleTestElectionFactory) CreateElector(_ context.Context, _ config.Namespace) (election.Elector, error) {
+func (f *lifecycleTestElectionFactory) CreateElector(_ context.Context, _ namespaces.Namespace) (election.Elector, error) {
 	return &lifecycleTestElector{
 		managerStopped: f.managerStopped,
 	}, nil
@@ -175,7 +175,7 @@ func TestStartManagerWithElectorError(t *testing.T) {
 	}
 
 	expectedErr := errors.New("elector creation failed")
-	electionFactory.EXPECT().CreateElector(gomock.Any(), config.Namespace{Name: "test-namespace", Type: config.NamespaceTypeEphemeral}).Return(nil, expectedErr)
+	electionFactory.EXPECT().CreateElector(gomock.Any(), namespaces.Namespace{Name: "test-namespace", Type: namespaces.TypeEphemeral}).Return(nil, expectedErr)
 
 	manager := &Manager{
 		registry:        namespaces.MustNewRegistry(cfg),
@@ -245,7 +245,7 @@ func TestHandleNamespaceAlreadyExists(t *testing.T) {
 
 	manager.namespaces["test-namespace"] = &namespaceHandler{}
 
-	err := manager.handleNamespace(config.Namespace{Name: "test-namespace", Type: config.NamespaceTypeEphemeral})
+	err := manager.handleNamespace(namespaces.Namespace{Name: "test-namespace", Type: namespaces.TypeEphemeral})
 	assert.ErrorContains(t, err, "namespace test-namespace already running")
 }
 

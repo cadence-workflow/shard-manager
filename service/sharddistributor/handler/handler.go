@@ -119,7 +119,7 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 		}
 	}
 	if errors.Is(err, store.ErrShardNotFound) {
-		if ns.Type == config.NamespaceTypeEphemeral {
+		if ns.IsEphemeral() {
 			return h.assigner.GetOrAssign(ctx, request)
 		}
 
@@ -286,7 +286,7 @@ func (h *handlerImpl) ListNamespaces(_ context.Context, _ *types.ListNamespacesR
 	for _, ns := range configured {
 		result = append(result, &types.NamespaceConfig{
 			Name:     ns.Name,
-			Type:     ns.Type,
+			Type:     ns.Type.String(),
 			Mode:     "onboarded",
 			ShardNum: ns.ShardNum,
 		})

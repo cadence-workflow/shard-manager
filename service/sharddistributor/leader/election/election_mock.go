@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	config "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	namespaces "github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 )
 
 // MockElector is a mock of Elector interface.
@@ -81,7 +81,7 @@ func (m *MockFactory) EXPECT() *MockFactoryMockRecorder {
 }
 
 // CreateElector mocks base method.
-func (m *MockFactory) CreateElector(ctx context.Context, namespaceCfg config.Namespace) (Elector, error) {
+func (m *MockFactory) CreateElector(ctx context.Context, namespaceCfg namespaces.Namespace) (Elector, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateElector", ctx, namespaceCfg)
 	ret0, _ := ret[0].(Elector)

@@ -13,7 +13,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/election"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 )
@@ -45,7 +44,7 @@ type namespaceHandler struct {
 	logger          log.Logger
 	leaderScope     metrics.Scope
 	electionFactory election.Factory
-	namespaceCfg    config.Namespace
+	namespaceCfg    namespaces.Namespace
 	drainObserver   clientcommon.DrainSignalObserver
 	cleanupWg       sync.WaitGroup
 }
@@ -114,7 +113,7 @@ func (m *Manager) Stop() error {
 }
 
 // handleNamespace sets up a namespace handler and starts its election goroutine.
-func (m *Manager) handleNamespace(namespaceCfg config.Namespace) error {
+func (m *Manager) handleNamespace(namespaceCfg namespaces.Namespace) error {
 	if _, exists := m.namespaces[namespaceCfg.Name]; exists {
 		return fmt.Errorf("namespace %s already running", namespaceCfg.Name)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/process"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -37,7 +38,7 @@ type Elector interface {
 
 // Factory creates elector instances
 type Factory interface {
-	CreateElector(ctx context.Context, namespaceCfg config.Namespace) (Elector, error)
+	CreateElector(ctx context.Context, namespaceCfg namespaces.Namespace) (Elector, error)
 }
 
 type electionFactory struct {
@@ -53,7 +54,7 @@ type electionFactory struct {
 
 type elector struct {
 	hostname       string
-	namespace      config.Namespace
+	namespace      namespaces.Namespace
 	leaderStore    store.Elector
 	store          store.Store
 	logger         log.Logger
@@ -89,7 +90,7 @@ func NewElectionFactory(p FactoryParams) Factory {
 }
 
 // CreateElector creates a new elector for the given namespace
-func (f *electionFactory) CreateElector(ctx context.Context, namespaceCfg config.Namespace) (Elector, error) {
+func (f *electionFactory) CreateElector(ctx context.Context, namespaceCfg namespaces.Namespace) (Elector, error) {
 	return &elector{
 		namespace:      namespaceCfg,
 		leaderStore:    f.leaderStore,

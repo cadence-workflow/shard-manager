@@ -88,7 +88,7 @@ func New(timeSource clock.TimeSource, namespaceRegistry *namespaces.Registry, cf
 
 	var ephemeralNamespaces []string
 	for _, ns := range namespaceRegistry.List() {
-		if ns.Type == config.NamespaceTypeEphemeral {
+		if ns.IsEphemeral() {
 			ephemeralNamespaces = append(ephemeralNamespaces, ns.Name)
 		}
 	}

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/cadence-workflow/shard-manager/common/hash"
 )
 
 // RangeIndex is an immutable, sorted index of range assignments, ordered by
@@ -31,7 +33,7 @@ func NewRangeIndex(ranges []*RangeAssignment) (*RangeIndex, error) {
 
 	sorted := slices.Clone(ranges)
 	slices.SortFunc(sorted, compareRangeAssignments)
-	if err := validateSortedCover(sorted); err != nil {
+	if err := ValidateCover(sorted); err != nil {
 		return nil, err
 	}
 	return &RangeIndex{ranges: sorted}, nil
@@ -84,17 +86,19 @@ func (i *RangeIndex) Ranges() []*RangeAssignment {
 	return slices.Clone(i.ranges)
 }
 
-// validateSortedCover checks that sorted ranges form a complete cover. It
-// assumes the input is already sorted by lower bound and contains no nils.
-func validateSortedCover(sorted []*RangeAssignment) error {
+// ValidateCover checks that sorted ranges form a complete cover. It assumes the
+// input is already sorted by lower bound and contains no nils.
+func ValidateCover(sorted []*RangeAssignment) error {
 	if len(sorted) == 0 {
 		return errors.New("range cover must not be empty")
 	}
 
-	// The first range must start at the beginning of the key space. The minimum
-	// bound is the empty byte string, which sorts before every fingerprint.
-	if len(sorted[0].Range.LowInclusive) != 0 {
-		return fmt.Errorf("first range must start at the minimum bound, got %v", sorted[0].Range)
+	// The first range must start at the minimum bound: exactly
+	// hash.FingerprintSize zero bytes. The empty byte string is not a valid
+	// minimum, because the storage layer only ever persists 8-byte bounds (see
+	// etcdkeys.ParseRangeKey).
+	if !bytes.Equal(sorted[0].Range.LowInclusive, make([]byte, hash.FingerprintSize)) {
+		return fmt.Errorf("first range must start at the minimum bound of %d zero bytes, got %v", hash.FingerprintSize, sorted[0].Range)
 	}
 
 	// Adjacent ranges must share an exact boundary: the previous high bound is

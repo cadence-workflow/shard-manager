@@ -23,6 +23,12 @@ func mustFinalRange(t *testing.T, low []byte) *types.Range {
 	return r
 }
 
+// b8 builds an 8-byte bound whose first byte is b and the remaining bytes are
+// zero, matching the Fingerprint64 layout used for range bounds.
+func b8(b byte) []byte {
+	return []byte{b, 0, 0, 0, 0, 0, 0, 0}
+}
+
 // assignment builds a READY RangeAssignment for the given range and executor.
 func assignment(t *testing.T, r *types.Range, executorID string) *RangeAssignment {
 	t.Helper()
@@ -30,14 +36,15 @@ func assignment(t *testing.T, r *types.Range, executorID string) *RangeAssignmen
 	return &RangeAssignment{Range: r, ExecutorID: executorID, Status: types.AssignmentStatusREADY}
 }
 
-// validCover builds a three-range cover of [empty, 0x40), [0x40, 0x80) and
-// [0x80, infinity), each with a distinct executor.
+// validCover builds a three-range cover of [min, 0x40…), [0x40…, 0x80…) and
+// [0x80…, infinity), each with a distinct executor. All bounds are 8 bytes, so
+// the first low bound is the 8-zero-byte minimum.
 func validCover(t *testing.T) []*RangeAssignment {
 	t.Helper()
 	return []*RangeAssignment{
-		assignment(t, mustRange(t, []byte{}, []byte{0x40}), "exec-1"),
-		assignment(t, mustRange(t, []byte{0x40}, []byte{0x80}), "exec-2"),
-		assignment(t, mustFinalRange(t, []byte{0x80}), "exec-3"),
+		assignment(t, mustRange(t, b8(0x00), b8(0x40)), "exec-1"),
+		assignment(t, mustRange(t, b8(0x40), b8(0x80)), "exec-2"),
+		assignment(t, mustFinalRange(t, b8(0x80)), "exec-3"),
 	}
 }
 
@@ -94,36 +101,45 @@ func TestNewRangeIndex(t *testing.T) {
 		{
 			name: "gap between ranges",
 			ranges: []*RangeAssignment{
-				assignment(t, mustRange(t, []byte{}, []byte{0x40}), "exec-1"),
-				assignment(t, mustRange(t, []byte{0x60}, []byte{0x80}), "exec-2"),
-				assignment(t, mustFinalRange(t, []byte{0x80}), "exec-3"),
+				assignment(t, mustRange(t, b8(0x00), b8(0x40)), "exec-1"),
+				assignment(t, mustRange(t, b8(0x60), b8(0x80)), "exec-2"),
+				assignment(t, mustFinalRange(t, b8(0x80)), "exec-3"),
 			},
 			wantErr: "not adjacent",
 		},
 		{
 			name: "overlap between ranges",
 			ranges: []*RangeAssignment{
-				assignment(t, mustRange(t, []byte{}, []byte{0x40}), "exec-1"),
-				assignment(t, mustRange(t, []byte{0x20}, []byte{0x80}), "exec-2"),
-				assignment(t, mustFinalRange(t, []byte{0x80}), "exec-3"),
+				assignment(t, mustRange(t, b8(0x00), b8(0x40)), "exec-1"),
+				assignment(t, mustRange(t, b8(0x20), b8(0x80)), "exec-2"),
+				assignment(t, mustFinalRange(t, b8(0x80)), "exec-3"),
 			},
 			wantErr: "not adjacent",
 		},
 		{
+			name: "first range has empty low bound",
+			ranges: []*RangeAssignment{
+				assignment(t, mustRange(t, []byte{}, b8(0x40)), "exec-1"),
+				assignment(t, mustRange(t, b8(0x40), b8(0x80)), "exec-2"),
+				assignment(t, mustFinalRange(t, b8(0x80)), "exec-3"),
+			},
+			wantErr: "minimum bound",
+		},
+		{
 			name: "first range does not start at minimum",
 			ranges: []*RangeAssignment{
-				assignment(t, mustRange(t, []byte{0x10}, []byte{0x40}), "exec-1"),
-				assignment(t, mustRange(t, []byte{0x40}, []byte{0x80}), "exec-2"),
-				assignment(t, mustFinalRange(t, []byte{0x80}), "exec-3"),
+				assignment(t, mustRange(t, b8(0x10), b8(0x40)), "exec-1"),
+				assignment(t, mustRange(t, b8(0x40), b8(0x80)), "exec-2"),
+				assignment(t, mustFinalRange(t, b8(0x80)), "exec-3"),
 			},
 			wantErr: "minimum bound",
 		},
 		{
 			name: "last range is not final",
 			ranges: []*RangeAssignment{
-				assignment(t, mustRange(t, []byte{}, []byte{0x40}), "exec-1"),
-				assignment(t, mustRange(t, []byte{0x40}, []byte{0x80}), "exec-2"),
-				assignment(t, mustRange(t, []byte{0x80}, []byte{0xc0}), "exec-3"),
+				assignment(t, mustRange(t, b8(0x00), b8(0x40)), "exec-1"),
+				assignment(t, mustRange(t, b8(0x40), b8(0x80)), "exec-2"),
+				assignment(t, mustRange(t, b8(0x80), b8(0xc0)), "exec-3"),
 			},
 			wantErr: "end of the key space",
 		},
@@ -179,28 +195,33 @@ func TestNewRangeIndex_DoesNotMutateInput(t *testing.T) {
 func TestRangeIndex_GetRangeForKey(t *testing.T) {
 	idx := mustIndex(t, validCover(t))
 
-	// A valid cover contains every key, so each case is found. The
-	// empty slice is the minimum key and belongs to the first range.
 	tests := []struct {
 		name      string
 		key       []byte
 		wantOwner string
+		wantFound bool
 	}{
-		{name: "empty key is the minimum", key: []byte{}, wantOwner: "exec-1"},
-		{name: "first range", key: []byte{0x00}, wantOwner: "exec-1"},
-		{name: "first range upper interior", key: []byte{0x3f}, wantOwner: "exec-1"},
-		{name: "middle range at lower bound", key: []byte{0x40}, wantOwner: "exec-2"},
-		{name: "middle range interior", key: []byte{0x60}, wantOwner: "exec-2"},
-		{name: "final range at lower bound", key: []byte{0x80}, wantOwner: "exec-3"},
-		{name: "final range upper interior", key: []byte{0xff}, wantOwner: "exec-3"},
+		// The cover starts at the 8-zero-byte minimum, so the empty slice is
+		// below it and is not found.
+		{name: "empty key below the minimum", key: []byte{}, wantFound: false},
+		{name: "minimum bound", key: b8(0x00), wantOwner: "exec-1", wantFound: true},
+		{name: "first range upper interior", key: b8(0x3f), wantOwner: "exec-1", wantFound: true},
+		{name: "middle range at lower bound", key: b8(0x40), wantOwner: "exec-2", wantFound: true},
+		{name: "middle range interior", key: b8(0x60), wantOwner: "exec-2", wantFound: true},
+		{name: "final range at lower bound", key: b8(0x80), wantOwner: "exec-3", wantFound: true},
+		{name: "final range upper interior", key: b8(0xff), wantOwner: "exec-3", wantFound: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, found := idx.GetRangeForKey(tt.key)
-			require.True(t, found)
-			require.NotNil(t, got)
-			assert.Equal(t, tt.wantOwner, got.ExecutorID)
+			assert.Equal(t, tt.wantFound, found)
+			if tt.wantFound {
+				require.NotNil(t, got)
+				assert.Equal(t, tt.wantOwner, got.ExecutorID)
+			} else {
+				assert.Nil(t, got)
+			}
 		})
 	}
 }

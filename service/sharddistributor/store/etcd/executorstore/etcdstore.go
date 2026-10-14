@@ -923,12 +923,15 @@ func (s *executorStoreImpl) RecordShardStatisticsBatch(ctx context.Context, name
 	return multiError
 }
 
-// --- RangeStore Implementation ---
+// --- Range Implementation ---
 
 // PutRange stores a single range assignment at the key derived from its lower bound.
 func (s *executorStoreImpl) PutRange(ctx context.Context, namespace string, assignment *store.RangeAssignment) error {
 	if assignment == nil || assignment.Range == nil {
 		return fmt.Errorf("put range: assignment and its Range must not be nil")
+	}
+	if err := store.ValidateRangeBounds(assignment.Range); err != nil {
+		return fmt.Errorf("put range: %w", err)
 	}
 
 	value, err := json.Marshal(etcdtypes.FromRangeAssignment(assignment))
@@ -945,6 +948,10 @@ func (s *executorStoreImpl) PutRange(ctx context.Context, namespace string, assi
 
 // GetRange retrieves the range whose lower bound is lowInclusive.
 func (s *executorStoreImpl) GetRange(ctx context.Context, namespace string, lowInclusive []byte) (*store.RangeAssignment, error) {
+	if err := store.ValidateLowBound(lowInclusive); err != nil {
+		return nil, fmt.Errorf("get range: %w", err)
+	}
+
 	resp, err := s.client.Get(ctx, etcdkeys.BuildRangeKey(s.prefix, namespace, lowInclusive))
 	if err != nil {
 		return nil, fmt.Errorf("get range: %w", err)
@@ -957,11 +964,20 @@ func (s *executorStoreImpl) GetRange(ctx context.Context, namespace string, lowI
 	if err := json.Unmarshal(resp.Kvs[0].Value, &stored); err != nil {
 		return nil, fmt.Errorf("unmarshal range assignment: %w", err)
 	}
-	return stored.ToRangeAssignment(lowInclusive)
+
+	assignment, err := stored.ToRangeAssignment(lowInclusive)
+	if err != nil {
+		return nil, fmt.Errorf("decode range assignment: %w", err)
+	}
+	assignment.ModRevision = resp.Kvs[0].ModRevision
+	return assignment, nil
 }
 
 // DeleteRange removes the range whose lower bound is lowInclusive.
 func (s *executorStoreImpl) DeleteRange(ctx context.Context, namespace string, lowInclusive []byte) error {
+	if err := store.ValidateLowBound(lowInclusive); err != nil {
+		return fmt.Errorf("delete range: %w", err)
+	}
 	if _, err := s.client.Delete(ctx, etcdkeys.BuildRangeKey(s.prefix, namespace, lowInclusive)); err != nil {
 		return fmt.Errorf("delete range: %w", err)
 	}
@@ -993,11 +1009,13 @@ func (s *executorStoreImpl) ListRanges(ctx context.Context, namespace string) ([
 		if err != nil {
 			return nil, fmt.Errorf("decode range assignment for key %q: %w", string(kv.Key), err)
 		}
+		assignment.ModRevision = kv.ModRevision
 		assignments = append(assignments, assignment)
 	}
 	return assignments, nil
 }
 
-func (s *executorStoreImpl) AssignRanges(ctx context.Context, namespace string, assignments []*store.RangeAssignment) error {
-	panic("not implemented: needed for Phase 2 split/merge")
+func (s *executorStoreImpl) AssignRanges(ctx context.Context, namespace string, request store.AssignRangesRequest, guard store.GuardFunc) error {
+	// TODO
+	panic("not implemented")
 }

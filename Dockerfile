@@ -31,16 +31,13 @@ RUN make .just-build
 RUN CGO_ENABLED=0 make shard-manager-server shard-manager-canary
 
 # Runtime base: the alpine release the builder's golang image is built on.
-FROM alpine:3.21 AS alpine-nonroot
+FROM alpine:3.21 AS alpine
 
 RUN apk add --update --no-cache ca-certificates
 
-RUN addgroup -g 1000 shard-manager && \
-    adduser -u 1000 -G shard-manager -s /bin/sh -D shard-manager
-
 
 # Shard Manager Server
-FROM alpine-nonroot AS shard-manager-server
+FROM alpine AS shard-manager-server
 
 # WORKDIR plus the default --root/--config/--env flags resolve to these two files.
 COPY config/base.yaml /etc/shard-manager/config/base.yaml
@@ -57,20 +54,18 @@ ENV BIND_ON_LOCALHOST=false \
 # grpc, pprof
 EXPOSE 7943 7942
 
-USER shard-manager
 ENTRYPOINT ["/usr/local/bin/shard-manager-server"]
 # shard-distributor is not in ListWithRing, so the --services default is empty.
 CMD ["start", "--services", "shard-distributor"]
 
 
 # Shard Manager Canary: flag-driven, so it needs no config files.
-FROM alpine-nonroot AS shard-manager-canary
+FROM alpine AS shard-manager-canary
 
 COPY --from=builder /shard-manager/shard-manager-canary /usr/local/bin/shard-manager-canary
 
 # No EXPOSE: the ping listener binds 127.0.0.1 and advertises that same address.
 
-USER shard-manager
 ENTRYPOINT ["/usr/local/bin/shard-manager-canary"]
 # buildCLI has no app-level Action, so without a subcommand this prints help and exits.
 CMD ["start"]

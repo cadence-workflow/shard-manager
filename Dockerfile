@@ -30,7 +30,6 @@ ENV SHARD_MANAGER_RELEASE_VERSION=$RELEASE_VERSION
 RUN make .just-build
 RUN CGO_ENABLED=0 make shard-manager-server shard-manager-canary
 
-# Runtime base: the alpine release the builder's golang image is built on.
 FROM alpine:3.21 AS alpine
 
 RUN apk add --update --no-cache ca-certificates

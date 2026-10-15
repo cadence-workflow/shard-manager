@@ -30,13 +30,22 @@ ENV SHARD_MANAGER_RELEASE_VERSION=$RELEASE_VERSION
 RUN make .just-build
 RUN CGO_ENABLED=0 make shard-manager-server shard-manager-canary
 
+# Runtime base
+#
+# The same alpine release the builder's golang image is built on, so the repo
+# tracks one distro version rather than two. The binaries are static
+# (CGO_ENABLED=0 above), so only certs and zoneinfo are needed on top.
+FROM alpine:3.21 AS alpine-nonroot
+
+RUN apk add --update --no-cache ca-certificates tzdata
+
+# Non-root user, shared by both runtime stages.
+RUN addgroup -g 1000 shard-manager && \
+    adduser -u 1000 -G shard-manager -s /bin/sh -D shard-manager
+
 
 # Shard Manager Server
-#
-# The binaries are static (CGO_ENABLED=0 above), so the runtime images carry no
-# distro: distroless/static supplies only ca-certificates, tzdata and a nonroot
-# user. There is no shell, so ENTRYPOINT/CMD must stay in exec form.
-FROM gcr.io/distroless/static-debian12:nonroot AS shard-manager-server
+FROM alpine-nonroot AS shard-manager-server
 
 # The server resolves config as <root>/<config>/{base,<env>}.yaml, which WORKDIR
 # and the default --root/--config/--env flags make
@@ -56,7 +65,7 @@ ENV BIND_ON_LOCALHOST=false \
 # grpc, pprof
 EXPOSE 7943 7942
 
-USER nonroot
+USER shard-manager
 ENTRYPOINT ["/usr/local/bin/shard-manager-server"]
 # shard-distributor is the only service in this repo, and it is not in
 # ListWithRing, so the --services default is empty and must be given here.
@@ -66,7 +75,7 @@ CMD ["start", "--services", "shard-distributor"]
 # Shard Manager Canary
 #
 # Entirely flag-driven, so it needs no config files.
-FROM gcr.io/distroless/static-debian12:nonroot AS shard-manager-canary
+FROM alpine-nonroot AS shard-manager-canary
 
 COPY --from=builder /shard-manager/shard-manager-canary /usr/local/bin/shard-manager-canary
 
@@ -74,7 +83,7 @@ COPY --from=builder /shard-manager/shard-manager-canary /usr/local/bin/shard-man
 # same address to the shard distributor, so the port is not reachable from
 # outside the container and publishing it would not help.
 
-USER nonroot
+USER shard-manager
 ENTRYPOINT ["/usr/local/bin/shard-manager-canary"]
 # buildCLI defines only a start subcommand and no app-level Action, so without
 # this the container would print help and exit.

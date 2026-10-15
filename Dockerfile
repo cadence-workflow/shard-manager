@@ -48,7 +48,7 @@ WORKDIR /etc/shard-manager
 # The three values a container differs on from development.yaml's loopback defaults.
 ENV BIND_ON_LOCALHOST=false \
     DYNAMIC_CONFIG_CLIENT=nop \
-    ETCD_ENDPOINTS='["etcd:2379"]'
+    ETCD_ENDPOINTS=etcd:2379
 
 # grpc, pprof
 EXPOSE 7943 7942

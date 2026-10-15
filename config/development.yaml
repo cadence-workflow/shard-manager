@@ -34,12 +34,14 @@ shardDistribution:
       type: ephemeral
   leaderStore:
     storageParams:
-      endpoints: ${ETCD_ENDPOINTS:["localhost:2379"]}
+      endpoints:
+        - ${ETCD_ENDPOINTS:"localhost:2379"}
       dialTimeout: 1s
       prefix: "leader"
   store:
     storageParams:
-      endpoints: ${ETCD_ENDPOINTS:["localhost:2379"]}
+      endpoints:
+        - ${ETCD_ENDPOINTS:"localhost:2379"}
       dialTimeout: 1s
       prefix: "store"
   process:

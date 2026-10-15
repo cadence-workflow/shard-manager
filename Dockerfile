@@ -30,16 +30,11 @@ ENV SHARD_MANAGER_RELEASE_VERSION=$RELEASE_VERSION
 RUN make .just-build
 RUN CGO_ENABLED=0 make shard-manager-server shard-manager-canary
 
-# Runtime base
-#
-# The same alpine release the builder's golang image is built on, so the repo
-# tracks one distro version rather than two. The binaries are static
-# (CGO_ENABLED=0 above), so only certs and zoneinfo are needed on top.
+# Runtime base: the alpine release the builder's golang image is built on.
 FROM alpine:3.21 AS alpine-nonroot
 
-RUN apk add --update --no-cache ca-certificates tzdata
+RUN apk add --update --no-cache ca-certificates
 
-# Non-root user, shared by both runtime stages.
 RUN addgroup -g 1000 shard-manager && \
     adduser -u 1000 -G shard-manager -s /bin/sh -D shard-manager
 
@@ -47,17 +42,14 @@ RUN addgroup -g 1000 shard-manager && \
 # Shard Manager Server
 FROM alpine-nonroot AS shard-manager-server
 
-# The server resolves config as <root>/<config>/{base,<env>}.yaml, which WORKDIR
-# and the default --root/--config/--env flags make
-# /etc/shard-manager/config/{base,development}.yaml.
+# WORKDIR plus the default --root/--config/--env flags resolve to these two files.
 COPY config/base.yaml /etc/shard-manager/config/base.yaml
 COPY config/development.yaml /etc/shard-manager/config/development.yaml
 COPY --from=builder /shard-manager/shard-manager-server /usr/local/bin/shard-manager-server
 
 WORKDIR /etc/shard-manager
 
-# development.yaml defaults to a loopback dev setup. These are the three values a
-# container has to differ on; nop keeps the Cadence dynamicconfig file out of the image.
+# The three values a container differs on from development.yaml's loopback defaults.
 ENV BIND_ON_LOCALHOST=false \
     DYNAMIC_CONFIG_CLIENT=nop \
     ETCD_ENDPOINTS='["etcd:2379"]'
@@ -67,26 +59,20 @@ EXPOSE 7943 7942
 
 USER shard-manager
 ENTRYPOINT ["/usr/local/bin/shard-manager-server"]
-# shard-distributor is the only service in this repo, and it is not in
-# ListWithRing, so the --services default is empty and must be given here.
+# shard-distributor is not in ListWithRing, so the --services default is empty.
 CMD ["start", "--services", "shard-distributor"]
 
 
-# Shard Manager Canary
-#
-# Entirely flag-driven, so it needs no config files.
+# Shard Manager Canary: flag-driven, so it needs no config files.
 FROM alpine-nonroot AS shard-manager-canary
 
 COPY --from=builder /shard-manager/shard-manager-canary /usr/local/bin/shard-manager-canary
 
-# No EXPOSE: the canary binds its ping listener on 127.0.0.1 and advertises that
-# same address to the shard distributor, so the port is not reachable from
-# outside the container and publishing it would not help.
+# No EXPOSE: the ping listener binds 127.0.0.1 and advertises that same address.
 
 USER shard-manager
 ENTRYPOINT ["/usr/local/bin/shard-manager-canary"]
-# buildCLI defines only a start subcommand and no app-level Action, so without
-# this the container would print help and exit.
+# buildCLI has no app-level Action, so without a subcommand this prints help and exits.
 CMD ["start"]
 
 

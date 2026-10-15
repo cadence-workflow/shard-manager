@@ -3,7 +3,7 @@ ARG TARGET=server
 # Can be used in case a proxy is necessary
 ARG GOPROXY
 
-# Build Shard Manager Server binaries
+# Build Shard Manager binaries
 FROM golang:1.23.4-alpine3.21 AS builder
 
 ARG RELEASE_VERSION
@@ -31,56 +31,45 @@ RUN make .just-build
 RUN CGO_ENABLED=0 make shard-manager-server shard-manager-canary
 
 
-# Download dockerize
-FROM alpine:3.18 AS dockerize
-
-# appears to require `docker buildx` or an explicit `--platform` at build time
-ARG TARGETARCH
-
-RUN apk add --no-cache openssl
-
-ENV DOCKERIZE_VERSION=v0.9.3
-RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-$TARGETARCH-$DOCKERIZE_VERSION.tar.gz \
-    && tar -C /usr/local/bin -xzvf dockerize-linux-$TARGETARCH-$DOCKERIZE_VERSION.tar.gz \
-    && rm dockerize-linux-$TARGETARCH-$DOCKERIZE_VERSION.tar.gz \
-    && echo "**** fix for host id mapping error ****" \
-    && chown root:root /usr/local/bin/dockerize
-
-
-# Alpine base image
-FROM alpine:3.18 AS alpine
-
-RUN apk add --update --no-cache ca-certificates tzdata bash curl
-
-# set up nsswitch.conf for Go's "netgo" implementation
-# https://github.com/gliderlabs/docker-alpine/issues/367#issuecomment-424546457
-RUN [ -e /etc/nsswitch.conf ] && grep '^hosts: files dns' /etc/nsswitch.conf
-
-SHELL ["/bin/bash", "-c"]
-
-
 # Shard Manager Server
-FROM alpine AS shard-manager-server
+#
+# The binaries are static (CGO_ENABLED=0 above), so the runtime images carry no
+# distro: distroless/static supplies only ca-certificates, tzdata and a nonroot
+# user. There is no shell, so ENTRYPOINT/CMD must stay in exec form.
+FROM gcr.io/distroless/static-debian12:nonroot AS shard-manager-server
 
-ENV SHARD_MANAGER_HOME=/etc/shard-manager
-RUN mkdir -p /etc/shard-manager
-
-COPY --from=dockerize /usr/local/bin/dockerize /usr/local/bin
-COPY --from=builder /shard-manager/shard-manager-server /usr/local/bin
-
-COPY docker/entrypoint.sh /docker-entrypoint.sh
-COPY config/dynamicconfig /etc/shard-manager/config/dynamicconfig
-COPY config/credentials /etc/shard-manager/config/credentials
-COPY docker/config_template.yaml /etc/shard-manager/config
-COPY docker/start-shard-manager.sh /start-shard-manager.sh
+# The server resolves config as <root>/<config>/{base,$CADENCE_ENVIRONMENT}.yaml,
+# which WORKDIR and the default --root/--config flags make /etc/shard-manager/config.
+COPY config/base.yaml /etc/shard-manager/config/base.yaml
+COPY config/docker.yaml /etc/shard-manager/config/docker.yaml
+COPY --from=builder /shard-manager/shard-manager-server /usr/local/bin/shard-manager-server
 
 WORKDIR /etc/shard-manager
+ENV CADENCE_ENVIRONMENT=docker
 
-ENV SERVICES="history,matching,frontend,worker"
+# grpc, pprof
+EXPOSE 7943 7942
 
-EXPOSE 7933 7934 7935 7939
-ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD /start-shard-manager.sh
+USER nonroot
+ENTRYPOINT ["/usr/local/bin/shard-manager-server"]
+# shard-distributor is the only service in this repo, and it is not in
+# ListWithRing, so the --services default is empty and must be given here.
+CMD ["start", "--services", "shard-distributor"]
+
+
+# Shard Manager Canary
+#
+# Entirely flag-driven, so it needs no config files.
+FROM gcr.io/distroless/static-debian12:nonroot AS shard-manager-canary
+
+COPY --from=builder /shard-manager/shard-manager-canary /usr/local/bin/shard-manager-canary
+
+# ping listener
+EXPOSE 7953
+
+USER nonroot
+ENTRYPOINT ["/usr/local/bin/shard-manager-canary"]
+
 
 # Final image
 FROM shard-manager-${TARGET}

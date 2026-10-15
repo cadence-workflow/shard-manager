@@ -1,0 +1,34 @@
+rpc:
+  grpcPort: 7943
+  bindOnLocalHost: false
+
+pprof:
+  port: 7942
+
+clusterGroupMetadata:
+  currentClusterName: "cluster0"
+
+# The image ships no dynamic config file, so the server runs on static config.
+dynamicconfig:
+  client: nop
+
+shardDistribution:
+  election:
+    leaderPeriod: 60s
+    maxRandomDelay: 1s
+    failedElectionCooldown: 1s
+  # Namespaces are deployment-specific; override this file to declare them.
+  namespaces: []
+  leaderStore:
+    storageParams:
+      endpoints: ${ETCD_ENDPOINTS:["etcd:2379"]}
+      dialTimeout: 1s
+      prefix: "leader"
+  store:
+    storageParams:
+      endpoints: ${ETCD_ENDPOINTS:["etcd:2379"]}
+      dialTimeout: 1s
+      prefix: "store"
+  process:
+    period: 1s
+    heartbeatTTL: 2s

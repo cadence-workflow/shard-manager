@@ -1,6 +1,6 @@
 rpc:
   grpcPort: 7943
-  bindOnLocalHost: true
+  bindOnLocalHost: ${BIND_ON_LOCALHOST:true}
 
 metrics:
   statsd:
@@ -14,7 +14,7 @@ clusterGroupMetadata:
   currentClusterName: "cluster0"
 
 dynamicconfig:
-  client: filebased
+  client: ${DYNAMIC_CONFIG_CLIENT:filebased}
   filebased:
     filepath: "config/dynamicconfig/development.yaml"
     pollInterval: "10s"
@@ -34,12 +34,12 @@ shardDistribution:
       type: ephemeral
   leaderStore:
     storageParams:
-      endpoints: [localhost:2379]
+      endpoints: ${ETCD_ENDPOINTS:["localhost:2379"]}
       dialTimeout: 1s
       prefix: "leader"
   store:
     storageParams:
-      endpoints: [localhost:2379]
+      endpoints: ${ETCD_ENDPOINTS:["localhost:2379"]}
       dialTimeout: 1s
       prefix: "store"
   process:

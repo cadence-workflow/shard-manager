@@ -38,14 +38,20 @@ RUN CGO_ENABLED=0 make shard-manager-server shard-manager-canary
 # user. There is no shell, so ENTRYPOINT/CMD must stay in exec form.
 FROM gcr.io/distroless/static-debian12:nonroot AS shard-manager-server
 
-# The server resolves config as <root>/<config>/{base,$CADENCE_ENVIRONMENT}.yaml,
-# which WORKDIR and the default --root/--config flags make /etc/shard-manager/config.
+# The server resolves config as <root>/<config>/{base,<env>}.yaml, which WORKDIR
+# and the default --root/--config/--env flags make
+# /etc/shard-manager/config/{base,development}.yaml.
 COPY config/base.yaml /etc/shard-manager/config/base.yaml
-COPY config/docker.yaml /etc/shard-manager/config/docker.yaml
+COPY config/development.yaml /etc/shard-manager/config/development.yaml
 COPY --from=builder /shard-manager/shard-manager-server /usr/local/bin/shard-manager-server
 
 WORKDIR /etc/shard-manager
-ENV CADENCE_ENVIRONMENT=docker
+
+# development.yaml defaults to a loopback dev setup. These are the three values a
+# container has to differ on; nop keeps the Cadence dynamicconfig file out of the image.
+ENV BIND_ON_LOCALHOST=false \
+    DYNAMIC_CONFIG_CLIENT=nop \
+    ETCD_ENDPOINTS='["etcd:2379"]'
 
 # grpc, pprof
 EXPOSE 7943 7942

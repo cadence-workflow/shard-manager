@@ -1,5 +1,0 @@
-services:
-  cadence-bench:
-    image: ubercadence/cadence-bench:master
-    volumes:
-      - ./config/bench:/etc/cadence-bench/config/bench

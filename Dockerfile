@@ -64,11 +64,15 @@ FROM gcr.io/distroless/static-debian12:nonroot AS shard-manager-canary
 
 COPY --from=builder /shard-manager/shard-manager-canary /usr/local/bin/shard-manager-canary
 
-# ping listener
-EXPOSE 7953
+# No EXPOSE: the canary binds its ping listener on 127.0.0.1 and advertises that
+# same address to the shard distributor, so the port is not reachable from
+# outside the container and publishing it would not help.
 
 USER nonroot
 ENTRYPOINT ["/usr/local/bin/shard-manager-canary"]
+# buildCLI defines only a start subcommand and no app-level Action, so without
+# this the container would print help and exit.
+CMD ["start"]
 
 
 # Final image

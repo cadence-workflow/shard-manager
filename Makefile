@@ -367,7 +367,7 @@ $(BUILD)/code-lint: $(LINT_SRC) $(BIN)/revive $(BIN)/nilaway | $(BUILD)
 	$Q GOTOOLCHAIN=go1.24.0 $(BIN)/nilaway -test=false github.com/cadence-workflow/shard-manager/common/types/mapper/...
 	$Q touch $@
 
-$(BUILD)/goversion-lint: go.work Dockerfile docker/github_actions/Dockerfile${DOCKERFILE_SUFFIX}
+$(BUILD)/goversion-lint: go.work Dockerfile
 	$Q echo "checking go version..."
 	$Q # intentionally using go.work toolchain, as GOTOOLCHAIN is user-overridable
 	$Q ./scripts/check-go-toolchain.sh $(GOWORK_TOOLCHAIN)

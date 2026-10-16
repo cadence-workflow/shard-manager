@@ -42,7 +42,7 @@ import (
 // processFnFromMap returns an ephemeralAssignmentBatchFn that resolves shard keys from a
 // fixed map, returning an empty map (and no error) for any key not present.
 func processFnFromMap(results map[string]*types.GetShardOwnerResponse) ephemeralAssignmentBatchFn {
-	return func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+	return func(_ context.Context, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 		out := make(map[string]*types.GetShardOwnerResponse, len(shardKeys))
 		for _, k := range shardKeys {
 			if v, ok := results[k]; ok {
@@ -84,7 +84,7 @@ func TestShardBatcher_Submit(t *testing.T) {
 		},
 		{
 			name: "batch function returns error - propagated to caller",
-			batchFn: func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+			batchFn: func(_ context.Context, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 				return nil, nil, errors.New("storage unavailable")
 			},
 			namespace:  "ns",
@@ -94,7 +94,7 @@ func TestShardBatcher_Submit(t *testing.T) {
 		},
 		{
 			name: "key absent from batch result returns internal error",
-			batchFn: func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+			batchFn: func(_ context.Context, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 				return map[string]*types.GetShardOwnerResponse{}, nil, nil
 			},
 			namespace:  "ns",
@@ -104,7 +104,7 @@ func TestShardBatcher_Submit(t *testing.T) {
 		},
 		{
 			name: "drained key returns ShardDrainedError",
-			batchFn: func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+			batchFn: func(_ context.Context, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 				return map[string]*types.GetShardOwnerResponse{}, map[string]struct{}{"shard-drained": {}}, nil
 			},
 			namespace:  "ns",
@@ -129,7 +129,7 @@ func TestShardBatcher_Submit(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), tc.batchFn)
+			b := newShardBatcher(tc.namespace, clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), tc.batchFn)
 			b.Start()
 			defer b.Stop()
 
@@ -138,7 +138,7 @@ func TestShardBatcher_Submit(t *testing.T) {
 				ctx = tc.ctxFn()
 			}
 
-			resp, err := b.Submit(ctx, &types.GetShardOwnerRequest{Namespace: tc.namespace, ShardKey: tc.shardKey})
+			resp, err := b.Submit(ctx, tc.shardKey)
 			if tc.wantErr {
 				require.Error(t, err)
 				if tc.wantErrIs != nil {
@@ -215,69 +215,6 @@ func TestToBatchResponse_DrainedVsMissing(t *testing.T) {
 	}
 }
 
-func TestShardBatcher_MultipleNamespacesIsolated(t *testing.T) {
-	defer goleak.VerifyNone(t)
-	tests := []struct {
-		name     string
-		results  map[string]*types.GetShardOwnerResponse
-		requests []struct {
-			namespace string
-			shardKey  string
-			wantOwner string
-		}
-	}{
-		{
-			name: "two namespaces resolved independently",
-			results: map[string]*types.GetShardOwnerResponse{
-				"shard-a": {Owner: "exec-ns1", Namespace: "ns1"},
-				"shard-b": {Owner: "exec-ns2", Namespace: "ns2"},
-			},
-			requests: []struct {
-				namespace string
-				shardKey  string
-				wantOwner string
-			}{
-				{namespace: "ns1", shardKey: "shard-a", wantOwner: "exec-ns1"},
-				{namespace: "ns2", shardKey: "shard-b", wantOwner: "exec-ns2"},
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), processFnFromMap(tc.results))
-			b.Start()
-			defer b.Stop()
-
-			type result struct {
-				owner string
-				err   error
-			}
-			got := make([]result, len(tc.requests))
-			var wg sync.WaitGroup
-			for i, req := range tc.requests {
-				wg.Add(1)
-				go func(i int, namespace, shardKey string) {
-					defer wg.Done()
-					resp, err := b.Submit(context.Background(), &types.GetShardOwnerRequest{Namespace: namespace, ShardKey: shardKey})
-					if err == nil {
-						got[i] = result{owner: resp.Owner}
-					} else {
-						got[i] = result{err: err}
-					}
-				}(i, req.namespace, req.shardKey)
-			}
-
-			wg.Wait()
-
-			for i, req := range tc.requests {
-				require.NoError(t, got[i].err)
-				assert.Equal(t, req.wantOwner, got[i].owner)
-			}
-		})
-	}
-}
-
 func TestShardBatcher_ErrorPropagatedToAllCallers(t *testing.T) {
 	defer goleak.VerifyNone(t)
 	tests := []struct {
@@ -296,12 +233,12 @@ func TestShardBatcher_ErrorPropagatedToAllCallers(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Block the first batch so all callers queue up together.
 			firstCall := make(chan struct{})
-			batchFn := func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+			batchFn := func(_ context.Context, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 				<-firstCall
 				return nil, nil, tc.batchErr
 			}
 
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+			b := newShardBatcher("ns", clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 			b.Start()
 			defer b.Stop()
 
@@ -312,7 +249,7 @@ func TestShardBatcher_ErrorPropagatedToAllCallers(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, errs[0] = b.Submit(context.Background(), &types.GetShardOwnerRequest{Namespace: "ns", ShardKey: "shard"})
+				_, errs[0] = b.Submit(context.Background(), "shard")
 			}()
 
 			// Give the first request time to be picked up and start flushing.
@@ -323,7 +260,7 @@ func TestShardBatcher_ErrorPropagatedToAllCallers(t *testing.T) {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					_, errs[i] = b.Submit(context.Background(), &types.GetShardOwnerRequest{Namespace: "ns", ShardKey: "shard"})
+					_, errs[i] = b.Submit(context.Background(), "shard")
 				}(i)
 			}
 
@@ -345,7 +282,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 
 	t.Run("requests queued during initial window share one batch", func(t *testing.T) {
 		batchCalls := make(chan []string, 1)
-		batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+		batchFn := func(_ context.Context, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 			batchCalls <- shardKeys
 			out := make(map[string]*types.GetShardOwnerResponse, len(shardKeys))
 			for _, key := range shardKeys {
@@ -355,12 +292,11 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 		}
 
 		timeSource := clock.NewMockedTimeSource()
-		b := newShardBatcher(timeSource, time.Second, fixedCoalescingWindow(100*time.Millisecond), batchFn)
+		b := newShardBatcher("ns", timeSource, time.Second, fixedCoalescingWindow(100*time.Millisecond), batchFn)
 		for _, key := range []string{"shard-1", "shard-2"} {
 			b.requestChan <- &batchRequest{
-				namespace: "ns",
-				shardKey:  key,
-				respChan:  make(chan batchResponse, 1),
+				shardKey: key,
+				respChan: make(chan batchResponse, 1),
 			}
 		}
 		b.Start()
@@ -382,7 +318,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 		gate := make(chan struct{})
 		var callCount atomic.Int32
 
-		batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+		batchFn := func(_ context.Context, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 			call := callCount.Add(1)
 			if call == 1 {
 				<-gate
@@ -398,7 +334,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 			return out, nil, nil
 		}
 
-		b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+		b := newShardBatcher("ns", clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 		b.Start()
 		defer b.Stop()
 
@@ -408,7 +344,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			resp, err := b.Submit(context.Background(), &types.GetShardOwnerRequest{Namespace: "ns", ShardKey: "shard-1"})
+			resp, err := b.Submit(context.Background(), "shard-1")
 			require.NoError(t, err)
 			assert.Equal(t, "exec-1", resp.Owner)
 		}()
@@ -421,7 +357,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 			wg.Add(1)
 			go func(k string) {
 				defer wg.Done()
-				resp, err := b.Submit(context.Background(), &types.GetShardOwnerRequest{Namespace: "ns", ShardKey: k})
+				resp, err := b.Submit(context.Background(), k)
 				require.NoError(t, err)
 				assert.Equal(t, "exec-1", resp.Owner)
 			}(key)
@@ -443,7 +379,7 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 
 	t.Run("single request is processed without delay", func(t *testing.T) {
 		processed := make(chan struct{})
-		batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+		batchFn := func(_ context.Context, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 			close(processed)
 			out := make(map[string]*types.GetShardOwnerResponse, len(shardKeys))
 			for _, k := range shardKeys {
@@ -452,12 +388,12 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 			return out, nil, nil
 		}
 
-		b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+		b := newShardBatcher("ns", clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 		b.Start()
 		defer b.Stop()
 
 		go func() {
-			_, _ = b.Submit(context.Background(), &types.GetShardOwnerRequest{Namespace: "ns", ShardKey: "shard-1"})
+			_, _ = b.Submit(context.Background(), "shard-1")
 		}()
 
 		select {
@@ -493,7 +429,7 @@ func TestShardBatcher_ConcurrentRequestsBatchedTogether(t *testing.T) {
 			gate := make(chan struct{})
 			var callCount atomic.Int32
 
-			batchFn := func(_ context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+			batchFn := func(_ context.Context, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 				call := callCount.Add(1)
 				if call == 1 {
 					<-gate
@@ -513,7 +449,7 @@ func TestShardBatcher_ConcurrentRequestsBatchedTogether(t *testing.T) {
 				return out, nil, nil
 			}
 
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+			b := newShardBatcher("ns", clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 			b.Start()
 			defer b.Stop()
 
@@ -523,7 +459,7 @@ func TestShardBatcher_ConcurrentRequestsBatchedTogether(t *testing.T) {
 				go func(i int) {
 					defer wg.Done()
 					key := fmt.Sprintf("shard-%d", i)
-					resp, err := b.Submit(context.Background(), &types.GetShardOwnerRequest{Namespace: "ns", ShardKey: key})
+					resp, err := b.Submit(context.Background(), key)
 					require.NoError(t, err)
 					assert.Equal(t, "exec-1", resp.Owner)
 				}(i)
@@ -557,17 +493,17 @@ func TestShardBatcher_StopDrainsAndCancelsRemainingRequests(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			block := make(chan struct{})
-			batchFn := func(_ context.Context, _ string, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
+			batchFn := func(_ context.Context, _ []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
 				<-block
 				return nil, nil, nil
 			}
 
-			b := newShardBatcher(clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
+			b := newShardBatcher("ns", clock.NewMockedTimeSource(), time.Second, fixedCoalescingWindow(0), batchFn)
 			b.Start()
 
 			errCh := make(chan error, 1)
 			go func() {
-				_, err := b.Submit(context.Background(), &types.GetShardOwnerRequest{Namespace: "ns", ShardKey: "shard-1"})
+				_, err := b.Submit(context.Background(), "shard-1")
 				errCh <- err
 			}()
 

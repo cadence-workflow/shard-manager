@@ -26,7 +26,20 @@ for setup, configuration, tuning, and trade-offs.
 
 ## Getting Started
 
-The distributor needs an etcd cluster. The quickest way to get one locally:
+The quickest way to run the distributor is with Docker Compose, which starts etcd and
+shard-manager (gRPC API on port `7943`):
+
+```
+docker compose up --build
+```
+
+The image also ships `smctl` (see [CLI](#cli)):
+
+```
+docker compose exec shard-manager smctl --address shard-manager:7943 namespace list
+```
+
+To run it from source instead, the distributor needs an etcd cluster:
 
 ```
 docker compose -f docker/github_actions/docker-compose.yml up -d etcd

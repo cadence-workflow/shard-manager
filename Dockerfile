@@ -24,11 +24,11 @@ RUN go mod download
 COPY . .
 RUN rm -fr .bin .build
 
-ENV SHARD_MANAGER_RELEASE_VERSION=$RELEASE_VERSION
+ENV CADENCE_RELEASE_VERSION=$RELEASE_VERSION
 
 # don't do anything fancy, just build.  must be run separately, before building things.
 RUN make .just-build
-RUN CGO_ENABLED=0 make shard-manager-server shard-manager-canary
+RUN CGO_ENABLED=0 make shard-manager-server shard-manager-canary smctl
 
 FROM alpine:3.21 AS alpine
 
@@ -42,6 +42,7 @@ FROM alpine AS shard-manager-server
 COPY config/base.yaml /etc/shard-manager/config/base.yaml
 COPY config/development.yaml /etc/shard-manager/config/development.yaml
 COPY --from=builder /shard-manager/shard-manager-server /usr/local/bin/shard-manager-server
+COPY --from=builder /shard-manager/smctl /usr/local/bin/smctl
 
 WORKDIR /etc/shard-manager
 

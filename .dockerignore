@@ -1,4 +1,6 @@
 .bin/
 .build/
 shard-manager-server
+shard-manager-canary
+smctl
 vendor/

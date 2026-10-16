@@ -220,6 +220,7 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 		clientv3.OpGet(etcdkeys.BuildDrainedHostsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+		clientv3.OpGet(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace)),
 	)
 	start := s.timeSource.Now()
 	txnResp, err := txn.Commit()
@@ -227,8 +228,8 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 	if err != nil {
 		return nil, fmt.Errorf("get namespace state: %w", err)
 	}
-	if len(txnResp.Responses) != 3 {
-		return nil, fmt.Errorf("get namespace state: expected 3 responses, got %d", len(txnResp.Responses))
+	if len(txnResp.Responses) != 4 {
+		return nil, fmt.Errorf("get namespace state: expected 4 responses, got %d", len(txnResp.Responses))
 	}
 
 	parsedData, err := common.ParseExecutorKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
@@ -251,10 +252,11 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 
 	return &store.NamespaceState{
 		AssignmentState: store.AssignmentState{
-			ExecutorMetadata: executorMetadata,
-			ShardAssignments: assignedStates,
-			DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
-			Revision:         txnResp.Header.Revision,
+			ExecutorMetadata:  executorMetadata,
+			ShardAssignments:  assignedStates,
+			DrainedShards:     s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+			Revision:          txnResp.Header.Revision,
+			AssignmentVersion: parseAssignmentVersion(txnResp.Responses[3].GetResponseRange().Kvs),
 		},
 		Executors:    heartbeatStates,
 		ShardStats:   shardStats,
@@ -281,6 +283,7 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 	txn := s.client.Txn(ctx).Then(
 		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+		clientv3.OpGet(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace)),
 	)
 	start := s.timeSource.Now()
 	txnResp, err := txn.Commit()
@@ -288,8 +291,8 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 	if err != nil {
 		return nil, fmt.Errorf("get namespace assignment state: %w", err)
 	}
-	if len(txnResp.Responses) != 2 {
-		return nil, fmt.Errorf("get namespace assignment state: expected 2 responses, got %d", len(txnResp.Responses))
+	if len(txnResp.Responses) != 3 {
+		return nil, fmt.Errorf("get namespace assignment state: expected 3 responses, got %d", len(txnResp.Responses))
 	}
 
 	metadata, assignments, err := common.ParseExecutorAssignmentKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
@@ -298,10 +301,11 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 	}
 
 	return &store.AssignmentState{
-		ExecutorMetadata: metadata,
-		ShardAssignments: assignments,
-		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
-		Revision:         txnResp.Header.Revision,
+		ExecutorMetadata:  metadata,
+		ShardAssignments:  assignments,
+		DrainedShards:     s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+		Revision:          txnResp.Header.Revision,
+		AssignmentVersion: parseAssignmentVersion(txnResp.Responses[2].GetResponseRange().Kvs),
 	}, nil
 }
 
@@ -491,6 +495,13 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 		return nil
 	}
 
+	// Commit only if the assignment version hasn't changed since GetState returned it,
+	// and advance it so that writers who read the old version fail.
+	assignmentVersionKey := etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace)
+	expectedAssignmentVersion := request.NewState.AssignmentVersion
+	comparisons = append(comparisons, clientv3.Compare(clientv3.ModRevision(assignmentVersionKey), "=", expectedAssignmentVersion))
+	ops = append(ops, s.putAssignmentVersionOp(namespace))
+
 	// 3. Apply the guard function to get the base transaction, which may already have an 'If' condition for leadership.
 	nativeTxn := s.client.Txn(ctx)
 	guardedTxn, err := guard(nativeTxn)
@@ -610,16 +621,18 @@ func deletedIDs(responses []*clientv3.TxnResponse, ids []string) ([]string, erro
 
 // DeleteExecutors deletes the given executors from the store. It does not delete the shards owned by the executors, this
 // should be handled by the namespace processor loop as we want to reassign, not delete the shards.
+// It also advances the assignment version, so assignment writes planned before the delete fail.
 func (s *executorStoreImpl) DeleteExecutors(ctx context.Context, namespace string, executorIDs []string, guard store.GuardFunc) error {
 	if len(executorIDs) == 0 {
 		return nil
 	}
-	ops := make([]clientv3.Op, 0, len(executorIDs))
+	ops := make([]clientv3.Op, 0, len(executorIDs)+1) // one delete per executor and the assignment_version put
 
 	for _, executorID := range executorIDs {
 		executorIDPrefix := etcdkeys.BuildExecutorIDPrefix(s.prefix, namespace, executorID)
 		ops = append(ops, clientv3.OpDelete(executorIDPrefix, clientv3.WithPrefix()))
 	}
+	ops = append(ops, s.putAssignmentVersionOp(namespace))
 
 	if _, err := s.commitOps(ctx, ops, guard); err != nil {
 		return fmt.Errorf("delete executors: %w", err)
@@ -709,7 +722,8 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 
 // ResetNamespace deletes every key under <prefix>/<namespace>/ in a single
 // etcd op. This wipes the leader key, executor heartbeats/status/metadata,
-// shard assignments, shard statistics, drained shards, and drained hosts.
+// shard assignments, the assignment version, shard statistics, drained shards,
+// and drained hosts.
 // It is intentionally NOT guarded by leadership: any concurrent leader write
 // will subsequently fail its own leadership-key revision check, which is the
 // desired behaviour.
@@ -918,4 +932,19 @@ func (s *executorStoreImpl) RecordShardStatisticsBatch(ctx context.Context, name
 		}
 	}
 	return multiError
+}
+
+// putAssignmentVersionOp rewrites the assignment version key, which gives it a new
+// mod revision. The value is an empty JSON object, so fields can be added later.
+func (s *executorStoreImpl) putAssignmentVersionOp(namespace string) clientv3.Op {
+	return clientv3.OpPut(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace), "{}")
+}
+
+// parseAssignmentVersion returns the mod revision of the assignment version key, or
+// zero when the key does not exist.
+func parseAssignmentVersion(kvs []*mvccpb.KeyValue) int64 {
+	if len(kvs) == 0 {
+		return 0
+	}
+	return kvs[0].ModRevision
 }

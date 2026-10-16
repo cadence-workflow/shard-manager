@@ -71,6 +71,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 			name:      "HappyPath",
 			shardKeys: []string{"NON-EXISTING-SHARD"},
 			setupMocks: func(mockStore *store.MockStore, mockCache *cache.MockShardCache) {
+				readAssignmentVersion := int64(42)
 				mockStore.EXPECT().GetState(gomock.Any(), _testNamespaceEphemeral).Return(&store.NamespaceState{
 					AssignmentState: store.AssignmentState{
 						ShardAssignments: map[string]store.AssignedState{
@@ -82,6 +83,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 								"shard3": {Status: types.AssignmentStatusREADY},
 							}},
 						},
+						AssignmentVersion: readAssignmentVersion,
 					},
 					Executors: map[string]store.HeartbeatState{
 						"owner1": {Status: types.ExecutorStatusACTIVE},
@@ -89,6 +91,7 @@ func TestAssignEphemeralBatch(t *testing.T) {
 					}}, nil)
 				mockStore.EXPECT().AssignShards(gomock.Any(), _testNamespaceEphemeral, gomock.Any(), gomock.Any()).Do(
 					func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) {
+						require.Equal(t, readAssignmentVersion, request.NewState.AssignmentVersion, "the write must carry the version it was planned from")
 						require.Equal(t, map[string]struct{}{"owner2": {}}, request.ChangedExecutors)
 						require.Len(t, request.NewState.ShardAssignments, 2)
 						require.Len(t, request.NewState.ShardAssignments["owner1"].AssignedShards, 2)

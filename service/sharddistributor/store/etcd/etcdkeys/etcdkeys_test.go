@@ -200,6 +200,11 @@ func TestDrainedHostsPrefixIsDisjointFromSiblingPrefixes(t *testing.T) {
 	}
 }
 
+func TestBuildAssignmentVersionKey(t *testing.T) {
+	got := BuildAssignmentVersionKey("/cadence", "test-ns")
+	assert.Equal(t, "/cadence/test-ns/assignment_version", got)
+}
+
 func TestParseExecutorKey_HostMetadata(t *testing.T) {
 	hostMetadataKey := BuildExecutorKey("/cadence", "test-ns", "exec-1", ExecutorHostMetadataKey)
 	executorID, keyType, err := ParseExecutorKey("/cadence", "test-ns", hostMetadataKey)

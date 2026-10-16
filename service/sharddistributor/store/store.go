@@ -46,6 +46,8 @@ func NopGuard() GuardFunc {
 // AssignShardsRequest is a request to assign shards to executors, and remove unused shards.
 type AssignShardsRequest struct {
 	// NewState is the new state of the namespace, containing the new assignments of shards to executors.
+	// Its AssignmentVersion must be the one it was read with. The write fails with
+	// ErrVersionConflict if another assignment write committed since.
 	NewState *NamespaceState
 	// ExecutorsToDelete maps executor IDs to their expected ModRevision for deletion.
 	// The ModRevision is used to ensure the executor's assigned state hasn't changed since we decided to delete it.
@@ -83,6 +85,9 @@ type Store interface {
 	// or the drained shard set change. Sends are coalesced; unchanged rewrites are ignored.
 	// The channel is closed when the store stops.
 	SubscribeToNamespaceChanges(namespace string) (<-chan struct{}, error)
+
+	// DeleteExecutors deletes every key of the given executors and advances the
+	// assignment version.
 	DeleteExecutors(ctx context.Context, namespace string, executorIDs []string, guard GuardFunc) error
 
 	GetExecutorState(ctx context.Context, namespace string, executorID string) (ExecutorState, error)
@@ -93,10 +98,10 @@ type Store interface {
 
 	// ResetNamespace deletes every key under the namespace prefix in storage,
 	// including the leader key, executor heartbeats/status/metadata, shard
-	// assignments, shard statistics, drained shards, and drained hosts. The
-	// namespace itself stays configured at the service-config level; executors
-	// will re-register on their next heartbeat and the next leader will rebuild
-	// the assignment plan.
+	// assignments, the assignment version, shard statistics, drained shards, and
+	// drained hosts. The namespace itself stays configured at the service-config
+	// level; executors will re-register on their next heartbeat and the next
+	// leader will rebuild the assignment plan.
 	//
 	// This is intentionally NOT guarded by leadership: any in-flight leader
 	// writes will fail their own leadership guard once the leader key is gone,

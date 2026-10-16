@@ -353,10 +353,11 @@ func TestGetState(t *testing.T) {
 	require.Len(t, namespaceState.ShardAssignments, 2, "Should retrieve two assignment states")
 	assert.Contains(t, namespaceState.ShardAssignments[executorID1].AssignedShards, shardID1)
 	assert.Contains(t, namespaceState.ShardAssignments[executorID2].AssignedShards, shardID2)
+	assert.NotZero(t, namespaceState.AssignmentVersion)
 }
 
-// The assignment read covers two etcd ranges, and the drained set comes from the second
-// one, so a test that only checks assignments would not notice it going missing.
+// GetAssignmentState reads assignments, drained shards and the assignment version
+// separately, so the test checks all three.
 func TestGetAssignmentState(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)
@@ -394,6 +395,7 @@ func TestGetAssignmentState(t *testing.T) {
 
 	assert.Contains(t, state.DrainedShards, "shard-2")
 	assert.NotZero(t, state.Revision)
+	assert.NotZero(t, state.AssignmentVersion)
 }
 
 func TestGetStateRecordsETCDRoundTripLatencyOnError(t *testing.T) {
@@ -551,6 +553,111 @@ func TestAssignShards_WithRevisions(t *testing.T) {
 		err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: state}, store.NopGuard())
 		require.NoError(t, err, "Assigning with no changes should succeed")
 	})
+}
+
+// The plan writes only its own executor, so no per-executor compare covers the write made
+// after the read. Whether the plan commits depends on the assignment version alone.
+func TestAssignShards_AssignmentVersion(t *testing.T) {
+	planningExecutorID := "exec-planning"
+	plannedShardID := "planned-shard"
+
+	otherExecutorID := "exec-other"
+	otherShardID := "other-shard"
+	laterAssignedShardID := "later-assigned-shard"
+
+	tests := []struct {
+		name           string
+		writeAfterRead func(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace string)
+		wantConflict   bool
+	}{
+		{
+			name:           "NoWriteAfterRead",
+			writeAfterRead: func(context.Context, *testing.T, *executorStoreImpl, string) {},
+		},
+		{
+			name: "HeartbeatLeavesVersion",
+			writeAfterRead: func(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace string) {
+				err := executorStore.RecordHeartbeat(ctx, namespace, otherExecutorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE})
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "StatisticsLeaveVersion",
+			writeAfterRead: func(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace string) {
+				executorState, err := executorStore.GetExecutorState(ctx, namespace, otherExecutorID)
+				require.NoError(t, err)
+
+				statistics := map[string]store.ShardStatistics{otherShardID: {SmoothedLoad: 1}}
+				err = executorStore.RecordShardStatistics(ctx, namespace, otherExecutorID, executorState.Assignment.ModRevision, statistics)
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "AssignmentToAnotherExecutor",
+			writeAfterRead: func(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace string) {
+				assignShardForTest(ctx, t, executorStore, namespace, laterAssignedShardID, otherExecutorID)
+			},
+			wantConflict: true,
+		},
+		{
+			name: "ExecutorDeletion",
+			writeAfterRead: func(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace string) {
+				err := executorStore.DeleteExecutors(ctx, namespace, []string{otherExecutorID}, store.NopGuard())
+				require.NoError(t, err)
+			},
+			wantConflict: true,
+		},
+		{
+			name: "NamespaceReset",
+			writeAfterRead: func(ctx context.Context, t *testing.T, executorStore *executorStoreImpl, namespace string) {
+				_, err := executorStore.ResetNamespace(ctx, namespace)
+				require.NoError(t, err)
+			},
+			wantConflict: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tc := testhelper.SetupStoreTestCluster(t)
+			executorStore := createStore(t, tc)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			recordHeartbeats(ctx, t, executorStore, tc.Namespace, planningExecutorID, otherExecutorID)
+			assignShardForTest(ctx, t, executorStore, tc.Namespace, otherShardID, otherExecutorID)
+
+			plannedState, err := executorStore.GetState(ctx, tc.Namespace)
+			require.NoError(t, err)
+			require.NotZero(t, plannedState.AssignmentVersion)
+
+			tt.writeAfterRead(ctx, t, executorStore, tc.Namespace)
+
+			plannedState.ShardAssignments = map[string]store.AssignedState{
+				planningExecutorID: {AssignedShards: map[string]*types.ShardAssignment{
+					plannedShardID: {Status: types.AssignmentStatusREADY},
+				}},
+			}
+			err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: plannedState}, store.NopGuard())
+
+			stateAfterWrite, getErr := executorStore.GetState(ctx, tc.Namespace)
+			require.NoError(t, getErr)
+			if tt.wantConflict {
+				require.ErrorIs(t, err, store.ErrVersionConflict)
+				assert.NotContains(t, stateAfterWrite.ShardAssignments, planningExecutorID)
+				return
+			}
+			require.NoError(t, err)
+			assert.Contains(t, stateAfterWrite.ShardAssignments[planningExecutorID].AssignedShards, plannedShardID)
+			assert.Greater(t, stateAfterWrite.AssignmentVersion, plannedState.AssignmentVersion)
+
+			assignmentVersionKey := etcdkeys.BuildAssignmentVersionKey(tc.EtcdPrefix, tc.Namespace)
+			resp, err := tc.Client.Get(ctx, assignmentVersionKey)
+			require.NoError(t, err)
+			require.Equal(t, int64(1), resp.Count, "Assignment version key should exist")
+			assert.JSONEq(t, `{}`, string(resp.Kvs[0].Value))
+		})
+	}
 }
 
 // TestGuardedOperations verifies that AssignShards and DeleteExecutors respect the leader guard.

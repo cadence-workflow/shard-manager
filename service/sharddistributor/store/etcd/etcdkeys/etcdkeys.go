@@ -145,3 +145,10 @@ func ParseDrainedHostKey(prefix, namespace, key string) (string, error) {
 	}
 	return parsed, nil
 }
+
+// BuildAssignmentVersionKey constructs the etcd key whose mod revision is the
+// namespace's assignment version. Every assignment write checks and advances it.
+// Result: <prefix>/<namespace>/assignment_version
+func BuildAssignmentVersionKey(prefix, namespace string) string {
+	return fmt.Sprintf("%sassignment_version", BuildNamespacePrefix(prefix, namespace))
+}

@@ -154,14 +154,17 @@ func TestRebalanceShards_ExecutorRemoved(t *testing.T) {
 			},
 		},
 	}
+	readAssignmentVersion := int64(42)
 	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
 		AssignmentState: store.AssignmentState{
-			ShardAssignments: assignments,
+			ShardAssignments:  assignments,
+			AssignmentVersion: readAssignmentVersion,
 		},
 		Executors: heartbeats}, nil)
 	mocks.election.EXPECT().Guard().Return(store.NopGuard())
 	mocks.store.EXPECT().AssignShards(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) error {
+			assert.Equal(t, readAssignmentVersion, request.NewState.AssignmentVersion, "the write must carry the version it was planned from")
 			assert.Len(t, request.NewState.ShardAssignments["exec-1"].AssignedShards, 2)
 			assert.Len(t, request.NewState.ShardAssignments["exec-2"].AssignedShards, 0)
 			assert.Lenf(t, request.NewState.ShardAssignments["exec-1"].ShardHandoverStats, 2, "both shards move from the draining executor in the snapshot")

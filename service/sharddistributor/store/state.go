@@ -121,6 +121,12 @@ type AssignmentState struct {
 	// Revision is the store revision the snapshot was read at. Readers that cache the
 	// state use it to discard a snapshot older than the one they hold.
 	Revision int64
+
+	// AssignmentVersion is the store revision of the last assignment write in the
+	// namespace. Writers pass it back with the new state, so the write fails if another
+	// assignment write committed after the read. Zero means the assignment version key
+	// doesn't exist yet.
+	AssignmentVersion int64
 }
 
 // DrainedHost is the persisted metadata for a host drain

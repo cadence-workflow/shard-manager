@@ -2,7 +2,7 @@ module github.com/cadence-workflow/shard-manager
 
 go 1.23.0
 
-toolchain go1.23.4
+toolchain go1.26.6
 
 require (
 	github.com/cactus/go-statsd-client/statsd v0.0.0-20191106001114-12b4e2b38748

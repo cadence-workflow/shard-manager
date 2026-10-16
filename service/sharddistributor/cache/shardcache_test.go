@@ -7,12 +7,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
+	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -33,16 +38,12 @@ func TestShardExecutorCacheForwarding(t *testing.T) {
 			"executor-1": {shards: []string{"shard-1"}, metadata: metadata},
 		}), nil)
 
-	cache := NewShardCache(ShardCacheParams{
-		ExecutorStore: executorStore,
-		Lifecycle:     fxtest.NewLifecycle(t),
-		Logger:        testlogger.New(t),
-		TimeSource:    clock.NewRealTimeSource(),
-		MetricsClient: metrics.NewNoopMetricsClient(),
-	}).(*ShardToExecutorCache)
-	defer cache.Stop()
+	lc := fxtest.NewLifecycle(t)
+	cache := newTestShardCache(t, lc, executorStore, namespace).(*ShardToExecutorCache)
+	lc.RequireStart()
+	defer lc.RequireStop()
 
-	// The namespace is created on first use, and read through as the cache is empty
+	// Read through as the cache is empty
 	owner, err := cache.GetShardOwner(context.Background(), namespace, "shard-1")
 	require.NoError(t, err)
 	assert.Equal(t, "executor-1", owner.ExecutorID)
@@ -68,27 +69,34 @@ func TestShardExecutorCacheForwarding(t *testing.T) {
 	unsubscribe()
 }
 
-// A namespace that cannot be started must surface the failure on every entry point
-// rather than serving an empty cache as if the namespace were simply unknown.
-func TestShardCacheNamespaceStartFailure(t *testing.T) {
-	const namespace = "test-namespace"
+// A failed start must stop the namespaces that did start.
+func TestShardCacheStartFailure(t *testing.T) {
+	defer goleak.VerifyNone(t)
 
 	executorStore := store.NewMockStore(gomock.NewController(t))
-	// A failed start is not cached, so every entry point subscribes again.
 	executorStore.EXPECT().
-		SubscribeToNamespaceChanges(namespace).
-		Return(nil, errors.New("subscribe failed")).
-		AnyTimes()
+		SubscribeToNamespaceChanges(gomock.Any()).
+		Return((<-chan struct{})(make(chan struct{})), nil).
+		MaxTimes(1)
+	executorStore.EXPECT().
+		SubscribeToNamespaceChanges(gomock.Any()).
+		Return(nil, errors.New("subscribe failed"))
 
-	cache := NewShardCache(ShardCacheParams{
-		ExecutorStore: executorStore,
-		Lifecycle:     fxtest.NewLifecycle(t),
-		Logger:        testlogger.New(t),
-		TimeSource:    clock.NewRealTimeSource(),
-		MetricsClient: metrics.NewNoopMetricsClient(),
-	}).(*ShardToExecutorCache)
-	defer cache.Stop()
+	lc := fxtest.NewLifecycle(t)
+	newTestShardCache(t, lc, executorStore, "ns-1", "ns-2")
 
+	require.ErrorContains(t, lc.Start(context.Background()), "subscribe failed")
+}
+
+func TestShardCacheUnknownNamespace(t *testing.T) {
+	// No expectations: an unknown namespace must not reach the store.
+	executorStore := store.NewMockStore(gomock.NewController(t))
+	lc := fxtest.NewLifecycle(t)
+	cache := newTestShardCache(t, lc, executorStore).(*ShardToExecutorCache)
+	lc.RequireStart()
+	defer lc.RequireStop()
+
+	const namespace = "unknown"
 	tests := map[string]func() error{
 		"GetShardOwner": func() error {
 			_, err := cache.GetShardOwner(context.Background(), namespace, "shard-1")
@@ -114,7 +122,23 @@ func TestShardCacheNamespaceStartFailure(t *testing.T) {
 
 	for name, call := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.ErrorContains(t, call(), "subscribe failed")
+			var notFound *types.NamespaceNotFoundError
+			require.ErrorAs(t, call(), &notFound)
 		})
 	}
+}
+
+func newTestShardCache(t *testing.T, lc fx.Lifecycle, executorStore store.Store, namespaceNames ...string) ShardCache {
+	cfg := config.ShardDistribution{}
+	for _, name := range namespaceNames {
+		cfg.Namespaces = append(cfg.Namespaces, config.Namespace{Name: name, Type: config.NamespaceTypeEphemeral})
+	}
+	return NewShardCache(ShardCacheParams{
+		Namespaces:    namespaces.MustNewRegistry(cfg),
+		ExecutorStore: executorStore,
+		Lifecycle:     lc,
+		Logger:        testlogger.New(t),
+		TimeSource:    clock.NewRealTimeSource(),
+		MetricsClient: metrics.NewNoopMetricsClient(),
+	})
 }

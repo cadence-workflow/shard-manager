@@ -10,6 +10,8 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
+	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -17,6 +19,7 @@ import (
 type ShardCacheParams struct {
 	fx.In
 
+	Namespaces    *namespaces.Registry
 	ExecutorStore store.Store
 	Lifecycle     fx.Lifecycle
 	Logger        log.Logger
@@ -25,15 +28,14 @@ type ShardCacheParams struct {
 }
 
 type NamespaceToShards map[string]*namespaceShardToExecutor
+
+// ShardToExecutorCache holds one cache per configured namespace.
+// namespaceToShards is populated at construction and never modified afterwards,
+// so it is read without locking.
 type ShardToExecutorCache struct {
-	sync.RWMutex
 	namespaceToShards NamespaceToShards
-	timeSource        clock.TimeSource
-	executorStore     store.Store
 	stopC             chan struct{}
-	logger            log.Logger
 	wg                sync.WaitGroup
-	metricsClient     metrics.Client
 }
 
 // Module provides the shard cache to the fx application.
@@ -44,18 +46,27 @@ var Module = fx.Module("shardcache",
 func NewShardCache(p ShardCacheParams) ShardCache {
 	cache := &ShardToExecutorCache{
 		namespaceToShards: make(NamespaceToShards),
-		timeSource:        p.TimeSource,
-		executorStore:     p.ExecutorStore,
 		stopC:             make(chan struct{}),
-		logger:            p.Logger,
-		wg:                sync.WaitGroup{},
-		metricsClient:     p.MetricsClient,
+	}
+	for _, ns := range p.Namespaces.List() {
+		cache.namespaceToShards[ns.Name] = newNamespaceShardToExecutor(ns.Name, p.ExecutorStore, cache.stopC, p.Logger, p.TimeSource, p.MetricsClient)
 	}
 
-	// Nothing to start: the per-namespace refresh loops begin lazily on first use.
-	p.Lifecycle.Append(fx.StopHook(cache.Stop))
+	p.Lifecycle.Append(fx.StartStopHook(cache.Start, cache.Stop))
 
 	return cache
+}
+
+// Start begins the refresh loop of every namespace. On failure, the loops
+// that were already started are stopped before returning.
+func (s *ShardToExecutorCache) Start() error {
+	for name, namespaceShardToExecutor := range s.namespaceToShards {
+		if err := namespaceShardToExecutor.Start(&s.wg); err != nil {
+			s.Stop()
+			return fmt.Errorf("start shard cache for namespace %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
 func (s *ShardToExecutorCache) Stop() {
@@ -117,26 +128,9 @@ func (s *ShardToExecutorCache) GetShardAssignments(namespace string) (store.Assi
 }
 
 func (s *ShardToExecutorCache) getNamespaceShardToExecutor(namespace string) (*namespaceShardToExecutor, error) {
-	s.RLock()
 	namespaceShardToExecutor, ok := s.namespaceToShards[namespace]
-	s.RUnlock()
-
-	if ok {
-		return namespaceShardToExecutor, nil
+	if !ok {
+		return nil, &types.NamespaceNotFoundError{Namespace: namespace}
 	}
-
-	s.Lock()
-	defer s.Unlock()
-
-	if namespaceShardToExecutor, ok := s.namespaceToShards[namespace]; ok {
-		return namespaceShardToExecutor, nil
-	}
-
-	namespaceShardToExecutor = newNamespaceShardToExecutor(namespace, s.executorStore, s.stopC, s.logger, s.timeSource, s.metricsClient)
-	if err := namespaceShardToExecutor.Start(&s.wg); err != nil {
-		return nil, fmt.Errorf("start namespace shard to executor: %w", err)
-	}
-
-	s.namespaceToShards[namespace] = namespaceShardToExecutor
 	return namespaceShardToExecutor, nil
 }

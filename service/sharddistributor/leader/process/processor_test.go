@@ -24,7 +24,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	metricmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
@@ -85,7 +84,6 @@ func TestRunAndTerminate(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -111,7 +109,6 @@ func TestRunAndTerminate(t *testing.T) {
 
 func TestRebalanceShards_InitialDistribution(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	now := mocks.timeSource.Now()
@@ -138,7 +135,6 @@ func TestRebalanceShards_InitialDistribution(t *testing.T) {
 
 func TestRebalanceShards_ExecutorRemoved(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	now := mocks.timeSource.Now()
@@ -196,7 +192,6 @@ func TestRebalanceShards_ClearsAssignmentOfLiveNonAssignableExecutor(t *testing.
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-			defer mocks.ctrl.Finish()
 			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 			now := mocks.timeSource.Now()
@@ -245,7 +240,6 @@ func TestRebalanceShards_ClearsAssignmentOfLiveNonAssignableExecutor(t *testing.
 
 func TestRebalanceShards_ExecutorStale(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	now := mocks.timeSource.Now()
@@ -289,7 +283,6 @@ func TestRebalanceShards_ExecutorStale(t *testing.T) {
 
 func TestRebalanceShards_NoActiveExecutors(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	now := mocks.timeSource.Now()
@@ -336,7 +329,6 @@ func TestRebalanceShards_EmitsDrainedHostsGauge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-			defer mocks.ctrl.Finish()
 			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 			testScope := tally.NewTestScope("test", nil)
 			processor.metricsClient = metrics.NewClient(testScope, metrics.ShardDistributor, metrics.MigrationConfig{})
@@ -368,7 +360,6 @@ func TestRebalanceShards_EmitsDrainedHostsGauge(t *testing.T) {
 func TestRebalanceShards_NoActiveExecutors_WithStaleExecutors(t *testing.T) {
 	t.Run("one stale executor", func(t *testing.T) {
 		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		defer mocks.ctrl.Finish()
 		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 		now := mocks.timeSource.Now()
@@ -396,7 +387,6 @@ func TestRebalanceShards_NoActiveExecutors_WithStaleExecutors(t *testing.T) {
 
 	t.Run("all stale executor", func(t *testing.T) {
 		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		defer mocks.ctrl.Finish()
 		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 		now := mocks.timeSource.Now()
@@ -425,7 +415,6 @@ func TestRebalanceShards_NoActiveExecutors_WithStaleExecutors(t *testing.T) {
 
 func TestCleanupStaleExecutors(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 	now := mocks.timeSource.Now()
 
@@ -450,7 +439,6 @@ func TestCleanupStaleExecutors(t *testing.T) {
 func TestCleanupStaleShardStats(t *testing.T) {
 	t.Run("stale shard stats are deleted", func(t *testing.T) {
 		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		defer mocks.ctrl.Finish()
 		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 		now := mocks.timeSource.Now().UTC()
@@ -494,7 +482,6 @@ func TestCleanupStaleShardStats(t *testing.T) {
 
 	t.Run("recent shard stats are preserved", func(t *testing.T) {
 		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		defer mocks.ctrl.Finish()
 		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 		now := mocks.timeSource.Now()
@@ -519,7 +506,6 @@ func TestCleanupStaleShardStats(t *testing.T) {
 
 func TestRebalance_StoreErrors(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 	expectedErr := errors.New("store is down")
 
@@ -541,7 +527,6 @@ func TestRebalance_StoreErrors(t *testing.T) {
 
 func TestRunLoop_SubscriptionError(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	expectedErr := errors.New("subscription failed")
@@ -559,7 +544,6 @@ func TestRunLoop_SubscriptionError(t *testing.T) {
 
 func TestRunLoop_ContextCancellation(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -583,7 +567,6 @@ func TestRunLoop_ContextCancellation(t *testing.T) {
 
 func TestRebalanceShards_NoShardsToReassign(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 	testScope := tally.NewTestScope("test", nil)
 	processor.metricsClient = metrics.NewClient(testScope, metrics.ShardDistributor, metrics.MigrationConfig{})
@@ -690,7 +673,6 @@ func TestRebalanceShards_DrainedShardsAreDroppedFromExecutors(t *testing.T) {
 	for _, namespaceType := range []string{config.NamespaceTypeFixed, config.NamespaceTypeEphemeral} {
 		t.Run(namespaceType, func(t *testing.T) {
 			mocks := setupProcessorTest(t, namespaceType)
-			defer mocks.ctrl.Finish()
 
 			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
@@ -727,7 +709,6 @@ func TestRebalanceShards_DrainedShardsAreDroppedFromExecutors(t *testing.T) {
 
 func TestRebalanceShards_AlreadyUnassignedDrainedShardsSkipAssign(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
@@ -751,7 +732,6 @@ func TestRebalanceShards_AlreadyUnassignedDrainedShardsSkipAssign(t *testing.T) 
 
 func TestRebalanceShards_WithUnassignedShards(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	now := mocks.timeSource.Now()
@@ -785,7 +765,6 @@ func TestRebalanceShards_WithUnassignedShards(t *testing.T) {
 
 func TestRebalanceShards_AppliesNaiveLoadBalancingPlan(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeEphemeral)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	now := mocks.timeSource.Now()
@@ -832,7 +811,6 @@ func TestRebalanceShards_AppliesNaiveLoadBalancingPlan(t *testing.T) {
 
 func TestRebalanceShards_AppliesGreedyLoadBalancingPlan(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeEphemeral)
-	defer mocks.ctrl.Finish()
 	initialShardsPerExecutor := 50
 	// With 100 shards total, a 1% move budget permits one shard move.
 	expectedMovedShards := 1
@@ -1139,7 +1117,6 @@ func TestApplyMoves(t *testing.T) {
 
 func TestBuildHandoverStats(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	now := time.Now().UTC()
@@ -1288,7 +1265,6 @@ func TestBuildHandoverStats(t *testing.T) {
 
 func TestBuildHandoverStats_MultipleShards(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	defer mocks.ctrl.Finish()
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	now := time.Now().UTC()
@@ -1479,24 +1455,22 @@ func TestEmitExecutorMetric(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-			defer mocks.ctrl.Finish()
 			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 			namespaceState := &store.NamespaceState{
 				Executors: tt.executors,
 			}
 
-			metricsScope := &metricmocks.Scope{}
+			metricsScope := metrics.NewMockScope(mocks.ctrl)
 
 			for status, count := range tt.expectedCounts {
-				taggedScope := &metricmocks.Scope{}
-				metricsScope.On("Tagged", metrics.ExecutorStatusTag(status.String())).Return(taggedScope).Once()
-				taggedScope.On("UpdateGauge", metrics.ShardDistributorTotalExecutors, float64(count)).Once()
+				taggedScope := metrics.NewMockScope(mocks.ctrl)
+				metricsScope.EXPECT().Tagged(metrics.ExecutorStatusTag(status.String())).Return(taggedScope).Times(1)
+				taggedScope.EXPECT().UpdateGauge(metrics.ShardDistributorTotalExecutors, float64(count)).Times(1)
 			}
 
 			processor.emitExecutorMetric(namespaceState, metricsScope)
 
-			metricsScope.AssertExpectations(t)
 		})
 	}
 }
@@ -1533,7 +1507,6 @@ func TestEmitOldestExecutorHeartbeatLag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-			defer mocks.ctrl.Finish()
 			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 			now := mocks.timeSource.Now()
@@ -1562,15 +1535,14 @@ func TestEmitOldestExecutorHeartbeatLag(t *testing.T) {
 				Executors: tt.executors,
 			}
 
-			metricsScope := &metricmocks.Scope{}
+			metricsScope := metrics.NewMockScope(mocks.ctrl)
 
 			if tt.expectedLag != nil {
-				metricsScope.On("UpdateGauge", metrics.ShardDistributorOldestExecutorHeartbeatLag, *tt.expectedLag).Once()
+				metricsScope.EXPECT().UpdateGauge(metrics.ShardDistributorOldestExecutorHeartbeatLag, *tt.expectedLag).Times(1)
 			}
 
 			processor.emitOldestExecutorHeartbeatLag(namespaceState, metricsScope)
 
-			metricsScope.AssertExpectations(t)
 		})
 	}
 }
@@ -1672,11 +1644,10 @@ func TestEmitMaxOwnersPerShardMetric(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-			defer mocks.ctrl.Finish()
 			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
-			metricsScope := &metricmocks.Scope{}
-			metricsScope.On("UpdateGauge", metrics.ShardDistributorMaxExecutorsPerShard, tt.expectedMaxExecutors).Once()
+			metricsScope := metrics.NewMockScope(mocks.ctrl)
+			metricsScope.EXPECT().UpdateGauge(metrics.ShardDistributorMaxExecutorsPerShard, tt.expectedMaxExecutors).Times(1)
 
 			loggerMock := log.NewMockLogger(mocks.ctrl)
 			processor.logger = loggerMock
@@ -1691,7 +1662,6 @@ func TestEmitMaxOwnersPerShardMetric(t *testing.T) {
 
 			processor.emitMaxOwnersPerShardMetric(tt.shardAssignments, metricsScope)
 
-			metricsScope.AssertExpectations(t)
 		})
 	}
 }
@@ -1699,7 +1669,6 @@ func TestEmitMaxOwnersPerShardMetric(t *testing.T) {
 func TestRunRebalanceTriggeringLoop(t *testing.T) {
 	t.Run("no events from subscribe, trigger from ticker", func(t *testing.T) {
 		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		defer mocks.ctrl.Finish()
 		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -1729,7 +1698,6 @@ func TestRunRebalanceTriggeringLoop(t *testing.T) {
 
 	t.Run("events from subscribe before period, trigger from state change", func(t *testing.T) {
 		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		defer mocks.ctrl.Finish()
 		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -1759,7 +1727,6 @@ func TestRunRebalanceTriggeringLoop(t *testing.T) {
 
 	t.Run("triggerChan full, multiple subscribe events, loop not stuck", func(t *testing.T) {
 		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		defer mocks.ctrl.Finish()
 		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -1804,7 +1771,6 @@ func TestRunRebalanceTriggeringLoop(t *testing.T) {
 
 	t.Run("update channel closed stops loop", func(t *testing.T) {
 		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		defer mocks.ctrl.Finish()
 		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 		ctx := context.Background()

@@ -177,9 +177,6 @@ $(BIN) $(BUILD) $(STABLE_BIN):
 $(BIN)/mockgen: internal/tools/go.mod go.work
 	$(call go_build_tool,go.uber.org/mock/mockgen)
 
-$(BIN)/mockery: internal/tools/go.mod go.work
-	$(call go_build_tool,github.com/vektra/mockery/v2,mockery)
-
 $(BIN)/enumer: internal/tools/go.mod go.work
 	$(call go_build_tool,github.com/dmarkham/enumer)
 
@@ -462,7 +459,7 @@ bins: $(BINS) ## Build all binaries, and any fast codegen needed (does not refre
 
 tools: $(TOOLS)
 
-go-generate: $(BIN)/mockgen $(BIN)/enumer $(BIN)/mockery  $(BIN)/gowrap ## Run `go generate` to regen mocks, enums, etc
+go-generate: $(BIN)/mockgen $(BIN)/enumer $(BIN)/gowrap ## Run `go generate` to regen mocks, enums, etc
 	$Q echo "running go generate $(GO_GENERATE_SCOPE), this takes a minute or more..."
 	$Q # add our bins to PATH so `go generate` can find them
 	$Q $(BIN_PATH) go generate $(if $(verbose),-v) $(GO_GENERATE_SCOPE)

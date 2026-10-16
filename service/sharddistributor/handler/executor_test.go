@@ -15,7 +15,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	metricmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -743,29 +742,25 @@ func TestEmitShardAssignmentMetrics(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
-			metricsClient := &metricmocks.Client{}
-			metricsScope := &metricmocks.Scope{}
+			metricsClient := metrics.NewMockClient(ctrl)
+			metricsScope := metrics.NewMockScope(ctrl)
 
 			if tc.expectedDistributionLatency != nil {
-				metricsClient.On("Scope", metrics.ShardDistributorHeartbeatScope).Return(metricsScope).Once()
-				metricsScope.On("Tagged", metrics.NamespaceTag(namespace)).Return(metricsScope).Once()
-				metricsScope.On("RecordHistogramDuration", metrics.ShardDistributorShardAssignmentDistributionLatency, *tc.expectedDistributionLatency).Once()
+				metricsClient.EXPECT().Scope(metrics.ShardDistributorHeartbeatScope).Return(metricsScope).Times(1)
+				metricsScope.EXPECT().Tagged(metrics.NamespaceTag(namespace)).Return(metricsScope).Times(1)
+				metricsScope.EXPECT().RecordHistogramDuration(metrics.ShardDistributorShardAssignmentDistributionLatency, *tc.expectedDistributionLatency).Times(1)
 			}
 
 			if tc.expectedHandoverLatencies != nil {
 				for _, expected := range tc.expectedHandoverLatencies {
-					metricsScope.On("Tagged", metrics.HandoverTypeTag(expected.HandoverType.String())).Return(metricsScope)
-					metricsScope.On("RecordHistogramDuration", metrics.ShardDistributorShardHandoverLatency, expected.Latency).Once()
+					metricsScope.EXPECT().Tagged(metrics.HandoverTypeTag(expected.HandoverType.String())).Return(metricsScope).AnyTimes()
+					metricsScope.EXPECT().RecordHistogramDuration(metrics.ShardDistributorShardHandoverLatency, expected.Latency).Times(1)
 				}
 			}
 
 			exec := &executor{metricsClient: metricsClient, logger: testlogger.New(t)}
 			exec.emitShardAssignmentMetrics(namespace, heartbeatTime, tc.previousHeartbeat, tc.assignedState)
-
-			metricsClient.AssertExpectations(t)
-			metricsScope.AssertExpectations(t)
 		})
 	}
 }

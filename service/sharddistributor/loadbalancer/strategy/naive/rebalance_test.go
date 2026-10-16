@@ -5,10 +5,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	metricsmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	config "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
@@ -251,9 +251,10 @@ func TestPlanRebalanceEmitsMovedLoad(t *testing.T) {
 	movedShardReportedLoad := 30.0
 	expectedMovedLoad := int64(movedShardReportedLoad)
 
-	metricsScope := &metricsmocks.Scope{}
-	metricsScope.On("AddCounter", metrics.ShardDistributorAssignLoopLoadBasedMoves, int64(expectedMoveCount)).Once()
-	metricsScope.On("AddCounter", metrics.ShardDistributorAssignLoopMovedShardLoad, expectedMovedLoad).Once()
+	ctrl := gomock.NewController(t)
+	metricsScope := metrics.NewMockScope(ctrl)
+	metricsScope.EXPECT().AddCounter(metrics.ShardDistributorAssignLoopLoadBasedMoves, int64(expectedMoveCount)).Times(1)
+	metricsScope.EXPECT().AddCounter(metrics.ShardDistributorAssignLoopMovedShardLoad, expectedMovedLoad).Times(1)
 
 	_, err := PlanRebalance(
 		testNaiveConfig(2),
@@ -265,7 +266,6 @@ func TestPlanRebalanceEmitsMovedLoad(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	metricsScope.AssertExpectations(t)
 }
 
 func cloneAssignments(assignments map[string][]string) map[string][]string {

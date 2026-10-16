@@ -110,7 +110,6 @@ func TestSpectatorPeerChooser_SetSpectators(t *testing.T) {
 
 func TestSpectatorPeerChooser_Choose_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	mockSpectator := NewMockSpectator(ctrl)
 	peerTransport := grpc.NewTransport()
@@ -160,7 +159,6 @@ func TestSpectatorPeerChooser_Choose_Success(t *testing.T) {
 // Routing a drained shard must fail with a code callers do not retry
 func TestSpectatorPeerChooser_Choose_DrainedShardIsNotRetryable(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	mockSpectator := NewMockSpectator(ctrl)
 	chooser := &SpectatorPeerChooser{
@@ -192,7 +190,6 @@ func TestSpectatorPeerChooser_Choose_DrainedShardIsNotRetryable(t *testing.T) {
 
 func TestSpectatorPeerChooser_Choose_ReusesPeer(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	mockSpectator := NewMockSpectator(ctrl)
 	peerTransport := grpc.NewTransport()
@@ -240,7 +237,6 @@ func TestSpectatorPeerChooser_Choose_ReusesPeer(t *testing.T) {
 
 func TestSpectatorPeerChooser_Choose_TracksLastUsed(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	mockSpectator := NewMockSpectator(ctrl)
 	peerTransport := grpc.NewTransport()

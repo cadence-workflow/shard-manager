@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	metricsmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
@@ -470,14 +470,14 @@ func TestLoadBalance_MultiMovePerCycle(t *testing.T) {
 		},
 		ShardStats: shardStats}
 
-	metricsScope := &metricsmocks.Scope{}
-	metricsScope.On("AddCounter", metrics.ShardDistributorAssignLoopLoadBasedMoves, int64(expectedMoveCount)).Once()
-	metricsScope.On("AddCounter", metrics.ShardDistributorAssignLoopMovedShardLoad, expectedMovedLoad).Once()
+	ctrl := gomock.NewController(t)
+	metricsScope := metrics.NewMockScope(ctrl)
+	metricsScope.EXPECT().AddCounter(metrics.ShardDistributorAssignLoopLoadBasedMoves, int64(expectedMoveCount)).Times(1)
+	metricsScope.EXPECT().AddCounter(metrics.ShardDistributorAssignLoopMovedShardLoad, expectedMovedLoad).Times(1)
 
 	moves, err := PlanRebalance(cfg, testNamespace, namespaceState, currentAssignments, now, log.NewNoop(), metricsScope)
 	require.NoError(t, err)
 	require.Len(t, moves, expectedMoveCount)
-	metricsScope.AssertExpectations(t)
 	applyMoves(t, currentAssignments, moves)
 	assert.Equal(t, initialExecAShardCount-expectedBudget, len(currentAssignments[execA]), "ExecA should shed budgeted shards")
 	assert.Equal(t, initialExecBShardCount+expectedBudget, len(currentAssignments[execB]), "ExecB should gain budgeted shards")

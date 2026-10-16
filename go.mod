@@ -74,7 +74,6 @@ require (
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.26.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/uber-go/mapdecode v1.0.0 // indirect
 	go.uber.org/dig v1.18.0 // indirect
 	go.uber.org/goleak v1.2.0

@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/cadence-workflow/shard-manager/common/metrics"
-	metricmocks "github.com/cadence-workflow/shard-manager/common/metrics/mocks"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -15,31 +16,29 @@ const testNamespace = "test-namespace"
 
 func TestEmitAssignmentImbalanceMetrics_NaiveEmitsReportedLoadOnly(t *testing.T) {
 	cfg := loadBalancingModeConfig(config.LoadBalancingModeNAIVE)
-	metricsScope := &metricmocks.Scope{}
+	ctrl := gomock.NewController(t)
+	metricsScope := metrics.NewMockScope(ctrl)
 
-	metricsScope.On("UpdateGauge", metrics.ShardDistributorAssignmentLoadMaxOverMean, 1.5).Once()
-	metricsScope.On("UpdateGauge", metrics.ShardDistributorAssignmentLoadCV, 0.5).Once()
+	metricsScope.EXPECT().UpdateGauge(metrics.ShardDistributorAssignmentLoadMaxOverMean, 1.5).Times(1)
+	metricsScope.EXPECT().UpdateGauge(metrics.ShardDistributorAssignmentLoadCV, 0.5).Times(1)
 
 	EmitAssignmentImbalanceMetrics(cfg, testNamespace, metricsScope, testAssignments(), testNamespaceState(time.Now()))
-
-	metricsScope.AssertExpectations(t)
 }
 
 // Greedy balancing uses persisted smoothed loads, so it emits both imbalance
 // metrics and the ratio of assigned shards missing smoothed-load data.
 func TestEmitAssignmentImbalanceMetrics_GreedyEmitsSmoothedLoadMetrics(t *testing.T) {
 	cfg := loadBalancingModeConfig(config.LoadBalancingModeGREEDY)
-	metricsScope := &metricmocks.Scope{}
+	ctrl := gomock.NewController(t)
+	metricsScope := metrics.NewMockScope(ctrl)
 
-	metricsScope.On("UpdateGauge", metrics.ShardDistributorAssignmentLoadMaxOverMean, 1.5).Once()
-	metricsScope.On("UpdateGauge", metrics.ShardDistributorAssignmentLoadCV, 0.5).Once()
-	metricsScope.On("UpdateGauge", metrics.ShardDistributorAssignmentSmoothedLoadMaxOverMean, 1.5).Once()
-	metricsScope.On("UpdateGauge", metrics.ShardDistributorAssignmentSmoothedLoadCV, 0.5).Once()
-	metricsScope.On("UpdateGauge", metrics.ShardDistributorAssignmentSmoothedLoadMissingRatio, 1.0/3.0).Once()
+	metricsScope.EXPECT().UpdateGauge(metrics.ShardDistributorAssignmentLoadMaxOverMean, 1.5).Times(1)
+	metricsScope.EXPECT().UpdateGauge(metrics.ShardDistributorAssignmentLoadCV, 0.5).Times(1)
+	metricsScope.EXPECT().UpdateGauge(metrics.ShardDistributorAssignmentSmoothedLoadMaxOverMean, 1.5).Times(1)
+	metricsScope.EXPECT().UpdateGauge(metrics.ShardDistributorAssignmentSmoothedLoadCV, 0.5).Times(1)
+	metricsScope.EXPECT().UpdateGauge(metrics.ShardDistributorAssignmentSmoothedLoadMissingRatio, 1.0/3.0).Times(1)
 
 	EmitAssignmentImbalanceMetrics(cfg, testNamespace, metricsScope, testAssignments(), testNamespaceState(time.Now()))
-
-	metricsScope.AssertExpectations(t)
 }
 
 func loadBalancingModeConfig(mode string) *config.Config {

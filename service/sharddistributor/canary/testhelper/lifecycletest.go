@@ -33,21 +33,19 @@ func AssertInjectsLifecycleDelay(t *testing.T, factory LifecyclerFactory) {
 	t.Helper()
 
 	tests := []struct {
-		name          string
-		shardID       string
-		kind          latencykind.Kind
-		wantStartTag  bool
-		wantStopTag   bool
-		startSleepers int
-		stopSleepers  int
+		name         string
+		shardID      string
+		kind         latencykind.Kind
+		wantStartTag bool
+		wantStopTag  bool
 	}{
 		// shardID fixtures rely on the farm.Fingerprint32 hash in
 		// latencykind.ShardIDToKind — the require.Equal check below makes the
 		// dependency loud if the distribution ever changes.
-		{name: "slow_start", shardID: "25", kind: latencykind.SlowStart, wantStartTag: true, startSleepers: 1, stopSleepers: 1},
-		{name: "slow_stop", shardID: "11", kind: latencykind.SlowStop, wantStopTag: true, startSleepers: 1, stopSleepers: 2},
-		{name: "stuck_start", shardID: "68", kind: latencykind.StuckStart, wantStartTag: true, startSleepers: 1, stopSleepers: 1},
-		{name: "stuck_stop", shardID: "6", kind: latencykind.StuckStop, wantStopTag: true, startSleepers: 1, stopSleepers: 2},
+		{name: "slow_start", shardID: "25", kind: latencykind.SlowStart, wantStartTag: true},
+		{name: "slow_stop", shardID: "11", kind: latencykind.SlowStop, wantStopTag: true},
+		{name: "stuck_start", shardID: "68", kind: latencykind.StuckStart, wantStartTag: true},
+		{name: "stuck_stop", shardID: "6", kind: latencykind.StuckStop, wantStopTag: true},
 	}
 
 	for _, tt := range tests {
@@ -60,16 +58,22 @@ func AssertInjectsLifecycleDelay(t *testing.T, factory LifecyclerFactory) {
 
 			startErr := make(chan error, 1)
 			go func() { startErr <- p.Start(context.Background()) }()
-			tc.BlockUntil(tt.startSleepers)
 			if d := tt.kind.StartDelay(); d > 0 {
+				tc.BlockUntil(1)
 				tc.Advance(d)
 			}
 			require.NoError(t, <-startErr)
 
+			// Start returns before the background process loop registers its
+			// ticker; calling Stop earlier lets the loop exit without ever
+			// creating a sleeper, so the sleeper count below would never be reached.
+			tc.BlockUntil(1)
+
 			stopDone := make(chan struct{})
 			go func() { p.Stop(); close(stopDone) }()
-			tc.BlockUntil(tt.stopSleepers)
 			if d := tt.kind.StopDelay(); d > 0 {
+				// The process loop ticker plus the injected Stop sleep.
+				tc.BlockUntil(2)
 				tc.Advance(d)
 			}
 			<-stopDone

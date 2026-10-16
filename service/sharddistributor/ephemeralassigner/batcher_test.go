@@ -366,6 +366,8 @@ func TestShardBatcher_CoalescingBehavior(t *testing.T) {
 		b.Start()
 		defer b.Stop()
 		timeSource.BlockUntil(1)
+		// Wait until both shards are read by the loop before closing the window.
+		require.Eventually(t, func() bool { return len(b.requestChan) == 0 }, time.Second, time.Millisecond)
 		timeSource.Advance(100 * time.Millisecond)
 
 		select {

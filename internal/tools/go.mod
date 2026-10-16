@@ -11,7 +11,6 @@ require (
 	github.com/vektra/mockery/v2 v2.53.5
 	go.uber.org/mock v0.5.0
 	go.uber.org/nilaway v0.0.0-20251021214447-34f56b8c16b9
-	go.uber.org/thriftrw v1.29.2
 	go.uber.org/yarpc v1.70.3
 	golang.org/x/tools v0.38.0
 )
@@ -60,7 +59,6 @@ require (
 	github.com/OpenPeeDeeP/depguard v1.1.0 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210512092938-c05353c2d58c // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect
-	github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 // indirect
 	github.com/apex/log v1.9.0 // indirect
 	github.com/ashanbrown/forbidigo v1.3.0 // indirect
 	github.com/ashanbrown/makezero v1.1.1 // indirect
@@ -162,7 +160,6 @@ require (
 	github.com/imdario/mergo v0.3.15 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/jgautheron/goconst v1.5.1 // indirect
 	github.com/jingyugao/rowserrcheck v1.1.1 // indirect
 	github.com/jinzhu/copier v0.4.0 // indirect
@@ -200,7 +197,6 @@ require (
 	github.com/nishanths/exhaustive v0.7.11 // indirect
 	github.com/nishanths/predeclared v0.2.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pascaldekloe/name v1.0.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/phayes/checkstyle v0.0.0-20170904204023-bfd46e6a821d // indirect
@@ -268,7 +264,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.29.0 // indirect
 	go.opentelemetry.io/otel/trace v1.29.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/fx v1.13.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	gocloud.dev v0.23.0 // indirect

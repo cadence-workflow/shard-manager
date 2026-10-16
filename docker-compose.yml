@@ -1,13 +1,17 @@
 services:
   etcd:
-    image: bitnamilegacy/etcd:3.5.5
+    image: gcr.io/etcd-development/etcd:v3.6.15
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
     ports:
-      - "2379:2379"
-    environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
-      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+      # etcd runs without authentication, so only expose it on the host's loopback
+      - "127.0.0.1:2379:2379"
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
+      test: ["CMD", "/usr/local/bin/etcdctl", "endpoint", "health"]
       interval: 2s
       timeout: 5s
       retries: 15

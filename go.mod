@@ -24,14 +24,13 @@ require (
 	github.com/urfave/cli/v2 v2.27.4
 	github.com/urfave/cli/v3 v3.8.0
 	go.etcd.io/etcd/client/v3 v3.5.5
-	go.uber.org/atomic v1.10.0
+	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/config v1.4.0
 	go.uber.org/fx v1.23.0
 	go.uber.org/multierr v1.10.0
 	go.uber.org/thriftrw v1.29.2 // indirect
 	go.uber.org/yarpc v1.70.3
 	go.uber.org/zap v1.26.0
-	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.14.0
 	golang.org/x/tools v0.22.0

@@ -14,6 +14,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -26,6 +27,7 @@ const (
 type executor struct {
 	logger        log.Logger
 	timeSource    clock.TimeSource
+	namespaces    *namespaces.Registry
 	storage       store.Store
 	sdConfig      *config.Config
 	metricsClient metrics.Client
@@ -33,6 +35,7 @@ type executor struct {
 
 func NewExecutorHandler(
 	logger log.Logger,
+	namespaceRegistry *namespaces.Registry,
 	storage store.Store,
 	timeSource clock.TimeSource,
 	cfg *config.Config,
@@ -41,6 +44,7 @@ func NewExecutorHandler(
 	return &executor{
 		logger:        logger,
 		timeSource:    timeSource,
+		namespaces:    namespaceRegistry,
 		storage:       storage,
 		sdConfig:      cfg,
 		metricsClient: metricsClient,
@@ -48,6 +52,10 @@ func NewExecutorHandler(
 }
 
 func (h *executor) Heartbeat(ctx context.Context, request *types.ExecutorHeartbeatRequest) (*types.ExecutorHeartbeatResponse, error) {
+	if _, err := h.namespaces.Get(request.Namespace); err != nil {
+		return nil, err
+	}
+
 	heartbeatTime := h.timeSource.Now().UTC()
 
 	executorState, err := h.storage.GetExecutorState(ctx, request.Namespace, request.ExecutorID)

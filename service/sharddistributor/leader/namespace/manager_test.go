@@ -19,6 +19,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/election"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 )
 
 // mockElectorRun returns a DoAndReturn function that simulates an elector:
@@ -106,12 +107,13 @@ func TestNewManager(t *testing.T) {
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
-			{Name: "test-namespace"},
+			{Name: "test-namespace", Type: config.NamespaceTypeEphemeral},
 		},
 	}
 
+	registry := namespaces.MustNewRegistry(cfg)
 	manager := NewManager(ManagerParams{
-		Cfg:             cfg,
+		Namespaces:      registry,
 		Logger:          logger,
 		MetricsClient:   metrics.NewNoopMetricsClient(),
 		ElectionFactory: electionFactory,
@@ -119,7 +121,7 @@ func TestNewManager(t *testing.T) {
 	})
 
 	assert.NotNil(t, manager)
-	assert.Equal(t, cfg, manager.cfg)
+	assert.Same(t, registry, manager.registry)
 	assert.Equal(t, 0, len(manager.namespaces))
 }
 
@@ -135,12 +137,12 @@ func TestStartManager(t *testing.T) {
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
-			{Name: "test-namespace"},
+			{Name: "test-namespace", Type: config.NamespaceTypeEphemeral},
 		},
 	}
 
 	manager := &Manager{
-		cfg:             cfg,
+		registry:        namespaces.MustNewRegistry(cfg),
 		logger:          logger,
 		metricsClient:   metrics.NewNoopMetricsClient(),
 		electionFactory: electionFactory,
@@ -168,15 +170,15 @@ func TestStartManagerWithElectorError(t *testing.T) {
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
-			{Name: "test-namespace"},
+			{Name: "test-namespace", Type: config.NamespaceTypeEphemeral},
 		},
 	}
 
 	expectedErr := errors.New("elector creation failed")
-	electionFactory.EXPECT().CreateElector(gomock.Any(), config.Namespace{Name: "test-namespace"}).Return(nil, expectedErr)
+	electionFactory.EXPECT().CreateElector(gomock.Any(), config.Namespace{Name: "test-namespace", Type: config.NamespaceTypeEphemeral}).Return(nil, expectedErr)
 
 	manager := &Manager{
-		cfg:             cfg,
+		registry:        namespaces.MustNewRegistry(cfg),
 		logger:          logger,
 		metricsClient:   metrics.NewNoopMetricsClient(),
 		electionFactory: electionFactory,
@@ -206,12 +208,12 @@ func TestStopManager(t *testing.T) {
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
-			{Name: "test-namespace"},
+			{Name: "test-namespace", Type: config.NamespaceTypeEphemeral},
 		},
 	}
 
 	manager := &Manager{
-		cfg:             cfg,
+		registry:        namespaces.MustNewRegistry(cfg),
 		logger:          logger,
 		metricsClient:   metrics.NewNoopMetricsClient(),
 		electionFactory: electionFactory,
@@ -231,7 +233,7 @@ func TestHandleNamespaceAlreadyExists(t *testing.T) {
 	electionFactory := election.NewMockFactory(ctrl)
 
 	manager := &Manager{
-		cfg:             config.ShardDistribution{},
+		registry:        namespaces.MustNewRegistry(config.ShardDistribution{}),
 		logger:          logger,
 		metricsClient:   metrics.NewNoopMetricsClient(),
 		electionFactory: electionFactory,
@@ -243,7 +245,7 @@ func TestHandleNamespaceAlreadyExists(t *testing.T) {
 
 	manager.namespaces["test-namespace"] = &namespaceHandler{}
 
-	err := manager.handleNamespace(config.Namespace{Name: "test-namespace"})
+	err := manager.handleNamespace(config.Namespace{Name: "test-namespace", Type: config.NamespaceTypeEphemeral})
 	assert.ErrorContains(t, err, "namespace test-namespace already running")
 }
 
@@ -259,12 +261,12 @@ func TestRunElection_LeadershipEvents(t *testing.T) {
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
-			{Name: "test-namespace"},
+			{Name: "test-namespace", Type: config.NamespaceTypeEphemeral},
 		},
 	}
 
 	manager := &Manager{
-		cfg:             cfg,
+		registry:        namespaces.MustNewRegistry(cfg),
 		logger:          logger,
 		metricsClient:   metrics.NewNoopMetricsClient(),
 		electionFactory: electionFactory,
@@ -298,12 +300,12 @@ func TestDrainSignal_TriggersResign(t *testing.T) {
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
-			{Name: "test-namespace"},
+			{Name: "test-namespace", Type: config.NamespaceTypeEphemeral},
 		},
 	}
 
 	manager := &Manager{
-		cfg:             cfg,
+		registry:        namespaces.MustNewRegistry(cfg),
 		logger:          logger,
 		metricsClient:   metrics.NewNoopMetricsClient(),
 		electionFactory: electionFactory,
@@ -339,12 +341,12 @@ func TestDrainSignal_NilDrainObserver(t *testing.T) {
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
-			{Name: "test-namespace"},
+			{Name: "test-namespace", Type: config.NamespaceTypeEphemeral},
 		},
 	}
 
 	manager := &Manager{
-		cfg:             cfg,
+		registry:        namespaces.MustNewRegistry(cfg),
 		logger:          logger,
 		metricsClient:   metrics.NewNoopMetricsClient(),
 		electionFactory: electionFactory,
@@ -374,12 +376,12 @@ func TestDrainSignal_ManagerStopsBeforeDrain(t *testing.T) {
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
-			{Name: "test-namespace"},
+			{Name: "test-namespace", Type: config.NamespaceTypeEphemeral},
 		},
 	}
 
 	manager := &Manager{
-		cfg:             cfg,
+		registry:        namespaces.MustNewRegistry(cfg),
 		logger:          logger,
 		metricsClient:   metrics.NewNoopMetricsClient(),
 		electionFactory: electionFactory,
@@ -416,12 +418,12 @@ func TestDrainThenUndrain_ResumesElection(t *testing.T) {
 
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{
-			{Name: "test-namespace"},
+			{Name: "test-namespace", Type: config.NamespaceTypeEphemeral},
 		},
 	}
 
 	manager := &Manager{
-		cfg:             cfg,
+		registry:        namespaces.MustNewRegistry(cfg),
 		logger:          logger,
 		metricsClient:   metrics.NewNoopMetricsClient(),
 		electionFactory: electionFactory,
@@ -462,10 +464,10 @@ func TestManagerStopsBeforeDispatcher(t *testing.T) {
 
 	app := fxtest.New(t,
 		fx.Provide(
-			func() config.ShardDistribution {
-				return config.ShardDistribution{
-					Namespaces: []config.Namespace{{Name: "test-namespace"}},
-				}
+			func() *namespaces.Registry {
+				return namespaces.MustNewRegistry(config.ShardDistribution{
+					Namespaces: []config.Namespace{{Name: "test-namespace", Type: config.NamespaceTypeEphemeral}},
+				})
 			},
 			func() log.Logger { return testlogger.New(t) },
 			func() metrics.Client { return metrics.NewNoopMetricsClient() },

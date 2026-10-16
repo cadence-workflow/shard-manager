@@ -37,6 +37,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/election"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/namespace"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/leader/process"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	meteredStore "github.com/cadence-workflow/shard-manager/service/sharddistributor/store/wrappers/metered"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/wrappers/accesscontrolled"
@@ -47,6 +48,7 @@ import (
 // Module provides shard distributor YARPC server implementations.
 // The caller is responsible for registering procedures on the dispatcher.
 var Module = fx.Module("sharddistributor",
+	namespaces.Module,
 	namespace.Module,
 	election.Module,
 	process.Module,
@@ -61,7 +63,7 @@ var Module = fx.Module("sharddistributor",
 type serversParams struct {
 	fx.In
 
-	ShardDistributionCfg config.ShardDistribution
+	Namespaces *namespaces.Registry
 
 	Logger        log.Logger
 	MetricsClient metrics.Client
@@ -88,11 +90,11 @@ type ServersResult struct {
 }
 
 func provideServers(params serversParams) ServersResult {
-	rawHandler := handler.NewHandler(params.Logger, params.TimeSource, params.ShardDistributionCfg, params.Config, params.Store, params.ShardCache, params.MetricsClient)
+	rawHandler := handler.NewHandler(params.Logger, params.TimeSource, params.Namespaces, params.Config, params.Store, params.ShardCache, params.MetricsClient)
 	wrappedHandler := metered.NewMetricsHandler(rawHandler, params.Logger, params.MetricsClient)
 	wrappedHandler = accesscontrolled.NewHandler(wrappedHandler, params.Authorizer)
 
-	executorHandler := handler.NewExecutorHandler(params.Logger, params.Store, params.TimeSource, params.Config, params.MetricsClient)
+	executorHandler := handler.NewExecutorHandler(params.Logger, params.Namespaces, params.Store, params.TimeSource, params.Config, params.MetricsClient)
 	wrappedExecutor := metered.NewExecutorMetricsExecutor(executorHandler, params.Logger, params.MetricsClient)
 
 	params.Lifecycle.Append(fx.StartStopHook(rawHandler.Start, rawHandler.Stop))

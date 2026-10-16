@@ -41,6 +41,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/loadbalancer/plan"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -74,8 +75,9 @@ type Assigner struct {
 	batcher *shardBatcher
 }
 
-// New builds an Assigner. Call Start before serving requests and Stop on shutdown.
-func New(timeSource clock.TimeSource, cfg *config.Config, storage store.Store, shardCache cache.ShardCache, metricsClient metrics.Client) *Assigner {
+// New builds an Assigner serving the ephemeral namespaces of the registry.
+// Call Start before serving requests and Stop on shutdown.
+func New(timeSource clock.TimeSource, namespaceRegistry *namespaces.Registry, cfg *config.Config, storage store.Store, shardCache cache.ShardCache, metricsClient metrics.Client) *Assigner {
 	a := &Assigner{
 		timeSource: timeSource,
 		cfg:        cfg,
@@ -83,7 +85,14 @@ func New(timeSource clock.TimeSource, cfg *config.Config, storage store.Store, s
 		shardCache: shardCache,
 		metrics:    metricsClient.Scope(metrics.ShardDistributorEphemeralAssignmentScope),
 	}
-	a.batcher = newShardBatcher(timeSource, ephemeralBatchTimeout, cfg.EphemeralAssignmentCoalescingWindow, a.assignEphemeralBatch)
+
+	var ephemeralNamespaces []string
+	for _, ns := range namespaceRegistry.List() {
+		if ns.Type == config.NamespaceTypeEphemeral {
+			ephemeralNamespaces = append(ephemeralNamespaces, ns.Name)
+		}
+	}
+	a.batcher = newShardBatcher(ephemeralNamespaces, timeSource, ephemeralBatchTimeout, cfg.EphemeralAssignmentCoalescingWindow, a.assignEphemeralBatch)
 	return a
 }
 
@@ -110,6 +119,10 @@ func (a *Assigner) GetOrAssign(ctx context.Context, request *types.GetShardOwner
 func mapAssignError(request *types.GetShardOwnerRequest, err error) error {
 	var drained *types.ShardDrainedError
 	if errors.As(err, &drained) {
+		return err
+	}
+	var notFound *types.NamespaceNotFoundError
+	if errors.As(err, &notFound) {
 		return err
 	}
 	if errors.Is(err, store.ErrShardDrained) {

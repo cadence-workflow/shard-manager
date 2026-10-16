@@ -28,7 +28,7 @@ This document contains critical information about working with this codebase.
 - `service/sharddistributor` is the main service
 - `common/types` contains the RPC layer internal type representation. This package should have few, if any dependencies and should be near the top of the dependency tree. It has values which represent IDL values and mappers in `common/types/mapper`
 - `cmd/` contains the entry points: `server`, `smctl` (CLI), `sharddistributor-canary`, and `tools`
-- `idls` is the submodule for building thrift specifically. Protobuf is imported via a go module.
+- `idls` is the cadence-idl submodule. Nothing in this repo generates code from it; protobuf is imported via a go module.
 - `proto` contains protobuf definitions
 
 ## Development Workflow Commands

@@ -335,7 +335,7 @@ $(BUILD)/code-lint: $(LINT_SRC) $(BIN)/revive $(BIN)/nilaway | $(BUILD)
 		  exit 1; \
 		fi
 	$Q echo "nilaway check..."
-	$Q GOTOOLCHAIN=go1.26.6 $(BIN)/nilaway -test=false github.com/cadence-workflow/shard-manager/common/types/mapper/...
+	$Q GOTOOLCHAIN=go1.26.9 $(BIN)/nilaway -test=false github.com/cadence-workflow/shard-manager/common/types/mapper/...
 	$Q touch $@
 
 $(BUILD)/goversion-lint: go.work Dockerfile

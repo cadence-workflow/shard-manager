@@ -6,7 +6,6 @@ toolchain go1.23.4
 
 require (
 	github.com/cactus/go-statsd-client/statsd v0.0.0-20191106001114-12b4e2b38748
-	github.com/dave/dst v0.26.2
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-farm v0.0.0-20240924180020-3414d57e47da
 	github.com/fatih/color v1.13.0
@@ -34,7 +33,7 @@ require (
 	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.14.0
-	golang.org/x/tools v0.22.0
+	golang.org/x/tools v0.22.0 // indirect
 	google.golang.org/grpc v1.59.0
 	gopkg.in/validator.v2 v2.0.0-20180514200540-135c24b11c19
 	gopkg.in/yaml.v2 v2.4.0
@@ -42,7 +41,6 @@ require (
 
 require (
 	github.com/google/gofuzz v1.0.0
-	github.com/mark3labs/mcp-go v0.18.0
 	go.etcd.io/etcd/api/v3 v3.5.5
 	go.uber.org/mock v0.5.0
 )
@@ -52,7 +50,6 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
-	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.5 // indirect
 	google.golang.org/genproto v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231012201019-e917dd12ba7a // indirect

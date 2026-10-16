@@ -57,7 +57,6 @@ ignore:
   - "common/persistence/nosql/nosqlplugin/mongodb/**"
   - "common/types/shared.go" # 8k lines of getters. Not worth testing manually but consider switching to generated code.
   - "host/**"
-  - "idls/**"
   - "service/frontend/service.go"
   - "service/history/constants/test_constants.go"
   - "service/history/execution/mutable_state.go"

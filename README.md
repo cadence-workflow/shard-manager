@@ -92,7 +92,7 @@ Wire in one of the clients under `service/sharddistributor/client` with fx:
 | `cmd/sharddistributor-canary` | The canary binary (`shard-manager-canary`) |
 | `common` | Shared libraries inherited from Cadence: config, log, metrics, rpc, dynamic config, types |
 | `common/types` | Internal RPC types and mappers — service logic uses these, never generated IDL types |
-| `proto`, `idls` | API definitions |
+| `proto` | API definitions |
 
 ## Development
 

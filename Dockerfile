@@ -22,7 +22,7 @@ COPY cmd/server/go.* ./cmd/server/
 RUN go mod download
 
 COPY . .
-RUN rm -fr .bin .build idls
+RUN rm -fr .bin .build
 
 ENV SHARD_MANAGER_RELEASE_VERSION=$RELEASE_VERSION
 

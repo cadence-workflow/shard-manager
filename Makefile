@@ -123,7 +123,6 @@ FRESH_ALL_SRC = $(shell \
 	find . \
 	\( \
 		-path './vendor/*' \
-		-o -path './idls/*' \
 		-o -path './.build/*' \
 		-o -path './.bin/*' \
 		-o -path './.git/*' \
@@ -249,31 +248,6 @@ $(STABLE_BIN)/$(PROTOC_VERSION_BIN): | $(STABLE_BIN)
 	$Q unzip -q $(STABLE_BIN)/protoc.zip -d $(PROTOC_UNZIP_DIR)
 	$Q cp $(PROTOC_UNZIP_DIR)/bin/protoc $@
 
-# checks that the idl submodule points to a commit on master, and that it matches the go module (which must be a pseudo version).
-# this is only used in an explicit CI step, because it's expected to fail when developing.
-#
-# `git ls-tree HEAD idls` is selected because this only cares about the committed/checked-out target,
-# not whatever the current status is, because only the committed value will exist for others.
-#
-# and last but not least: this avoids using `go` to make this check take only a couple seconds in CI,
-# so the whole docker container doesn't have to be prepared.
-.idl-status:
-	$(Q) cd idls && \
-		SUBMODULE_COMMIT=$$(git rev-parse HEAD) && \
-		BRANCH_INFO=$$(git branch -r --contains "$$SUBMODULE_COMMIT" | head -n1) && \
-		if ! git branch -r --contains "$$SUBMODULE_COMMIT" | grep -q "origin/master"; then \
-			echo "Error: Submodule commit $$SUBMODULE_COMMIT belongs to $$BRANCH_INFO, not to master branch" && \
-			exit 1; \
-		fi
-	$(Q) idlsha=$$(git ls-tree HEAD idls | awk '{print substr($$3,0,12)}') && \
-		gosha=$$(grep github.com/uber/cadence-idl go.mod | tr '-' '\n' | tail -n1) && \
-		if [[ "$$idlsha" != "$$gosha" ]]; then \
-			echo "IDL submodule sha ($$idlsha) does not match go module sha ($$gosha)." >&2 && \
-			echo "Make sure the IDL PR has been merged, and this PR is updated, before merging here." >&2 && \
-			exit 1; \
-		fi
-
-
 # ====================================
 # Codegen targets
 # ====================================
@@ -337,7 +311,7 @@ $(BUILD)/gomod-lint: go.mod internal/tools/go.mod | $(BUILD)
 	$Q echo "checking for direct submodule dependencies in root go.mod..."
 	$Q ( \
 		MAIN_MODULE=$$(grep "^module " go.mod | awk '{print $$2}'); \
-		SUBMODULES=$$(find . -type f -name "go.mod" -not -path "./go.mod" -not -path "./idls/*" -exec dirname {} \; | sed 's|^\./||'); \
+		SUBMODULES=$$(find . -type f -name "go.mod" -not -path "./go.mod" -exec dirname {} \; | sed 's|^\./||'); \
 		for submodule in $$SUBMODULES; do \
 			submodule_path="$$MAIN_MODULE/$$submodule"; \
 			if grep -q "$$submodule_path" go.mod; then \
@@ -357,7 +331,7 @@ $(BUILD)/code-lint: $(LINT_SRC) $(BIN)/revive $(BIN)/nilaway | $(BUILD)
 	$Q go vet -copylocks ./...
 	$Q $(BIN)/revive -config revive.toml -exclude './vendor/...' -exclude './.gen/...' -formatter stylish ./...
 	$Q # look for go files with "//comments", and ignore "//go:build"-style directives ("grep -n" shows "file:line: //go:build" so the regex is a bit complex)
-	$Q bad="$$(find . -type f -name '*.go' -not -path './idls/*' | xargs grep -n -E '^\s*//\S' | grep -E -v '^[^:]+:[^:]+:\s*//[a-z]+:[a-z]+' || true)"; \
+	$Q bad="$$(find . -type f -name '*.go' | xargs grep -n -E '^\s*//\S' | grep -E -v '^[^:]+:[^:]+:\s*//[a-z]+:[a-z]+' || true)"; \
 		if [ -n "$$bad" ]; then \
 		  echo "$$bad" >&2; \
 		  echo 'non-directive comments must have a space after the "//"' >&2; \

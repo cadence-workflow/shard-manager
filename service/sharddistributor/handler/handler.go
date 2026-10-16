@@ -40,25 +40,26 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
 func NewHandler(
 	logger log.Logger,
 	timeSource clock.TimeSource,
-	shardDistributionCfg config.ShardDistribution,
+	namespaceRegistry *namespaces.Registry,
 	cfg *config.Config,
 	storage store.Store,
 	shardCache cache.ShardCache,
 	metricsClient metrics.Client,
 ) Handler {
 	handler := &handlerImpl{
-		logger:               logger,
-		shardDistributionCfg: shardDistributionCfg,
-		storage:              storage,
-		shardCache:           shardCache,
-		timeSource:           timeSource,
-		assigner:             ephemeralassigner.New(timeSource, cfg, storage, shardCache, metricsClient),
+		logger:     logger,
+		namespaces: namespaceRegistry,
+		storage:    storage,
+		shardCache: shardCache,
+		timeSource: timeSource,
+		assigner:   ephemeralassigner.New(timeSource, cfg, storage, shardCache, metricsClient),
 	}
 	handler.stopCtx, handler.cancel = context.WithCancel(context.Background())
 
@@ -74,10 +75,10 @@ type handlerImpl struct {
 	stopCtx context.Context
 	cancel  context.CancelFunc
 
-	storage              store.Store
-	shardCache           cache.ShardCache
-	shardDistributionCfg config.ShardDistribution
-	timeSource           clock.TimeSource
+	storage    store.Store
+	shardCache cache.ShardCache
+	namespaces *namespaces.Registry
+	timeSource clock.TimeSource
 
 	assigner *ephemeralassigner.Assigner
 }
@@ -104,13 +105,9 @@ func (h *handlerImpl) Health(ctx context.Context) (*types.HealthStatus, error) {
 func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShardOwnerRequest) (resp *types.GetShardOwnerResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 
-	namespaceIdx := slices.IndexFunc(h.shardDistributionCfg.Namespaces, func(namespace config.Namespace) bool {
-		return namespace.Name == request.Namespace
-	})
-	if namespaceIdx == -1 {
-		return nil, &types.NamespaceNotFoundError{
-			Namespace: request.Namespace,
-		}
+	ns, err := h.namespaces.Get(request.Namespace)
+	if err != nil {
+		return nil, err
 	}
 
 	shardOwner, err := h.shardCache.GetShardOwner(ctx, request.Namespace, request.ShardKey)
@@ -122,7 +119,7 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 		}
 	}
 	if errors.Is(err, store.ErrShardNotFound) {
-		if h.shardDistributionCfg.Namespaces[namespaceIdx].Type == config.NamespaceTypeEphemeral {
+		if ns.Type == config.NamespaceTypeEphemeral {
 			return h.assigner.GetOrAssign(ctx, request)
 		}
 
@@ -146,13 +143,8 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 func (h *handlerImpl) InspectShard(ctx context.Context, request *types.GetShardOwnerRequest) (resp *types.GetShardOwnerResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 
-	namespaceIdx := slices.IndexFunc(h.shardDistributionCfg.Namespaces, func(namespace config.Namespace) bool {
-		return namespace.Name == request.Namespace
-	})
-	if namespaceIdx == -1 {
-		return nil, &types.NamespaceNotFoundError{
-			Namespace: request.Namespace,
-		}
+	if _, err := h.namespaces.Get(request.Namespace); err != nil {
+		return nil, err
 	}
 
 	shardOwner, err := h.shardCache.GetShardOwner(ctx, request.Namespace, request.ShardKey)
@@ -185,7 +177,7 @@ func (h *handlerImpl) GetNamespaceState(ctx context.Context, request *types.GetN
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	if err := h.validateNamespace(namespace); err != nil {
+	if _, err := h.namespaces.Get(namespace); err != nil {
 		return nil, err
 	}
 
@@ -212,7 +204,7 @@ func (h *handlerImpl) GetFullNamespaceState(ctx context.Context, request *types.
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	if err := h.validateNamespace(namespace); err != nil {
+	if _, err := h.namespaces.Get(namespace); err != nil {
 		return nil, err
 	}
 
@@ -237,13 +229,8 @@ func (h *handlerImpl) GetExecutorState(ctx context.Context, request *types.GetEx
 
 	h.startWG.Wait()
 
-	namespaceIdx := slices.IndexFunc(h.shardDistributionCfg.Namespaces, func(namespace config.Namespace) bool {
-		return namespace.Name == request.GetNamespace()
-	})
-	if namespaceIdx == -1 {
-		return nil, &types.NamespaceNotFoundError{
-			Namespace: request.GetNamespace(),
-		}
+	if _, err := h.namespaces.Get(request.GetNamespace()); err != nil {
+		return nil, err
 	}
 
 	executorState, err := h.storage.GetExecutorState(ctx, request.GetNamespace(), request.GetExecutorID())
@@ -270,7 +257,7 @@ func (h *handlerImpl) ForceResetNamespace(ctx context.Context, request *types.Fo
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	if err := h.validateNamespace(namespace); err != nil {
+	if _, err := h.namespaces.Get(namespace); err != nil {
 		return nil, err
 	}
 
@@ -294,16 +281,17 @@ func (h *handlerImpl) ListNamespaces(_ context.Context, _ *types.ListNamespacesR
 
 	h.startWG.Wait()
 
-	namespaces := make([]*types.NamespaceConfig, 0, len(h.shardDistributionCfg.Namespaces))
-	for _, ns := range h.shardDistributionCfg.Namespaces {
-		namespaces = append(namespaces, &types.NamespaceConfig{
+	configured := h.namespaces.List()
+	result := make([]*types.NamespaceConfig, 0, len(configured))
+	for _, ns := range configured {
+		result = append(result, &types.NamespaceConfig{
 			Name:     ns.Name,
 			Type:     ns.Type,
 			Mode:     "onboarded",
 			ShardNum: ns.ShardNum,
 		})
 	}
-	return &types.ListNamespacesResponse{Namespaces: namespaces}, nil
+	return &types.ListNamespacesResponse{Namespaces: result}, nil
 }
 
 func (h *handlerImpl) sendWatchResponse(namespace string, server WatchNamespaceStateServer) error {
@@ -325,6 +313,10 @@ func (h *handlerImpl) sendWatchResponse(namespace string, server WatchNamespaceS
 
 func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequest, server WatchNamespaceStateServer) error {
 	h.startWG.Wait()
+
+	if _, err := h.namespaces.Get(request.Namespace); err != nil {
+		return err
+	}
 
 	var stopDone <-chan struct{}
 	if h.stopCtx != nil {
@@ -370,7 +362,7 @@ func (h *handlerImpl) DrainShards(ctx context.Context, request *types.DrainShard
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	if err := h.validateNamespace(namespace); err != nil {
+	if _, err := h.namespaces.Get(namespace); err != nil {
 		return err
 	}
 	shardKeys := request.GetShardKeys()
@@ -399,7 +391,7 @@ func (h *handlerImpl) UndrainShards(ctx context.Context, request *types.UndrainS
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	if err := h.validateNamespace(namespace); err != nil {
+	if _, err := h.namespaces.Get(namespace); err != nil {
 		return nil, err
 	}
 	shardKeys := request.GetShardKeys()
@@ -428,7 +420,7 @@ func (h *handlerImpl) GetDrainedShards(ctx context.Context, request *types.GetDr
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	if err := h.validateNamespace(namespace); err != nil {
+	if _, err := h.namespaces.Get(namespace); err != nil {
 		return nil, err
 	}
 
@@ -452,7 +444,7 @@ func (h *handlerImpl) DrainHosts(ctx context.Context, request *types.DrainHostsR
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	if err := h.validateNamespace(namespace); err != nil {
+	if _, err := h.namespaces.Get(namespace); err != nil {
 		return err
 	}
 	hosts := fromTypesDrainedHosts(request.GetHosts())
@@ -485,7 +477,7 @@ func (h *handlerImpl) UndrainHosts(ctx context.Context, request *types.UndrainHo
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	if err := h.validateNamespace(namespace); err != nil {
+	if _, err := h.namespaces.Get(namespace); err != nil {
 		return nil, err
 	}
 	hostnames := request.GetHostnames()
@@ -514,7 +506,7 @@ func (h *handlerImpl) GetDrainedHosts(ctx context.Context, request *types.GetDra
 	h.startWG.Wait()
 
 	namespace := request.GetNamespace()
-	if err := h.validateNamespace(namespace); err != nil {
+	if _, err := h.namespaces.Get(namespace); err != nil {
 		return nil, err
 	}
 
@@ -527,17 +519,6 @@ func (h *handlerImpl) GetDrainedHosts(ctx context.Context, request *types.GetDra
 		Namespace: namespace,
 		Hosts:     toTypesDrainedHosts(hosts),
 	}, nil
-}
-
-// validateNamespace rejects namespaces that are absent from the static service config
-func (h *handlerImpl) validateNamespace(namespace string) error {
-	found := slices.ContainsFunc(h.shardDistributionCfg.Namespaces, func(n config.Namespace) bool {
-		return n.Name == namespace
-	})
-	if !found {
-		return &types.NamespaceNotFoundError{Namespace: namespace}
-	}
-	return nil
 }
 
 // validateShardKeys rejects drain and undrain requests that storage cannot represent

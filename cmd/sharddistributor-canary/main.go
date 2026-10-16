@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"time"
 
 	"github.com/uber-go/tally"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/api/peer"
@@ -36,7 +37,7 @@ const (
 	shardDistributorServiceName = "shard-distributor"
 )
 
-func runApp(c *cli.Context) {
+func runApp(c *cli.Command) {
 	endpoint := c.String("endpoint")
 	fixedNamespace := c.String("fixed-namespace")
 	ephemeralNamespace := c.String("ephemeral-namespace")
@@ -150,8 +151,8 @@ func opts(fixedNamespace, ephemeralNamespace, endpoint string, canaryGRPCPort in
 	)
 }
 
-func buildCLI() *cli.App {
-	app := cli.NewApp()
+func buildCLI() *cli.Command {
+	app := &cli.Command{}
 	app.Name = "sharddistributor-canary"
 	app.Usage = "Cadence shard distributor canary"
 	app.Version = "0.0.1"
@@ -198,7 +199,7 @@ func buildCLI() *cli.App {
 					Usage: "number of executors of ephemeral namespace to start. Don't use with num-executors",
 				},
 			},
-			Action: func(c *cli.Context) error {
+			Action: func(_ context.Context, c *cli.Command) error {
 				runApp(c)
 				return nil
 			},
@@ -210,5 +211,5 @@ func buildCLI() *cli.App {
 
 func main() {
 	app := buildCLI()
-	commoncli.ExitHandler(app.Run(os.Args))
+	commoncli.ExitHandler(app.Run(context.Background(), os.Args))
 }

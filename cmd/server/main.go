@@ -21,6 +21,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/cadence-workflow/shard-manager/cmd/server/cadence"
@@ -33,5 +34,5 @@ import (
 // main entry point for the cadence server
 func main() {
 	app := cadence.BuildCLI(metrics.ReleaseVersion, metrics.Revision)
-	commoncli.ExitHandler(app.Run(os.Args))
+	commoncli.ExitHandler(app.Run(context.Background(), os.Args))
 }

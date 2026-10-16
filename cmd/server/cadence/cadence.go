@@ -30,7 +30,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
 
@@ -54,12 +54,12 @@ func isValidService(in string) bool {
 }
 
 // BuildCLI is the main entry point for the cadence server
-func BuildCLI(releaseVersion string, gitRevision string) *cli.App {
+func BuildCLI(releaseVersion string, gitRevision string) *cli.Command {
 	version := fmt.Sprintf(" Release version: %v \n"+
 		"   Build commit: %v",
 		releaseVersion, gitRevision)
 
-	app := cli.NewApp()
+	app := &cli.Command{}
 	app.Name = "cadence"
 	app.Usage = "Cadence server"
 	app.Version = version
@@ -69,28 +69,28 @@ func BuildCLI(releaseVersion string, gitRevision string) *cli.App {
 			Aliases: []string{"r"},
 			Value:   ".",
 			Usage:   "root directory of execution environment",
-			EnvVars: []string{config.EnvKeyRoot},
+			Sources: cli.EnvVars(config.EnvKeyRoot),
 		},
 		&cli.StringFlag{
 			Name:    "config",
 			Aliases: []string{"c"},
 			Value:   "config",
 			Usage:   "config dir is a path relative to root, or an absolute path",
-			EnvVars: []string{config.EnvKeyConfigDir},
+			Sources: cli.EnvVars(config.EnvKeyConfigDir),
 		},
 		&cli.StringFlag{
 			Name:    "env",
 			Aliases: []string{"e"},
 			Value:   "development",
 			Usage:   "runtime environment",
-			EnvVars: []string{config.EnvKeyEnvironment},
+			Sources: cli.EnvVars(config.EnvKeyEnvironment),
 		},
 		&cli.StringFlag{
 			Name:    "zone",
 			Aliases: []string{"az"},
 			Value:   "",
 			Usage:   "availability zone",
-			EnvVars: []string{config.EnvKeyAvailabilityZone},
+			Sources: cli.EnvVars(config.EnvKeyAvailabilityZone),
 		},
 	}
 
@@ -107,7 +107,7 @@ func BuildCLI(releaseVersion string, gitRevision string) *cli.App {
 					Usage:   "list of services to start",
 				},
 			},
-			Action: func(c *cli.Context) error {
+			Action: func(_ context.Context, c *cli.Command) error {
 				host, err := os.Hostname()
 				if err != nil {
 					return fmt.Errorf("get hostname: %w", err)
@@ -210,17 +210,17 @@ type appContext struct {
 	HostName   string `name:"hostname"`
 }
 
-func getEnvironment(c *cli.Context) string {
+func getEnvironment(c *cli.Command) string {
 	return strings.TrimSpace(c.String("env"))
 }
 
-func getZone(c *cli.Context) string {
+func getZone(c *cli.Command) string {
 	return strings.TrimSpace(c.String("zone"))
 }
 
 // getServices parses the services arg from cli
 // and returns a list of services to start
-func getServices(c *cli.Context) []string {
+func getServices(c *cli.Command) []string {
 	val := strings.TrimSpace(c.String("services"))
 	tokens := strings.Split(val, ",")
 
@@ -237,11 +237,11 @@ func getServices(c *cli.Context) []string {
 	return tokens
 }
 
-func getConfigDir(c *cli.Context) string {
+func getConfigDir(c *cli.Command) string {
 	return constructPathIfNeed(getRootDir(c), c.String("config"))
 }
 
-func getRootDir(c *cli.Context) string {
+func getRootDir(c *cli.Command) string {
 	dirpath := c.String("root")
 	if len(dirpath) == 0 {
 		cwd, err := os.Getwd()

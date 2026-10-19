@@ -134,5 +134,5 @@ type Store interface {
 	// GetDrainedHosts returns the hosts currently drained for the namespace.
 	GetDrainedHosts(ctx context.Context, namespace string) ([]DrainedHost, error)
 
-	//TODO: Add RangeStore to Store interface once range-based ownership is fully implemented.
+	// TODO: Add RangeStore to Store interface once range-based ownership is fully implemented.
 }

@@ -98,11 +98,11 @@ func TestListRanges_SortedByLowerBound(t *testing.T) {
 	}
 
 	high := assignment([]byte{0x80, 0, 0, 0, 0, 0, 0, 0}, []byte{0xff, 0, 0, 0, 0, 0, 0, 0}, "host-3@uuid-3")
-	mid_1 := assignment([]byte{0x10, 0, 0, 0, 0, 0, 0, 0}, []byte{0x7f, 0, 0, 0, 0, 0, 0, 0}, "host-2@uuid-2")
+	mid1 := assignment([]byte{0x10, 0, 0, 0, 0, 0, 0, 0}, []byte{0x7f, 0, 0, 0, 0, 0, 0, 0}, "host-2@uuid-2")
 	low := assignment([]byte{0x00, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}, "host-1@uuid-1")
-	mid_2 := assignment([]byte{0x7f, 0, 0, 0, 0, 0, 0, 0}, []byte{0x80, 0, 0, 0, 0, 0, 0, 0}, "host-2@uuid-2")
+	mid2 := assignment([]byte{0x7f, 0, 0, 0, 0, 0, 0, 0}, []byte{0x80, 0, 0, 0, 0, 0, 0, 0}, "host-2@uuid-2")
 
-	for _, a := range []*store.RangeAssignment{high, low, mid_1, mid_2} {
+	for _, a := range []*store.RangeAssignment{high, low, mid1, mid2} {
 		require.NoError(t, s.PutRange(ctx, tc.Namespace, a))
 	}
 
@@ -111,14 +111,14 @@ func TestListRanges_SortedByLowerBound(t *testing.T) {
 	require.Len(t, got, 4)
 
 	require.Equal(t, low.ExecutorID, got[0].ExecutorID)
-	require.Equal(t, mid_1.ExecutorID, got[1].ExecutorID)
-	require.Equal(t, mid_2.ExecutorID, got[2].ExecutorID)
+	require.Equal(t, mid1.ExecutorID, got[1].ExecutorID)
+	require.Equal(t, mid2.ExecutorID, got[2].ExecutorID)
 	require.Equal(t, high.ExecutorID, got[3].ExecutorID)
 
 	// The ranges must be sorted by lower bound.
 	require.Equal(t, low.Range.LowInclusive, got[0].Range.LowInclusive)
-	require.Equal(t, mid_1.Range.LowInclusive, got[1].Range.LowInclusive)
-	require.Equal(t, mid_2.Range.LowInclusive, got[2].Range.LowInclusive)
+	require.Equal(t, mid1.Range.LowInclusive, got[1].Range.LowInclusive)
+	require.Equal(t, mid2.Range.LowInclusive, got[2].Range.LowInclusive)
 	require.Equal(t, high.Range.LowInclusive, got[3].Range.LowInclusive)
 
 	// for i := 1; i < len(got); i++ {

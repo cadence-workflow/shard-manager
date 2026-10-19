@@ -13,6 +13,9 @@ import (
 // not exist.
 var ErrRangeNotFound = fmt.Errorf("range not found")
 
+// ErrRangeNotImplemented is returned by range operations that are not implemented yet.
+var ErrRangeNotImplemented = fmt.Errorf("range operation not implemented")
+
 // RangeAssignment is the internal representation of a range's ownership. The
 // Range identifies the keyspace interval.
 type RangeAssignment struct {
@@ -26,7 +29,7 @@ type RangeAssignment struct {
 }
 
 // RangeStore is the set of storage operations for range-based ownership.
-// Embedded in Store, so a Store serves both shard- and range-based namespaces.
+// Embedded in Store.
 type RangeStore interface {
 	// PutRange stores a single range assignment. The range's lower bound
 	// determines its storage key.
@@ -44,19 +47,12 @@ type RangeStore interface {
 	ListRanges(ctx context.Context, namespace string) ([]*RangeAssignment, error)
 
 	// AssignRanges atomically rewrites the full range cover in a single guarded
-	// transaction. The request carries the complete new cover, each element's
-	// ModRevision acting as the optimistic-lock token (0 for a new range).
-
-	// AssignRanges atomically rewrites the full range cover in a single guarded
-	// transaction. Each assignment's ModRevision acts as its optimistic-lock token;
-	// zero indicates a range that does not exist. The operation fails if the guard
-	// or a revision check fails.
+	// transaction, failing if the guard or any assignment's ModRevision
+	// precondition fails.
 	AssignRanges(ctx context.Context, namespace string, request AssignRangesRequest, guard GuardFunc) error
 }
 
-// AssignRangesRequest contains the complete target range cover.
-// Each assignment's ModRevision is its optimistic-lock token; zero indicates
-// that the range does not yet exist and must be created.
+// AssignRangesRequest is the complete target cover passed to AssignRanges.
 type AssignRangesRequest struct {
 	Assignments []*RangeAssignment
 }

@@ -150,7 +150,7 @@ func ParseDrainedHostKey(prefix, namespace, key string) (string, error) {
 
 // BuildRangesPrefix constructs the etcd key prefix for range assignments within
 // a given namespace.
-// Expected format:: <prefix>/<namespace>/ranges/
+// Expected format: <prefix>/<namespace>/ranges/
 func BuildRangesPrefix(prefix, namespace string) string {
 	return fmt.Sprintf("%sranges/", BuildNamespacePrefix(prefix, namespace))
 }

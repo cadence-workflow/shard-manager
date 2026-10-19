@@ -16,7 +16,7 @@ func Fingerprint64(value []byte) []byte {
 	return key
 }
 
-// Fingerprint64String returns the fingerprint of value.
+// Fingerprint64String is Fingerprint64 for string keys.
 func Fingerprint64String(value string) []byte {
 	return Fingerprint64([]byte(value))
 }

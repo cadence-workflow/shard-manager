@@ -16,7 +16,8 @@ import (
 // A RangeIndex can only be constructed through NewRangeIndex, which guarantees
 // that its ranges form a complete, non-overlapping cover of the key space.
 // The *RangeAssignment elements are shared with the caller and must not be
-// mutated.
+// mutated. Splitting or merging adjacent ranges must therefore build a new
+// RangeIndex rather than editing this one.
 type RangeIndex struct {
 	ranges []*RangeAssignment
 }
@@ -38,11 +39,6 @@ func NewRangeIndex(ranges []*RangeAssignment) (*RangeIndex, error) {
 	}
 	return &RangeIndex{ranges: sorted}, nil
 }
-
-// TODO: Add split/merge support. Both must return a new RangeIndex so that
-// immutability is preserved:
-//   - SplitRange(lowInclusive, splitKey) — split one range into two at splitKey
-//   - MergeRanges(low1, low2) — merge two adjacent ranges into one
 
 func (i *RangeIndex) String() string {
 	var sb strings.Builder

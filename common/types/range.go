@@ -64,6 +64,8 @@ func NewFinalRange(lowInclusive []byte) (*Range, error) {
 	return r, nil
 }
 
+// IsValid reports whether the range is well-formed: non-nil, with non-nil bounds
+// and LowInclusive strictly less than HighExclusive.
 func (r *Range) IsValid() bool {
 	if r == nil || r.LowInclusive == nil || r.HighExclusive == nil {
 		return false
@@ -71,6 +73,8 @@ func (r *Range) IsValid() bool {
 	return bytes.Compare(r.LowInclusive, r.HighExclusive) < 0
 }
 
+// Contains reports whether key lies in the half-open interval
+// [LowInclusive, HighExclusive). A nil key or an invalid range returns false.
 func (r *Range) Contains(key []byte) bool {
 	if !r.IsValid() || key == nil {
 		return false
@@ -78,6 +82,7 @@ func (r *Range) Contains(key []byte) bool {
 	return bytes.Compare(r.LowInclusive, key) <= 0 && bytes.Compare(key, r.HighExclusive) < 0
 }
 
+// Overlaps reports whether the two ranges share at least one key.
 func (r *Range) Overlaps(other *Range) bool {
 	if !r.IsValid() || !other.IsValid() {
 		return false
@@ -86,6 +91,8 @@ func (r *Range) Overlaps(other *Range) bool {
 		bytes.Compare(other.LowInclusive, r.HighExclusive) < 0
 }
 
+// Adjacent reports whether the two ranges touch at exactly one boundary, with no
+// gap and no overlap.
 func (r *Range) Adjacent(other *Range) bool {
 	if !r.IsValid() || !other.IsValid() {
 		return false

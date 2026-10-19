@@ -40,7 +40,7 @@ type executorStoreImpl struct {
 	metricsClient metrics.Client
 }
 
-// The etcd store implements RangeStore in addition to store.Store.
+// Ensure *executorStoreImpl implements RangeStore.
 var _ store.RangeStore = (*executorStoreImpl)(nil)
 
 func newExecutorStoreImpl(
@@ -925,7 +925,6 @@ func (s *executorStoreImpl) RecordShardStatisticsBatch(ctx context.Context, name
 
 // --- Range Implementation ---
 
-// PutRange stores a single range assignment at the key derived from its lower bound.
 func (s *executorStoreImpl) PutRange(ctx context.Context, namespace string, assignment *store.RangeAssignment) error {
 	if assignment == nil || assignment.Range == nil {
 		return fmt.Errorf("put range: assignment and its Range must not be nil")
@@ -946,7 +945,6 @@ func (s *executorStoreImpl) PutRange(ctx context.Context, namespace string, assi
 	return nil
 }
 
-// GetRange retrieves the range whose lower bound is lowInclusive.
 func (s *executorStoreImpl) GetRange(ctx context.Context, namespace string, lowInclusive []byte) (*store.RangeAssignment, error) {
 	if err := store.ValidateLowBound(lowInclusive); err != nil {
 		return nil, fmt.Errorf("get range: %w", err)
@@ -973,7 +971,6 @@ func (s *executorStoreImpl) GetRange(ctx context.Context, namespace string, lowI
 	return assignment, nil
 }
 
-// DeleteRange removes the range whose lower bound is lowInclusive.
 func (s *executorStoreImpl) DeleteRange(ctx context.Context, namespace string, lowInclusive []byte) error {
 	if err := store.ValidateLowBound(lowInclusive); err != nil {
 		return fmt.Errorf("delete range: %w", err)
@@ -984,9 +981,8 @@ func (s *executorStoreImpl) DeleteRange(ctx context.Context, namespace string, l
 	return nil
 }
 
-// ListRanges returns every range in a namespace, sorted by lower bound. etcd
-// returns keys in lexicographic order and the hex-encoded lower bounds preserve
-// that ordering, so the result is already sorted.
+// The result is already sorted: etcd returns keys in lexicographic order and the
+// hex-encoded lower bounds preserve that ordering.
 func (s *executorStoreImpl) ListRanges(ctx context.Context, namespace string) ([]*store.RangeAssignment, error) {
 	resp, err := s.client.Get(ctx, etcdkeys.BuildRangesPrefix(s.prefix, namespace), clientv3.WithPrefix())
 	if err != nil {
@@ -1015,7 +1011,7 @@ func (s *executorStoreImpl) ListRanges(ctx context.Context, namespace string) ([
 	return assignments, nil
 }
 
+// AssignRanges is not implemented yet; it returns ErrRangeNotImplemented.
 func (s *executorStoreImpl) AssignRanges(ctx context.Context, namespace string, request store.AssignRangesRequest, guard store.GuardFunc) error {
-	// TODO
-	panic("not implemented")
+	return store.ErrRangeNotImplemented
 }

@@ -25,9 +25,8 @@ type RangeAssignment struct {
 	ModRevision int64
 }
 
-// RangeStore is the set of storage operations for range-based ownership. It is
-// kept separate from Store so the range keyspace can be introduced additively
-// without changing the existing shard-based contract.
+// RangeStore is the set of storage operations for range-based ownership.
+// Embedded in Store, so a Store serves both shard- and range-based namespaces.
 type RangeStore interface {
 	// PutRange stores a single range assignment. The range's lower bound
 	// determines its storage key.

@@ -3,93 +3,47 @@ package types
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// bareRange builds a Range directly from single-byte bounds. It bypasses
+// NewRange so the invalid ranges the negative cases need can be constructed.
+func bareRange(low, high byte) *Range {
+	return &Range{LowInclusive: []byte{low}, HighExclusive: []byte{high}}
+}
 
 func TestNewRange(t *testing.T) {
 	tests := []struct {
 		name          string
 		lowInclusive  []byte
 		highExclusive []byte
-		wantErr       bool
-		errType       error
+		wantErr       error
 	}{
-		{
-			name:          "valid range",
-			lowInclusive:  []byte{0x00, 0x10},
-			highExclusive: []byte{0x00, 0x20},
-			wantErr:       false,
-		},
-		{
-			name:          "valid range with different lengths",
-			lowInclusive:  []byte{0x00},
-			highExclusive: []byte{0x00, 0x10},
-			wantErr:       false,
-		},
-		{
-			name:          "invalid - equal bounds",
-			lowInclusive:  []byte{0x10, 0x20},
-			highExclusive: []byte{0x10, 0x20},
-			wantErr:       true,
-			errType:       ErrRangeInvalid,
-		},
-		{
-			name:          "invalid - low > high",
-			lowInclusive:  []byte{0x20, 0x30},
-			highExclusive: []byte{0x10, 0x20},
-			wantErr:       true,
-			errType:       ErrRangeInvalid,
-		},
-		{
-			name:          "invalid - nil low bound",
-			lowInclusive:  nil,
-			highExclusive: []byte{0x10, 0x20},
-			wantErr:       true,
-			errType:       ErrRangeNilBounds,
-		},
-		{
-			name:          "invalid - nil high bound",
-			lowInclusive:  []byte{0x10, 0x20},
-			highExclusive: nil,
-			wantErr:       true,
-			errType:       ErrRangeNilBounds,
-		},
-		{
-			name:          "invalid - both nil",
-			lowInclusive:  nil,
-			highExclusive: nil,
-			wantErr:       true,
-			errType:       ErrRangeNilBounds,
-		},
-		{
-			name:          "valid - empty slices",
-			lowInclusive:  []byte{},
-			highExclusive: []byte{0x00},
-			wantErr:       false,
-		},
+		{name: "valid", lowInclusive: []byte{0x00, 0x10}, highExclusive: []byte{0x00, 0x20}},
+		{name: "valid - bounds of different lengths", lowInclusive: []byte{0x00}, highExclusive: []byte{0x00, 0x10}},
+		{name: "valid - empty low bound", lowInclusive: []byte{}, highExclusive: []byte{0x00}},
+		{name: "invalid - equal bounds", lowInclusive: []byte{0x10, 0x20}, highExclusive: []byte{0x10, 0x20}, wantErr: ErrRangeInvalid},
+		{name: "invalid - low greater than high", lowInclusive: []byte{0x20, 0x30}, highExclusive: []byte{0x10, 0x20}, wantErr: ErrRangeInvalid},
+		{name: "invalid - nil low bound", lowInclusive: nil, highExclusive: []byte{0x10, 0x20}, wantErr: ErrRangeNilBounds},
+		{name: "invalid - nil high bound", lowInclusive: []byte{0x10, 0x20}, highExclusive: nil, wantErr: ErrRangeNilBounds},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := NewRange(tt.lowInclusive, tt.highExclusive)
 
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("NewRange() expected error, got nil")
-				}
-				if tt.errType != nil && err != tt.errType {
-					t.Errorf("NewRange() error = %v, want %v", err, tt.errType)
-				}
-				if got != nil {
-					t.Errorf("NewRange() expected nil range on error, got %v", got)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("NewRange() unexpected error: %v", err)
-				}
-				if got == nil {
-					t.Errorf("NewRange() expected non-nil range")
-				}
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
 			}
+
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.Equal(t, tt.lowInclusive, got.LowInclusive)
+			assert.Equal(t, tt.highExclusive, got.HighExclusive)
 		})
 	}
 }
@@ -100,128 +54,45 @@ func TestRange_IsValid(t *testing.T) {
 		r    *Range
 		want bool
 	}{
-		{
-			name: "nil range",
-			r:    nil,
-			want: false,
-		},
-		{
-			name: "valid range",
-			r: &Range{
-				LowInclusive:  []byte{0x00, 0x10},
-				HighExclusive: []byte{0x00, 0x20},
-			},
-			want: true,
-		},
-		{
-			name: "invalid - equal bounds",
-			r: &Range{
-				LowInclusive:  []byte{0x10, 0x20},
-				HighExclusive: []byte{0x10, 0x20},
-			},
-			want: false,
-		},
-		{
-			name: "invalid - low > high",
-			r: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x10},
-			},
-			want: false,
-		},
-		{
-			name: "invalid - nil low",
-			r: &Range{
-				LowInclusive:  nil,
-				HighExclusive: []byte{0x10},
-			},
-			want: false,
-		},
-		{
-			name: "invalid - nil high",
-			r: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: nil,
-			},
-			want: false,
-		},
+		{name: "nil range", r: nil, want: false},
+		{name: "valid", r: &Range{LowInclusive: []byte{0x00, 0x10}, HighExclusive: []byte{0x00, 0x20}}, want: true},
+		{name: "equal bounds", r: &Range{LowInclusive: []byte{0x10}, HighExclusive: []byte{0x10}}, want: false},
+		{name: "low greater than high", r: &Range{LowInclusive: []byte{0x20}, HighExclusive: []byte{0x10}}, want: false},
+		{name: "nil low bound", r: &Range{LowInclusive: nil, HighExclusive: []byte{0x10}}, want: false},
+		{name: "nil high bound", r: &Range{LowInclusive: []byte{0x10}, HighExclusive: nil}, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.r.IsValid(); got != tt.want {
-				t.Errorf("IsValid() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.r.IsValid())
 		})
 	}
 }
 
 func TestRange_Contains(t *testing.T) {
-	r := &Range{
-		LowInclusive:  []byte{0x10, 0x00},
-		HighExclusive: []byte{0x20, 0x00},
-	}
+	r := &Range{LowInclusive: []byte{0x10, 0x00}, HighExclusive: []byte{0x20, 0x00}}
 
 	tests := []struct {
 		name string
 		key  []byte
 		want bool
 	}{
-		{
-			name: "key at lower bound (inclusive)",
-			key:  []byte{0x10, 0x00},
-			want: true,
-		},
-		{
-			name: "key in middle",
-			key:  []byte{0x15, 0x00},
-			want: true,
-		},
-		{
-			name: "key just before upper bound",
-			key:  []byte{0x1F, 0xFF},
-			want: true,
-		},
-		{
-			name: "key at upper bound (exclusive)",
-			key:  []byte{0x20, 0x00},
-			want: false,
-		},
-		{
-			name: "key below range",
-			key:  []byte{0x0F, 0xFF},
-			want: false,
-		},
-		{
-			name: "key above range",
-			key:  []byte{0x20, 0x01},
-			want: false,
-		},
-		{
-			name: "nil key",
-			key:  nil,
-			want: false,
-		},
+		{name: "key at the inclusive lower bound", key: []byte{0x10, 0x00}, want: true},
+		{name: "key in the middle", key: []byte{0x15, 0x00}, want: true},
+		{name: "key just below the exclusive upper bound", key: []byte{0x1F, 0xFF}, want: true},
+		{name: "key at the exclusive upper bound", key: []byte{0x20, 0x00}, want: false},
+		{name: "key below the range", key: []byte{0x0F, 0xFF}, want: false},
+		{name: "key above the range", key: []byte{0x20, 0x01}, want: false},
+		{name: "nil key", key: nil, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := r.Contains(tt.key); got != tt.want {
-				t.Errorf("Contains(%v) = %v, want %v", tt.key, got, tt.want)
-			}
+			assert.Equal(t, tt.want, r.Contains(tt.key))
 		})
 	}
 
-	// Test with invalid range
-	t.Run("invalid range", func(t *testing.T) {
-		invalidRange := &Range{
-			LowInclusive:  []byte{0x20},
-			HighExclusive: []byte{0x10},
-		}
-		if invalidRange.Contains([]byte{0x15}) {
-			t.Error("Contains() on invalid range should return false")
-		}
-	})
+	assert.False(t, bareRange(0x20, 0x10).Contains([]byte{0x15}), "an invalid range contains nothing")
 }
 
 func TestRange_Overlaps(t *testing.T) {
@@ -231,101 +102,19 @@ func TestRange_Overlaps(t *testing.T) {
 		r2   *Range
 		want bool
 	}{
-		{
-			name: "overlapping ranges",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x30},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x40},
-			},
-			want: true,
-		},
-		{
-			name: "adjacent ranges (no overlap)",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x30},
-			},
-			want: false,
-		},
-		{
-			name: "disjoint ranges",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x30},
-				HighExclusive: []byte{0x40},
-			},
-			want: false,
-		},
-		{
-			name: "one contains the other",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x50},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x30},
-			},
-			want: true,
-		},
-		{
-			name: "identical ranges",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			want: true,
-		},
-		{
-			name: "invalid r1",
-			r1: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x10},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x15},
-				HighExclusive: []byte{0x25},
-			},
-			want: false,
-		},
-		{
-			name: "invalid r2",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x10},
-			},
-			want: false,
-		},
+		{name: "overlapping", r1: bareRange(0x10, 0x30), r2: bareRange(0x20, 0x40), want: true},
+		{name: "adjacent - no overlap", r1: bareRange(0x10, 0x20), r2: bareRange(0x20, 0x30), want: false},
+		{name: "disjoint", r1: bareRange(0x10, 0x20), r2: bareRange(0x30, 0x40), want: false},
+		{name: "one contains the other", r1: bareRange(0x10, 0x50), r2: bareRange(0x20, 0x30), want: true},
+		{name: "identical", r1: bareRange(0x10, 0x20), r2: bareRange(0x10, 0x20), want: true},
+		{name: "invalid r1", r1: bareRange(0x20, 0x10), r2: bareRange(0x15, 0x25), want: false},
+		{name: "invalid r2", r1: bareRange(0x10, 0x20), r2: bareRange(0x20, 0x10), want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.r1.Overlaps(tt.r2); got != tt.want {
-				t.Errorf("Overlaps() = %v, want %v", got, tt.want)
-			}
-			// Test symmetry
-			if got := tt.r2.Overlaps(tt.r1); got != tt.want {
-				t.Errorf("Overlaps() symmetric check = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.r1.Overlaps(tt.r2))
+			assert.Equal(t, tt.want, tt.r2.Overlaps(tt.r1), "Overlaps must be symmetric")
 		})
 	}
 }
@@ -337,73 +126,16 @@ func TestRange_Adjacent(t *testing.T) {
 		r2   *Range
 		want bool
 	}{
-		{
-			name: "adjacent - r1 before r2",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x30},
-			},
-			want: true,
-		},
-		{
-			name: "adjacent - r2 before r1",
-			r1: &Range{
-				LowInclusive:  []byte{0x30},
-				HighExclusive: []byte{0x40},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x30},
-			},
-			want: true,
-		},
-		{
-			name: "not adjacent - gap",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x30},
-				HighExclusive: []byte{0x40},
-			},
-			want: false,
-		},
-		{
-			name: "not adjacent - overlap",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x30},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x40},
-			},
-			want: false,
-		},
-		{
-			name: "invalid r1",
-			r1: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x10},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			want: false,
-		},
+		{name: "r1 immediately before r2", r1: bareRange(0x10, 0x20), r2: bareRange(0x20, 0x30), want: true},
+		{name: "r2 immediately before r1", r1: bareRange(0x30, 0x40), r2: bareRange(0x10, 0x30), want: true},
+		{name: "gap", r1: bareRange(0x10, 0x20), r2: bareRange(0x30, 0x40), want: false},
+		{name: "overlap", r1: bareRange(0x10, 0x30), r2: bareRange(0x20, 0x40), want: false},
+		{name: "invalid r1", r1: bareRange(0x20, 0x10), r2: bareRange(0x10, 0x20), want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.r1.Adjacent(tt.r2); got != tt.want {
-				t.Errorf("Adjacent() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.r1.Adjacent(tt.r2))
 		})
 	}
 }
@@ -415,61 +147,15 @@ func TestRange_Compare(t *testing.T) {
 		r2   *Range
 		want int
 	}{
-		{
-			name: "r1 < r2",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x30},
-				HighExclusive: []byte{0x40},
-			},
-			want: -1,
-		},
-		{
-			name: "r1 > r2",
-			r1: &Range{
-				LowInclusive:  []byte{0x30},
-				HighExclusive: []byte{0x40},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			want: 1,
-		},
-		{
-			name: "r1 == r2",
-			r1: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x10},
-				HighExclusive: []byte{0x20},
-			},
-			want: 0,
-		},
-		{
-			name: "invalid r1",
-			r1: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x10},
-			},
-			r2: &Range{
-				LowInclusive:  []byte{0x30},
-				HighExclusive: []byte{0x40},
-			},
-			want: 0,
-		},
+		{name: "r1 before r2", r1: bareRange(0x10, 0x20), r2: bareRange(0x30, 0x40), want: -1},
+		{name: "r1 after r2", r1: bareRange(0x30, 0x40), r2: bareRange(0x10, 0x20), want: 1},
+		{name: "same lower bound", r1: bareRange(0x10, 0x20), r2: bareRange(0x10, 0x20), want: 0},
+		{name: "invalid r1", r1: bareRange(0x20, 0x10), r2: bareRange(0x30, 0x40), want: 0},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.r1.Compare(tt.r2); got != tt.want {
-				t.Errorf("Compare() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.r1.Compare(tt.r2))
 		})
 	}
 }
@@ -480,29 +166,13 @@ func TestRange_String(t *testing.T) {
 		r    *Range
 		want string
 	}{
-		{
-			name: "valid range",
-			r: &Range{
-				LowInclusive:  []byte{0x10, 0x20},
-				HighExclusive: []byte{0x30, 0x40},
-			},
-			want: "[1020, 3040)",
-		},
-		{
-			name: "invalid range",
-			r: &Range{
-				LowInclusive:  []byte{0x20},
-				HighExclusive: []byte{0x10},
-			},
-			want: "<invalid range>",
-		},
+		{name: "valid range", r: &Range{LowInclusive: []byte{0x10, 0x20}, HighExclusive: []byte{0x30, 0x40}}, want: "[1020, 3040)"},
+		{name: "invalid range", r: bareRange(0x20, 0x10), want: "<invalid range>"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.r.String(); got != tt.want {
-				t.Errorf("String() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, tt.r.String())
 		})
 	}
 }
@@ -510,87 +180,38 @@ func TestRange_String(t *testing.T) {
 func TestRangeUpperBoundInfinity(t *testing.T) {
 	maxFingerprint := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 
-	// The sentinel must be longer than a fingerprint so that it sorts after the
-	// maximum fingerprint.
-	if len(RangeUpperBoundInfinity) <= len(maxFingerprint) {
-		t.Errorf("RangeUpperBoundInfinity length = %d, want greater than %d", len(RangeUpperBoundInfinity), len(maxFingerprint))
-	}
-
-	// The maximum fingerprint must sort before the sentinel.
-	if bytes.Compare(maxFingerprint, RangeUpperBoundInfinity) >= 0 {
-		t.Errorf("max fingerprint %x must sort before sentinel %x", maxFingerprint, RangeUpperBoundInfinity)
-	}
+	// The sentinel is one byte longer than a fingerprint, so it sorts after the
+	// maximum fingerprint while staying a valid exclusive upper bound.
+	assert.Greater(t, len(RangeUpperBoundInfinity), len(maxFingerprint))
+	assert.Negative(t, bytes.Compare(maxFingerprint, RangeUpperBoundInfinity))
 }
 
 func TestNewFinalRange(t *testing.T) {
-	tests := []struct {
-		name         string
-		lowInclusive []byte
-		wantErr      bool
-		errType      error
-	}{
-		{
-			name:         "valid",
-			lowInclusive: []byte{0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		},
-		{
-			name:    "nil low bound",
-			wantErr: true,
-			errType: ErrRangeNilBounds,
-		},
-	}
+	t.Run("valid", func(t *testing.T) {
+		got, err := NewFinalRange([]byte{0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		require.NoError(t, err)
+		assert.True(t, got.IsValid())
+		assert.True(t, got.IsFinalRange())
+		// No finite upper bound covers the maximum fingerprint, so the final
+		// range must.
+		assert.True(t, got.Contains([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}))
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewFinalRange(tt.lowInclusive)
-
-			if tt.wantErr {
-				if err != tt.errType {
-					t.Errorf("NewFinalRange() error = %v, want %v", err, tt.errType)
-				}
-				if got != nil {
-					t.Errorf("NewFinalRange() expected nil on error, got %v", got)
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("NewFinalRange() unexpected error: %v", err)
-			}
-			if !got.IsValid() {
-				t.Error("NewFinalRange() produced an invalid range")
-			}
-			if !got.IsFinalRange() {
-				t.Error("NewFinalRange() produced a range that is not final")
-			}
-			// The final range must contain the maximum fingerprint, which no
-			// finite upper bound can cover.
-			if !got.Contains([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}) {
-				t.Error("final range must contain the maximum fingerprint")
-			}
-		})
-	}
+	t.Run("nil low bound", func(t *testing.T) {
+		got, err := NewFinalRange(nil)
+		assert.ErrorIs(t, err, ErrRangeNilBounds)
+		assert.Nil(t, got)
+	})
 }
 
 func TestRange_IsFinalRange(t *testing.T) {
 	final, err := NewFinalRange([]byte{0x00})
-	if err != nil {
-		t.Fatalf("NewFinalRange() error: %v", err)
-	}
-	if !final.IsFinalRange() {
-		t.Error("final range must report IsFinalRange() == true")
-	}
+	require.NoError(t, err)
+	assert.True(t, final.IsFinalRange())
 
 	finite, err := NewRange([]byte{0x00}, []byte{0x40})
-	if err != nil {
-		t.Fatalf("NewRange() error: %v", err)
-	}
-	if finite.IsFinalRange() {
-		t.Error("finite range must report IsFinalRange() == false")
-	}
+	require.NoError(t, err)
+	assert.False(t, finite.IsFinalRange())
 
-	var nilRange *Range
-	if nilRange.IsFinalRange() {
-		t.Error("nil range must report IsFinalRange() == false")
-	}
+	assert.False(t, (*Range)(nil).IsFinalRange())
 }

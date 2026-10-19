@@ -2,6 +2,7 @@
 [![Build Status](https://github.com/cadence-workflow/shard-manager/actions/workflows/ci-checks.yml/badge.svg)](https://github.com/cadence-workflow/shard-manager/actions/workflows/ci-checks.yml)
 [![Slack Status](https://img.shields.io/badge/slack-join_chat-white.svg?logo=slack&style=social)](https://communityinviter.com/apps/cloud-native/cncf)
 [![License](https://img.shields.io/github/license/cadence-workflow/shard-manager.svg)](http://www.apache.org/licenses/LICENSE-2.0)
+[![Snyk](https://snyk.io/test/github/cadence-workflow/shard-manager/badge.svg)](https://security.snyk.io/package/golang/github.com%2Fcadence-workflow%2Fshard-manager)
 
 Shard Manager is a service that assigns shards to the hosts of a sharded application and keeps that
 assignment balanced and up to date as hosts come and go. Applications hand over ownership decisions.

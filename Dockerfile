@@ -32,7 +32,9 @@ RUN CGO_ENABLED=0 make shard-manager-server shard-manager-canary smctl
 
 FROM alpine:3.23 AS alpine
 
-RUN apk add --update --no-cache ca-certificates
+# The published base image lags the v3.23 repo, so refresh before installing:
+# without this the image ships whatever CVE-affected packages the snapshot froze.
+RUN apk upgrade --no-cache && apk add --update --no-cache ca-certificates
 
 
 # Shard Manager Server

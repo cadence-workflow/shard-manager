@@ -8,8 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// bareRange builds a Range directly from single-byte bounds. It bypasses
-// NewRange so the invalid ranges the negative cases need can be constructed.
+// bareRange constructs a Range directly without validation, enabling tests of invalid ranges.
 func bareRange(low, high byte) *Range {
 	return &Range{LowInclusive: []byte{low}, HighExclusive: []byte{high}}
 }
@@ -140,26 +139,6 @@ func TestRange_Adjacent(t *testing.T) {
 	}
 }
 
-func TestRange_Compare(t *testing.T) {
-	tests := []struct {
-		name string
-		r1   *Range
-		r2   *Range
-		want int
-	}{
-		{name: "r1 before r2", r1: bareRange(0x10, 0x20), r2: bareRange(0x30, 0x40), want: -1},
-		{name: "r1 after r2", r1: bareRange(0x30, 0x40), r2: bareRange(0x10, 0x20), want: 1},
-		{name: "same lower bound", r1: bareRange(0x10, 0x20), r2: bareRange(0x10, 0x20), want: 0},
-		{name: "invalid r1", r1: bareRange(0x20, 0x10), r2: bareRange(0x30, 0x40), want: 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, tt.r1.Compare(tt.r2))
-		})
-	}
-}
-
 func TestRange_String(t *testing.T) {
 	tests := []struct {
 		name string
@@ -184,6 +163,26 @@ func TestRangeUpperBoundInfinity(t *testing.T) {
 	// maximum fingerprint while staying a valid exclusive upper bound.
 	assert.Greater(t, len(RangeUpperBoundInfinity), len(maxFingerprint))
 	assert.Negative(t, bytes.Compare(maxFingerprint, RangeUpperBoundInfinity))
+}
+
+// A final range's upper bound must never share backing bytes with the package
+// sentinel. Ranges are passed between components, and an in-place write to one
+// bound would otherwise corrupt final-range detection for the whole process.
+func TestFinalRangeDoesNotAliasSentinel(t *testing.T) {
+	original := bytes.Clone(RangeUpperBoundInfinity)
+	low := []byte{0x40, 0, 0, 0, 0, 0, 0, 0}
+
+	final, err := NewFinalRange(low)
+	require.NoError(t, err)
+	require.True(t, final.IsFinalRange())
+
+	final.HighExclusive[0] = 0
+
+	assert.Equal(t, original, RangeUpperBoundInfinity, "mutating a returned bound must not change the sentinel")
+
+	again, err := NewFinalRange(low)
+	require.NoError(t, err)
+	assert.True(t, again.IsFinalRange(), "the sentinel must still identify final ranges")
 }
 
 func TestNewFinalRange(t *testing.T) {

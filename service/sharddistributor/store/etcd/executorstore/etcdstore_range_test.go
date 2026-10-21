@@ -1,6 +1,7 @@
 package executorstore
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -115,18 +116,16 @@ func TestListRanges_SortedByLowerBound(t *testing.T) {
 	require.Equal(t, mid2.ExecutorID, got[2].ExecutorID)
 	require.Equal(t, high.ExecutorID, got[3].ExecutorID)
 
-	// The ranges must be sorted by lower bound.
-	require.Equal(t, low.Range.LowInclusive, got[0].Range.LowInclusive)
-	require.Equal(t, mid1.Range.LowInclusive, got[1].Range.LowInclusive)
-	require.Equal(t, mid2.Range.LowInclusive, got[2].Range.LowInclusive)
-	require.Equal(t, high.Range.LowInclusive, got[3].Range.LowInclusive)
-
-	// for i := 1; i < len(got); i++ {
-	// 	require.True(t, got[i-1].Range.Compare(got[i].Range) < 0, "ranges must be sorted by lower bound")
-	// }
+	// Verify ordering: etcd returns keys lexicographically, and hex encoding
+	// preserves byte ordering. If this fails, the storage layer's sort guarantee
+	// is broken.
+	for i := 1; i < len(got); i++ {
+		require.Negative(t, bytes.Compare(got[i-1].Range.LowInclusive, got[i].Range.LowInclusive),
+			"ranges must be sorted by lower bound")
+	}
 }
 
-func TestPutRange_RejectsInvalidBoundWidth(t *testing.T) {
+func TestPutRange_RejectsInvalidBounds(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	s := createStore(t, tc)
 
@@ -140,6 +139,8 @@ func TestPutRange_RejectsInvalidBoundWidth(t *testing.T) {
 		"empty finite high":      rawRange([]byte{0x00, 0, 0, 0, 0, 0, 0, 0}, []byte{}),
 		"short finite high":      rawRange([]byte{0x00, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40}),
 		"long non-sentinel high": rawRange([]byte{0x00, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0, 0}),
+		"equal bounds":           rawRange([]byte{0x40, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
+		"inverted bounds":        rawRange([]byte{0x80, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
 	}
 
 	for name, rng := range tests {

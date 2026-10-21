@@ -1,12 +1,16 @@
 package etcdkeys
 
 import (
+	"bytes"
 	"encoding/hex"
+	"math/rand"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/cadence-workflow/shard-manager/common/hash"
 )
 
 func TestBuildNamespacePrefix(t *testing.T) {
@@ -237,17 +241,40 @@ func TestRangesPrefixIsDisjointFromSiblingPrefixes(t *testing.T) {
 	}
 }
 
-// Hex encoding must preserve lexicographic ordering of the bounds. If it did
-// not, etcd prefix scans would return ranges out of order, breaking the range
-// cache and cover validation.
+// Hex encoding must preserve lexicographic ordering of the bounds; if it did
+// not, etcd prefix scans would return ranges out of order.
+//
+// Sampled pairs, not one example: a single ordered pair passes even for a
+// non-monotonic encoding like base64, which inverts about a third of random
+// pairs.
 func TestRangeKeyHexPreservesOrdering(t *testing.T) {
-	lower := []byte{0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-	upper := []byte{0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	// Pairs that cross a nibble boundary, where a non-monotonic alphabet is most
+	// likely to invert the order.
+	pairs := [][2][]byte{
+		{{0x0f, 0, 0, 0, 0, 0, 0, 0}, {0x10, 0, 0, 0, 0, 0, 0, 0}},
+		{{0x3f, 0, 0, 0, 0, 0, 0, 0}, {0x40, 0, 0, 0, 0, 0, 0, 0}},
+		{{0x7f, 0xff, 0, 0, 0, 0, 0, 0}, {0x80, 0, 0, 0, 0, 0, 0, 0}},
+		{{0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, {0xff, 0, 0, 0, 0, 0, 0, 0}},
+	}
 
-	lowerKey := BuildRangeKey("/cadence", "test-ns", lower)
-	upperKey := BuildRangeKey("/cadence", "test-ns", upper)
+	rng := rand.New(rand.NewSource(1))
+	for i := 0; i < 1000; i++ {
+		low := make([]byte, hash.FingerprintSize)
+		high := make([]byte, hash.FingerprintSize)
+		rng.Read(low)
+		rng.Read(high)
+		if bytes.Equal(low, high) {
+			continue
+		}
+		pairs = append(pairs, [2][]byte{low, high})
+	}
 
-	assert.True(t, lowerKey < upperKey, "lower bound key must sort before upper bound key")
+	for _, pair := range pairs {
+		low, high := pair[0], pair[1]
+		want := bytes.Compare(low, high) < 0
+		got := BuildRangeKey("/cadence", "test-ns", low) < BuildRangeKey("/cadence", "test-ns", high)
+		assert.Equalf(t, want, got, "key order must match bound order: low=%x high=%x", low, high)
+	}
 }
 
 func TestParseRangeKey(t *testing.T) {

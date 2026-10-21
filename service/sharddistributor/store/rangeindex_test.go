@@ -98,6 +98,8 @@ func TestNewRangeIndex(t *testing.T) {
 			ranges:  nil,
 			wantErr: "must not be empty",
 		},
+		// Gap between 0x40 and 0x60 leaves keys in that range unowned. This would
+		// break the "complete cover" invariant and cause key lookups to fail.
 		{
 			name: "gap between ranges",
 			ranges: []*RangeAssignment{
@@ -107,6 +109,8 @@ func TestNewRangeIndex(t *testing.T) {
 			},
 			wantErr: "not adjacent",
 		},
+		// Overlap means two executors claim the same keys, violating the
+		// non-overlapping invariant and causing ambiguous ownership.
 		{
 			name: "overlap between ranges",
 			ranges: []*RangeAssignment{
@@ -116,6 +120,9 @@ func TestNewRangeIndex(t *testing.T) {
 			},
 			wantErr: "not adjacent",
 		},
+		// The cover must start at the minimum bound (all zeros) to ensure every
+		// key in the keyspace is owned. A cover starting at a higher bound leaves
+		// keys below it unowned.
 		{
 			name: "first range has empty low bound",
 			ranges: []*RangeAssignment{
@@ -134,6 +141,8 @@ func TestNewRangeIndex(t *testing.T) {
 			},
 			wantErr: "minimum bound",
 		},
+		// The cover must end with a final range extending to infinity. Without
+		// this, keys above the last range's upper bound would be unowned.
 		{
 			name: "last range is not final",
 			ranges: []*RangeAssignment{
@@ -152,6 +161,18 @@ func TestNewRangeIndex(t *testing.T) {
 			name:    "assignment with nil range",
 			ranges:  []*RangeAssignment{{Range: nil, ExecutorID: "exec-1", Status: types.AssignmentStatusREADY}},
 			wantErr: "nil",
+		},
+		{
+			// Degenerate range (low == high) contains no keys, leaving its boundary unowned.
+			// Storage cannot produce this, but NewRangeIndex must reject it defensively.
+			name: "degenerate range",
+			ranges: []*RangeAssignment{
+				assignment(t, mustRange(t, b8(0x00), b8(0x40)), "exec-1"),
+				assignment(t, &types.Range{LowInclusive: b8(0x40), HighExclusive: b8(0x40)}, "exec-2"),
+				assignment(t, mustRange(t, b8(0x40), b8(0x80)), "exec-3"),
+				assignment(t, mustFinalRange(t, b8(0x80)), "exec-4"),
+			},
+			wantErr: "invalid range",
 		},
 	}
 

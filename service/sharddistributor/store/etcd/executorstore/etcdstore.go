@@ -1011,7 +1011,7 @@ func (s *executorStoreImpl) ListRanges(ctx context.Context, namespace string) ([
 	return assignments, nil
 }
 
-// AssignRanges is not implemented yet; it returns ErrRangeNotImplemented.
+// TODO(range-phase-2): Implement atomic range cover rewrite with ModRevision guards.
 func (s *executorStoreImpl) AssignRanges(ctx context.Context, namespace string, request store.AssignRangesRequest, guard store.GuardFunc) error {
 	return store.ErrRangeNotImplemented
 }

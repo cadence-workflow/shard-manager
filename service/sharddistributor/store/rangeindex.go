@@ -30,6 +30,13 @@ func NewRangeIndex(ranges []*RangeAssignment) (*RangeIndex, error) {
 		if r == nil || r.Range == nil {
 			return nil, errors.New("range cover must not contain nil assignments or nil ranges")
 		}
+		// A range with low >= high contains no key, so a cover containing one
+		// would leave the key at that boundary unowned. Checked before the sort
+		// to catch this case.
+		if !r.Range.IsValid() {
+			return nil, fmt.Errorf("range cover contains an invalid range: low=%x high=%x",
+				r.Range.LowInclusive, r.Range.HighExclusive)
+		}
 	}
 
 	sorted := slices.Clone(ranges)
@@ -61,6 +68,8 @@ func (i *RangeIndex) GetRangeForKey(key []byte) (*RangeAssignment, bool) {
 	pos, found := slices.BinarySearchFunc(i.ranges, key, func(a *RangeAssignment, k []byte) int {
 		return bytes.Compare(a.Range.LowInclusive, k)
 	})
+	// BinarySearchFunc returns the insertion point for key. If not found, decrement
+	// to find the range whose lower bound is ≤ key.
 	if !found {
 		pos--
 	}

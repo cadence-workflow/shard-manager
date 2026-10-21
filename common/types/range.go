@@ -43,6 +43,9 @@ func NewRange(lowInclusive, highExclusive []byte) (*Range, error) {
 // extends to the end of the key space. It is one byte longer than a fingerprint
 // so that byte comparison orders it after every finite fingerprint
 // while it remains a valid upper bound for the half-open interval.
+//
+// Callers must not mutate it: IsFinalRange, NewFinalRange and the storage
+// bound validation all compare against this value.
 var RangeUpperBoundInfinity = bytes.Repeat([]byte{0xFF}, 9)
 
 // NewFinalRange creates the final range [lowInclusive, infinity), covering every
@@ -99,18 +102,6 @@ func (r *Range) Adjacent(other *Range) bool {
 	}
 	return bytes.Equal(r.HighExclusive, other.LowInclusive) ||
 		bytes.Equal(other.HighExclusive, r.LowInclusive)
-}
-
-// Compare orders valid ranges by their lower bounds. It returns:
-//
-//	-1 if r < other (r.LowInclusive < other.LowInclusive)
-//	 0 if r == other (same bounds)
-//	+1 if r > other (r.LowInclusive > other.LowInclusive)
-func (r *Range) Compare(other *Range) int {
-	if !r.IsValid() || !other.IsValid() {
-		return 0
-	}
-	return bytes.Compare(r.LowInclusive, other.LowInclusive)
 }
 
 // IsFinalRange reports whether the range extends to the end of the key space.

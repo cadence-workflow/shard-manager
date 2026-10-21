@@ -33,6 +33,10 @@ type RangeAssignment struct {
 type RangeStore interface {
 	// PutRange stores a single range assignment. The range's lower bound
 	// determines its storage key.
+	//
+	// It is unguarded and exists for tests and tooling only: leader code writes
+	// ranges exclusively through AssignRanges, which carries the leadership
+	// guard and the per-range ModRevision preconditions.
 	PutRange(ctx context.Context, namespace string, assignment *RangeAssignment) error
 
 	// GetRange retrieves the range whose lower bound is lowInclusive. It returns
@@ -68,13 +72,15 @@ func ValidateLowBound(lowInclusive []byte) error {
 	return nil
 }
 
-// ValidateRangeBounds checks that a range's bounds have the width the storage
-// layer persists: the lower bound must be exactly hash.FingerprintSize bytes,
-// and a finite upper bound must be exactly hash.FingerprintSize bytes. The
-// final range's sentinel upper bound (9 bytes of 0xFF) is the only exempt.
+// ValidateRangeBounds rejects ranges with incorrect bound widths or inverted bounds.
+// The storage layer cannot round-trip invalid ranges, so we reject them at the boundary.
 func ValidateRangeBounds(r *types.Range) error {
 	if r == nil {
 		return errors.New("range must not be nil")
+	}
+	if !r.IsValid() {
+		return fmt.Errorf("range is invalid: low=%x high=%x, low must be < high",
+			r.LowInclusive, r.HighExclusive)
 	}
 	if err := ValidateLowBound(r.LowInclusive); err != nil {
 		return err

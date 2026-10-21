@@ -10,14 +10,10 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/hash"
 )
 
-// RangeIndex is an immutable, sorted index of range assignments, ordered by
-// lower bound. It answers "which range contains this key?" in O(log n).
+// RangeIndex is an immutable sorted index of a validated range cover.
+// Ranges are ordered by low bound and support O(log n) key lookup.
 //
-// A RangeIndex can only be constructed through NewRangeIndex, which guarantees
-// that its ranges form a complete, non-overlapping cover of the key space.
-// The *RangeAssignment elements are shared with the caller and must not be
-// mutated. Splitting or merging adjacent ranges must therefore build a new
-// RangeIndex rather than editing this one.
+// RangeAssignment objects are shared with the caller and must not be mutated.
 type RangeIndex struct {
 	ranges []*RangeAssignment
 }

@@ -89,7 +89,6 @@ func TestListRanges_SortedByLowerBound(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Insert out of order so the test verifies etcd returns them sorted.
 	assignment := func(low, high []byte, executor string) *store.RangeAssignment {
 		return &store.RangeAssignment{
 			Range:      mustRange(t, low, high),

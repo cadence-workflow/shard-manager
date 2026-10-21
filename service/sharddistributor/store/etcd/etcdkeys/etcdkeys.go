@@ -155,10 +155,9 @@ func BuildRangesPrefix(prefix, namespace string) string {
 	return fmt.Sprintf("%sranges/", BuildNamespacePrefix(prefix, namespace))
 }
 
-// BuildRangeKey constructs the etcd key for the range whose inclusive lower
-// bound is lowInclusive. The bound is hex-encoded so that lexicographic key
-// ordering matches numeric ordering of the bounds, which is required for etcd
-// prefix scans to return ranges in sorted order.
+// The bound is hex-encoded so that lexicographic key ordering matches numeric
+// ordering of the bounds, which is required for etcd prefix scans to return
+// ranges in sorted order.
 // Expected format: <prefix>/<namespace>/ranges/<hex(lowInclusive)>
 func BuildRangeKey(prefix, namespace string, lowInclusive []byte) string {
 	return fmt.Sprintf("%s%s", BuildRangesPrefix(prefix, namespace), hex.EncodeToString(lowInclusive))

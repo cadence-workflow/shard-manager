@@ -15,7 +15,6 @@ type Range struct {
 	HighExclusive []byte
 }
 
-// Errors returned when constructing an invalid range.
 var (
 	ErrRangeInvalid   = errors.New("range is invalid: LowInclusive must be < HighExclusive")
 	ErrRangeNilBounds = errors.New("range bounds cannot be nil")
@@ -109,7 +108,7 @@ func (r *Range) IsFinalRange() bool {
 	return r != nil && bytes.Equal(r.HighExclusive, RangeUpperBoundInfinity)
 }
 
-// String returns a bounded hexadecimal representation used for logs.
+// String returns a hexadecimal representation suitable for logs.
 func (r *Range) String() string {
 	if !r.IsValid() {
 		return "<invalid range>"

@@ -36,9 +36,7 @@ func assignment(t *testing.T, r *types.Range, executorID string) *RangeAssignmen
 	return &RangeAssignment{Range: r, ExecutorID: executorID, Status: types.AssignmentStatusREADY}
 }
 
-// validCover builds a three-range cover of [min, 0x40…), [0x40…, 0x80…) and
-// [0x80…, infinity), each with a distinct executor. All bounds are 8 bytes, so
-// the first low bound is the 8-zero-byte minimum.
+// validCover returns a valid three-range cover used by tests.
 func validCover(t *testing.T) []*RangeAssignment {
 	t.Helper()
 	return []*RangeAssignment{
@@ -98,8 +96,6 @@ func TestNewRangeIndex(t *testing.T) {
 			ranges:  nil,
 			wantErr: "must not be empty",
 		},
-		// Gap between 0x40 and 0x60 leaves keys in that range unowned. This would
-		// break the "complete cover" invariant and cause key lookups to fail.
 		{
 			name: "gap between ranges",
 			ranges: []*RangeAssignment{
@@ -109,8 +105,6 @@ func TestNewRangeIndex(t *testing.T) {
 			},
 			wantErr: "not adjacent",
 		},
-		// Overlap means two executors claim the same keys, violating the
-		// non-overlapping invariant and causing ambiguous ownership.
 		{
 			name: "overlap between ranges",
 			ranges: []*RangeAssignment{

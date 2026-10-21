@@ -61,10 +61,7 @@ type AssignRangesRequest struct {
 	Assignments []*RangeAssignment
 }
 
-// ValidateLowBound checks that a lower bound is exactly hash.FingerprintSize
-// bytes. The storage layer keys ranges by the hex-encoded lower bound, and
-// ParseRangeKey only accepts an 8-byte bound, so any other width would produce
-// a key that cannot round-trip.
+// ValidateLowBound ensures the bound can round-trip through the storage key format.
 func ValidateLowBound(lowInclusive []byte) error {
 	if len(lowInclusive) != hash.FingerprintSize {
 		return fmt.Errorf("low bound must be exactly %d bytes, got %d", hash.FingerprintSize, len(lowInclusive))

@@ -24,12 +24,7 @@ func TestValidateRangeBounds(t *testing.T) {
 		{name: "final", r: &types.Range{LowInclusive: midBound, HighExclusive: types.RangeUpperBoundInfinity}},
 		{name: "minimum to infinity", r: &types.Range{LowInclusive: minBound, HighExclusive: types.RangeUpperBoundInfinity}},
 		{name: "nil", r: nil, wantErr: "must not be nil"},
-		// Equal bounds create a zero-width range containing no keys. Without this
-		// check, such ranges could be stored but would break cover validation and
-		// leave keys unowned.
 		{name: "equal bounds", r: &types.Range{LowInclusive: midBound, HighExclusive: midBound}, wantErr: "low must be < high"},
-		// Inverted bounds (low > high) would create an impossible range. This must
-		// be rejected to prevent invalid state in the system.
 		{name: "inverted bounds", r: &types.Range{LowInclusive: highBound, HighExclusive: midBound}, wantErr: "low must be < high"},
 		{name: "short low bound", r: &types.Range{LowInclusive: midBound[:4], HighExclusive: highBound}, wantErr: "low bound must be exactly"},
 		{name: "short high bound", r: &types.Range{LowInclusive: minBound, HighExclusive: highBound[:4]}, wantErr: "high bound must be exactly"},

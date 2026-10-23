@@ -11,6 +11,7 @@ import (
 	"go.uber.org/yarpc/api/peer"
 	"go.uber.org/yarpc/api/transport"
 	"go.uber.org/yarpc/peer/hostport"
+	"go.uber.org/yarpc/pkg/lifecycle"
 	"go.uber.org/yarpc/yarpcerrors"
 	"go.uber.org/zap"
 
@@ -50,14 +51,14 @@ type SpectatorPeerChooser struct {
 	spectators *Spectators
 	transport  peer.Transport
 	logger     *zap.Logger
-	namespace  string
 
 	peersMutex sync.RWMutex
 	peers      map[string]*trackedPeer // grpc_address -> peer
 	timeSource clock.TimeSource
 	peerTTL    time.Duration
-	stopCh     chan struct{}
-	stopWG     sync.WaitGroup
+
+	once   *lifecycle.Once
+	stopWG sync.WaitGroup
 }
 
 type SpectatorPeerChooserParams struct {
@@ -78,42 +79,24 @@ func NewSpectatorPeerChooser(
 		peers:      make(map[string]*trackedPeer),
 		peerTTL:    params.Config.GetPeerTTL(),
 		timeSource: params.TimeSource,
+		once:       lifecycle.NewOnce(),
 	}
 }
 
-// Start satisfies the peer.Chooser interface
+// Start satisfies the peer.Chooser interface. A stopped chooser does not start again.
 func (c *SpectatorPeerChooser) Start() error {
-	c.logger.Info("Starting shard distributor peer chooser", zap.String(tag.Namespace, c.namespace))
-	c.startEvictionLoop()
-	return nil
+	return c.once.Start(c.start)
 }
 
-// Stop satisfies the peer.Chooser interface
+// Stop satisfies the peer.Chooser interface. It returns once the eviction loop
+// has exited and every cached peer is released.
 func (c *SpectatorPeerChooser) Stop() error {
-	c.logger.Info("Stopping shard distributor peer chooser", zap.String(tag.Namespace, c.namespace))
-
-	if c.stopCh != nil {
-		close(c.stopCh)
-		c.stopWG.Wait()
-		c.stopCh = nil
-	}
-
-	c.peersMutex.Lock()
-	defer c.peersMutex.Unlock()
-
-	for addr, tp := range c.peers {
-		if err := c.transport.ReleasePeer(tp.peer, &noOpSubscriber{}); err != nil {
-			c.logger.Error("Failed to release peer", zap.Error(err), zap.String(tag.Address, addr))
-		}
-	}
-	c.peers = make(map[string]*trackedPeer)
-
-	return nil
+	return c.once.Stop(c.stop)
 }
 
 // IsRunning satisfies the peer.Chooser interface
 func (c *SpectatorPeerChooser) IsRunning() bool {
-	return true
+	return c.once.IsRunning()
 }
 
 // Choose returns a peer for the given shard key by:
@@ -174,6 +157,30 @@ func (c *SpectatorPeerChooser) SetSpectators(spectators *Spectators) {
 	c.spectators = spectators
 }
 
+func (c *SpectatorPeerChooser) start() error {
+	c.logger.Info("Starting shard distributor peer chooser")
+	c.startEvictionLoop()
+	return nil
+}
+
+func (c *SpectatorPeerChooser) stop() error {
+	c.logger.Info("Stopping shard distributor peer chooser")
+
+	c.stopWG.Wait()
+
+	c.peersMutex.Lock()
+	defer c.peersMutex.Unlock()
+
+	for addr, tp := range c.peers {
+		if err := c.transport.ReleasePeer(tp.peer, &noOpSubscriber{}); err != nil {
+			c.logger.Error("Failed to release peer", zap.Error(err), zap.String(tag.Address, addr))
+		}
+	}
+	c.peers = make(map[string]*trackedPeer)
+
+	return nil
+}
+
 func (c *SpectatorPeerChooser) getOrCreatePeer(grpcAddress string) (peer.Peer, error) {
 	c.peersMutex.Lock()
 	defer c.peersMutex.Unlock()
@@ -210,10 +217,6 @@ func (c *SpectatorPeerChooser) evictStalePeers() {
 }
 
 func (c *SpectatorPeerChooser) startEvictionLoop() {
-	if c.stopCh != nil {
-		return // already started
-	}
-	c.stopCh = make(chan struct{})
 	c.stopWG.Add(1)
 	go func() {
 		defer c.stopWG.Done()
@@ -226,7 +229,7 @@ func (c *SpectatorPeerChooser) startEvictionLoop() {
 			select {
 			case <-ticker.Chan():
 				c.evictStalePeers()
-			case <-c.stopCh:
+			case <-c.once.Stopping():
 				return
 			}
 		}

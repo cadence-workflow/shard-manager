@@ -2,12 +2,15 @@ package spectatorclient
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/yarpc/api/peer"
 	"go.uber.org/yarpc/api/transport"
 	"go.uber.org/yarpc/peer/hostport"
 	"go.uber.org/yarpc/transport/grpc"
@@ -80,21 +83,68 @@ func TestSpectatorPeerChooser_Choose_SpectatorNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "spectator not found")
 }
 
-func TestSpectatorPeerChooser_StartStop(t *testing.T) {
-	chooser := &SpectatorPeerChooser{
-		logger:     zap.NewNop(),
-		peers:      make(map[string]*trackedPeer),
-		timeSource: clock.NewRealTimeSource(),
-		peerTTL:    time.Minute,
+func TestSpectatorPeerChooser_ConcurrentStartStop(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	peerTransport := grpc.NewTransport()
+	require.NoError(t, peerTransport.Start())
+	defer peerTransport.Stop()
+
+	timeSource := clock.NewMockedTimeSource()
+	params := SpectatorPeerChooserParams{
+		Transport:  peerTransport,
+		Logger:     zap.NewNop(),
+		TimeSource: timeSource,
+	}
+	chooser := NewSpectatorPeerChooser(params).(*SpectatorPeerChooser)
+
+	namespace := "test-namespace"
+	shardKey := "shard-1"
+	cachedPeerAddress := "127.0.0.1:7953"
+
+	mockSpectator := NewMockSpectator(gomock.NewController(t))
+	mockSpectator.EXPECT().
+		GetShardOwner(gomock.Any(), shardKey).
+		Return(&ShardOwner{
+			ExecutorID: "executor-1",
+			Metadata:   map[string]string{clientcommon.GrpcAddressMetadataKey: cachedPeerAddress},
+		}, nil)
+	chooser.SetSpectators(&Spectators{spectators: map[string]Spectator{namespace: mockSpectator}})
+
+	// Several outbounds can share one chooser, and yarpc starts and stops them concurrently.
+	outbounds := 3
+	callConcurrently := func(lifecycleMethod func() error) {
+		var wg sync.WaitGroup
+		for range outbounds {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				assert.NoError(t, lifecycleMethod())
+			}()
+		}
+		wg.Wait()
 	}
 
-	err := chooser.Start()
+	callConcurrently(chooser.Start)
+	assert.True(t, chooser.IsRunning(), "chooser should be running after Start")
+	// The eviction loop's ticker is the clock's only waiter.
+	timeSource.BlockUntil(1)
+
+	req := &transport.Request{
+		ShardKey: shardKey,
+		Headers:  transport.NewHeaders().With(NamespaceHeader, namespace),
+	}
+	chosenPeer, _, err := chooser.Choose(context.Background(), req)
 	require.NoError(t, err)
+	require.Equal(t, cachedPeerAddress, chosenPeer.Identifier(), "Choose should route to the shard owner's address")
 
-	assert.True(t, chooser.IsRunning())
+	callConcurrently(chooser.Stop)
+	assert.False(t, chooser.IsRunning(), "chooser should not be running after Stop")
 
-	err = chooser.Stop()
-	assert.NoError(t, err)
+	// Releasing again fails only if the chooser already released its reference.
+	err = peerTransport.ReleasePeer(hostport.Identify(cachedPeerAddress), &noOpSubscriber{})
+	var noReferenceErr peer.ErrTransportHasNoReferenceToPeer
+	assert.ErrorAs(t, err, &noReferenceErr, "Stop should release the chooser's reference to every cached peer")
 }
 
 func TestSpectatorPeerChooser_SetSpectators(t *testing.T) {
@@ -282,28 +332,6 @@ func TestSpectatorPeerChooser_Choose_TracksLastUsed(t *testing.T) {
 
 	// lastUsed should have advanced
 	assert.True(t, secondLastUsed.After(firstLastUsed), "lastUsed should be updated on reuse")
-}
-
-func TestSpectatorPeerChooser_StartStop_WithTTL(t *testing.T) {
-	peerTransport := grpc.NewTransport()
-	require.NoError(t, peerTransport.Start())
-	defer peerTransport.Stop()
-
-	chooser := &SpectatorPeerChooser{
-		transport:  peerTransport,
-		logger:     zap.NewNop(),
-		peers:      make(map[string]*trackedPeer),
-		timeSource: clock.NewRealTimeSource(),
-		peerTTL:    100 * time.Millisecond,
-	}
-
-	require.NoError(t, chooser.Start())
-	assert.NotNil(t, chooser.stopCh, "eviction loop should be started")
-
-	require.NoError(t, chooser.Stop())
-	// After Stop, the goroutine must have exited (stopWG.Wait() returned)
-	// Verify idempotency: a second Stop should not panic
-	require.NoError(t, chooser.Stop())
 }
 
 func TestSpectatorPeerChooser_EvictStalePeers(t *testing.T) {

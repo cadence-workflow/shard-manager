@@ -62,9 +62,6 @@ func opts(names NamespacesNames) fx.Option {
 
 		spectatorclient.Module(),
 		fx.Provide(spectatorclient.NewSpectatorPeerChooser),
-		fx.Invoke(func(chooser spectatorclient.SpectatorPeerChooserInterface, lc fx.Lifecycle) {
-			lc.Append(fx.StartStopHook(chooser.Start, chooser.Stop))
-		}),
 
 		// Create canary client using the dispatcher's client config
 		fx.Provide(func(dispatcher *yarpc.Dispatcher) sharddistributorv1.ShardDistributorExecutorCanaryAPIYARPCClient {

@@ -86,10 +86,7 @@ func New(namespace string, timeSource clock.TimeSource, cfg *config.Config, stor
 		cache:      shardCache,
 		metrics:    metricsClient.Scope(metrics.ShardDistributorEphemeralAssignmentScope, metrics.NamespaceTag(namespace)),
 	}
-	a.batcher = newShardBatcher(timeSource, ephemeralBatchTimeout, cfg.EphemeralAssignmentCoalescingWindow,
-		func(ctx context.Context, _ string, shardKeys []string) (map[string]*types.GetShardOwnerResponse, map[string]struct{}, error) {
-			return a.assignEphemeralBatch(ctx, shardKeys)
-		})
+	a.batcher = newShardBatcher(namespace, timeSource, ephemeralBatchTimeout, cfg.EphemeralAssignmentCoalescingWindow, a.assignEphemeralBatch)
 	return a
 }
 
@@ -105,7 +102,7 @@ func (a *Assigner) Stop() {
 
 // GetOrAssign assigns an ephemeral shard that does not yet exist in storage.
 func (a *Assigner) GetOrAssign(ctx context.Context, shardKey string) (*types.GetShardOwnerResponse, error) {
-	resp, err := a.batcher.Submit(ctx, &types.GetShardOwnerRequest{Namespace: a.namespace, ShardKey: shardKey})
+	resp, err := a.batcher.Submit(ctx, shardKey)
 	if err != nil {
 		return nil, a.mapAssignError(shardKey, err)
 	}

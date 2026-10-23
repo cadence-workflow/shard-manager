@@ -40,6 +40,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -55,12 +56,12 @@ func newTestHandler(t *testing.T, cfg config.ShardDistribution, mockStore *store
 	t.Helper()
 	assigner := ephemeralassigner.New(clock.NewRealTimeSource(), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStore, mockCache, metrics.NewNoopMetricsClient())
 	handler := &handlerImpl{
-		logger:               testlogger.New(t),
-		shardDistributionCfg: cfg,
-		storage:              mockStore,
-		shardCache:           mockCache,
-		timeSource:           clock.NewRealTimeSource(),
-		assigner:             assigner,
+		logger:     testlogger.New(t),
+		namespaces: namespaces.MustNewRegistry(cfg),
+		storage:    mockStore,
+		shardCache: mockCache,
+		timeSource: clock.NewRealTimeSource(),
+		assigner:   assigner,
 	}
 	assigner.Start()
 	t.Cleanup(assigner.Stop)
@@ -365,11 +366,11 @@ func TestWatchNamespaceState(t *testing.T) {
 	}
 
 	handler := &handlerImpl{
-		logger:               logger,
-		shardDistributionCfg: cfg,
-		storage:              mockStorage,
-		shardCache:           mockCache,
-		startWG:              sync.WaitGroup{},
+		logger:     logger,
+		namespaces: namespaces.MustNewRegistry(cfg),
+		storage:    mockStorage,
+		shardCache: mockCache,
+		startWG:    sync.WaitGroup{},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -435,6 +436,21 @@ func TestWatchNamespaceState(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+func TestWatchNamespaceStateUnknownNamespace(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	// No expectations: an unknown namespace must not reach the cache.
+	mockCache := cache.NewMockShardCache(ctrl)
+	handler := &handlerImpl{
+		logger:     testlogger.New(t),
+		namespaces: namespaces.MustNewRegistry(config.ShardDistribution{}),
+		shardCache: mockCache,
+	}
+
+	err := handler.WatchNamespaceState(&types.WatchNamespaceStateRequest{Namespace: "unknown"}, NewMockWatchNamespaceStateServer(ctrl))
+
+	require.Equal(t, &types.NamespaceNotFoundError{Namespace: "unknown"}, err)
+}
+
 func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 	const watchStopTimeout = 5 * time.Second
 
@@ -450,7 +466,7 @@ func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {
 		},
 	}
 
-	rawHandler := NewHandler(logger, clock.NewRealTimeSource(), cfg, newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage, mockCache, metrics.NewNoopMetricsClient())
+	rawHandler := NewHandler(logger, clock.NewRealTimeSource(), namespaces.MustNewRegistry(cfg), newTestShardDistributorConfig(config.LoadBalancingModeNAIVE), mockStorage, mockCache, metrics.NewNoopMetricsClient())
 	handler := rawHandler.(*handlerImpl)
 	handler.Start()
 
@@ -1014,7 +1030,7 @@ func TestListNamespaces(t *testing.T) {
 			},
 		},
 		{
-			name: "preserves order and surfaces both fixed and ephemeral",
+			name: "surfaces both fixed and ephemeral",
 			cfg: config.ShardDistribution{
 				Namespaces: []config.Namespace{
 					{Name: "first", Type: config.NamespaceTypeFixed, ShardNum: 8},

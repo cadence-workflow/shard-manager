@@ -17,6 +17,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -116,6 +117,21 @@ func TestHeartbeat(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("UnknownNamespace", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		// No expectations: an unknown namespace must not reach storage.
+		mockStore := store.NewMockStore(ctrl)
+		handler := newTestExecutorHandler(t, mockStore, clock.NewMockedTimeSource())
+
+		_, err := handler.Heartbeat(ctx, &types.ExecutorHeartbeatRequest{
+			Namespace:  "unknown",
+			ExecutorID: executorID,
+			Status:     types.ExecutorStatusACTIVE,
+		})
+
+		require.Equal(t, &types.NamespaceNotFoundError{Namespace: "unknown"}, err)
+	})
+
 	// Test Case 4: Storage Error
 	t.Run("StorageError", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -142,7 +158,7 @@ func TestHeartbeat(t *testing.T) {
 		mockStore := store.NewMockStore(ctrl)
 		mockTimeSource := clock.NewMockedTimeSourceAt(now)
 		logger, logs := testlogger.NewObserved(t)
-		handler := NewExecutorHandler(logger, mockStore, mockTimeSource, newTestShardDistributorConfig(config.LoadBalancingModeGREEDY), metrics.NoopClient)
+		handler := NewExecutorHandler(logger, newTestExecutorNamespaces(), mockStore, mockTimeSource, newTestShardDistributorConfig(config.LoadBalancingModeGREEDY), metrics.NoopClient)
 
 		const assignmentModRevision = int64(42)
 		reports := map[string]*types.ShardStatusReport{
@@ -765,10 +781,17 @@ func TestEmitShardAssignmentMetrics(t *testing.T) {
 	}
 }
 
+func newTestExecutorNamespaces() *namespaces.Registry {
+	return namespaces.MustNewRegistry(config.ShardDistribution{
+		Namespaces: []config.Namespace{{Name: "test-namespace", Type: config.NamespaceTypeFixed, ShardNum: 1}},
+	})
+}
+
 func newTestExecutorHandler(t *testing.T, storage store.Store, timeSource clock.TimeSource) Executor {
 	t.Helper()
 	return NewExecutorHandler(
 		testlogger.New(t),
+		newTestExecutorNamespaces(),
 		storage,
 		timeSource,
 		newTestShardDistributorConfig(config.LoadBalancingModeNAIVE),

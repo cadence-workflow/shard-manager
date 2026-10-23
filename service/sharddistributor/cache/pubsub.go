@@ -4,8 +4,6 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-
-	"github.com/cadence-workflow/shard-manager/common/log"
 )
 
 type executorStateSubscriber struct {
@@ -22,20 +20,15 @@ type executorStatePubSub struct {
 	sync.RWMutex
 
 	subscribers map[string]*executorStateSubscriber
-	logger      log.Logger
-	namespace   string
 }
 
-func newExecutorStatePubSub(logger log.Logger, namespace string) *executorStatePubSub {
+func newExecutorStatePubSub() *executorStatePubSub {
 	return &executorStatePubSub{
 		subscribers: make(map[string]*executorStateSubscriber),
-		logger:      logger,
-		namespace:   namespace,
 	}
 }
 
 // subscribe returns a channel that receives executor state updates.
-// snapshot is called under p.mu — it must not re-acquire p.mu.
 func (p *executorStatePubSub) subscribe() (chan struct{}, func()) {
 	uniqueID := uuid.New().String()
 	subscriber := &executorStateSubscriber{

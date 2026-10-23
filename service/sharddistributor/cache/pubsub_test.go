@@ -7,13 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
-
-	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 )
 
 func TestExecutorStatePubSub_SubscribeUnsubscribeWorks(t *testing.T) {
 	defer goleak.VerifyNone(t)
-	pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
+	pubsub := newExecutorStatePubSub()
 
 	ch, unsub := pubsub.subscribe()
 	assert.NotNil(t, ch)
@@ -30,7 +28,7 @@ func TestExecutorStatePubSub_SubscribeUnsubscribeWorks(t *testing.T) {
 func TestExecutorStatePubSub_NotificationsSent(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
-	pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
+	pubsub := newExecutorStatePubSub()
 
 	var receivedCh1, receivedCh2 bool
 	ch1, unsub1 := pubsub.subscribe()
@@ -61,7 +59,7 @@ func TestExecutorStatePubSub_NotificationsSent(t *testing.T) {
 func TestExecutorStatePubSub_NotificationsAreNotBlockedWhenOneReaderIsStuck(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
-	pubsub := newExecutorStatePubSub(testlogger.New(t), "test-ns")
+	pubsub := newExecutorStatePubSub()
 
 	var receivedCh2 int
 

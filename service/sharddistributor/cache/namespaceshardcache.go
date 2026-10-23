@@ -10,10 +10,8 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
-	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -29,7 +27,7 @@ const (
 	refreshOperationTimeout = 5 * time.Second
 )
 
-type namespaceShardToExecutor struct {
+type shardCache struct {
 	sync.RWMutex
 
 	shardToExecutor  map[string]*store.ShardOwner   // shardID -> shardOwner
@@ -40,11 +38,10 @@ type namespaceShardToExecutor struct {
 	lastRevision     int64               // etcd store revision of the last applied snapshot
 	namespace        string
 	stopCh           chan struct{}
+	wg               sync.WaitGroup
 	logger           log.Logger
 	executorStore    store.Store
-	timeSource       clock.TimeSource
 	pubSub           *executorStatePubSub
-	metricsClient    metrics.Client
 
 	// refreshSF deduplicates concurrent cache-miss refreshes. When N callers
 	// simultaneously miss the cache, only one of them performs the etcd read;
@@ -55,41 +52,61 @@ type namespaceShardToExecutor struct {
 	refreshTimeout time.Duration
 }
 
-func newNamespaceShardToExecutor(namespace string, executorStore store.Store, stopCh chan struct{}, logger log.Logger, timeSource clock.TimeSource, metricsClient metrics.Client) *namespaceShardToExecutor {
-	return &namespaceShardToExecutor{
+var _ ShardCache = (*shardCache)(nil)
+
+// NewShardCache builds the cache of one namespace.
+func NewShardCache(namespace string, executorStore store.Store, logger log.Logger) ShardCache {
+	return newShardCache(namespace, executorStore, logger)
+}
+
+func newShardCache(namespace string, executorStore store.Store, logger log.Logger) *shardCache {
+	return &shardCache{
 		shardToExecutor:  make(map[string]*store.ShardOwner),
 		executorToShards: make(map[*store.ShardOwner][]string),
 		executorRevision: make(map[string]int64),
 		shardOwners:      make(map[string]*store.ShardOwner),
 		drainedShards:    make(map[string]struct{}),
 		namespace:        namespace,
-		stopCh:           stopCh,
+		stopCh:           make(chan struct{}),
 		logger:           logger.WithTags(tag.ShardNamespace(namespace)),
 		executorStore:    executorStore,
-		timeSource:       timeSource,
-		pubSub:           newExecutorStatePubSub(logger, namespace),
-		metricsClient:    metricsClient,
+		pubSub:           newExecutorStatePubSub(),
 		refreshTimeout:   refreshOperationTimeout,
 	}
 }
 
-func (n *namespaceShardToExecutor) Start(wg *sync.WaitGroup) error {
-	changeCh, err := n.executorStore.SubscribeToNamespaceChanges(n.namespace)
+func (c *shardCache) Start() error {
+	changeCh, err := c.executorStore.SubscribeToNamespaceChanges(c.namespace)
 	if err != nil {
 		return fmt.Errorf("subscribe to namespace changes: %w", err)
 	}
 
-	wg.Add(1)
+	c.wg.Add(1)
 	go func() {
-		defer wg.Done()
-		n.namespaceRefreshLoop(changeCh)
+		defer c.wg.Done()
+		c.namespaceRefreshLoop(changeCh)
 	}()
 
 	return nil
 }
 
-func (n *namespaceShardToExecutor) GetShardOwner(ctx context.Context, shardID string) (*store.ShardOwner, error) {
-	shardOwner, err := n.getShardOwnerInMap(ctx, &n.shardToExecutor, shardID)
+func (c *shardCache) Stop() {
+	close(c.stopCh)
+	c.wg.Wait()
+}
+
+// GetShardOwner returns the owner of the shard.
+// Drained shards return ErrShardDrained rather than the last assigned owner
+func (c *shardCache) GetShardOwner(ctx context.Context, shardID string) (*store.ShardOwner, error) {
+	drained, err := c.IsShardDrained(ctx, shardID)
+	if err != nil {
+		return nil, fmt.Errorf("check shard drained: %w", err)
+	}
+	if drained {
+		return nil, store.ErrShardDrained
+	}
+
+	shardOwner, err := c.getShardOwnerInMap(ctx, &c.shardToExecutor, shardID)
 	if err != nil {
 		return nil, fmt.Errorf("get shard owner in map: %w", err)
 	}
@@ -101,31 +118,31 @@ func (n *namespaceShardToExecutor) GetShardOwner(ctx context.Context, shardID st
 }
 
 // IsShardDrained answers from the cached drained set, which the namespace watch keeps current
-func (n *namespaceShardToExecutor) IsShardDrained(ctx context.Context, shardID string) (bool, error) {
-	if drained, loaded := n.lookupDrained(shardID); loaded {
+func (c *shardCache) IsShardDrained(ctx context.Context, shardID string) (bool, error) {
+	if drained, loaded := c.lookupDrained(shardID); loaded {
 		return drained, nil
 	}
 
-	if err := n.refreshSingleFlight(ctx); err != nil {
-		return false, fmt.Errorf("refresh for namespace %s: %w", n.namespace, err)
+	if err := c.refreshSingleFlight(ctx); err != nil {
+		return false, fmt.Errorf("refresh for namespace %s: %w", c.namespace, err)
 	}
 
-	drained, _ := n.lookupDrained(shardID)
+	drained, _ := c.lookupDrained(shardID)
 	return drained, nil
 }
 
 // lookupDrained reports whether the shard is drained, and whether the cache holds a
 // loaded snapshot at all
-func (n *namespaceShardToExecutor) lookupDrained(shardID string) (drained, loaded bool) {
-	n.RLock()
-	defer n.RUnlock()
+func (c *shardCache) lookupDrained(shardID string) (drained, loaded bool) {
+	c.RLock()
+	defer c.RUnlock()
 
-	_, drained = n.drainedShards[shardID]
-	return drained, n.lastRevision > 0
+	_, drained = c.drainedShards[shardID]
+	return drained, c.lastRevision > 0
 }
 
-func (n *namespaceShardToExecutor) GetExecutor(ctx context.Context, executorID string) (*store.ShardOwner, error) {
-	shardOwner, err := n.getShardOwnerInMap(ctx, &n.shardOwners, executorID)
+func (c *shardCache) GetExecutor(ctx context.Context, executorID string) (*store.ShardOwner, error) {
+	shardOwner, err := c.getShardOwnerInMap(ctx, &c.shardOwners, executorID)
 	if err != nil {
 		return nil, fmt.Errorf("get shard owner in map: %w", err)
 	}
@@ -136,73 +153,73 @@ func (n *namespaceShardToExecutor) GetExecutor(ctx context.Context, executorID s
 	return nil, store.ErrExecutorNotFound
 }
 
-func (n *namespaceShardToExecutor) Subscribe() (<-chan struct{}, func()) {
-	return n.pubSub.subscribe()
+func (c *shardCache) Subscribe() (<-chan struct{}, func()) {
+	return c.pubSub.subscribe()
 }
 
-func (n *namespaceShardToExecutor) namespaceRefreshLoop(changeCh <-chan struct{}) {
+func (c *shardCache) namespaceRefreshLoop(changeCh <-chan struct{}) {
 	for {
 		select {
-		case <-n.stopCh:
-			n.logger.Info("stop channel closed, exiting namespaceRefreshLoop")
+		case <-c.stopCh:
+			c.logger.Info("stop channel closed, exiting namespaceRefreshLoop")
 			return
 
 		case _, ok := <-changeCh:
 			if !ok {
-				n.logger.Info("namespace change channel closed, exiting namespaceRefreshLoop")
+				c.logger.Info("namespace change channel closed, exiting namespaceRefreshLoop")
 				return
 			}
 
 			// Bounded so a stuck etcd call can't block this loop from observing stopCh.
-			refreshCtx, cancel := context.WithTimeout(context.Background(), n.refreshTimeout)
-			err := n.refresh(refreshCtx)
+			refreshCtx, cancel := context.WithTimeout(context.Background(), c.refreshTimeout)
+			err := c.refresh(refreshCtx)
 			cancel()
 			if err != nil {
-				n.logger.Error("failed to refresh namespace shard to executor", tag.Error(err))
+				c.logger.Error("failed to refresh namespace shard to executor", tag.Error(err))
 			}
 		}
 	}
 }
 
-func (n *namespaceShardToExecutor) refresh(ctx context.Context) error {
-	updated, err := n.refreshNamespaceState(ctx)
+func (c *shardCache) refresh(ctx context.Context) error {
+	updated, err := c.refreshNamespaceState(ctx)
 	if err != nil {
 		return fmt.Errorf("refresh namespace state: %w", err)
 	}
 
 	if updated {
-		n.pubSub.notifySubscribers()
+		c.pubSub.notifySubscribers()
 	}
 	return nil
 }
 
-func (n *namespaceShardToExecutor) GetShardAssignments() store.AssignmentSnapshot {
-	n.RLock()
-	defer n.RUnlock()
+func (c *shardCache) GetShardAssignments() store.AssignmentSnapshot {
+	c.RLock()
+	defer c.RUnlock()
 
-	shardAssignments := make(map[*store.ShardOwner][]string, len(n.executorToShards))
-	for executor, shardIDs := range n.executorToShards {
+	shardAssignments := make(map[*store.ShardOwner][]string, len(c.executorToShards))
+	for executor, shardIDs := range c.executorToShards {
 		shardAssignments[executor] = slices.Clone(shardIDs)
 	}
 
 	return store.AssignmentSnapshot{
 		ExecutorToShards: shardAssignments,
-		DrainedShards:    maps.Clone(n.drainedShards),
+		DrainedShards:    maps.Clone(c.drainedShards),
 	}
 }
 
 // refreshNamespaceState reads every keyspace the cache tracks in one store call, so both
 // the executor state and the drained set advance together under a single store revision.
-func (n *namespaceShardToExecutor) refreshNamespaceState(ctx context.Context) (bool, error) {
-	state, err := n.executorStore.GetAssignmentState(ctx, n.namespace)
+func (c *shardCache) refreshNamespaceState(ctx context.Context) (bool, error) {
+	state, err := c.executorStore.GetAssignmentState(ctx, c.namespace)
 	if err != nil {
-		return false, fmt.Errorf("get assignment state for namespace %s: %w", n.namespace, err)
+		return false, fmt.Errorf("get assignment state for namespace %s: %w", c.namespace, err)
 	}
 
-	return n.applyNamespaceState(state), nil
+	return c.applyNamespaceState(state), nil
 }
 
-func (n *namespaceShardToExecutor) applyNamespaceState(state *store.AssignmentState) bool {
+func (c *shardCache) applyNamespaceState(state *store.AssignmentState) bool {
 	shardToExecutor := make(map[string]*store.ShardOwner)
 	executorState := make(map[*store.ShardOwner][]string)
 	executorRevision := make(map[string]int64)
@@ -224,10 +241,10 @@ func (n *namespaceShardToExecutor) applyNamespaceState(state *store.AssignmentSt
 		maps.Copy(shardOwner.Metadata, executorMetadata)
 	}
 
-	return n.replaceNamespaceState(state.Revision, shardToExecutor, executorState, executorRevision, shardOwners, state.DrainedShards)
+	return c.replaceNamespaceState(state.Revision, shardToExecutor, executorState, executorRevision, shardOwners, state.DrainedShards)
 }
 
-func (n *namespaceShardToExecutor) replaceNamespaceState(
+func (c *shardCache) replaceNamespaceState(
 	storeRevision int64,
 	shardToExecutor map[string]*store.ShardOwner,
 	executorState map[*store.ShardOwner][]string,
@@ -235,23 +252,23 @@ func (n *namespaceShardToExecutor) replaceNamespaceState(
 	shardOwners map[string]*store.ShardOwner,
 	drainedShards map[string]struct{},
 ) bool {
-	n.Lock()
-	defer n.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
-	if storeRevision <= n.lastRevision {
-		n.logger.Debug("skipping stale cache update",
+	if storeRevision <= c.lastRevision {
+		c.logger.Debug("skipping stale cache update",
 			tag.Dynamic("storeRevision", storeRevision),
-			tag.Dynamic("lastRevision", n.lastRevision),
+			tag.Dynamic("lastRevision", c.lastRevision),
 		)
 		return false
 	}
 
-	n.lastRevision = storeRevision
-	n.shardToExecutor = shardToExecutor
-	n.executorToShards = executorState
-	n.executorRevision = executorRevision
-	n.shardOwners = shardOwners
-	n.drainedShards = drainedShards
+	c.lastRevision = storeRevision
+	c.shardToExecutor = shardToExecutor
+	c.executorToShards = executorState
+	c.executorRevision = executorRevision
+	c.shardOwners = shardOwners
+	c.drainedShards = drainedShards
 	return true
 }
 
@@ -270,21 +287,21 @@ func getOrCreateShardOwner(shardOwners map[string]*store.ShardOwner, executorID 
 
 // getShardOwnerInMap retrieves a shard owner from the map if it exists, otherwise it refreshes the cache and tries again
 // it takes a pointer to the map. When the cache is refreshed, the map is updated, so we need to pass a pointer to the map
-func (n *namespaceShardToExecutor) getShardOwnerInMap(ctx context.Context, m *map[string]*store.ShardOwner, key string) (*store.ShardOwner, error) {
-	n.RLock()
+func (c *shardCache) getShardOwnerInMap(ctx context.Context, m *map[string]*store.ShardOwner, key string) (*store.ShardOwner, error) {
+	c.RLock()
 	shardOwner, ok := (*m)[key]
-	n.RUnlock()
+	c.RUnlock()
 	if ok {
 		return shardOwner, nil
 	}
 
-	if err := n.refreshSingleFlight(ctx); err != nil {
-		return nil, fmt.Errorf("refresh for namespace %s: %w", n.namespace, err)
+	if err := c.refreshSingleFlight(ctx); err != nil {
+		return nil, fmt.Errorf("refresh for namespace %s: %w", c.namespace, err)
 	}
 
-	n.RLock()
+	c.RLock()
 	shardOwner, ok = (*m)[key]
-	n.RUnlock()
+	c.RUnlock()
 	if ok {
 		return shardOwner, nil
 	}
@@ -297,11 +314,11 @@ func (n *namespaceShardToExecutor) getShardOwnerInMap(ctx context.Context, m *ma
 // refreshTimeout: detached so the leader's cancellation cannot poison the
 // flight for joiners, bounded, so a hung etcd read cannot hold the singleflight
 // key indefinitely.
-func (n *namespaceShardToExecutor) refreshSingleFlight(ctx context.Context) error {
-	ch := n.refreshSF.DoChan(refreshSingleFlightKey, func() (interface{}, error) {
-		refreshCtx, cancel := context.WithTimeout(context.Background(), n.refreshTimeout)
+func (c *shardCache) refreshSingleFlight(ctx context.Context) error {
+	ch := c.refreshSF.DoChan(refreshSingleFlightKey, func() (interface{}, error) {
+		refreshCtx, cancel := context.WithTimeout(context.Background(), c.refreshTimeout)
 		defer cancel()
-		return nil, n.refresh(refreshCtx)
+		return nil, c.refresh(refreshCtx)
 	})
 
 	select {

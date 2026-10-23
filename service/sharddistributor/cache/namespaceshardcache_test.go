@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,17 +13,15 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
-	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
-	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
 // Every signal on the namespace subscription applies the state it reads, and a state
 // that changed notifies the subscribers.
-func TestNamespaceShardToExecutor_SignalAppliesStateAndNotifies(t *testing.T) {
-	tc := setupNamespaceShardToExecutorTestCase(t)
+func TestShardCache_SignalAppliesStateAndNotifies(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
 	defer goleak.VerifyNone(t)
 
 	executor1 := testExecutor{shards: []string{"shard-1"}, metadata: map[string]string{
@@ -45,17 +44,16 @@ func TestNamespaceShardToExecutor_SignalAppliesStateAndNotifies(t *testing.T) {
 		After(firstRead).
 		AnyTimes()
 
-	wg := sync.WaitGroup{}
-	require.NoError(t, tc.e.Start(&wg))
+	require.NoError(t, tc.c.Start())
 
 	tc.changeCh <- struct{}{}
-	requireExecutorCached(t, tc.e, "executor-1", "shard-1")
-	verifyShardOwner(t, tc.e, "shard-1", "executor-1", executor1.metadata)
+	requireExecutorCached(t, tc.c, "executor-1", "shard-1")
+	verifyShardOwner(t, tc.c, "shard-1", "executor-1", executor1.metadata)
 
-	notifyCh, unSub := tc.e.Subscribe()
+	notifyCh, unSub := tc.c.Subscribe()
 	defer unSub()
 
-	snapshot := tc.e.GetShardAssignments()
+	snapshot := tc.c.GetShardAssignments()
 	assert.Len(t, snapshot.ExecutorToShards, 1)
 	verifyExecutorInState(t, snapshot.ExecutorToShards, "executor-1", []string{"shard-1"}, executor1.metadata)
 
@@ -68,33 +66,51 @@ func TestNamespaceShardToExecutor_SignalAppliesStateAndNotifies(t *testing.T) {
 		require.Fail(t, "expected to receive a notification")
 	}
 
-	snapshot = tc.e.GetShardAssignments()
+	snapshot = tc.c.GetShardAssignments()
 	assert.Len(t, snapshot.ExecutorToShards, 2)
 	verifyExecutorInState(t, snapshot.ExecutorToShards, "executor-1", []string{"shard-1"}, executor1.metadata)
 	verifyExecutorInState(t, snapshot.ExecutorToShards, "executor-2", []string{"shard-2"}, executor2.metadata)
-	verifyShardOwner(t, tc.e, "shard-2", "executor-2", executor2.metadata)
+	verifyShardOwner(t, tc.c, "shard-2", "executor-2", executor2.metadata)
 
-	close(tc.stopCh)
-	wg.Wait()
+	tc.c.Stop()
 }
 
-func TestNamespaceShardToExecutor_namespaceRefreshLoop_HungRefreshDoesNotBlockStop(t *testing.T) {
-	tc := setupNamespaceShardToExecutorTestCase(t)
+func TestShardCache_StartFailure(t *testing.T) {
+	executorStore := store.NewMockStore(gomock.NewController(t))
+	executorStore.EXPECT().
+		SubscribeToNamespaceChanges("test-namespace").
+		Return(nil, errors.New("subscribe failed"))
+
+	c := newTestShardCache(t, "test-namespace", executorStore)
+
+	require.ErrorContains(t, c.Start(), "subscribe failed")
+}
+
+func TestShardCache_GetShardOwner_DrainedShard(t *testing.T) {
+	c := newTestShardCache(t, "ns", store.NewMockStore(gomock.NewController(t)))
+	seedState(c, 1, "exec-a", "shard-1")
+
+	_, err := c.GetShardOwner(context.Background(), "shard-1")
+	assert.ErrorIs(t, err, store.ErrShardDrained)
+}
+
+func TestShardCache_namespaceRefreshLoop_HungRefreshDoesNotBlockStop(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
 	defer goleak.VerifyNone(t)
-	tc.e.refreshTimeout = 50 * time.Millisecond
+	tc.c.refreshTimeout = 50 * time.Millisecond
 
 	gatedGetState(tc, nil)
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		tc.e.namespaceRefreshLoop(tc.changeCh)
+		tc.c.namespaceRefreshLoop(tc.changeCh)
 	}()
 
 	tc.changeCh <- struct{}{}
 
 	time.Sleep(10 * time.Millisecond)
-	close(tc.stopCh)
+	tc.c.Stop()
 
 	select {
 	case <-done:
@@ -103,55 +119,53 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_HungRefreshDoesNotBlockSt
 	}
 }
 
-func TestNamespaceShardToExecutor_replaceNamespaceState_skipsStaleRevision(t *testing.T) {
+func TestShardCache_replaceNamespaceState_skipsStaleRevision(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	e := newNamespaceShardToExecutor("ns", store.NewMockStore(gomock.NewController(t)), stopCh, testlogger.New(t), clock.NewMockedTimeSource(), metrics.NewNoopMetricsClient())
+	c := newTestShardCache(t, "ns", store.NewMockStore(gomock.NewController(t)))
+	defer c.Stop()
 
 	// Apply revision 10
-	seedState(e, 10, "exec-a", "shard-1")
+	seedState(c, 10, "exec-a", "shard-1")
 
-	got := e.GetShardAssignments()
+	got := c.GetShardAssignments()
 	require.Len(t, got.ExecutorToShards, 1)
 	assert.Contains(t, got.DrainedShards, "shard-1")
-	assertShardDrained(t, e, "shard-1", true)
+	assertShardDrained(t, c, "shard-1", true)
 
 	// Apply revision 5 (stale) — should be ignored
-	seedState(e, 5, "exec-b", "shard-2")
+	seedState(c, 5, "exec-b", "shard-2")
 
-	got = e.GetShardAssignments()
+	got = c.GetShardAssignments()
 	require.Len(t, got.ExecutorToShards, 1)
 	for owner := range got.ExecutorToShards {
 		assert.Equal(t, "exec-a", owner.ExecutorID)
 	}
 	assert.Contains(t, got.DrainedShards, "shard-1")
 	assert.NotContains(t, got.DrainedShards, "shard-2")
-	assertShardDrained(t, e, "shard-1", true)
-	assertShardDrained(t, e, "shard-2", false)
+	assertShardDrained(t, c, "shard-1", true)
+	assertShardDrained(t, c, "shard-2", false)
 
 	// Apply revision 20 (newer) — should be accepted
-	seedState(e, 20, "exec-b", "shard-2")
+	seedState(c, 20, "exec-b", "shard-2")
 
-	got = e.GetShardAssignments()
+	got = c.GetShardAssignments()
 	require.Len(t, got.ExecutorToShards, 1)
 	for owner := range got.ExecutorToShards {
 		assert.Equal(t, "exec-b", owner.ExecutorID)
 	}
 	assert.NotContains(t, got.DrainedShards, "shard-1")
 	assert.Contains(t, got.DrainedShards, "shard-2")
-	assertShardDrained(t, e, "shard-1", false)
-	assertShardDrained(t, e, "shard-2", true)
+	assertShardDrained(t, c, "shard-1", false)
+	assertShardDrained(t, c, "shard-2", true)
 }
 
 // seedState applies a revision in which one executor owns one shard and that shard is
 // drained, which is the shape every caller here needs; replaceNamespaceState itself takes
 // five parallel maps.
-func seedState(e *namespaceShardToExecutor, revision int64, executorID, shardID string) {
+func seedState(c *shardCache, revision int64, executorID, shardID string) {
 	owner := &store.ShardOwner{ExecutorID: executorID, Metadata: map[string]string{}}
-	e.replaceNamespaceState(revision,
+	c.replaceNamespaceState(revision,
 		map[string]*store.ShardOwner{shardID: owner},
 		map[*store.ShardOwner][]string{owner: {shardID}},
 		map[string]int64{executorID: revision},
@@ -162,17 +176,17 @@ func seedState(e *namespaceShardToExecutor, revision int64, executorID, shardID 
 
 // assertShardDrained checks IsShardDrained without letting a cache miss reach the store; every
 // caller here has already seeded a revision.
-func assertShardDrained(t *testing.T, e *namespaceShardToExecutor, shardID string, expected bool) {
+func assertShardDrained(t *testing.T, c *shardCache, shardID string, expected bool) {
 	t.Helper()
 
-	drained, err := e.IsShardDrained(context.Background(), shardID)
+	drained, err := c.IsShardDrained(context.Background(), shardID)
 	require.NoError(t, err)
 	assert.Equal(t, expected, drained, "shard %s drained state", shardID)
 }
 
 // A drain and a later undrain must both reach the cache through the namespace subscription.
-func TestNamespaceShardToExecutor_namespaceRefreshLoop_refreshesDrainedShards(t *testing.T) {
-	tc := setupNamespaceShardToExecutorTestCase(t)
+func TestShardCache_namespaceRefreshLoop_refreshesDrainedShards(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
 	defer goleak.VerifyNone(t)
 
 	const shardID = "shard-1"
@@ -195,15 +209,15 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_refreshesDrainedShards(t 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		tc.e.namespaceRefreshLoop(tc.changeCh)
+		tc.c.namespaceRefreshLoop(tc.changeCh)
 	}()
 
 	// Read the map directly rather than through IsShardDrained, so polling cannot itself
 	// trigger a refresh and consume an expected GetState.
 	isDrained := func() bool {
-		tc.e.RLock()
-		defer tc.e.RUnlock()
-		_, drained := tc.e.drainedShards[shardID]
+		tc.c.RLock()
+		defer tc.c.RUnlock()
+		_, drained := tc.c.drainedShards[shardID]
 		return drained
 	}
 
@@ -213,14 +227,14 @@ func TestNamespaceShardToExecutor_namespaceRefreshLoop_refreshesDrainedShards(t 
 	tc.changeCh <- struct{}{}
 	require.Eventually(t, func() bool { return !isDrained() }, time.Second, time.Millisecond, "expected the undrained shard to leave the cache")
 
-	close(tc.stopCh)
+	tc.c.Stop()
 	wg.Wait()
 }
 
 // An empty drained set is a loaded state, not a miss, so it must not re-read the store.
-func TestNamespaceShardToExecutor_IsShardDrained_loadsOnceWhenNothingIsDrained(t *testing.T) {
-	tc := setupNamespaceShardToExecutorTestCase(t)
-	defer close(tc.stopCh)
+func TestShardCache_IsShardDrained_loadsOnceWhenNothingIsDrained(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
+	defer tc.c.Stop()
 
 	tc.store.EXPECT().
 		GetAssignmentState(gomock.Any(), tc.namespace).
@@ -228,7 +242,7 @@ func TestNamespaceShardToExecutor_IsShardDrained_loadsOnceWhenNothingIsDrained(t
 		Times(1)
 
 	for i := 0; i < 3; i++ {
-		drained, err := tc.e.IsShardDrained(context.Background(), "shard-1")
+		drained, err := tc.c.IsShardDrained(context.Background(), "shard-1")
 		require.NoError(t, err)
 		assert.False(t, drained)
 	}
@@ -237,23 +251,23 @@ func TestNamespaceShardToExecutor_IsShardDrained_loadsOnceWhenNothingIsDrained(t
 // Regression test: publish must take its snapshot only once it holds the
 // pubsub lock, so a publish queued behind a concurrent one can never deliver
 // a snapshot older than what was already applied to the cache.
-func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnapshot(t *testing.T) {
-	tc := setupNamespaceShardToExecutorTestCase(t)
-	defer close(tc.stopCh)
+func TestShardCache_Refresh_PublishReflectsLatestStateNotStaleSnapshot(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
+	defer tc.c.Stop()
 
-	subCh, unsub := tc.e.pubSub.subscribe()
+	subCh, unsub := tc.c.pubSub.subscribe()
 	defer unsub()
 
 	// Apply the older state.
-	seedState(tc.e, 5, "exec-a", "shard-a")
+	seedState(tc.c, 5, "exec-a", "shard-a")
 
 	// Hold the pubsub lock so the publish below queues behind it, simulating
 	// a slower refresh whose publish call loses the race for the lock.
-	tc.e.pubSub.Lock()
+	tc.c.pubSub.Lock()
 
 	publishDone := make(chan struct{})
 	go func() {
-		tc.e.pubSub.notifySubscribers() // this one should be enqueued since the lock is holded
+		tc.c.pubSub.notifySubscribers() // this one should be enqueued since the lock is holded
 		close(publishDone)
 	}()
 
@@ -262,9 +276,9 @@ func TestNamespaceShardToExecutor_Refresh_PublishReflectsLatestStateNotStaleSnap
 
 	// A concurrent, newer refresh applies its state while the notification above is
 	// still enqueued.
-	seedState(tc.e, 10, "exec-b", "shard-b")
+	seedState(tc.c, 10, "exec-b", "shard-b")
 
-	tc.e.pubSub.Unlock()
+	tc.c.pubSub.Unlock()
 	<-publishDone
 
 	select {
@@ -290,8 +304,8 @@ func verifyExecutorInState(t *testing.T, state map[*store.ShardOwner][]string, e
 }
 
 // verifyShardOwner checks that a shard has the expected owner and metadata
-func verifyShardOwner(t *testing.T, cache *namespaceShardToExecutor, shardID, expectedExecutorID string, expectedMetadata map[string]string) {
-	owner, err := cache.GetShardOwner(context.Background(), shardID)
+func verifyShardOwner(t *testing.T, c *shardCache, shardID, expectedExecutorID string, expectedMetadata map[string]string) {
+	owner, err := c.GetShardOwner(context.Background(), shardID)
 	require.NoError(t, err)
 	require.NotNil(t, owner)
 	assert.Equal(t, expectedExecutorID, owner.ExecutorID)
@@ -299,7 +313,7 @@ func verifyShardOwner(t *testing.T, cache *namespaceShardToExecutor, shardID, ex
 		assert.Equal(t, expectedValue, owner.Metadata[key])
 	}
 
-	executor, err := cache.GetExecutor(context.Background(), expectedExecutorID)
+	executor, err := c.GetExecutor(context.Background(), expectedExecutorID)
 	require.NoError(t, err)
 	require.NotNil(t, executor)
 	assert.Equal(t, expectedExecutorID, executor.ExecutorID)
@@ -308,23 +322,21 @@ func verifyShardOwner(t *testing.T, cache *namespaceShardToExecutor, shardID, ex
 	}
 }
 
-type namespaceShardToExecutorTestCase struct {
-	e     *namespaceShardToExecutor
+type shardCacheTestCase struct {
+	c     *shardCache
 	store *store.MockStore
 
 	// changeCh stands in for the store's namespace subscription.
 	changeCh chan struct{}
-	stopCh   chan struct{}
 
 	executorID string
 	namespace  string
 }
 
-func setupNamespaceShardToExecutorTestCase(t *testing.T) *namespaceShardToExecutorTestCase {
-	tc := &namespaceShardToExecutorTestCase{
+func setupShardCacheTestCase(t *testing.T) *shardCacheTestCase {
+	tc := &shardCacheTestCase{
 		store:      store.NewMockStore(gomock.NewController(t)),
 		changeCh:   make(chan struct{}),
-		stopCh:     make(chan struct{}),
 		executorID: "executor-1",
 		namespace:  "test-namespace",
 	}
@@ -334,12 +346,16 @@ func setupNamespaceShardToExecutorTestCase(t *testing.T) *namespaceShardToExecut
 		Return((<-chan struct{})(tc.changeCh), nil).
 		AnyTimes()
 
-	tc.e = newNamespaceShardToExecutor(tc.namespace, tc.store, tc.stopCh, testlogger.New(t), clock.NewRealTimeSource(), metrics.NewNoopMetricsClient())
+	tc.c = newTestShardCache(t, tc.namespace, tc.store)
 	return tc
 }
 
+func newTestShardCache(t *testing.T, namespace string, executorStore store.Store) *shardCache {
+	return newShardCache(namespace, executorStore, testlogger.New(t))
+}
+
 // state builds a namespace snapshot holding the test case's executor with shard-1 assigned.
-func (tc *namespaceShardToExecutorTestCase) state(revision int64, metadata map[string]string) *store.AssignmentState {
+func (tc *shardCacheTestCase) state(revision int64, metadata map[string]string) *store.AssignmentState {
 	return namespaceState(revision, map[string]testExecutor{
 		tc.executorID: {shards: []string{"shard-1"}, metadata: metadata},
 	})
@@ -372,17 +388,17 @@ func namespaceState(revision int64, executors map[string]testExecutor) *store.As
 
 // requireExecutorCached waits for a refresh to land, reading the maps directly so the wait
 // cannot itself trigger the cache-miss refresh it is waiting for.
-func requireExecutorCached(t *testing.T, e *namespaceShardToExecutor, executorID, shardID string) {
+func requireExecutorCached(t *testing.T, c *shardCache, executorID, shardID string) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		e.RLock()
-		defer e.RUnlock()
-		owner, ok := e.shardToExecutor[shardID]
+		c.RLock()
+		defer c.RUnlock()
+		owner, ok := c.shardToExecutor[shardID]
 		if !ok || owner.ExecutorID != executorID {
 			return false
 		}
-		_, ok = e.executorRevision[executorID]
+		_, ok = c.executorRevision[executorID]
 		return ok
 	}, time.Second, time.Millisecond, "expected %s to reach the cache", executorID)
 }
@@ -391,7 +407,7 @@ func requireExecutorCached(t *testing.T, e *namespaceShardToExecutor, executorID
 // up in one singleflight; a nil release never unblocks, standing in for a hung store. The
 // counter is how many reads actually reached the store, and the expectation is AnyTimes so a
 // regression surfaces as a count mismatch rather than "unexpected call".
-func gatedGetState(tc *namespaceShardToExecutorTestCase, release <-chan struct{}) *atomic.Int32 {
+func gatedGetState(tc *shardCacheTestCase, release <-chan struct{}) *atomic.Int32 {
 	calls := &atomic.Int32{}
 	tc.store.EXPECT().
 		GetAssignmentState(gomock.Any(), tc.namespace).
@@ -410,9 +426,9 @@ func gatedGetState(tc *namespaceShardToExecutorTestCase, release <-chan struct{}
 }
 
 // N concurrent cache-miss GetShardOwner calls must collapse into 1 store read.
-func TestNamespaceShardToExecutor_GetShardOwner_SingleFlightDedup(t *testing.T) {
-	tc := setupNamespaceShardToExecutorTestCase(t)
-	defer close(tc.stopCh)
+func TestShardCache_GetShardOwner_SingleFlightDedup(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
+	defer tc.c.Stop()
 
 	const numCallers = 50
 
@@ -429,7 +445,7 @@ func TestNamespaceShardToExecutor_GetShardOwner_SingleFlightDedup(t *testing.T) 
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			owners[i], errs[i] = tc.e.GetShardOwner(context.Background(), "shard-1")
+			owners[i], errs[i] = tc.c.GetShardOwner(context.Background(), "shard-1")
 		}(i)
 	}
 	close(start)
@@ -450,9 +466,9 @@ func TestNamespaceShardToExecutor_GetShardOwner_SingleFlightDedup(t *testing.T) 
 }
 
 // Cancelling the singleflight leader must not surface context.Canceled to other waiters.
-func TestNamespaceShardToExecutor_GetShardOwner_CallerCancelDoesNotPoisonFlight(t *testing.T) {
-	tc := setupNamespaceShardToExecutorTestCase(t)
-	defer close(tc.stopCh)
+func TestShardCache_GetShardOwner_CallerCancelDoesNotPoisonFlight(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
+	defer tc.c.Stop()
 
 	release := make(chan struct{})
 	getCalls := gatedGetState(tc, release)
@@ -460,14 +476,14 @@ func TestNamespaceShardToExecutor_GetShardOwner_CallerCancelDoesNotPoisonFlight(
 	cancelCtx, cancel := context.WithCancel(context.Background())
 	cancelledErrCh := make(chan error, 1)
 	go func() {
-		_, gerr := tc.e.GetShardOwner(cancelCtx, "shard-1")
+		_, gerr := tc.c.GetShardOwner(cancelCtx, "shard-1")
 		cancelledErrCh <- gerr
 	}()
 
 	survivorErrCh := make(chan error, 1)
 	survivorOwnerCh := make(chan *store.ShardOwner, 1)
 	go func() {
-		o, gerr := tc.e.GetShardOwner(context.Background(), "shard-1")
+		o, gerr := tc.c.GetShardOwner(context.Background(), "shard-1")
 		survivorErrCh <- gerr
 		survivorOwnerCh <- o
 	}()
@@ -501,10 +517,10 @@ func TestNamespaceShardToExecutor_GetShardOwner_CallerCancelDoesNotPoisonFlight(
 // A hung store read must not hold the singleflight key forever: the bounded
 // refresh context must time out, surface DeadlineExceeded to waiters, and
 // release the flight so the next caller can trigger a fresh read.
-func TestNamespaceShardToExecutor_GetShardOwner_RefreshContextHasBoundedTimeout(t *testing.T) {
-	tc := setupNamespaceShardToExecutorTestCase(t)
-	defer close(tc.stopCh)
-	tc.e.refreshTimeout = 50 * time.Millisecond
+func TestShardCache_GetShardOwner_RefreshContextHasBoundedTimeout(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
+	defer tc.c.Stop()
+	tc.c.refreshTimeout = 50 * time.Millisecond
 
 	getCalls := gatedGetState(tc, nil)
 
@@ -512,13 +528,13 @@ func TestNamespaceShardToExecutor_GetShardOwner_RefreshContextHasBoundedTimeout(
 	// the refresh's own bounded context, not the caller's.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := tc.e.GetShardOwner(ctx, "shard-1")
+	_, err := tc.c.GetShardOwner(ctx, "shard-1")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.EqualValues(t, 1, getCalls.Load())
 
 	// Flight must be released so the next caller triggers a fresh read.
-	_, err = tc.e.GetShardOwner(ctx, "shard-1")
+	_, err = tc.c.GetShardOwner(ctx, "shard-1")
 	require.Error(t, err)
 	assert.EqualValues(t, 2, getCalls.Load(), "second caller should trigger a new read, not join the previous flight")
 }

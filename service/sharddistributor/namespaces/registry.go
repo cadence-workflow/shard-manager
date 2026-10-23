@@ -3,7 +3,9 @@ package namespaces
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
+	"strings"
 
 	"go.uber.org/fx"
 
@@ -20,7 +22,6 @@ var Module = fx.Module("namespaces",
 // It is built once from static configuration and is immutable afterwards,
 // so it is safe for concurrent use.
 type Registry struct {
-	list   []config.Namespace
 	byName map[string]config.Namespace
 }
 
@@ -28,7 +29,6 @@ type Registry struct {
 // It returns an error if any namespace is invalid or a name appears more than once.
 func NewRegistry(cfg config.ShardDistribution) (*Registry, error) {
 	r := &Registry{
-		list:   slices.Clone(cfg.Namespaces),
 		byName: make(map[string]config.Namespace, len(cfg.Namespaces)),
 	}
 	for _, ns := range cfg.Namespaces {
@@ -77,7 +77,9 @@ func (r *Registry) Get(name string) (config.Namespace, error) {
 	return ns, nil
 }
 
-// List returns all namespaces in configuration order.
+// List returns all namespaces sorted by name.
 func (r *Registry) List() []config.Namespace {
-	return slices.Clone(r.list)
+	return slices.SortedFunc(maps.Values(r.byName), func(a, b config.Namespace) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 }

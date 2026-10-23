@@ -1030,7 +1030,7 @@ func TestListNamespaces(t *testing.T) {
 			},
 		},
 		{
-			name: "preserves order and surfaces both fixed and ephemeral",
+			name: "surfaces both fixed and ephemeral",
 			cfg: config.ShardDistribution{
 				Namespaces: []config.Namespace{
 					{Name: "first", Type: config.NamespaceTypeFixed, ShardNum: 8},

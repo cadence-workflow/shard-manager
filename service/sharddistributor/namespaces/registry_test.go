@@ -57,7 +57,7 @@ func TestNewRegistryValidation(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.cfg, r.List())
+			assert.ElementsMatch(t, tt.cfg, r.List())
 		})
 	}
 }
@@ -86,12 +86,15 @@ func TestRegistryGet(t *testing.T) {
 	}
 }
 
-func TestRegistryListIsACopy(t *testing.T) {
-	r := MustNewRegistry(config.ShardDistribution{Namespaces: []config.Namespace{{Name: "a", Type: config.NamespaceTypeEphemeral}}})
+func TestRegistryList(t *testing.T) {
+	b := config.Namespace{Name: "b", Type: config.NamespaceTypeEphemeral}
+	a := config.Namespace{Name: "a", Type: config.NamespaceTypeFixed, ShardNum: 1}
+	r := MustNewRegistry(config.ShardDistribution{Namespaces: []config.Namespace{b, a}})
+
+	assert.Equal(t, []config.Namespace{a, b}, r.List(), "sorted by name")
 
 	r.List()[0].Name = "mutated"
-
-	assert.Equal(t, "a", r.List()[0].Name)
+	assert.Equal(t, "a", r.List()[0].Name, "returns a copy")
 }
 
 func TestMustNewRegistryPanicsOnInvalidConfig(t *testing.T) {

@@ -43,62 +43,86 @@ func (m *MockShardCache) EXPECT() *MockShardCacheMockRecorder {
 }
 
 // GetExecutor mocks base method.
-func (m *MockShardCache) GetExecutor(ctx context.Context, namespace, executorID string) (*store.ShardOwner, error) {
+func (m *MockShardCache) GetExecutor(ctx context.Context, executorID string) (*store.ShardOwner, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetExecutor", ctx, namespace, executorID)
+	ret := m.ctrl.Call(m, "GetExecutor", ctx, executorID)
 	ret0, _ := ret[0].(*store.ShardOwner)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetExecutor indicates an expected call of GetExecutor.
-func (mr *MockShardCacheMockRecorder) GetExecutor(ctx, namespace, executorID any) *gomock.Call {
+func (mr *MockShardCacheMockRecorder) GetExecutor(ctx, executorID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutor", reflect.TypeOf((*MockShardCache)(nil).GetExecutor), ctx, namespace, executorID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutor", reflect.TypeOf((*MockShardCache)(nil).GetExecutor), ctx, executorID)
 }
 
 // GetShardAssignments mocks base method.
-func (m *MockShardCache) GetShardAssignments(namespace string) (store.AssignmentSnapshot, error) {
+func (m *MockShardCache) GetShardAssignments() store.AssignmentSnapshot {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetShardAssignments", namespace)
+	ret := m.ctrl.Call(m, "GetShardAssignments")
 	ret0, _ := ret[0].(store.AssignmentSnapshot)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	return ret0
 }
 
 // GetShardAssignments indicates an expected call of GetShardAssignments.
-func (mr *MockShardCacheMockRecorder) GetShardAssignments(namespace any) *gomock.Call {
+func (mr *MockShardCacheMockRecorder) GetShardAssignments() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardAssignments", reflect.TypeOf((*MockShardCache)(nil).GetShardAssignments), namespace)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardAssignments", reflect.TypeOf((*MockShardCache)(nil).GetShardAssignments))
 }
 
 // GetShardOwner mocks base method.
-func (m *MockShardCache) GetShardOwner(ctx context.Context, namespace, shardID string) (*store.ShardOwner, error) {
+func (m *MockShardCache) GetShardOwner(ctx context.Context, shardID string) (*store.ShardOwner, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetShardOwner", ctx, namespace, shardID)
+	ret := m.ctrl.Call(m, "GetShardOwner", ctx, shardID)
 	ret0, _ := ret[0].(*store.ShardOwner)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetShardOwner indicates an expected call of GetShardOwner.
-func (mr *MockShardCacheMockRecorder) GetShardOwner(ctx, namespace, shardID any) *gomock.Call {
+func (mr *MockShardCacheMockRecorder) GetShardOwner(ctx, shardID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardOwner", reflect.TypeOf((*MockShardCache)(nil).GetShardOwner), ctx, namespace, shardID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardOwner", reflect.TypeOf((*MockShardCache)(nil).GetShardOwner), ctx, shardID)
+}
+
+// Start mocks base method.
+func (m *MockShardCache) Start() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Start")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Start indicates an expected call of Start.
+func (mr *MockShardCacheMockRecorder) Start() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockShardCache)(nil).Start))
+}
+
+// Stop mocks base method.
+func (m *MockShardCache) Stop() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Stop")
+}
+
+// Stop indicates an expected call of Stop.
+func (mr *MockShardCacheMockRecorder) Stop() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stop", reflect.TypeOf((*MockShardCache)(nil).Stop))
 }
 
 // Subscribe mocks base method.
-func (m *MockShardCache) Subscribe(namespace string) (<-chan struct{}, func(), error) {
+func (m *MockShardCache) Subscribe() (<-chan struct{}, func()) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Subscribe", namespace)
+	ret := m.ctrl.Call(m, "Subscribe")
 	ret0, _ := ret[0].(<-chan struct{})
 	ret1, _ := ret[1].(func())
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	return ret0, ret1
 }
 
 // Subscribe indicates an expected call of Subscribe.
-func (mr *MockShardCacheMockRecorder) Subscribe(namespace any) *gomock.Call {
+func (mr *MockShardCacheMockRecorder) Subscribe() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Subscribe", reflect.TypeOf((*MockShardCache)(nil).Subscribe), namespace)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Subscribe", reflect.TypeOf((*MockShardCache)(nil).Subscribe))
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
@@ -26,6 +27,7 @@ var Module = fx.Module("namespace-manager",
 type Manager struct {
 	namespaces []Namespace
 	byName     map[string]Namespace
+	logger     log.Logger
 }
 
 // Params are the dependencies shared by all namespaces.
@@ -56,49 +58,71 @@ func New(p Params) *Manager {
 		namespaces = append(namespaces, newNamespace(nsCfg, shardCache, assigner))
 	}
 
-	m := newManager(namespaces)
+	m := newManager(p.Logger, namespaces)
 	p.Lifecycle.Append(fx.StartStopHook(m.Start, m.Stop))
 	return m
 }
 
-// Start starts every namespace: its cache first, then the assigner that reads
-// from it. If a cache fails to start, everything is stopped again; Stop is safe
-// on components that were never started.
+// Start starts every namespace in order. If one fails to start, the namespaces
+// started before it are stopped again.
 func (m *Manager) Start() error {
-	for _, ns := range m.namespaces {
-		if err := ns.Cache().Start(); err != nil {
-			m.Stop()
-			return fmt.Errorf("start cache of namespace %q: %w", ns.Name(), err)
-		}
-		if assigner := ns.Assigner(); assigner != nil {
-			assigner.Start()
+	for i, ns := range m.namespaces {
+		if err := m.startNamespace(ns); err != nil {
+			m.stopNamespaces(m.namespaces[:i])
+			return err
 		}
 	}
 	return nil
 }
 
-// Stop stops every namespace in reverse order, each assigner before the cache
-// it reads from.
+// Stop stops every namespace in reverse start order.
 func (m *Manager) Stop() {
-	for i := len(m.namespaces) - 1; i >= 0; i-- {
-		ns := m.namespaces[i]
-		if assigner := ns.Assigner(); assigner != nil {
-			assigner.Stop()
-		}
-		ns.Cache().Stop()
+	m.stopNamespaces(m.namespaces)
+}
+
+func (m *Manager) stopNamespaces(nss []Namespace) {
+	for i := len(nss) - 1; i >= 0; i-- {
+		m.stopNamespace(nss[i])
 	}
+}
+
+// startNamespace starts the cache first, then the assigner that reads from it.
+func (m *Manager) startNamespace(ns Namespace) error {
+	logger := m.logger.WithTags(tag.ShardNamespace(ns.Name()))
+	logger.Info("Namespace state changed", tag.LifeCycleStarting)
+	if err := ns.Cache().Start(); err != nil {
+		logger.Error("Namespace state changed", tag.LifeCycleStartFailed, tag.Error(err))
+		return fmt.Errorf("start cache of namespace %q: %w", ns.Name(), err)
+	}
+	if assigner := ns.Assigner(); assigner != nil {
+		assigner.Start()
+	}
+	logger.Info("Namespace state changed", tag.LifeCycleStarted)
+	return nil
+}
+
+// stopNamespace stops the assigner before the cache it reads from.
+func (m *Manager) stopNamespace(ns Namespace) {
+	logger := m.logger.WithTags(tag.ShardNamespace(ns.Name()))
+	logger.Info("Namespace state changed", tag.LifeCycleStopping)
+	if assigner := ns.Assigner(); assigner != nil {
+		assigner.Stop()
+	}
+	ns.Cache().Stop()
+	logger.Info("Namespace state changed", tag.LifeCycleStopped)
 }
 
 // NewTestManager builds a Manager over already-constructed namespaces, such as
 // mocks, and does not manage their lifecycle. It is meant for tests only.
 func NewTestManager(nss ...Namespace) *Manager {
-	return newManager(nss)
+	return newManager(log.NewNoop(), nss)
 }
 
-func newManager(nss []Namespace) *Manager {
+func newManager(logger log.Logger, nss []Namespace) *Manager {
 	m := &Manager{
 		namespaces: nss,
 		byName:     make(map[string]Namespace, len(nss)),
+		logger:     logger,
 	}
 	for _, ns := range nss {
 		m.byName[ns.Name()] = ns

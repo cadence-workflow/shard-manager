@@ -25,6 +25,14 @@ var (
 )
 
 var (
+	LifeCycleStarting    = lifecycle("Starting")
+	LifeCycleStarted     = lifecycle("Started")
+	LifeCycleStartFailed = lifecycle("StartFailed")
+	LifeCycleStopping    = lifecycle("Stopping")
+	LifeCycleStopped     = lifecycle("Stopped")
+)
+
+var (
 	ComponentNamespaceManager = component("shard-namespace-manager")
 	ComponentLeaderElection   = component("shard-leader-election")
 	ComponentLeaderProcessor  = component("shard-leader-processor")

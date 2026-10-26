@@ -53,6 +53,11 @@ func component(component string) Tag {
 	return newPredefinedStringTag("component", component)
 }
 
+// lifecycle returns tag for lifecycle
+func lifecycle(lifecycle string) Tag {
+	return newPredefinedStringTag("lifecycle", lifecycle)
+}
+
 // clientOperation returns tag for clientOperation
 func clientOperation(clientOperation string) Tag {
 	return newPredefinedStringTag("client-operation", clientOperation)

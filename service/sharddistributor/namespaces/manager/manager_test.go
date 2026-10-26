@@ -2,6 +2,7 @@ package manager
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,35 +73,74 @@ func TestNew(t *testing.T) {
 
 func TestStartStop(t *testing.T) {
 	tests := []struct {
-		name        string
-		cacheBStart error
-		wantErr     string
+		name     string
+		expect   func(a, b, c *cache.MockShardCache)
+		wantErr  string
+		wantLogs []string
 	}{
-		{name: "stops in reverse order"},
-		{name: "start failure stops everything", cacheBStart: errors.New("boom"), wantErr: `start cache of namespace "b": boom`},
+		{
+			name: "stops in reverse order",
+			expect: func(a, b, c *cache.MockShardCache) {
+				gomock.InOrder(
+					a.EXPECT().Start().Return(nil),
+					b.EXPECT().Start().Return(nil),
+					c.EXPECT().Start().Return(nil),
+					c.EXPECT().Stop(),
+					b.EXPECT().Stop(),
+					a.EXPECT().Stop(),
+				)
+			},
+			wantLogs: []string{
+				"info a Starting", "info a Started",
+				"info b Starting", "info b Started",
+				"info c Starting", "info c Started",
+				"info c Stopping", "info c Stopped",
+				"info b Stopping", "info b Stopped",
+				"info a Stopping", "info a Stopped",
+			},
+		},
+		{
+			name: "start failure stops only the started namespaces",
+			expect: func(a, b, _ *cache.MockShardCache) {
+				gomock.InOrder(
+					a.EXPECT().Start().Return(nil),
+					b.EXPECT().Start().Return(errors.New("boom")),
+					a.EXPECT().Stop(),
+				)
+			},
+			wantErr: `start cache of namespace "b": boom`,
+			wantLogs: []string{
+				"info a Starting", "info a Started",
+				"info b Starting", "error b StartFailed",
+				"info a Stopping", "info a Stopped",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			cacheA, cacheB := cache.NewMockShardCache(ctrl), cache.NewMockShardCache(ctrl)
-			gomock.InOrder(
-				cacheA.EXPECT().Start().Return(nil),
-				cacheB.EXPECT().Start().Return(tt.cacheBStart),
-				cacheB.EXPECT().Stop(),
-				cacheA.EXPECT().Stop(),
-			)
-			m := NewTestManager(
+			cacheA, cacheB, cacheC := cache.NewMockShardCache(ctrl), cache.NewMockShardCache(ctrl), cache.NewMockShardCache(ctrl)
+			tt.expect(cacheA, cacheB, cacheC)
+			logger, logs := testlogger.NewObserved(t)
+			m := newManager(logger, []Namespace{
 				newNamespace(config.Namespace{Name: "a"}, cacheA, nil),
 				newNamespace(config.Namespace{Name: "b"}, cacheB, nil),
-			)
+				newNamespace(config.Namespace{Name: "c"}, cacheC, nil),
+			})
 
-			err := m.Start()
-			if tt.wantErr != "" {
+			if err := m.Start(); tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
-				return
+			} else {
+				require.NoError(t, err)
+				m.Stop()
 			}
-			require.NoError(t, err)
-			m.Stop()
+
+			var gotLogs []string
+			for _, entry := range logs.All() {
+				fields := entry.ContextMap()
+				gotLogs = append(gotLogs, fmt.Sprintf("%v %v %v", entry.Level, fields["shard-namespace"], fields["lifecycle"]))
+			}
+			assert.Equal(t, tt.wantLogs, gotLogs)
 		})
 	}
 }

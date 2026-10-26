@@ -91,12 +91,12 @@ func TestStartStop(t *testing.T) {
 				)
 			},
 			wantLogs: []string{
-				"info a Starting", "info a Started",
-				"info b Starting", "info b Started",
-				"info c Starting", "info c Started",
-				"info c Stopping", "info c Stopped",
-				"info b Stopping", "info b Stopped",
-				"info a Stopping", "info a Stopped",
+				"info: a Starting", "info: a Started",
+				"info: b Starting", "info: b Started",
+				"info: c Starting", "info: c Started",
+				"info: c Stopping", "info: c Stopped",
+				"info: b Stopping", "info: b Stopped",
+				"info: a Stopping", "info: a Stopped",
 			},
 		},
 		{
@@ -110,9 +110,9 @@ func TestStartStop(t *testing.T) {
 			},
 			wantErr: `start cache of namespace "b": boom`,
 			wantLogs: []string{
-				"info a Starting", "info a Started",
-				"info b Starting", "error b StartFailed",
-				"info a Stopping", "info a Stopped",
+				"info: a Starting", "info: a Started",
+				"info: b Starting", "error: b StartFailed",
+				"info: a Stopping", "info: a Stopped",
 			},
 		},
 	}
@@ -138,7 +138,7 @@ func TestStartStop(t *testing.T) {
 			var gotLogs []string
 			for _, entry := range logs.All() {
 				fields := entry.ContextMap()
-				gotLogs = append(gotLogs, fmt.Sprintf("%v %v %v", entry.Level, fields["shard-namespace"], fields["lifecycle"]))
+				gotLogs = append(gotLogs, fmt.Sprintf("%v: %v %v", entry.Level, fields["shard-namespace"], fields["lifecycle"]))
 			}
 			assert.Equal(t, tt.wantLogs, gotLogs)
 		})

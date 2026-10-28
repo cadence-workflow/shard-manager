@@ -2,7 +2,7 @@ module github.com/cadence-workflow/shard-manager/cmd/server
 
 go 1.26.0
 
-toolchain go1.26.9
+toolchain go1.26.10
 
 // build against the current code in the "main" (and gcloud) module, not a specific SHA.
 //

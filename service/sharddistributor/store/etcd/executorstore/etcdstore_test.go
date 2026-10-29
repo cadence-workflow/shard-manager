@@ -432,6 +432,79 @@ func TestGetStateRecordsETCDRoundTripLatencyOnError(t *testing.T) {
 	assert.Equal(t, int64(1), bucketCounts[roundTripTime])
 }
 
+func TestNamespaceReadsRecordParseLatency(t *testing.T) {
+	tests := []struct {
+		name      string
+		operation string
+		read      func(executorStore *executorStoreImpl, namespace string) error
+	}{
+		{
+			name:      "GetState",
+			operation: "StoreGetState",
+			read: func(executorStore *executorStoreImpl, namespace string) error {
+				_, err := executorStore.GetState(context.Background(), namespace)
+				return err
+			},
+		},
+		{
+			name:      "GetAssignmentState",
+			operation: "StoreGetAssignmentState",
+			read: func(executorStore *executorStoreImpl, namespace string) error {
+				_, err := executorStore.GetAssignmentState(context.Background(), namespace)
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			namespace := "test_namespace"
+			histogramName := "test.shard_distributor_store_parse_latency+namespace=test_namespace,operation=" + tt.operation
+			ctrl := gomock.NewController(t)
+			mockClient := etcdclient.NewMockClient(ctrl)
+			timeSource := clock.NewMockedTimeSource()
+			testScope := tally.NewTestScope("test", nil)
+			metricsClient := metrics.NewClient(testScope, metrics.ShardDistributor, metrics.MigrationConfig{})
+
+			txn := &trackingTxn{
+				commitFn: func(numOps int) (*clientv3.TxnResponse, error) {
+					timeSource.Advance(50 * time.Millisecond)
+					return emptyTxnResponse(numOps), nil
+				},
+			}
+			mockClient.EXPECT().Txn(gomock.Any()).Return(txn)
+
+			executorStore := &executorStoreImpl{
+				client:        mockClient,
+				prefix:        "test-prefix",
+				timeSource:    timeSource,
+				metricsClient: metricsClient,
+			}
+
+			err := tt.read(executorStore, namespace)
+			require.NoError(t, err)
+
+			histograms := testScope.Snapshot().Histograms()
+			require.Contains(t, histograms, histogramName)
+			durations := histograms[histogramName].Durations()
+			assert.Equal(t, int64(1), durations[0], "parse latency should exclude the etcd round trip")
+		})
+	}
+}
+
+func emptyTxnResponse(numOps int) *clientv3.TxnResponse {
+	responses := make([]*etcdserverpb.ResponseOp, 0, numOps)
+	for range numOps {
+		responses = append(responses, &etcdserverpb.ResponseOp{
+			Response: &etcdserverpb.ResponseOp_ResponseRange{ResponseRange: &etcdserverpb.RangeResponse{}},
+		})
+	}
+	return &clientv3.TxnResponse{
+		Header:    &etcdserverpb.ResponseHeader{},
+		Responses: responses,
+	}
+}
+
 // TestAssignShards_WithRevisions tests the optimistic locking logic of AssignShards.
 func TestAssignShards_WithRevisions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

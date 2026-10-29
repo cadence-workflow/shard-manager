@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uber-go/tally"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v2"
@@ -430,6 +431,75 @@ func TestGetStateRecordsETCDRoundTripLatencyOnError(t *testing.T) {
 	bucketCounts := histograms[histogramName].Durations()
 	// We assert that the simulated 50 ms duration landed in the expected bucket.
 	assert.Equal(t, int64(1), bucketCounts[roundTripTime])
+}
+
+func TestGetAssignmentStateRecordsSizeGauges(t *testing.T) {
+	const (
+		prefix     = "test-prefix"
+		namespace  = "test_namespace"
+		keysGauge  = "test.shard_distributor_store_assignment_state_keys+namespace=test_namespace,operation=StoreGetAssignmentState"
+		bytesGauge = "test.shard_distributor_store_assignment_state_bytes+namespace=test_namespace,operation=StoreGetAssignmentState"
+	)
+
+	heartbeatKey := etcdkeys.BuildExecutorKey(prefix, namespace, "exec-1", etcdkeys.ExecutorHeartbeatKey)
+	metadataKey := etcdkeys.BuildMetadataKey(prefix, namespace, "exec-1", "hostname")
+
+	tests := []struct {
+		name          string
+		kvs           []*mvccpb.KeyValue
+		expectedKeys  float64
+		expectedBytes float64
+	}{
+		{
+			name: "empty namespace",
+		},
+		{
+			name: "executor keys",
+			kvs: []*mvccpb.KeyValue{
+				{Key: []byte(heartbeatKey), Value: []byte("1700000000")},
+				{Key: []byte(metadataKey), Value: []byte("host-1")},
+			},
+			expectedKeys:  2,
+			expectedBytes: float64(len(heartbeatKey) + len("1700000000") + len(metadataKey) + len("host-1")),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockClient := etcdclient.NewMockClient(ctrl)
+			testScope := tally.NewTestScope("test", nil)
+
+			txn := &trackingTxn{
+				commitFn: func(_ int) (*clientv3.TxnResponse, error) {
+					return &clientv3.TxnResponse{
+						Header: &etcdserverpb.ResponseHeader{Revision: 1},
+						Responses: []*etcdserverpb.ResponseOp{
+							{Response: &etcdserverpb.ResponseOp_ResponseRange{ResponseRange: &etcdserverpb.RangeResponse{Kvs: tt.kvs}}},
+							{Response: &etcdserverpb.ResponseOp_ResponseRange{ResponseRange: &etcdserverpb.RangeResponse{}}},
+						},
+					}, nil
+				},
+			}
+			mockClient.EXPECT().Txn(gomock.Any()).Return(txn)
+
+			executorStore := &executorStoreImpl{
+				client:        mockClient,
+				prefix:        prefix,
+				timeSource:    clock.NewMockedTimeSource(),
+				metricsClient: metrics.NewClient(testScope, metrics.ShardDistributor, metrics.MigrationConfig{}),
+			}
+
+			_, err := executorStore.GetAssignmentState(context.Background(), namespace)
+			require.NoError(t, err)
+
+			gauges := testScope.Snapshot().Gauges()
+			require.Contains(t, gauges, keysGauge)
+			require.Contains(t, gauges, bytesGauge)
+			assert.Equal(t, tt.expectedKeys, gauges[keysGauge].Value())
+			assert.Equal(t, tt.expectedBytes, gauges[bytesGauge].Value())
+		})
+	}
 }
 
 // TestAssignShards_WithRevisions tests the optimistic locking logic of AssignShards.

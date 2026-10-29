@@ -292,7 +292,15 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 		return nil, fmt.Errorf("get namespace assignment state: expected 2 responses, got %d", len(txnResp.Responses))
 	}
 
-	metadata, assignments, err := common.ParseExecutorAssignmentKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
+	executorKVs := txnResp.Responses[0].GetResponseRange().Kvs
+	assignmentStateBytes := 0
+	for _, kv := range executorKVs {
+		assignmentStateBytes += len(kv.Key) + len(kv.Value)
+	}
+	metricsScope.UpdateGauge(metrics.ShardDistributorStoreAssignmentStateKeys, float64(len(executorKVs)))
+	metricsScope.UpdateGauge(metrics.ShardDistributorStoreAssignmentStateBytes, float64(assignmentStateBytes))
+
+	metadata, assignments, err := common.ParseExecutorAssignmentKVs(s.prefix, namespace, executorKVs)
 	if err != nil {
 		return nil, err
 	}

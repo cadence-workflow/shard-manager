@@ -326,6 +326,10 @@ const (
 	ShardDistributorStoreLatencyHistogramPerNamespace
 	ShardDistributorStoreGetStateETCDRoundTripLatency
 	ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency
+	// ShardDistributorStoreAssignmentStateKeys tracks how many keys an assignment-state refresh reads from the executors prefix
+	ShardDistributorStoreAssignmentStateKeys
+	// ShardDistributorStoreAssignmentStateBytes tracks how many bytes an assignment-state refresh reads from the executors prefix
+	ShardDistributorStoreAssignmentStateBytes
 
 	ShardDistributorEphemeralAssignmentBatchSize
 	ShardDistributorEphemeralAssignmentWriteAttempts
@@ -410,6 +414,8 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ShardDistributorStoreLatencyHistogramPerNamespace:           {metricName: "shard_distributor_store_latency_histogram_per_namespace", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
 		ShardDistributorStoreGetStateETCDRoundTripLatency:           {metricName: "shard_distributor_store_get_state_etcd_round_trip_latency", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
 		ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency: {metricName: "shard_distributor_store_get_assignment_state_etcd_round_trip_latency", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
+		ShardDistributorStoreAssignmentStateKeys:                    {metricName: "shard_distributor_store_assignment_state_keys", metricType: Gauge},
+		ShardDistributorStoreAssignmentStateBytes:                   {metricName: "shard_distributor_store_assignment_state_bytes", metricType: Gauge},
 
 		ShardDistributorEphemeralAssignmentBatchSize:     {metricName: "shard_distributor_ephemeral_assignment_batch_size", metricType: Histogram, buckets: ShardDistributorEphemeralAssignmentBatchSizeBuckets},
 		ShardDistributorEphemeralAssignmentWriteAttempts: {metricName: "shard_distributor_ephemeral_assignment_write_attempts", metricType: Counter},

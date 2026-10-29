@@ -24,8 +24,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/cadence-workflow/shard-manager/common/dynamicconfig/dynamicproperties"
 	"github.com/cadence-workflow/shard-manager/common/log"
@@ -325,6 +327,22 @@ func (s *configSuite) TestUpdateConfig() {
 	err = s.client.UpdateValue(key, true)
 	s.NoError(err)
 	s.Equal(true, value())
+}
+
+func TestGetIntPropertyFilteredByNamespace(t *testing.T) {
+	key := dynamicproperties.ShardDistributorFixedShardNum
+	namespace := "test-namespace"
+	configuredValue := 16384
+
+	client := NewMockClient(gomock.NewController(t))
+	client.EXPECT().
+		GetIntValue(key, map[dynamicproperties.Filter]interface{}{dynamicproperties.Namespace: namespace}).
+		Return(configuredValue, nil)
+	cln := NewCollection(client, log.NewNoop())
+
+	value := cln.GetIntPropertyFilteredByNamespace(key)(namespace)
+
+	assert.Equal(t, configuredValue, value)
 }
 
 func TestDynamicConfigKeyIsMapped(t *testing.T) {

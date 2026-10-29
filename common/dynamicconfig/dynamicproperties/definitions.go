@@ -44,6 +44,9 @@ type IntPropertyFnWithTaskListInfoFilters func(domain string, taskList string, t
 // IntPropertyFnWithShardIDFilter is a wrapper to get int property from dynamic config with shardID as filter
 type IntPropertyFnWithShardIDFilter func(shardID int) int
 
+// IntPropertyFnWithNamespaceFilters is a wrapper to get int property from dynamic config with namespace as filter
+type IntPropertyFnWithNamespaceFilters func(namespace string) int
+
 // FloatPropertyFn is a wrapper to get float property from dynamic config
 type FloatPropertyFn func(opts ...FilterOption) float64
 

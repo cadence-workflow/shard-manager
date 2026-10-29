@@ -24,7 +24,9 @@ func TestNew(t *testing.T) {
 	cfg := config.ShardDistribution{Namespaces: []config.Namespace{
 		{Name: "fixed", Type: config.NamespaceTypeFixed, ShardNum: 1},
 		{Name: "ephemeral", Type: config.NamespaceTypeEphemeral},
+		{Name: "ephemeral-made-fixed", Type: config.NamespaceTypeEphemeral},
 	}}
+	fixedShardNums := map[string]int{"ephemeral-made-fixed": 16384}
 
 	mockStore := store.NewMockStore(gomock.NewController(t))
 	for _, ns := range cfg.Namespaces {
@@ -33,9 +35,13 @@ func TestNew(t *testing.T) {
 
 	lifecycle := fxtest.NewLifecycle(t)
 	m := New(Params{
-		Registry:      namespaces.MustNewRegistry(cfg),
-		Store:         mockStore,
-		Config:        &config.Config{},
+		Registry: namespaces.MustNewRegistry(cfg),
+		Store:    mockStore,
+		Config: &config.Config{
+			FixedShardNum: func(namespace string) int {
+				return fixedShardNums[namespace]
+			},
+		},
 		Logger:        testlogger.New(t),
 		TimeSource:    clock.NewRealTimeSource(),
 		MetricsClient: metrics.NewNoopMetricsClient(),
@@ -48,10 +54,26 @@ func TestNew(t *testing.T) {
 		name         string
 		namespace    string
 		wantErr      error
+		wantConfig   config.Namespace
 		wantAssigner bool
 	}{
-		{name: "fixed has no assigner", namespace: "fixed"},
-		{name: "ephemeral has an assigner", namespace: "ephemeral", wantAssigner: true},
+		{
+			name:       "fixed has no assigner",
+			namespace:  "fixed",
+			wantConfig: config.Namespace{Name: "fixed", Type: config.NamespaceTypeFixed, ShardNum: 1},
+		},
+		{
+			name:         "ephemeral has an assigner",
+			namespace:    "ephemeral",
+			wantConfig:   config.Namespace{Name: "ephemeral", Type: config.NamespaceTypeEphemeral},
+			wantAssigner: true,
+		},
+		{
+			name:         "ephemeral made fixed by dynamic config keeps its assigner",
+			namespace:    "ephemeral-made-fixed",
+			wantConfig:   config.Namespace{Name: "ephemeral-made-fixed", Type: config.NamespaceTypeFixed, ShardNum: 16384},
+			wantAssigner: true,
+		},
 		{name: "unknown", namespace: "unknown", wantErr: &types.NamespaceNotFoundError{Namespace: "unknown"}},
 	}
 	for _, tt := range tests {
@@ -63,12 +85,13 @@ func TestNew(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.namespace, ns.Name())
+			assert.Equal(t, tt.wantConfig, ns.Config())
 			assert.NotNil(t, ns.Cache())
 			assert.Equal(t, tt.wantAssigner, ns.Assigner() != nil)
 		})
 	}
 
-	assert.Len(t, m.List(), 2)
+	assert.Len(t, m.List(), 3)
 }
 
 func TestStartStop(t *testing.T) {
@@ -122,10 +145,11 @@ func TestStartStop(t *testing.T) {
 			cacheA, cacheB, cacheC := cache.NewMockShardCache(ctrl), cache.NewMockShardCache(ctrl), cache.NewMockShardCache(ctrl)
 			tt.expect(cacheA, cacheB, cacheC)
 			logger, logs := testlogger.NewObserved(t)
+			noFixedShardNum := func(string) int { return 0 }
 			m := newManager(logger, []Namespace{
-				newNamespace(config.Namespace{Name: "a"}, cacheA, nil),
-				newNamespace(config.Namespace{Name: "b"}, cacheB, nil),
-				newNamespace(config.Namespace{Name: "c"}, cacheC, nil),
+				newNamespace(config.Namespace{Name: "a"}, noFixedShardNum, cacheA, nil),
+				newNamespace(config.Namespace{Name: "b"}, noFixedShardNum, cacheB, nil),
+				newNamespace(config.Namespace{Name: "c"}, noFixedShardNum, cacheC, nil),
 			})
 
 			if err := m.Start(); tt.wantErr != "" {

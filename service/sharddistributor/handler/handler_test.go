@@ -243,6 +243,34 @@ func TestGetShardOwner(t *testing.T) {
 	}
 }
 
+func TestGetShardOwner_EphemeralNamespaceMadeFixedDoesNotAssign(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	shardKey := "unknown-shard"
+	mockCache := cache.NewMockShardCache(ctrl)
+	mockCache.EXPECT().GetShardOwner(gomock.Any(), shardKey).Return(nil, store.ErrShardNotFound)
+
+	// The namespace is ephemeral in the static config, so it has an assigner, but dynamic
+	// config makes it fixed. A fixed namespace must not assign unknown shards.
+	ns := manager.NewMockNamespace(ctrl)
+	ns.EXPECT().Name().Return(_testNamespaceEphemeral).AnyTimes()
+	ns.EXPECT().Config().Return(config.Namespace{Name: _testNamespaceEphemeral, Type: config.NamespaceTypeFixed, ShardNum: 16384}).AnyTimes()
+	ns.EXPECT().Cache().Return(mockCache).AnyTimes()
+	ns.EXPECT().Assigner().Times(0)
+
+	handler := &handlerImpl{
+		logger:     testlogger.New(t),
+		namespaces: manager.NewTestManager(ns),
+		timeSource: clock.NewRealTimeSource(),
+	}
+
+	request := &types.GetShardOwnerRequest{Namespace: _testNamespaceEphemeral, ShardKey: shardKey}
+	resp, err := handler.GetShardOwner(context.Background(), request)
+	var notFoundErr *types.ShardNotFoundError
+	require.ErrorAs(t, err, &notFoundErr)
+	require.Nil(t, resp)
+}
+
 func TestInspectShard(t *testing.T) {
 	cfg := config.ShardDistribution{
 		Namespaces: []config.Namespace{

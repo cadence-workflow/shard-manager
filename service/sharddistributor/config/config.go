@@ -38,6 +38,7 @@ type (
 		LoadBalancingMode                   dynamicproperties.StringPropertyFnWithNamespaceFilters
 		MaxEtcdTxnOps                       dynamicproperties.IntPropertyFn
 		EphemeralAssignmentCoalescingWindow dynamicproperties.DurationPropertyFnWithNamespaceFilters
+		FixedShardNum                       dynamicproperties.IntPropertyFnWithNamespaceFilters
 
 		LoadBalancingNaive  LoadBalancingNaiveConfig
 		LoadBalancingGreedy LoadBalancingGreedyConfig
@@ -125,6 +126,7 @@ func NewConfig(dc *dynamicconfig.Collection) *Config {
 		LoadBalancingMode:                   dc.GetStringPropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingMode),
 		MaxEtcdTxnOps:                       dc.GetIntProperty(dynamicproperties.ShardDistributorMaxEtcdTxnOps),
 		EphemeralAssignmentCoalescingWindow: dc.GetDurationPropertyFilteredByNamespace(dynamicproperties.ShardDistributorEphemeralAssignmentCoalescingWindow),
+		FixedShardNum:                       dc.GetIntPropertyFilteredByNamespace(dynamicproperties.ShardDistributorFixedShardNum),
 
 		LoadBalancingNaive: LoadBalancingNaiveConfig{
 			MaxDeviation: dc.GetFloat64PropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingNaiveMaxDeviation),
@@ -162,6 +164,17 @@ func (c *Config) GetLoadBalancingMode(namespace string) types.LoadBalancingMode 
 	}
 
 	return mode
+}
+
+// EffectiveNamespace returns the configuration ns runs with. A positive fixedShardNum
+// makes it fixed with that many shards, otherwise ns is returned unchanged.
+func EffectiveNamespace(ns Namespace, fixedShardNum int) Namespace {
+	if fixedShardNum <= 0 {
+		return ns
+	}
+	ns.Type = NamespaceTypeFixed
+	ns.ShardNum = int64(fixedShardNum)
+	return ns
 }
 
 var _ yaml.Unmarshaler = (*YamlNode)(nil)

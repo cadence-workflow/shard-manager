@@ -60,6 +60,9 @@ func setupProcessorTest(t *testing.T, namespaceType string) *testDependencies {
 				return 2.0
 			},
 		},
+		FixedShardNum: func(namespace string) int {
+			return 0
+		},
 	}
 
 	logger, observedLogs := testlogger.NewObserved(t)
@@ -125,6 +128,45 @@ func TestRebalanceShards_InitialDistribution(t *testing.T) {
 			assert.Len(t, request.NewState.ShardAssignments["exec-2"].AssignedShards, 1)
 			assert.Lenf(t, request.NewState.ShardAssignments["exec-1"].ShardHandoverStats, 0, "no handover stats should be present on initial assignment")
 			assert.Lenf(t, request.NewState.ShardAssignments["exec-2"].ShardHandoverStats, 0, "no handover stats should be present on initial assignment")
+			return nil
+		},
+	)
+
+	err := processor.rebalanceShards(context.Background())
+	require.NoError(t, err)
+}
+
+func TestRebalanceShards_FixedShardNumMakesEphemeralNamespaceFixed(t *testing.T) {
+	mocks := setupProcessorTest(t, config.NamespaceTypeEphemeral)
+	fixedShardNums := map[string]int{mocks.cfg.Name: 2}
+	mocks.sdConfig.FixedShardNum = func(namespace string) int {
+		return fixedShardNums[namespace]
+	}
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+	executorID := "exec-1"
+	ephemeralShard := "shard-1"
+
+	now := mocks.timeSource.Now()
+	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: map[string]store.AssignedState{
+				executorID: {
+					AssignedShards: map[string]*types.ShardAssignment{
+						ephemeralShard: {Status: types.AssignmentStatusREADY},
+					},
+				},
+			},
+		},
+		Executors: map[string]store.HeartbeatState{
+			executorID: {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+		},
+	}, nil)
+	mocks.election.EXPECT().Guard().Return(store.NopGuard())
+	mocks.store.EXPECT().AssignShards(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) error {
+			assignedShards := slices.Sorted(maps.Keys(request.NewState.ShardAssignments[executorID].AssignedShards))
+			assert.Equal(t, []string{"0", "1"}, assignedShards, "the executor should get the fixed shards and drop the ephemeral one")
 			return nil
 		},
 	)

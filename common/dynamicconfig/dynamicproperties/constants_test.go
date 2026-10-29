@@ -31,7 +31,7 @@ import (
 
 func TestListAllProductionKeys(t *testing.T) {
 	keys := ListAllProductionKeys()
-	require.Len(t, keys, 12)
+	require.Len(t, keys, 13)
 	for _, key := range keys {
 		assert.Contains(t, strings.ToLower(key.String()), "sharddistributor")
 	}

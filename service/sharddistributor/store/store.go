@@ -133,4 +133,8 @@ type Store interface {
 
 	// GetDrainedHosts returns the hosts currently drained for the namespace.
 	GetDrainedHosts(ctx context.Context, namespace string) ([]DrainedHost, error)
+
+	// RangeStore covers range-based ownership. Embedded so Store is the single
+	// storage contract for both shard- and range-based namespaces.
+	RangeStore
 }

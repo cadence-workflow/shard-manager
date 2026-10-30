@@ -30,6 +30,8 @@ shardDistribution:
       shardNum: 32
     - name: shard-distributor-canary-ephemeral
       type: ephemeral
+    - name: shard-distributor-canary-load
+      type: ephemeral
     - name: cadence-matching-dev
       type: ephemeral
   leaderStore:

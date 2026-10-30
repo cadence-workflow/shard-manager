@@ -9,6 +9,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/executors"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/factory"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/handler"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/load"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/pinger"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processorephemeral"
@@ -32,6 +33,11 @@ func Module(namespacesNames NamespacesNames) fx.Option {
 }
 
 func opts(names NamespacesNames) fx.Option {
+	loadModule := fx.Options()
+	if names.Config.Canary.Load.Namespace != "" {
+		loadModule = load.Module()
+	}
+
 	return fx.Options(
 		fx.Supply(names.Config),
 
@@ -59,6 +65,8 @@ func opts(names NamespacesNames) fx.Option {
 		executors.Module(names.FixedNamespace, names.EphemeralNamespace),
 
 		processorephemeral.ShardCreatorModule([]string{names.EphemeralNamespace}),
+
+		loadModule,
 
 		spectatorclient.Module(),
 		fx.Provide(spectatorclient.NewSpectatorPeerChooser),

@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/fx"
+
+	canaryConfig "github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/config"
 )
 
 func TestDependenciesAreSatisfied(t *testing.T) {
@@ -15,5 +17,13 @@ func TestDependenciesAreSatisfied(t *testing.T) {
 		defaultCanaryGRPCPort,
 		defaultNumExecutors,
 		defaultNumExecutors,
+		canaryConfig.LoadConfig{
+			Namespace:       defaultLoadNamespace,
+			Interval:        defaultLoadInterval,
+			NumShards:       defaultLoadNumShards,
+			ShardsPerSecond: defaultLoadShardsPerSecond,
+			NumExecutors:    defaultLoadNumExecutors,
+			Hold:            defaultLoadHold,
+		},
 	)))
 }

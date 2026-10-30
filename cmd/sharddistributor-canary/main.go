@@ -34,6 +34,13 @@ const (
 	defaultCanaryGRPCPort           = 7953 // Port for canary to receive ping requests
 	defaultNumExecutors             = 1
 
+	defaultLoadNamespace       = "shard-distributor-canary-load"
+	defaultLoadInterval        = time.Hour
+	defaultLoadNumShards       = 10000
+	defaultLoadShardsPerSecond = 200
+	defaultLoadNumExecutors    = 50
+	defaultLoadHold            = 5 * time.Minute
+
 	shardDistributorServiceName = "shard-distributor"
 )
 
@@ -53,10 +60,19 @@ func runApp(c *cli.Command) {
 
 	}
 
-	fx.New(opts(fixedNamespace, ephemeralNamespace, endpoint, canaryGRPCPort, numFixedExecutors, numEphemeralExecutors)).Run()
+	loadConfig := canaryConfig.LoadConfig{
+		Namespace:       c.String("load-namespace"),
+		Interval:        c.Duration("load-interval"),
+		NumShards:       c.Int("load-num-shards"),
+		ShardsPerSecond: c.Int("load-shards-per-second"),
+		NumExecutors:    c.Int("load-num-executors"),
+		Hold:            c.Duration("load-hold"),
+	}
+
+	fx.New(opts(fixedNamespace, ephemeralNamespace, endpoint, canaryGRPCPort, numFixedExecutors, numEphemeralExecutors, loadConfig)).Run()
 }
 
-func opts(fixedNamespace, ephemeralNamespace, endpoint string, canaryGRPCPort int, numFixedExecutors, numEphemeral int) fx.Option {
+func opts(fixedNamespace, ephemeralNamespace, endpoint string, canaryGRPCPort int, numFixedExecutors, numEphemeral int, loadConfig canaryConfig.LoadConfig) fx.Option {
 	configuration := clientcommon.Config{
 		Namespaces: []clientcommon.NamespaceConfig{
 			{Namespace: fixedNamespace, HeartBeatInterval: 1 * time.Second},
@@ -145,6 +161,7 @@ func opts(fixedNamespace, ephemeralNamespace, endpoint string, canaryGRPCPort in
 				Canary: canaryConfig.CanaryConfig{
 					NumFixedExecutors:     numFixedExecutors,
 					NumEphemeralExecutors: numEphemeral,
+					Load:                  loadConfig,
 				},
 			},
 		}),
@@ -197,6 +214,36 @@ func buildCLI() *cli.Command {
 					Name:  "num-ephemeral-executors",
 					Value: defaultNumExecutors,
 					Usage: "number of executors of ephemeral namespace to start. Don't use with num-executors",
+				},
+				&cli.StringFlag{
+					Name:  "load-namespace",
+					Value: defaultLoadNamespace,
+					Usage: "namespace for the periodic load run. A run only happens if the shard distributor has this namespace configured. Empty disables the load run",
+				},
+				&cli.DurationFlag{
+					Name:  "load-interval",
+					Value: defaultLoadInterval,
+					Usage: "time between load runs, before jitter",
+				},
+				&cli.IntFlag{
+					Name:  "load-num-shards",
+					Value: defaultLoadNumShards,
+					Usage: "number of shards each load run creates",
+				},
+				&cli.IntFlag{
+					Name:  "load-shards-per-second",
+					Value: defaultLoadShardsPerSecond,
+					Usage: "rate at which a load run creates shards",
+				},
+				&cli.IntFlag{
+					Name:  "load-num-executors",
+					Value: defaultLoadNumExecutors,
+					Usage: "number of extra executors each load run starts",
+				},
+				&cli.DurationFlag{
+					Name:  "load-hold",
+					Value: defaultLoadHold,
+					Usage: "how long a load run holds its peak before releasing the shards",
 				},
 			},
 			Action: func(_ context.Context, c *cli.Command) error {

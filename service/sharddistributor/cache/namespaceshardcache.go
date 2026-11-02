@@ -10,6 +10,8 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -25,6 +27,16 @@ const (
 	// only sets DialTimeout, so without this bound a hung Get would block
 	// every joiner indefinitely (until stopCh closes).
 	refreshOperationTimeout = 5 * time.Second
+
+	// Retry bounds for a failed refresh.
+	refreshRetryInitialInterval = 10 * time.Millisecond
+	refreshRetryMaxInterval     = 5 * time.Second
+	// The watch signals every host at once, so retries are jittered.
+	refreshRetryJitterCoeff = 0.5
+
+	// Reconcile interval for periodic reconciliations.
+	reconcileInterval    = 10 * time.Second
+	reconcileJitterCoeff = 0.2
 )
 
 type shardCache struct {
@@ -42,6 +54,7 @@ type shardCache struct {
 	logger           log.Logger
 	executorStore    store.Store
 	pubSub           *executorStatePubSub
+	timeSource       clock.TimeSource
 
 	// refreshSF deduplicates concurrent cache-miss refreshes. When N callers
 	// simultaneously miss the cache, only one of them performs the etcd read;
@@ -55,11 +68,11 @@ type shardCache struct {
 var _ ShardCache = (*shardCache)(nil)
 
 // NewShardCache builds the cache of one namespace.
-func NewShardCache(namespace string, executorStore store.Store, logger log.Logger) ShardCache {
-	return newShardCache(namespace, executorStore, logger)
+func NewShardCache(namespace string, executorStore store.Store, logger log.Logger, timeSource clock.TimeSource) ShardCache {
+	return newShardCache(namespace, executorStore, logger, timeSource)
 }
 
-func newShardCache(namespace string, executorStore store.Store, logger log.Logger) *shardCache {
+func newShardCache(namespace string, executorStore store.Store, logger log.Logger, timeSource clock.TimeSource) *shardCache {
 	return &shardCache{
 		shardToExecutor:  make(map[string]*store.ShardOwner),
 		executorToShards: make(map[*store.ShardOwner][]string),
@@ -71,6 +84,7 @@ func newShardCache(namespace string, executorStore store.Store, logger log.Logge
 		logger:           logger.WithTags(tag.ShardNamespace(namespace)),
 		executorStore:    executorStore,
 		pubSub:           newExecutorStatePubSub(),
+		timeSource:       timeSource,
 		refreshTimeout:   refreshOperationTimeout,
 	}
 }
@@ -157,28 +171,67 @@ func (c *shardCache) Subscribe() (<-chan struct{}, func()) {
 	return c.pubSub.subscribe()
 }
 
+// newRefreshRetrier handles the backoff for failed refreshes (never expires).
+func newRefreshRetrier(timeSource clock.TimeSource) backoff.Retrier {
+	retryPolicy := backoff.NewExponentialRetryPolicy(refreshRetryInitialInterval)
+	retryPolicy.SetMaximumInterval(refreshRetryMaxInterval)
+	retryPolicy.SetExpirationInterval(backoff.NoInterval)
+	return backoff.NewRetrier(retryPolicy, timeSource)
+}
+
 func (c *shardCache) namespaceRefreshLoop(changeCh <-chan struct{}) {
-	for {
-		select {
-		case <-c.stopCh:
-			c.logger.Info("stop channel closed, exiting namespaceRefreshLoop")
-			return
+	retrier := newRefreshRetrier(c.timeSource)
 
-		case _, ok := <-changeCh:
-			if !ok {
-				c.logger.Info("namespace change channel closed, exiting namespaceRefreshLoop")
-				return
-			}
+	delay := c.nextDelay(nil, retrier)
+	for c.waitForRefresh(changeCh, delay) {
+		// Bounded so a stuck etcd call can't block this loop from observing stopCh.
+		refreshCtx, cancel := context.WithTimeout(context.Background(), c.refreshTimeout)
+		err := c.refresh(refreshCtx)
+		cancel()
 
-			// Bounded so a stuck etcd call can't block this loop from observing stopCh.
-			refreshCtx, cancel := context.WithTimeout(context.Background(), c.refreshTimeout)
-			err := c.refresh(refreshCtx)
-			cancel()
-			if err != nil {
-				c.logger.Error("failed to refresh namespace shard to executor", tag.Error(err))
-			}
-		}
+		delay = c.nextDelay(err, retrier)
 	}
+}
+
+// waitForRefresh waits for a change signal or delay, returning false on stop.
+func (c *shardCache) waitForRefresh(changeCh <-chan struct{}, delay time.Duration) bool {
+	timer := c.timeSource.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-c.stopCh:
+		c.logger.Info("stop channel closed, exiting namespaceRefreshLoop")
+		return false
+
+	case _, ok := <-changeCh:
+		if !ok {
+			c.logger.Info("namespace change channel closed, exiting namespaceRefreshLoop")
+			return false
+		}
+		return true
+
+	case <-timer.Chan():
+		return true
+	}
+}
+
+// nextDelay is the duration to wait before the next refresh, either a retry or a reconcile.
+func (c *shardCache) nextDelay(err error, retrier backoff.Retrier) time.Duration {
+	if err == nil {
+		retrier.Reset()
+		return backoff.JitDuration(reconcileInterval, reconcileJitterCoeff)
+	}
+
+	// An exhausted retrier returns a non-positive delay, so this defensively falls back to the max
+	// retry interval, we should never stop retrying.
+	retryIn := retrier.NextBackOff()
+	if retryIn <= 0 {
+		retryIn = refreshRetryMaxInterval
+	}
+	retryIn = backoff.JitDuration(retryIn, refreshRetryJitterCoeff)
+	c.logger.Error("failed to refresh namespace shard to executor, retrying",
+		tag.Error(err), tag.Dynamic("retryIn", retryIn))
+	return retryIn
 }
 
 func (c *shardCache) refresh(ctx context.Context) error {

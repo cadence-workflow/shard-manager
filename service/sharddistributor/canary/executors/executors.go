@@ -34,15 +34,16 @@ type ExecutorsEphemeralResult struct {
 	ExecutorInfos []executorclient.ExecutorInfo                                 `group:"shard-distributor-executors,flatten"`
 }
 
-func NewExecutorsWithFixedNamespace(params executorclient.Params[*processor.ShardProcessor], namespace string, numExecutors int) (ExecutorsResult, error) {
+func NewExecutorsWithFixedNamespace(params executorclient.Params[*processor.ShardProcessor], cfg config.NamespaceConfig) (ExecutorsResult, error) {
 	var result ExecutorsResult
 
+	numExecutors := cfg.NumExecutors
 	if numExecutors <= 0 {
 		numExecutors = 1
 	}
 
 	for i := 0; i < numExecutors; i++ {
-		executor, err := executorclient.NewExecutorWithNamespace(params, namespace)
+		executor, err := executorclient.NewExecutorWithNamespace(params, cfg.Name)
 		if err != nil {
 			return ExecutorsResult{}, err
 		}
@@ -61,15 +62,16 @@ func NewExecutorWithFixedNamespace(params executorclient.Params[*processor.Shard
 	return ExecutorResult{Executor: executor, ExecutorInfo: executor}, nil
 }
 
-func NewExecutorsWithEphemeralNamespace(params executorclient.Params[*processorephemeral.ShardProcessor], namespace string, numExecutors int) (ExecutorsEphemeralResult, error) {
+func NewExecutorsWithEphemeralNamespace(params executorclient.Params[*processorephemeral.ShardProcessor], cfg config.NamespaceConfig) (ExecutorsEphemeralResult, error) {
 	var result ExecutorsEphemeralResult
 
+	numExecutors := cfg.NumExecutors
 	if numExecutors <= 0 {
 		numExecutors = 1
 	}
 
 	for i := 0; i < numExecutors; i++ {
-		executor, err := executorclient.NewExecutorWithNamespace(params, namespace)
+		executor, err := executorclient.NewExecutorWithNamespace(params, cfg.Name)
 		if err != nil {
 			return ExecutorsEphemeralResult{}, err
 		}
@@ -104,7 +106,7 @@ func NewExecutorsModule(params ExecutorsParams) {
 	}
 }
 
-func Module(fixedNamespace, ephemeralNamespace string) fx.Option {
+func Module() fx.Option {
 	return fx.Module("Executors",
 		// The canary stalls Start/Stop on purpose, so the framework's lifecycle
 		// timeouts are expected output here rather than actionable failures.
@@ -112,12 +114,12 @@ func Module(fixedNamespace, ephemeralNamespace string) fx.Option {
 
 		// Executor that is used for testing a namespace with fixed shards
 		fx.Provide(func(cfg config.Config, params executorclient.Params[*processor.ShardProcessor]) (ExecutorsResult, error) {
-			return NewExecutorsWithFixedNamespace(params, fixedNamespace, cfg.Canary.NumFixedExecutors)
+			return NewExecutorsWithFixedNamespace(params, cfg.Canary.Fixed)
 		}),
 
 		// Executor that is used for testing a namespaces with ephemeral shards
 		fx.Provide(func(cfg config.Config, params executorclient.Params[*processorephemeral.ShardProcessor]) (ExecutorsEphemeralResult, error) {
-			return NewExecutorsWithEphemeralNamespace(params, ephemeralNamespace, cfg.Canary.NumEphemeralExecutors)
+			return NewExecutorsWithEphemeralNamespace(params, cfg.Canary.Ephemeral)
 		}),
 
 		fx.Invoke(NewExecutorsModule),

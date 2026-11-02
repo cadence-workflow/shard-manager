@@ -1,6 +1,12 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+)
+
+const heartBeatInterval = time.Second
 
 // Config is the configuration for the shard distributor canary
 type Config struct {
@@ -8,24 +14,42 @@ type Config struct {
 }
 
 type CanaryConfig struct {
-	// NumFixedExecutors is the number of executors of fixed namespace
-	// Values more than 1 will create multiple executors processing the same fixed namespace
-	// Default: 1
-	NumFixedExecutors int `yaml:"numFixedExecutors"`
+	// Fixed is the namespace with a fixed set of shards
+	Fixed NamespaceConfig `yaml:"fixed"`
 
-	// NumEphemeralExecutors is the number of executors of ephemeral namespace
-	// Values more than 1 will create multiple executors processing the same ephemeral namespace
-	// Default: 1
-	NumEphemeralExecutors int `yaml:"numEphemeralExecutors"`
+	// Ephemeral is the namespace the canary creates shards in
+	Ephemeral NamespaceConfig `yaml:"ephemeral"`
 
 	// Load configures the periodic load run. The run is disabled when Load.Namespace is empty.
 	Load LoadConfig `yaml:"load"`
 }
 
+// NamespaceConfig configures the executors the canary runs for one namespace.
+type NamespaceConfig struct {
+	// Name is the namespace name
+	Name string `yaml:"name"`
+
+	// NumExecutors is the number of executors processing the namespace
+	// Values more than 1 will create multiple executors processing the same namespace
+	// Default: 1
+	NumExecutors int `yaml:"numExecutors"`
+}
+
+// ClientConfig returns the executor and spectator client config for the canary namespaces.
+// The load namespace is not included: load executors are built per run with their own config.
+func (c CanaryConfig) ClientConfig() clientcommon.Config {
+	return clientcommon.Config{
+		Namespaces: []clientcommon.NamespaceConfig{
+			{Namespace: c.Fixed.Name, HeartBeatInterval: heartBeatInterval},
+			{Namespace: c.Ephemeral.Name, HeartBeatInterval: heartBeatInterval},
+		},
+	}
+}
+
 // LoadConfig configures the periodic load run against a dedicated ephemeral namespace.
-// A run only happens if the shard distributor also has Namespace configured.
 type LoadConfig struct {
-	// Namespace is the namespace the load run targets
+	// Namespace is the namespace the load run targets. The shard distributor must
+	// have it configured as an ephemeral namespace. Empty disables the load run.
 	Namespace string `yaml:"namespace"`
 
 	// Interval is the time between runs, before jitter
@@ -42,4 +66,8 @@ type LoadConfig struct {
 
 	// Hold is how long a run keeps its peak before releasing the shards
 	Hold time.Duration `yaml:"hold"`
+
+	// MaxFailureRatio is the fraction of shard creations, in [0, 1], that may
+	// fail before the run is reported as failed
+	MaxFailureRatio float64 `yaml:"maxFailureRatio"`
 }

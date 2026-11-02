@@ -106,20 +106,20 @@ func NewExecutorsModule(params ExecutorsParams) {
 	}
 }
 
-func Module() fx.Option {
+func Module(fixed, ephemeral config.NamespaceConfig) fx.Option {
 	return fx.Module("Executors",
 		// The canary stalls Start/Stop on purpose, so the framework's lifecycle
 		// timeouts are expected output here rather than actionable failures.
 		fx.Decorate(faultlog.WrapLogger),
 
 		// Executor that is used for testing a namespace with fixed shards
-		fx.Provide(func(cfg config.Config, params executorclient.Params[*processor.ShardProcessor]) (ExecutorsResult, error) {
-			return NewExecutorsWithFixedNamespace(params, cfg.Canary.Fixed)
+		fx.Provide(func(params executorclient.Params[*processor.ShardProcessor]) (ExecutorsResult, error) {
+			return NewExecutorsWithFixedNamespace(params, fixed)
 		}),
 
 		// Executor that is used for testing a namespaces with ephemeral shards
-		fx.Provide(func(cfg config.Config, params executorclient.Params[*processorephemeral.ShardProcessor]) (ExecutorsEphemeralResult, error) {
-			return NewExecutorsWithEphemeralNamespace(params, cfg.Canary.Ephemeral)
+		fx.Provide(func(params executorclient.Params[*processorephemeral.ShardProcessor]) (ExecutorsEphemeralResult, error) {
+			return NewExecutorsWithEphemeralNamespace(params, ephemeral)
 		}),
 
 		fx.Invoke(NewExecutorsModule),

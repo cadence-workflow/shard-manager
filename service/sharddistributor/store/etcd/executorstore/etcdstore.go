@@ -221,9 +221,9 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 		clientv3.OpGet(etcdkeys.BuildDrainedHostsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 	)
-	start := s.timeSource.Now()
+	roundTripStart := s.timeSource.Now()
 	txnResp, err := txn.Commit()
-	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreGetStateETCDRoundTripLatency, s.timeSource.Since(start))
+	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreGetStateETCDRoundTripLatency, s.timeSource.Since(roundTripStart))
 	if err != nil {
 		return nil, fmt.Errorf("get namespace state: %w", err)
 	}
@@ -231,7 +231,9 @@ func (s *executorStoreImpl) GetState(ctx context.Context, namespace string) (*st
 		return nil, fmt.Errorf("get namespace state: expected 3 responses, got %d", len(txnResp.Responses))
 	}
 
+	parseStart := s.timeSource.Now()
 	parsedData, err := common.ParseExecutorKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
+	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreParseLatency, s.timeSource.Since(parseStart))
 	if err != nil {
 		return nil, err
 	}
@@ -282,9 +284,9 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 	)
-	start := s.timeSource.Now()
+	roundTripStart := s.timeSource.Now()
 	txnResp, err := txn.Commit()
-	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency, s.timeSource.Since(start))
+	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency, s.timeSource.Since(roundTripStart))
 	if err != nil {
 		return nil, fmt.Errorf("get namespace assignment state: %w", err)
 	}
@@ -292,7 +294,9 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 		return nil, fmt.Errorf("get namespace assignment state: expected 2 responses, got %d", len(txnResp.Responses))
 	}
 
+	parseStart := s.timeSource.Now()
 	metadata, assignments, err := common.ParseExecutorAssignmentKVs(s.prefix, namespace, txnResp.Responses[0].GetResponseRange().Kvs)
+	metricsScope.RecordHistogramDuration(metrics.ShardDistributorStoreParseLatency, s.timeSource.Since(parseStart))
 	if err != nil {
 		return nil, err
 	}

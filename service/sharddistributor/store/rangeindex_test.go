@@ -9,14 +9,14 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
-func mustRange(t *testing.T, low, high []byte) *types.Range {
+func mustRange(t *testing.T, low, high []byte) types.Range {
 	t.Helper()
 	r, err := types.NewRange(low, high)
 	require.NoError(t, err)
 	return r
 }
 
-func mustFinalRange(t *testing.T, low []byte) *types.Range {
+func mustFinalRange(t *testing.T, low []byte) types.Range {
 	t.Helper()
 	r, err := types.NewFinalRange(low)
 	require.NoError(t, err)
@@ -30,9 +30,8 @@ func b8(b byte) []byte {
 }
 
 // assignment builds a READY RangeAssignment for the given range and executor.
-func assignment(t *testing.T, r *types.Range, executorID string) *RangeAssignment {
+func assignment(t *testing.T, r types.Range, executorID string) *RangeAssignment {
 	t.Helper()
-	require.NotNil(t, r)
 	return &RangeAssignment{Range: r, ExecutorID: executorID, Status: types.AssignmentStatusREADY}
 }
 
@@ -114,13 +113,32 @@ func TestNewRangeIndex(t *testing.T) {
 			},
 			wantErr: "not adjacent",
 		},
-		// The cover must start at the minimum bound (all zeros) to ensure every
-		// key in the keyspace is owned. A cover starting at a higher bound leaves
-		// keys below it unowned.
+		// Ranges can share a lower bound in storage; cover validation is
+		// responsible for rejecting this.
 		{
-			name: "first range has empty low bound",
+			name: "duplicate lower bounds",
 			ranges: []*RangeAssignment{
-				assignment(t, mustRange(t, []byte{}, b8(0x40)), "exec-1"),
+				assignment(t, mustRange(t, b8(0x00), b8(0x40)), "exec-1"),
+				assignment(t, mustRange(t, b8(0x00), b8(0x80)), "exec-2"),
+				assignment(t, mustFinalRange(t, b8(0x80)), "exec-3"),
+			},
+			wantErr: "not adjacent",
+		},
+		// The cover must start at the exact 8-zero-byte minimum fingerprint bound
+		// to ensure every key in the keyspace is owned.
+		{
+			name: "first range has 7-byte zero low bound",
+			ranges: []*RangeAssignment{
+				assignment(t, mustRange(t, make([]byte, 7), b8(0x40)), "exec-1"),
+				assignment(t, mustRange(t, b8(0x40), b8(0x80)), "exec-2"),
+				assignment(t, mustFinalRange(t, b8(0x80)), "exec-3"),
+			},
+			wantErr: "minimum bound",
+		},
+		{
+			name: "first range has 9-byte zero low bound",
+			ranges: []*RangeAssignment{
+				assignment(t, mustRange(t, make([]byte, 9), b8(0x40)), "exec-1"),
 				assignment(t, mustRange(t, b8(0x40), b8(0x80)), "exec-2"),
 				assignment(t, mustFinalRange(t, b8(0x80)), "exec-3"),
 			},
@@ -152,9 +170,20 @@ func TestNewRangeIndex(t *testing.T) {
 			wantErr: "nil",
 		},
 		{
-			name:    "assignment with nil range",
-			ranges:  []*RangeAssignment{{Range: nil, ExecutorID: "exec-1", Status: types.AssignmentStatusREADY}},
-			wantErr: "nil",
+			name:    "assignment with zero-value range",
+			ranges:  []*RangeAssignment{{Range: types.Range{}, ExecutorID: "exec-1", Status: types.AssignmentStatusREADY}},
+			wantErr: "invalid range",
+		},
+		{
+			// Empty or nil lower bounds are invalid, even when the upper bound is valid.
+			name:    "assignment with empty low bound",
+			ranges:  []*RangeAssignment{{Range: types.Range{LowInclusive: []byte{}, HighExclusive: b8(0x40)}, ExecutorID: "exec-1", Status: types.AssignmentStatusREADY}},
+			wantErr: "invalid range",
+		},
+		{
+			name:    "assignment with nil low bound",
+			ranges:  []*RangeAssignment{{Range: types.Range{LowInclusive: nil, HighExclusive: b8(0x40)}, ExecutorID: "exec-1", Status: types.AssignmentStatusREADY}},
+			wantErr: "invalid range",
 		},
 		{
 			// Degenerate range (low == high) contains no keys, leaving its boundary unowned.
@@ -162,7 +191,7 @@ func TestNewRangeIndex(t *testing.T) {
 			name: "degenerate range",
 			ranges: []*RangeAssignment{
 				assignment(t, mustRange(t, b8(0x00), b8(0x40)), "exec-1"),
-				assignment(t, &types.Range{LowInclusive: b8(0x40), HighExclusive: b8(0x40)}, "exec-2"),
+				assignment(t, types.Range{LowInclusive: b8(0x40), HighExclusive: b8(0x40)}, "exec-2"),
 				assignment(t, mustRange(t, b8(0x40), b8(0x80)), "exec-3"),
 				assignment(t, mustFinalRange(t, b8(0x80)), "exec-4"),
 			},

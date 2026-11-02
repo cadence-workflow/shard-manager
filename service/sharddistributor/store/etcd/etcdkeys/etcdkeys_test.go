@@ -9,8 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/cadence-workflow/shard-manager/common/hash"
 )
 
 func TestBuildNamespacePrefix(t *testing.T) {
@@ -259,8 +257,8 @@ func TestRangeKeyHexPreservesOrdering(t *testing.T) {
 
 	rng := rand.New(rand.NewSource(1))
 	for i := 0; i < 1000; i++ {
-		low := make([]byte, hash.FingerprintSize)
-		high := make([]byte, hash.FingerprintSize)
+		low := make([]byte, 8)
+		high := make([]byte, 8)
 		rng.Read(low)
 		rng.Read(high)
 		if bytes.Equal(low, high) {
@@ -323,11 +321,6 @@ func TestParseRangeKey(t *testing.T) {
 			name:    "odd hex length",
 			key:     "/cadence/test-ns/ranges/abc",
 			wantErr: "invalid hex lower bound",
-		},
-		{
-			name:    "wrong byte length",
-			key:     "/cadence/test-ns/ranges/83ee861aac65536200",
-			wantErr: "must be 8 bytes",
 		},
 		{
 			name:    "extra path segment",

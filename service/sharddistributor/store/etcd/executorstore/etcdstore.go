@@ -926,11 +926,11 @@ func (s *executorStoreImpl) RecordShardStatisticsBatch(ctx context.Context, name
 // --- Range Implementation ---
 
 func (s *executorStoreImpl) PutRange(ctx context.Context, namespace string, assignment *store.RangeAssignment) error {
-	if assignment == nil || assignment.Range == nil {
-		return fmt.Errorf("put range: assignment and its Range must not be nil")
+	if assignment == nil {
+		return fmt.Errorf("put range: assignment must not be nil")
 	}
-	if err := store.ValidateRangeBounds(assignment.Range); err != nil {
-		return fmt.Errorf("put range: %w", err)
+	if !assignment.Range.IsValid() {
+		return fmt.Errorf("put range: range is invalid: low=%x high=%x", assignment.Range.LowInclusive, assignment.Range.HighExclusive)
 	}
 
 	value, err := json.Marshal(etcdtypes.FromRangeAssignment(assignment))
@@ -946,10 +946,6 @@ func (s *executorStoreImpl) PutRange(ctx context.Context, namespace string, assi
 }
 
 func (s *executorStoreImpl) GetRange(ctx context.Context, namespace string, lowInclusive []byte) (*store.RangeAssignment, error) {
-	if err := store.ValidateLowBound(lowInclusive); err != nil {
-		return nil, fmt.Errorf("get range: %w", err)
-	}
-
 	resp, err := s.client.Get(ctx, etcdkeys.BuildRangeKey(s.prefix, namespace, lowInclusive))
 	if err != nil {
 		return nil, fmt.Errorf("get range: %w", err)
@@ -972,9 +968,6 @@ func (s *executorStoreImpl) GetRange(ctx context.Context, namespace string, lowI
 }
 
 func (s *executorStoreImpl) DeleteRange(ctx context.Context, namespace string, lowInclusive []byte) error {
-	if err := store.ValidateLowBound(lowInclusive); err != nil {
-		return fmt.Errorf("delete range: %w", err)
-	}
 	if _, err := s.client.Delete(ctx, etcdkeys.BuildRangeKey(s.prefix, namespace, lowInclusive)); err != nil {
 		return fmt.Errorf("delete range: %w", err)
 	}

@@ -2,10 +2,8 @@ package store
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/cadence-workflow/shard-manager/common/hash"
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
 
@@ -19,7 +17,7 @@ var ErrRangeNotImplemented = fmt.Errorf("range operation not implemented")
 // RangeAssignment is the internal representation of a range's ownership. The
 // Range identifies the keyspace interval.
 type RangeAssignment struct {
-	Range      *types.Range
+	Range      types.Range
 	ExecutorID string
 	Status     types.AssignmentStatus
 	// ModRevision is the etcd modification revision of the range key, used as
@@ -59,31 +57,4 @@ type RangeStore interface {
 // AssignRangesRequest is the complete target cover passed to AssignRanges.
 type AssignRangesRequest struct {
 	Assignments []*RangeAssignment
-}
-
-// ValidateLowBound ensures the bound can round-trip through the storage key format.
-func ValidateLowBound(lowInclusive []byte) error {
-	if len(lowInclusive) != hash.FingerprintSize {
-		return fmt.Errorf("low bound must be exactly %d bytes, got %d", hash.FingerprintSize, len(lowInclusive))
-	}
-	return nil
-}
-
-// ValidateRangeBounds rejects ranges with incorrect bound widths or inverted bounds.
-// The storage layer cannot round-trip invalid ranges, so we reject them at the boundary.
-func ValidateRangeBounds(r *types.Range) error {
-	if r == nil {
-		return errors.New("range must not be nil")
-	}
-	if !r.IsValid() {
-		return fmt.Errorf("range is invalid: low=%x high=%x, low must be < high",
-			r.LowInclusive, r.HighExclusive)
-	}
-	if err := ValidateLowBound(r.LowInclusive); err != nil {
-		return err
-	}
-	if !r.IsFinalRange() && len(r.HighExclusive) != hash.FingerprintSize {
-		return fmt.Errorf("high bound must be exactly %d bytes, got %d", hash.FingerprintSize, len(r.HighExclusive))
-	}
-	return nil
 }

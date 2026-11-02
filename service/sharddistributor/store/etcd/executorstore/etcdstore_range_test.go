@@ -131,15 +131,10 @@ func TestPutRange_RejectsInvalidBounds(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	tests := map[string]*types.Range{
-		"empty low bound":        rawRange([]byte{}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
-		"short low bound":        rawRange([]byte{0x40}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
-		"long low bound":         rawRange([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
-		"empty finite high":      rawRange([]byte{0x00, 0, 0, 0, 0, 0, 0, 0}, []byte{}),
-		"short finite high":      rawRange([]byte{0x00, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40}),
-		"long non-sentinel high": rawRange([]byte{0x00, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0, 0}),
-		"equal bounds":           rawRange([]byte{0x40, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
-		"inverted bounds":        rawRange([]byte{0x80, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
+	tests := map[string]types.Range{
+		"empty low bound": rawRange([]byte{}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
+		"equal bounds":    rawRange([]byte{0x40, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
+		"inverted bounds": rawRange([]byte{0x80, 0, 0, 0, 0, 0, 0, 0}, []byte{0x40, 0, 0, 0, 0, 0, 0, 0}),
 	}
 
 	for name, rng := range tests {
@@ -178,23 +173,22 @@ func TestListRangesAndGetRange_PopulateModRevision(t *testing.T) {
 	require.Equal(t, got.ModRevision, listed[0].ModRevision)
 }
 
-func mustRange(t *testing.T, low, high []byte) *types.Range {
+func mustRange(t *testing.T, low, high []byte) types.Range {
 	t.Helper()
 	r, err := types.NewRange(low, high)
 	require.NoError(t, err)
 	return r
 }
 
-func mustFinalRange(t *testing.T, low []byte) *types.Range {
+func mustFinalRange(t *testing.T, low []byte) types.Range {
 	t.Helper()
 	r, err := types.NewFinalRange(low)
 	require.NoError(t, err)
 	return r
 }
 
-// rawRange builds a Range without the NewRange validity check, so bound-width
-// cases that types.NewRange would reject for other reasons can be exercised
-// directly against the store's width validation.
-func rawRange(low, high []byte) *types.Range {
-	return &types.Range{LowInclusive: low, HighExclusive: high}
+// rawRange builds a Range without the constructor's validation, for the invalid
+// shapes PutRange must reject.
+func rawRange(low, high []byte) types.Range {
+	return types.Range{LowInclusive: low, HighExclusive: high}
 }

@@ -27,7 +27,7 @@ func (r *RangeAssignment) ToRangeAssignment(lowInclusive []byte) (*store.RangeAs
 		return nil, nil
 	}
 
-	var rng *types.Range
+	var rng types.Range
 	if r.HighExclusiveHex == "" {
 		var err error
 		rng, err = types.NewFinalRange(lowInclusive)
@@ -60,7 +60,7 @@ func FromRangeAssignment(src *store.RangeAssignment) *RangeAssignment {
 	}
 
 	var highExclusiveHex string
-	if src.Range != nil && !src.Range.IsFinalRange() {
+	if !src.Range.IsFinalRange() {
 		highExclusiveHex = hex.EncodeToString(src.Range.HighExclusive)
 	}
 

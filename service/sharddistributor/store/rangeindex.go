@@ -23,12 +23,12 @@ type RangeIndex struct {
 // modified or retained.
 func NewRangeIndex(ranges []*RangeAssignment) (*RangeIndex, error) {
 	for _, r := range ranges {
-		if r == nil || r.Range == nil {
-			return nil, errors.New("range cover must not contain nil assignments or nil ranges")
+		if r == nil {
+			return nil, errors.New("range cover must not contain nil assignments")
 		}
-		// A range with low >= high contains no key, so a cover containing one
-		// would leave the key at that boundary unowned. Checked before the sort
-		// to catch this case.
+		// A range with low >= high or an empty low bound contains no valid
+		// interval, so a cover containing one would leave keys unowned. Checked
+		// before the sort to catch this case.
 		if !r.Range.IsValid() {
 			return nil, fmt.Errorf("range cover contains an invalid range: low=%x high=%x",
 				r.Range.LowInclusive, r.Range.HighExclusive)
@@ -94,21 +94,19 @@ func ValidateCover(sorted []*RangeAssignment) error {
 		return errors.New("range cover must not be empty")
 	}
 
-	// The first range must start at the minimum bound: exactly
-	// hash.FingerprintSize zero bytes. The empty byte string is not a valid
-	// minimum, because the storage layer only ever persists 8-byte bounds (see
-	// etcdkeys.ParseRangeKey).
-	if !bytes.Equal(sorted[0].Range.LowInclusive, make([]byte, hash.FingerprintSize)) {
-		return fmt.Errorf("first range must start at the minimum bound of %d zero bytes, got %v", hash.FingerprintSize, sorted[0].Range)
+	if !hash.IsMinFingerprint(sorted[0].Range.LowInclusive) {
+		return fmt.Errorf("first range must start at the minimum bound, got %v", sorted[0].Range)
 	}
 
 	// Adjacent ranges must share an exact boundary: the previous high bound is
 	// the next low bound. A mismatch means either a gap (prev high < next low)
-	// or an overlap (prev high > next low).
+	// or an overlap (prev high > next low, or prev is already unbounded).
 	for i := 1; i < len(sorted); i++ {
 		prev := sorted[i-1].Range
 		curr := sorted[i].Range
-		if !bytes.Equal(prev.HighExclusive, curr.LowInclusive) {
+		// A final range cannot have a successor. Check that explicitly before
+		// validating adjacency
+		if prev.IsFinalRange() || !bytes.Equal(prev.HighExclusive, curr.LowInclusive) {
 			return fmt.Errorf("ranges are not adjacent (gap or overlap): %v and %v", prev, curr)
 		}
 	}

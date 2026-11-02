@@ -34,8 +34,8 @@ func TestFingerprint64(t *testing.T) {
 			if !bytes.Equal(got, tt.want) {
 				t.Errorf("Fingerprint64(%q) = %x, want %x", tt.input, got, tt.want)
 			}
-			if len(got) != FingerprintSize {
-				t.Errorf("Fingerprint64() length = %d, want %d", len(got), FingerprintSize)
+			if len(got) != fingerprintSize {
+				t.Errorf("Fingerprint64() length = %d, want %d", len(got), fingerprintSize)
 			}
 		})
 	}
@@ -60,5 +60,28 @@ func TestFingerprint64String_MatchesBytes(t *testing.T) {
 	input := "my-task-list"
 	if got, want := Fingerprint64String(input), Fingerprint64([]byte(input)); !bytes.Equal(got, want) {
 		t.Errorf("Fingerprint64String(%q) = %x, want %x", input, got, want)
+	}
+}
+
+func TestIsMinFingerprint(t *testing.T) {
+	tests := []struct {
+		name string
+		key  []byte
+		want bool
+	}{
+		{name: "exact 8 zero bytes", key: make([]byte, 8), want: true},
+		{name: "nil", key: nil, want: false},
+		{name: "empty", key: []byte{}, want: false},
+		{name: "7 zero bytes", key: make([]byte, 7), want: false},
+		{name: "9 zero bytes", key: make([]byte, 9), want: false},
+		{name: "non-zero 8 bytes", key: []byte{0, 0, 0, 0, 0, 0, 0, 1}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsMinFingerprint(tt.key); got != tt.want {
+				t.Errorf("IsMinFingerprint(%x) = %v, want %v", tt.key, got, tt.want)
+			}
+		})
 	}
 }

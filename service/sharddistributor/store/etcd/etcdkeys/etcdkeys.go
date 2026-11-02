@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cadence-workflow/shard-manager/common/hash"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 )
 
@@ -177,9 +176,6 @@ func ParseRangeKey(prefix, namespace, key string) ([]byte, error) {
 	lowInclusive, err := hex.DecodeString(hexBound)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected range key format '%s': invalid hex lower bound: %w", key, err)
-	}
-	if len(lowInclusive) != hash.FingerprintSize {
-		return nil, fmt.Errorf("unexpected range key format '%s': lower bound must be %d bytes, got %d", key, hash.FingerprintSize, len(lowInclusive))
 	}
 	return lowInclusive, nil
 }

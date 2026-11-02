@@ -13,6 +13,8 @@ import (
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
 
+	"github.com/cadence-workflow/shard-manager/common/backoff"
+	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -117,6 +119,124 @@ func TestShardCache_namespaceRefreshLoop_HungRefreshDoesNotBlockStop(t *testing.
 	case <-time.After(2 * time.Second):
 		t.Fatal("namespaceRefreshLoop did not exit after stopCh was closed while a refresh was in flight")
 	}
+}
+
+// Failed refreshes stay pending, so the cache recovers and notifies without another signal.
+func TestShardCache_namespaceRefreshLoop_failedRefreshRetriesUntilRecovered(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
+	defer goleak.VerifyNone(t)
+
+	shard1Owner := testExecutor{shards: []string{"shard-1"}}
+	initialRead := tc.store.EXPECT().
+		GetAssignmentState(gomock.Any(), tc.namespace).
+		Return(namespaceState(1, map[string]testExecutor{"executor-1": shard1Owner}), nil).
+		Times(1)
+	failedReads := tc.store.EXPECT().
+		GetAssignmentState(gomock.Any(), tc.namespace).
+		Return(nil, context.DeadlineExceeded).
+		After(initialRead).
+		Times(3)
+	tc.store.EXPECT().
+		GetAssignmentState(gomock.Any(), tc.namespace).
+		Return(namespaceState(2, map[string]testExecutor{"executor-2": shard1Owner}), nil).
+		After(failedReads).
+		AnyTimes()
+
+	require.NoError(t, tc.c.Start())
+	defer tc.c.Stop()
+
+	tc.changeCh <- struct{}{}
+	requireExecutorCached(t, tc.c, "executor-1", "shard-1")
+
+	notifyCh, unSub := tc.c.Subscribe()
+	defer unSub()
+
+	// The ownership change is signalled, but reading it fails and no signal follows.
+	tc.changeCh <- struct{}{}
+
+	// Stepping the clock instead of waiting on its timers makes a missing retry
+	// fail rather than hang.
+	require.Eventually(t, func() bool {
+		tc.timeSource.Advance(refreshRetryMaxInterval)
+		select {
+		case <-notifyCh:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, 5*time.Millisecond, "expected the failed refresh to be retried and subscribers notified")
+
+	requireExecutorCached(t, tc.c, "executor-2", "shard-1")
+}
+
+func TestShardCache_namespaceRefreshLoop_stopWhileRetryPending(t *testing.T) {
+	tc := setupShardCacheTestCase(t)
+	defer goleak.VerifyNone(t)
+
+	tc.store.EXPECT().
+		GetAssignmentState(gomock.Any(), tc.namespace).
+		Return(nil, errors.New("etcd unavailable")).
+		Times(1)
+
+	require.NoError(t, tc.c.Start())
+	tc.changeCh <- struct{}{}
+
+	// The clock never advances, so Stop only returns if it does not wait out the retry.
+	tc.c.Stop()
+}
+
+func TestShardCache_nextDelay(t *testing.T) {
+	timeSource := clock.NewMockedTimeSource()
+	exhaustedPolicy := backoff.NewExponentialRetryPolicy(refreshRetryInitialInterval)
+	exhaustedPolicy.SetMaximumAttempts(1)
+	exhaustedRetrier := backoff.NewRetrier(exhaustedPolicy, timeSource)
+	exhaustedRetrier.NextBackOff()
+	errStore := errors.New("etcd unavailable")
+
+	tests := []struct {
+		name     string
+		err      error
+		retrier  backoff.Retrier
+		minDelay time.Duration
+		maxDelay time.Duration
+	}{
+		{
+			name:     "success waits for the reconcile",
+			retrier:  newRefreshRetrier(timeSource),
+			minDelay: jitterMin(reconcileInterval, reconcileJitterCoeff),
+			maxDelay: jitterMax(reconcileInterval, reconcileJitterCoeff),
+		},
+		{
+			name:    "failure waits for the first retry",
+			err:     errStore,
+			retrier: newRefreshRetrier(timeSource),
+			// The backoff policy jitters down to 80% of the interval.
+			minDelay: refreshRetryInitialInterval * 8 / 10,
+			maxDelay: refreshRetryInitialInterval,
+		},
+		{
+			name:     "failure with an exhausted retrier falls back to the max retry interval",
+			err:      errStore,
+			retrier:  exhaustedRetrier,
+			minDelay: refreshRetryMaxInterval,
+			maxDelay: refreshRetryMaxInterval,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			delay := newTestShardCache(t, "ns", nil).nextDelay(tt.err, tt.retrier)
+			assert.GreaterOrEqual(t, delay, tt.minDelay)
+			assert.LessOrEqual(t, delay, tt.maxDelay)
+		})
+	}
+}
+
+// jitterMin and jitterMax bound what backoff.JitDuration(d, coeff) returns.
+func jitterMin(d time.Duration, coeff float64) time.Duration {
+	return time.Duration(float64(d) * (1 - coeff))
+}
+func jitterMax(d time.Duration, coeff float64) time.Duration {
+	return time.Duration(float64(d) * (1 + coeff))
 }
 
 func TestShardCache_replaceNamespaceState_skipsStaleRevision(t *testing.T) {
@@ -323,8 +443,9 @@ func verifyShardOwner(t *testing.T, c *shardCache, shardID, expectedExecutorID s
 }
 
 type shardCacheTestCase struct {
-	c     *shardCache
-	store *store.MockStore
+	c          *shardCache
+	store      *store.MockStore
+	timeSource clock.MockedTimeSource
 
 	// changeCh stands in for the store's namespace subscription.
 	changeCh chan struct{}
@@ -336,6 +457,7 @@ type shardCacheTestCase struct {
 func setupShardCacheTestCase(t *testing.T) *shardCacheTestCase {
 	tc := &shardCacheTestCase{
 		store:      store.NewMockStore(gomock.NewController(t)),
+		timeSource: clock.NewMockedTimeSource(),
 		changeCh:   make(chan struct{}),
 		executorID: "executor-1",
 		namespace:  "test-namespace",
@@ -346,12 +468,12 @@ func setupShardCacheTestCase(t *testing.T) *shardCacheTestCase {
 		Return((<-chan struct{})(tc.changeCh), nil).
 		AnyTimes()
 
-	tc.c = newTestShardCache(t, tc.namespace, tc.store)
+	tc.c = newShardCache(tc.namespace, tc.store, testlogger.New(t), tc.timeSource)
 	return tc
 }
 
 func newTestShardCache(t *testing.T, namespace string, executorStore store.Store) *shardCache {
-	return newShardCache(namespace, executorStore, testlogger.New(t))
+	return newShardCache(namespace, executorStore, testlogger.New(t), clock.NewMockedTimeSource())
 }
 
 // state builds a namespace snapshot holding the test case's executor with shard-1 assigned.

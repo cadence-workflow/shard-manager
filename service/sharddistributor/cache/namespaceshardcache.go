@@ -30,7 +30,7 @@ const (
 
 	// Retry bounds for a failed refresh.
 	refreshRetryInitialInterval = 10 * time.Millisecond
-	refreshRetryMaxInterval     = 5 * time.Second
+	refreshRetryMaxInterval     = time.Second
 	// The watch signals every host at once, so retries are jittered.
 	refreshRetryJitterCoeff = 0.5
 

@@ -180,7 +180,6 @@ func TestShardCache_namespaceRefreshLoop_stopWhileRetryPending(t *testing.T) {
 
 	require.NoError(t, tc.c.Start())
 	tc.changeCh <- struct{}{}
-	time.Sleep(10 * time.Millisecond)
 
 	// The clock never advances, so Stop only returns if it does not wait out the retry.
 	tc.c.Stop()

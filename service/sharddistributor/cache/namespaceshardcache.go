@@ -183,10 +183,7 @@ func (c *shardCache) namespaceRefreshLoop(changeCh <-chan struct{}) {
 	delay := c.nextDelay(nil, retrier)
 	for c.waitForRefresh(changeCh, delay) {
 		// Bounded so a stuck etcd call can't block this loop from observing stopCh.
-		refreshCtx, cancel := context.WithTimeout(context.Background(), c.refreshTimeout)
-		err := c.refresh(refreshCtx)
-		cancel()
-
+		err := c.refreshWithTimeout()
 		delay = c.nextDelay(err, retrier)
 	}
 }
@@ -243,6 +240,13 @@ func (c *shardCache) refresh(ctx context.Context) error {
 		c.pubSub.notifySubscribers()
 	}
 	return nil
+}
+
+// refreshWithTimeout refreshes under a fresh background context bounded by refreshTimeout.
+func (c *shardCache) refreshWithTimeout() error {
+	refreshCtx, cancel := context.WithTimeout(context.Background(), c.refreshTimeout)
+	defer cancel()
+	return c.refresh(refreshCtx)
 }
 
 func (c *shardCache) GetShardAssignments() store.AssignmentSnapshot {
@@ -368,9 +372,7 @@ func (c *shardCache) getShardOwnerInMap(ctx context.Context, m *map[string]*stor
 // key indefinitely.
 func (c *shardCache) refreshSingleFlight(ctx context.Context) error {
 	ch := c.refreshSF.DoChan(refreshSingleFlightKey, func() (interface{}, error) {
-		refreshCtx, cancel := context.WithTimeout(context.Background(), c.refreshTimeout)
-		defer cancel()
-		return nil, c.refresh(refreshCtx)
+		return nil, c.refreshWithTimeout()
 	})
 
 	select {

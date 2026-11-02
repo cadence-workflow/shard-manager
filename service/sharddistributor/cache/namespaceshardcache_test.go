@@ -194,7 +194,6 @@ func TestShardCache_nextDelay(t *testing.T) {
 	exhaustedRetrier.NextBackOff()
 	errStore := errors.New("etcd unavailable")
 
-	// The failure lower bound is loose because the backoff policy adds its own jitter.
 	tests := []struct {
 		name     string
 		err      error
@@ -209,18 +208,19 @@ func TestShardCache_nextDelay(t *testing.T) {
 			maxDelay: jitterMax(reconcileInterval, reconcileJitterCoeff),
 		},
 		{
-			name:     "failure waits for the first retry",
-			err:      errStore,
-			retrier:  newRefreshRetrier(timeSource),
-			minDelay: time.Nanosecond,
-			maxDelay: jitterMax(refreshRetryInitialInterval, refreshRetryJitterCoeff),
+			name:    "failure waits for the first retry",
+			err:     errStore,
+			retrier: newRefreshRetrier(timeSource),
+			// The backoff policy jitters down to 80% of the interval.
+			minDelay: refreshRetryInitialInterval * 8 / 10,
+			maxDelay: refreshRetryInitialInterval,
 		},
 		{
 			name:     "failure with an exhausted retrier falls back to the max retry interval",
 			err:      errStore,
 			retrier:  exhaustedRetrier,
-			minDelay: jitterMin(refreshRetryMaxInterval, refreshRetryJitterCoeff),
-			maxDelay: jitterMax(refreshRetryMaxInterval, refreshRetryJitterCoeff),
+			minDelay: refreshRetryMaxInterval,
+			maxDelay: refreshRetryMaxInterval,
 		},
 	}
 	for _, tt := range tests {

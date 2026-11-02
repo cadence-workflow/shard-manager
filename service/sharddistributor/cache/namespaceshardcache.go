@@ -31,8 +31,6 @@ const (
 	// Retry bounds for a failed refresh.
 	refreshRetryInitialInterval = 10 * time.Millisecond
 	refreshRetryMaxInterval     = time.Second
-	// The watch signals every host at once, so retries are jittered.
-	refreshRetryJitterCoeff = 0.5
 
 	// Reconcile interval for periodic reconciliations.
 	reconcileInterval    = 10 * time.Second
@@ -222,13 +220,14 @@ func (c *shardCache) nextDelay(err error, retrier backoff.Retrier) time.Duration
 		return backoff.JitDuration(reconcileInterval, reconcileJitterCoeff)
 	}
 
+	// The watch signals every host at once. The retry policy already jitters below its max,
+	// so jittering again here would overshoot refreshRetryMaxInterval.
 	// An exhausted retrier returns a non-positive delay, so this defensively falls back to the max
 	// retry interval, we should never stop retrying.
 	retryIn := retrier.NextBackOff()
 	if retryIn <= 0 {
 		retryIn = refreshRetryMaxInterval
 	}
-	retryIn = backoff.JitDuration(retryIn, refreshRetryJitterCoeff)
 	c.logger.Error("failed to refresh namespace shard to executor, retrying",
 		tag.Error(err), tag.Dynamic("retryIn", retryIn))
 	return retryIn

@@ -1,14 +1,17 @@
 package etcdkeys
 
 import (
-	"bytes"
-	"encoding/hex"
-	"math/rand"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	testRangeID = "550e8400-e29b-41d4-a716-446655440000"
+	// A second, distinct ID: round-trip coverage must not depend on one value.
+	testAlternateRangeID = "123e4567-e89b-12d3-a456-426614174000"
 )
 
 func TestBuildNamespacePrefix(t *testing.T) {
@@ -217,8 +220,8 @@ func TestBuildRangesPrefix(t *testing.T) {
 }
 
 func TestBuildRangeKey(t *testing.T) {
-	got := BuildRangeKey("/cadence", "test-ns", []byte{0x83, 0xee, 0x86, 0x1a, 0xac, 0x65, 0x53, 0x62})
-	assert.Equal(t, "/cadence/test-ns/ranges/83ee861aac655362", got)
+	got := BuildRangeKey("/cadence", "test-ns", testRangeID)
+	assert.Equal(t, "/cadence/test-ns/ranges/"+testRangeID, got)
 }
 
 // The ranges keyspace must not collide with the executor, drained-shard, or
@@ -239,124 +242,98 @@ func TestRangesPrefixIsDisjointFromSiblingPrefixes(t *testing.T) {
 	}
 }
 
-// Hex encoding must preserve lexicographic ordering of the bounds; if it did
-// not, etcd prefix scans would return ranges out of order.
-//
-// Sampled pairs, not one example: a single ordered pair passes even for a
-// non-monotonic encoding like base64, which inverts about a third of random
-// pairs.
-func TestRangeKeyHexPreservesOrdering(t *testing.T) {
-	// Pairs that cross a nibble boundary, where a non-monotonic alphabet is most
-	// likely to invert the order.
-	pairs := [][2][]byte{
-		{{0x0f, 0, 0, 0, 0, 0, 0, 0}, {0x10, 0, 0, 0, 0, 0, 0, 0}},
-		{{0x3f, 0, 0, 0, 0, 0, 0, 0}, {0x40, 0, 0, 0, 0, 0, 0, 0}},
-		{{0x7f, 0xff, 0, 0, 0, 0, 0, 0}, {0x80, 0, 0, 0, 0, 0, 0, 0}},
-		{{0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, {0xff, 0, 0, 0, 0, 0, 0, 0}},
+func TestValidateRangeID(t *testing.T) {
+	tests := []struct {
+		name    string
+		rangeID string
+		wantErr string
+	}{
+		{name: "uuid", rangeID: testRangeID},
+		{name: "simple", rangeID: "range-1"},
+		{name: "empty", rangeID: "", wantErr: "must not be empty"},
+		{name: "leading slash", rangeID: "/range-1", wantErr: "must not contain '/'"},
+		{name: "trailing slash", rangeID: "range-1/", wantErr: "must not contain '/'"},
+		{name: "embedded slash", rangeID: "range/1", wantErr: "must not contain '/'"},
 	}
 
-	rng := rand.New(rand.NewSource(1))
-	for i := 0; i < 1000; i++ {
-		low := make([]byte, 8)
-		high := make([]byte, 8)
-		rng.Read(low)
-		rng.Read(high)
-		if bytes.Equal(low, high) {
-			continue
-		}
-		pairs = append(pairs, [2][]byte{low, high})
-	}
-
-	for _, pair := range pairs {
-		low, high := pair[0], pair[1]
-		want := bytes.Compare(low, high) < 0
-		got := BuildRangeKey("/cadence", "test-ns", low) < BuildRangeKey("/cadence", "test-ns", high)
-		assert.Equalf(t, want, got, "key order must match bound order: low=%x high=%x", low, high)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateRangeID(tc.rangeID)
+			if tc.wantErr != "" {
+				assert.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			assert.NoError(t, err)
+		})
 	}
 }
 
 func TestParseRangeKey(t *testing.T) {
 	tests := []struct {
-		name      string
-		key       string
-		wantBound []byte
-		wantErr   string
+		name    string
+		key     string
+		wantID  string
+		wantErr string
 	}{
 		{
-			name:      "valid",
-			key:       "/cadence/test-ns/ranges/83ee861aac655362",
-			wantBound: []byte{0x83, 0xee, 0x86, 0x1a, 0xac, 0x65, 0x53, 0x62},
+			name:   "valid uuid",
+			key:    "/cadence/test-ns/ranges/" + testRangeID,
+			wantID: testRangeID,
 		},
 		{
-			name:      "min bound",
-			key:       "/cadence/test-ns/ranges/0000000000000000",
-			wantBound: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		},
-		{
-			name:      "max bound",
-			key:       "/cadence/test-ns/ranges/ffffffffffffffff",
-			wantBound: []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			name:   "valid identifier",
+			key:    "/cadence/test-ns/ranges/range-1",
+			wantID: "range-1",
 		},
 		{
 			name:    "wrong prefix",
-			key:     "/wrong/prefix/ranges/83ee861aac655362",
+			key:     "/wrong/prefix/ranges/" + testRangeID,
 			wantErr: "does not have expected ranges prefix",
 		},
 		{
 			name:    "different namespace",
-			key:     "/cadence/other-ns/ranges/83ee861aac655362",
+			key:     "/cadence/other-ns/ranges/" + testRangeID,
 			wantErr: "does not have expected ranges prefix",
 		},
 		{
-			name:    "missing lower bound",
+			name:    "missing range ID",
 			key:     "/cadence/test-ns/ranges/",
-			wantErr: "missing lower bound",
-		},
-		{
-			name:    "invalid hex",
-			key:     "/cadence/test-ns/ranges/zzzz",
-			wantErr: "invalid hex lower bound",
-		},
-		{
-			name:    "odd hex length",
-			key:     "/cadence/test-ns/ranges/abc",
-			wantErr: "invalid hex lower bound",
+			wantErr: "must not be empty",
 		},
 		{
 			name:    "extra path segment",
-			key:     "/cadence/test-ns/ranges/83ee861aac655362/extra",
-			wantErr: "invalid hex lower bound",
+			key:     "/cadence/test-ns/ranges/" + testRangeID + "/extra",
+			wantErr: "must not contain '/'",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			bound, err := ParseRangeKey("/cadence", "test-ns", tc.key)
+			got, err := ParseRangeKey("/cadence", "test-ns", tc.key)
 			if tc.wantErr != "" {
 				assert.ErrorContains(t, err, tc.wantErr)
-				assert.Nil(t, bound)
+				assert.Empty(t, got)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantBound, bound)
+			assert.Equal(t, tc.wantID, got)
 		})
 	}
 }
 
 func TestRangeKeyRoundTrip(t *testing.T) {
-	bounds := [][]byte{
-		{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		{0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-		{0x83, 0xee, 0x86, 0x1a, 0xac, 0x65, 0x53, 0x62},
-		{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+	rangeIDs := []string{
+		testRangeID,
+		testAlternateRangeID,
+		"range-0",
 	}
 
-	for _, bound := range bounds {
-		t.Run(strings.ToUpper(hex.EncodeToString(bound)), func(t *testing.T) {
-			key := BuildRangeKey("/cadence", "test-ns", bound)
+	for _, rangeID := range rangeIDs {
+		t.Run(rangeID, func(t *testing.T) {
+			key := BuildRangeKey("/cadence", "test-ns", rangeID)
 			got, err := ParseRangeKey("/cadence", "test-ns", key)
 			require.NoError(t, err)
-			assert.Equal(t, bound, got)
+			assert.Equal(t, rangeID, got)
 		})
 	}
 }

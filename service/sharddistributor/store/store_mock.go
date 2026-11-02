@@ -107,17 +107,17 @@ func (mr *MockStoreMockRecorder) DeleteExecutors(ctx, namespace, executorIDs, gu
 }
 
 // DeleteRange mocks base method.
-func (m *MockStore) DeleteRange(ctx context.Context, namespace string, lowInclusive []byte) error {
+func (m *MockStore) DeleteRange(ctx context.Context, namespace, rangeID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteRange", ctx, namespace, lowInclusive)
+	ret := m.ctrl.Call(m, "DeleteRange", ctx, namespace, rangeID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteRange indicates an expected call of DeleteRange.
-func (mr *MockStoreMockRecorder) DeleteRange(ctx, namespace, lowInclusive any) *gomock.Call {
+func (mr *MockStoreMockRecorder) DeleteRange(ctx, namespace, rangeID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRange", reflect.TypeOf((*MockStore)(nil).DeleteRange), ctx, namespace, lowInclusive)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRange", reflect.TypeOf((*MockStore)(nil).DeleteRange), ctx, namespace, rangeID)
 }
 
 // DeleteShardStats mocks base method.
@@ -223,18 +223,18 @@ func (mr *MockStoreMockRecorder) GetExecutorState(ctx, namespace, executorID any
 }
 
 // GetRange mocks base method.
-func (m *MockStore) GetRange(ctx context.Context, namespace string, lowInclusive []byte) (*RangeAssignment, error) {
+func (m *MockStore) GetRange(ctx context.Context, namespace, rangeID string) (*RangeAssignment, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRange", ctx, namespace, lowInclusive)
+	ret := m.ctrl.Call(m, "GetRange", ctx, namespace, rangeID)
 	ret0, _ := ret[0].(*RangeAssignment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetRange indicates an expected call of GetRange.
-func (mr *MockStoreMockRecorder) GetRange(ctx, namespace, lowInclusive any) *gomock.Call {
+func (mr *MockStoreMockRecorder) GetRange(ctx, namespace, rangeID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRange", reflect.TypeOf((*MockStore)(nil).GetRange), ctx, namespace, lowInclusive)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRange", reflect.TypeOf((*MockStore)(nil).GetRange), ctx, namespace, rangeID)
 }
 
 // GetState mocks base method.

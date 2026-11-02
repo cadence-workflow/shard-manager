@@ -113,13 +113,13 @@ func TestNewRangeIndex(t *testing.T) {
 			},
 			wantErr: "not adjacent",
 		},
-		// Ranges can share a lower bound in storage; cover validation is
-		// responsible for rejecting this.
+		// etcd keys ranges by ID, so multiple assignments can share the same lower
+		// bound. Cover validation is responsible for rejecting this.
 		{
 			name: "duplicate lower bounds",
 			ranges: []*RangeAssignment{
-				assignment(t, mustRange(t, b8(0x00), b8(0x40)), "exec-1"),
-				assignment(t, mustRange(t, b8(0x00), b8(0x80)), "exec-2"),
+				{ID: "range-1", Range: mustRange(t, b8(0x00), b8(0x40)), ExecutorID: "exec-1", Status: types.AssignmentStatusREADY},
+				{ID: "range-2", Range: mustRange(t, b8(0x00), b8(0x80)), ExecutorID: "exec-2", Status: types.AssignmentStatusREADY},
 				assignment(t, mustFinalRange(t, b8(0x80)), "exec-3"),
 			},
 			wantErr: "not adjacent",

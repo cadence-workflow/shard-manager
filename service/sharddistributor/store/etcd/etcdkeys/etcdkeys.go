@@ -1,7 +1,6 @@
 package etcdkeys
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -154,28 +153,34 @@ func BuildRangesPrefix(prefix, namespace string) string {
 	return fmt.Sprintf("%sranges/", BuildNamespacePrefix(prefix, namespace))
 }
 
-// The bound is hex-encoded so that lexicographic key ordering matches numeric
-// ordering of the bounds, which is required for etcd prefix scans to return
-// ranges in sorted order.
-// Expected format: <prefix>/<namespace>/ranges/<hex(lowInclusive)>
-func BuildRangeKey(prefix, namespace string, lowInclusive []byte) string {
-	return fmt.Sprintf("%s%s", BuildRangesPrefix(prefix, namespace), hex.EncodeToString(lowInclusive))
+// BuildRangeKey constructs the etcd key for a single range assignment.
+// It does not validate rangeID; callers must validate it with ValidateRangeID.
+// Expected format: <prefix>/<namespace>/ranges/<rangeID>
+func BuildRangeKey(prefix, namespace, rangeID string) string {
+	return fmt.Sprintf("%s%s", BuildRangesPrefix(prefix, namespace), rangeID)
 }
 
-// ParseRangeKey extracts the lower bound from a range etcd key.
-// Expected format: <prefix>/<namespace>/ranges/<hex(lowInclusive)>
-func ParseRangeKey(prefix, namespace, key string) ([]byte, error) {
+// ValidateRangeID rejects range IDs that cannot survive a key round trip.
+func ValidateRangeID(rangeID string) error {
+	if rangeID == "" {
+		return errors.New("range ID must not be empty")
+	}
+	if strings.Contains(rangeID, "/") {
+		return fmt.Errorf("range ID '%s' must not contain '/'", rangeID)
+	}
+	return nil
+}
+
+// ParseRangeKey extracts the range ID from a range etcd key.
+// Expected format: <prefix>/<namespace>/ranges/<rangeID>
+func ParseRangeKey(prefix, namespace, key string) (string, error) {
 	rangesPrefix := BuildRangesPrefix(prefix, namespace)
 	if !strings.HasPrefix(key, rangesPrefix) {
-		return nil, fmt.Errorf("key '%s' does not have expected ranges prefix '%s'", key, rangesPrefix)
+		return "", fmt.Errorf("key '%s' does not have expected ranges prefix '%s'", key, rangesPrefix)
 	}
-	hexBound := strings.TrimPrefix(key, rangesPrefix)
-	if hexBound == "" {
-		return nil, fmt.Errorf("unexpected range key format '%s': missing lower bound", key)
+	rangeID := strings.TrimPrefix(key, rangesPrefix)
+	if err := ValidateRangeID(rangeID); err != nil {
+		return "", fmt.Errorf("unexpected range key format '%s': %w", key, err)
 	}
-	lowInclusive, err := hex.DecodeString(hexBound)
-	if err != nil {
-		return nil, fmt.Errorf("unexpected range key format '%s': invalid hex lower bound: %w", key, err)
-	}
-	return lowInclusive, nil
+	return rangeID, nil
 }

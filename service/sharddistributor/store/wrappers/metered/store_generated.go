@@ -70,9 +70,9 @@ func (c *meteredStore) DeleteExecutors(ctx context.Context, namespace string, ex
 	return
 }
 
-func (c *meteredStore) DeleteRange(ctx context.Context, namespace string, lowInclusive []byte) (err error) {
+func (c *meteredStore) DeleteRange(ctx context.Context, namespace string, rangeID string) (err error) {
 	op := func() error {
-		err = c.wrapped.DeleteRange(ctx, namespace, lowInclusive)
+		err = c.wrapped.DeleteRange(ctx, namespace, rangeID)
 		return err
 	}
 
@@ -150,9 +150,9 @@ func (c *meteredStore) GetExecutorState(ctx context.Context, namespace string, e
 	return
 }
 
-func (c *meteredStore) GetRange(ctx context.Context, namespace string, lowInclusive []byte) (rp1 *_sourceStore.RangeAssignment, err error) {
+func (c *meteredStore) GetRange(ctx context.Context, namespace string, rangeID string) (rp1 *_sourceStore.RangeAssignment, err error) {
 	op := func() error {
-		rp1, err = c.wrapped.GetRange(ctx, namespace, lowInclusive)
+		rp1, err = c.wrapped.GetRange(ctx, namespace, rangeID)
 		return err
 	}
 

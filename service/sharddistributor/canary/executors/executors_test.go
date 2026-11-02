@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processorephemeral"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
@@ -247,7 +248,7 @@ func TestNewExecutorsWithFixedNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			params := createMockParams[*processor.ShardProcessor](ctrl, tt.namespace)
-			result, err := NewExecutorsWithFixedNamespace(params, tt.namespace, tt.numExecutors)
+			result, err := NewExecutorsWithFixedNamespace(params, config.NamespaceConfig{Name: tt.namespace, NumExecutors: tt.numExecutors})
 
 			require.NoError(t, err)
 			assert.Len(t, result.Executors, tt.expected)
@@ -303,7 +304,7 @@ func TestNewExecutorsWithEphemeralNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			params := createMockParams[*processorephemeral.ShardProcessor](ctrl, tt.namespace)
-			result, err := NewExecutorsWithEphemeralNamespace(params, tt.namespace, tt.numExecutors)
+			result, err := NewExecutorsWithEphemeralNamespace(params, config.NamespaceConfig{Name: tt.namespace, NumExecutors: tt.numExecutors})
 
 			require.NoError(t, err)
 			assert.Len(t, result.Executors, tt.expected)

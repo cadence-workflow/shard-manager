@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"time"
 
 	"github.com/uber-go/tally"
 	"github.com/urfave/cli/v3"
@@ -38,32 +37,29 @@ const (
 )
 
 func runApp(c *cli.Command) {
-	endpoint := c.String("endpoint")
-	fixedNamespace := c.String("fixed-namespace")
-	ephemeralNamespace := c.String("ephemeral-namespace")
-	canaryGRPCPort := c.Int("canary-grpc-port")
-
-	numFixedExecutors := c.Int("num-fixed-executors")
-	numEphemeralExecutors := c.Int("num-ephemeral-executors")
-
-	if c.IsSet("num-executors") {
-		numExecutors := c.Int("num-executors")
-		numFixedExecutors = numExecutors
-		numEphemeralExecutors = numExecutors
-
-	}
-
-	fx.New(opts(fixedNamespace, ephemeralNamespace, endpoint, canaryGRPCPort, numFixedExecutors, numEphemeralExecutors)).Run()
-}
-
-func opts(fixedNamespace, ephemeralNamespace, endpoint string, canaryGRPCPort int, numFixedExecutors, numEphemeral int) fx.Option {
-	configuration := clientcommon.Config{
-		Namespaces: []clientcommon.NamespaceConfig{
-			{Namespace: fixedNamespace, HeartBeatInterval: 1 * time.Second},
-			{Namespace: ephemeralNamespace, HeartBeatInterval: 1 * time.Second},
+	cfg := canaryConfig.Config{
+		Canary: canaryConfig.CanaryConfig{
+			Fixed: canaryConfig.NamespaceConfig{
+				Name:         c.String("fixed-namespace"),
+				NumExecutors: c.Int("num-fixed-executors"),
+			},
+			Ephemeral: canaryConfig.NamespaceConfig{
+				Name:         c.String("ephemeral-namespace"),
+				NumExecutors: c.Int("num-ephemeral-executors"),
+			},
 		},
 	}
 
+	if c.IsSet("num-executors") {
+		numExecutors := c.Int("num-executors")
+		cfg.Canary.Fixed.NumExecutors = numExecutors
+		cfg.Canary.Ephemeral.NumExecutors = numExecutors
+	}
+
+	fx.New(opts(c.String("endpoint"), c.Int("canary-grpc-port"), cfg)).Run()
+}
+
+func opts(endpoint string, canaryGRPCPort int, cfg canaryConfig.Config) fx.Option {
 	canaryGRPCAddress := fmt.Sprintf("127.0.0.1:%d", canaryGRPCPort)
 
 	// Create listener for GRPC inbound
@@ -82,7 +78,7 @@ func opts(fixedNamespace, ephemeralNamespace, endpoint string, canaryGRPCPort in
 		fx.Supply(
 			fx.Annotate(tally.NoopScope, fx.As(new(tally.Scope))),
 			fx.Annotate(clock.NewRealTimeSource(), fx.As(new(clock.TimeSource))),
-			configuration,
+			cfg.Canary.ClientConfig(),
 			transport,
 			executorMetadata,
 		),
@@ -137,16 +133,9 @@ func opts(fixedNamespace, ephemeralNamespace, endpoint string, canaryGRPCPort in
 		}),
 
 		// Include the canary module - it will set up spectator peer choosers and canary client
-		canary.Module(canary.NamespacesNames{
-			FixedNamespace:              fixedNamespace,
-			EphemeralNamespace:          ephemeralNamespace,
+		canary.Module(canary.Params{
 			SharddistributorServiceName: shardDistributorServiceName,
-			Config: canaryConfig.Config{
-				Canary: canaryConfig.CanaryConfig{
-					NumFixedExecutors:     numFixedExecutors,
-					NumEphemeralExecutors: numEphemeral,
-				},
-			},
+			Config:                      cfg,
 		}),
 	)
 }

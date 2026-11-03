@@ -389,10 +389,12 @@ func (p *namespaceProcessor) identifyStaleShardStats(namespaceState *store.Names
 
 // rebalanceShards is the core logic for distributing shards among active executors.
 func (p *namespaceProcessor) rebalanceShards(ctx context.Context) (err error) {
+	fixedShardNum := p.sdConfig.FixedShardNum(p.namespaceCfg.Name)
+	namespaceCfg := config.EffectiveNamespace(p.namespaceCfg, fixedShardNum)
 	metricsLoopScope := p.metricsClient.Scope(
 		metrics.ShardDistributorAssignLoopScope,
-		metrics.NamespaceTag(p.namespaceCfg.Name),
-		metrics.NamespaceTypeTag(p.namespaceCfg.Type),
+		metrics.NamespaceTag(namespaceCfg.Name),
+		metrics.NamespaceTypeTag(namespaceCfg.Type),
 	)
 
 	metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopAttempts, 1)
@@ -412,10 +414,10 @@ func (p *namespaceProcessor) rebalanceShards(ctx context.Context) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, p.cfg.Timeout)
 	defer cancel()
 
-	return p.rebalanceShardsImpl(ctx, metricsLoopScope)
+	return p.rebalanceShardsImpl(ctx, namespaceCfg, metricsLoopScope)
 }
 
-func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoopScope metrics.Scope) (err error) {
+func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceCfg config.Namespace, metricsLoopScope metrics.Scope) (err error) {
 	namespaceState, err := p.shardStore.GetState(ctx, p.namespaceCfg.Name)
 	if err != nil {
 		return fmt.Errorf("get state: %w", err)
@@ -457,7 +459,7 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, metricsLoo
 		assignableExecutors[executorID] = struct{}{}
 	}
 
-	shardsToReassign, currentAssignments := p.findShardsToReassign(assignableExecutors, namespaceState, deletedShards)
+	shardsToReassign, currentAssignments := findShardsToReassign(namespaceCfg, assignableExecutors, namespaceState, deletedShards)
 
 	executorsToUnassign := findExecutorsToUnassign(namespaceState, assignableExecutors, staleExecutors)
 	if len(executorsToUnassign) > 0 {
@@ -640,13 +642,14 @@ func findDrainedAssignedShards(namespaceState *store.NamespaceState, executors [
 	return slices.Collect(maps.Keys(drainedAssigned))
 }
 
-func (p *namespaceProcessor) findShardsToReassign(
+func findShardsToReassign(
+	namespaceCfg config.Namespace,
 	assignableExecutors map[string]struct{},
 	namespaceState *store.NamespaceState,
 	deletedShards map[string]store.ShardState,
 ) ([]string, map[string][]string) {
 	allAvailableShards := make(map[string]struct{})
-	for _, shardID := range getShards(p.namespaceCfg, namespaceState, deletedShards) {
+	for _, shardID := range getShards(namespaceCfg, namespaceState, deletedShards) {
 		if namespaceState.IsShardDrained(shardID) {
 			continue
 		}

@@ -196,6 +196,22 @@ func (c *Collection) GetIntPropertyFilteredByShardID(key dynamicproperties.IntKe
 	}
 }
 
+// GetIntPropertyFilteredByNamespace gets property with namespace filter and asserts that it's an integer
+func (c *Collection) GetIntPropertyFilteredByNamespace(key dynamicproperties.IntKey) dynamicproperties.IntPropertyFnWithNamespaceFilters {
+	return func(namespace string) int {
+		filters := c.toFilterMap(dynamicproperties.NamespaceFilter(namespace))
+		val, err := c.client.GetIntValue(
+			key,
+			filters,
+		)
+		if err != nil {
+			c.logError(key, filters, err)
+			return key.DefaultInt()
+		}
+		return val
+	}
+}
+
 // GetBoolPropertyFilteredByShardID gets property with shardID as filter and asserts that it's a bool
 func (c *Collection) GetBoolPropertyFilteredByShardID(key dynamicproperties.BoolKey) dynamicproperties.BoolPropertyFnWithShardIDFilter {
 	return func(shardID int) bool {

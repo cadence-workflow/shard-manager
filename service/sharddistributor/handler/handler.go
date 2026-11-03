@@ -36,6 +36,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces/manager"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -106,8 +107,8 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 		}
 	}
 	if errors.Is(err, store.ErrShardNotFound) {
-		if assigner := ns.Assigner(); assigner != nil {
-			return assigner.GetOrAssign(ctx, request.ShardKey)
+		if ns.Config().Type == config.NamespaceTypeEphemeral {
+			return ns.Assigner().GetOrAssign(ctx, request.ShardKey)
 		}
 
 		return nil, &types.ShardNotFoundError{
@@ -262,8 +263,8 @@ func (h *handlerImpl) ForceResetNamespace(ctx context.Context, request *types.Fo
 	return &types.ForceResetNamespaceResponse{DeletedKeys: deleted}, nil
 }
 
-// ListNamespaces returns the static namespace configuration loaded from the
-// server's shardDistribution.namespaces YAML at startup.
+// ListNamespaces returns the configuration every namespace runs with: the
+// server's shardDistribution.namespaces YAML with dynamic config applied.
 func (h *handlerImpl) ListNamespaces(_ context.Context, _ *types.ListNamespacesRequest) (resp *types.ListNamespacesResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 

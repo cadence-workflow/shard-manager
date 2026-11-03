@@ -3,7 +3,6 @@ package executorstore
 import (
 	"context"
 	"encoding/json"
-	"slices"
 	"testing"
 	"time"
 
@@ -13,16 +12,21 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/common"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/testhelper"
 )
 
 // putRangeFixture writes a range directly to etcd and records its ModRevision.
 // Tests seed etcd this way because AssignRanges is not implemented yet.
-func putRangeFixture(t *testing.T, tc *testhelper.StoreTestCluster, assignment *store.RangeAssignment) {
+func putRangeFixture(t *testing.T, tc *testhelper.StoreTestCluster, assignment *store.RangeAssignment, compression string) {
 	t.Helper()
 	payload, err := json.Marshal(etcdtypes.FromRangeAssignment(assignment))
 	require.NoError(t, err)
-	resp, err := tc.Client.Put(context.Background(), etcdkeys.BuildRangeKey(tc.EtcdPrefix, tc.Namespace, assignment.ID), string(payload))
+	writer, err := common.NewRecordWriter(compression)
+	require.NoError(t, err)
+	value, err := writer.Write(payload)
+	require.NoError(t, err)
+	resp, err := tc.Client.Put(context.Background(), etcdkeys.BuildRangeKey(tc.EtcdPrefix, tc.Namespace, assignment.ID), string(value))
 	require.NoError(t, err)
 	assignment.ModRevision = resp.Header.Revision
 }
@@ -53,7 +57,8 @@ func TestListRanges(t *testing.T) {
 	require.Empty(t, empty)
 
 	// IDs are ordered opposite to their lower bounds, so the expected order
-	// cannot come from etcd key order.
+	// cannot come from etcd key order. One value is compressed to prove reads
+	// accept the same encoding the store writes elsewhere.
 	high := &store.RangeAssignment{
 		ID:    "range-high",
 		Range: mustRange(t, []byte{0x80, 0, 0, 0, 0, 0, 0, 0}, []byte{0xc0, 0, 0, 0, 0, 0, 0, 0}),
@@ -70,8 +75,10 @@ func TestListRanges(t *testing.T) {
 	for _, a := range []*store.RangeAssignment{low, high, final} {
 		a.ExecutorID = "host-1@uuid-1"
 		a.Status = types.AssignmentStatusREADY
-		putRangeFixture(t, tc, a)
 	}
+	putRangeFixture(t, tc, low, "")
+	putRangeFixture(t, tc, high, "")
+	putRangeFixture(t, tc, final, common.CompressionSnappy)
 
 	got, err := s.ListRanges(ctx, tc.Namespace)
 	require.NoError(t, err)
@@ -86,24 +93,8 @@ func TestListRanges_RejectsKeyWithSlashInID(t *testing.T) {
 		ID:         "bad/id",
 		Range:      mustFinalRange(t, []byte{0x00, 0, 0, 0, 0, 0, 0, 0}),
 		ExecutorID: "host-1@uuid-1",
-	})
+	}, "")
 
 	_, err := s.ListRanges(context.Background(), tc.Namespace)
 	require.ErrorContains(t, err, "must not contain '/'")
-}
-
-// The ID tie-break cannot be reached through etcd, which already returns
-// equal-bound keys in ID order.
-func TestSortRangeAssignments(t *testing.T) {
-	assignments := []*store.RangeAssignment{
-		{ID: "range-b", Range: mustRange(t, []byte{0x10}, []byte{0x11})},
-		{ID: "range-a", Range: mustRange(t, []byte{0x10}, []byte{0x11})},
-		{ID: "range-c", Range: mustRange(t, []byte{0x20}, []byte{0x21})},
-	}
-
-	slices.SortFunc(assignments, sortRangeAssignments)
-
-	require.Equal(t, "range-a", assignments[0].ID)
-	require.Equal(t, "range-b", assignments[1].ID)
-	require.Equal(t, "range-c", assignments[2].ID)
 }

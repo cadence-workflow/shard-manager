@@ -27,8 +27,7 @@ type RangeAssignment struct {
 // RangeStore is the set of storage operations for range-based ownership.
 // Embedded in Store.
 type RangeStore interface {
-	// ListRanges returns every range in a namespace, sorted by lower bound, then
-	// by ID.
+	// ListRanges returns every range in a namespace, sorted by lower bound.
 	ListRanges(ctx context.Context, namespace string) ([]*RangeAssignment, error)
 
 	// AssignRanges atomically rewrites the full range cover in a single guarded

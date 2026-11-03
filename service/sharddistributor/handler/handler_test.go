@@ -254,7 +254,7 @@ func TestGetShardOwner_EphemeralNamespaceMadeFixedDoesNotAssign(t *testing.T) {
 	// config makes it fixed. A fixed namespace must not assign unknown shards.
 	ns := manager.NewMockNamespace(ctrl)
 	ns.EXPECT().Name().Return(_testNamespaceEphemeral).AnyTimes()
-	ns.EXPECT().Config().Return(config.Namespace{Name: _testNamespaceEphemeral, Type: config.NamespaceTypeFixed, ShardNum: 16384}).AnyTimes()
+	ns.EXPECT().Config().Return(config.Namespace{Name: _testNamespaceEphemeral, Type: config.NamespaceTypeFixed, ShardNum: 8192}).AnyTimes()
 	ns.EXPECT().Cache().Return(mockCache).AnyTimes()
 	ns.EXPECT().Assigner().Times(0)
 

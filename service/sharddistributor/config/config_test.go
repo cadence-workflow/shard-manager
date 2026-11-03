@@ -109,8 +109,8 @@ func TestEffectiveNamespace(t *testing.T) {
 		{
 			name:          "positive makes an ephemeral namespace fixed",
 			static:        ephemeralNamespace,
-			fixedShardNum: 16384,
-			want:          Namespace{Name: "ephemeral-namespace", Type: NamespaceTypeFixed, ShardNum: 16384},
+			fixedShardNum: 8192,
+			want:          Namespace{Name: "ephemeral-namespace", Type: NamespaceTypeFixed, ShardNum: 8192},
 		},
 		{
 			name:          "positive replaces the shard count of a fixed namespace",

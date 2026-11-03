@@ -26,7 +26,7 @@ func TestNew(t *testing.T) {
 		{Name: "ephemeral", Type: config.NamespaceTypeEphemeral},
 		{Name: "ephemeral-made-fixed", Type: config.NamespaceTypeEphemeral},
 	}}
-	fixedShardNums := map[string]int{"ephemeral-made-fixed": 16384}
+	fixedShardNums := map[string]int{"ephemeral-made-fixed": 8192}
 
 	mockStore := store.NewMockStore(gomock.NewController(t))
 	for _, ns := range cfg.Namespaces {
@@ -71,7 +71,7 @@ func TestNew(t *testing.T) {
 		{
 			name:         "ephemeral made fixed by dynamic config keeps its assigner",
 			namespace:    "ephemeral-made-fixed",
-			wantConfig:   config.Namespace{Name: "ephemeral-made-fixed", Type: config.NamespaceTypeFixed, ShardNum: 16384},
+			wantConfig:   config.Namespace{Name: "ephemeral-made-fixed", Type: config.NamespaceTypeFixed, ShardNum: 8192},
 			wantAssigner: true,
 		},
 		{name: "unknown", namespace: "unknown", wantErr: &types.NamespaceNotFoundError{Namespace: "unknown"}},

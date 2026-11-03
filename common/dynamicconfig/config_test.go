@@ -332,7 +332,7 @@ func (s *configSuite) TestUpdateConfig() {
 func TestGetIntPropertyFilteredByNamespace(t *testing.T) {
 	key := dynamicproperties.ShardDistributorFixedShardNum
 	namespace := "test-namespace"
-	configuredValue := 16384
+	configuredValue := 8192
 
 	client := NewMockClient(gomock.NewController(t))
 	client.EXPECT().

@@ -18,25 +18,22 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient"
 )
 
-type NamespacesNames struct {
-	fx.In
-	FixedNamespace              string
-	EphemeralNamespace          string
+type Params struct {
 	SharddistributorServiceName string
 
 	Config config.Config
 }
 
-func Module(namespacesNames NamespacesNames) fx.Option {
-	return fx.Module("shard-distributor-canary", opts(namespacesNames))
+func Module(params Params) fx.Option {
+	return fx.Module("shard-distributor-canary", opts(params))
 }
 
-func opts(names NamespacesNames) fx.Option {
-	return fx.Options(
-		fx.Supply(names.Config),
+func opts(params Params) fx.Option {
+	cfg := params.Config.Canary
 
-		fx.Provide(sharddistributorv1.NewFxShardDistributorExecutorAPIYARPCClient(names.SharddistributorServiceName)),
-		fx.Provide(sharddistributorv1.NewFxShardDistributorAPIYARPCClient(names.SharddistributorServiceName)),
+	return fx.Options(
+		fx.Provide(sharddistributorv1.NewFxShardDistributorExecutorAPIYARPCClient(params.SharddistributorServiceName)),
+		fx.Provide(sharddistributorv1.NewFxShardDistributorAPIYARPCClient(params.SharddistributorServiceName)),
 
 		fx.Provide(sharddistributorclient.NewShardDistributorClient),
 		fx.Provide(sharddistributorexecutorclient.NewShardDistributorExecutorClient),
@@ -51,14 +48,9 @@ func opts(names NamespacesNames) fx.Option {
 			},
 		),
 
-		// Simple way to instantiate executor if only one namespace is used
-		// executorclient.ModuleWithNamespace[*processor.ShardProcessor](names.FixedNamespace),
-		// executorclient.ModuleWithNamespace[*processorephemeral.ShardProcessor](names.EphemeralNamespace),
+		executors.Module(cfg.Fixed, cfg.Ephemeral),
 
-		// Instantiate executors for multiple namespaces
-		executors.Module(names.FixedNamespace, names.EphemeralNamespace),
-
-		processorephemeral.ShardCreatorModule([]string{names.EphemeralNamespace}),
+		processorephemeral.ShardCreatorModule([]string{cfg.Ephemeral.Name}),
 
 		spectatorclient.Module(),
 		fx.Provide(spectatorclient.NewSpectatorPeerChooser),
@@ -70,7 +62,7 @@ func opts(names NamespacesNames) fx.Option {
 		}),
 
 		fx.Provide(func(params pinger.Params) *pinger.Pinger {
-			return pinger.NewPinger(params, names.FixedNamespace, 32)
+			return pinger.NewPinger(params, cfg.Fixed.Name, 32)
 		}),
 		fx.Invoke(func(p *pinger.Pinger, lc fx.Lifecycle) {
 			lc.Append(fx.StartStopHook(p.Start, p.Stop))

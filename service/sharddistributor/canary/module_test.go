@@ -2,7 +2,6 @@ package canary
 
 import (
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/uber-go/tally"
@@ -19,7 +18,7 @@ import (
 	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
@@ -47,10 +46,10 @@ func TestModule(t *testing.T) {
 		Return(&sharddistributorv1.HeartbeatResponse{}, nil).
 		AnyTimes()
 
-	config := clientcommon.Config{
-		Namespaces: []clientcommon.NamespaceConfig{
-			{Namespace: "shard-distributor-canary", HeartBeatInterval: 5 * time.Second},
-			{Namespace: "shard-distributor-canary-ephemeral", HeartBeatInterval: 5 * time.Second},
+	cfg := config.Config{
+		Canary: config.CanaryConfig{
+			Fixed:     config.NamespaceConfig{Name: "shard-distributor-canary"},
+			Ephemeral: config.NamespaceConfig{Name: "shard-distributor-canary-ephemeral"},
 		},
 	}
 
@@ -73,17 +72,16 @@ func TestModule(t *testing.T) {
 			fx.Annotate(mockClientConfigProvider, fx.As(new(yarpc.ClientConfig))),
 			fx.Annotate(transport, fx.As(new(peer.Transport))),
 			zaptest.NewLogger(t),
-			config,
+			cfg.Canary.ClientConfig(),
 			dispatcher,
 		),
 		// Replacing the real YARPC client with mock to handle the draining heartbeat
 		fx.Decorate(func() sharddistributorv1.ShardDistributorExecutorAPIYARPCClient {
 			return mockYARPCClient
 		}),
-		Module(NamespacesNames{
-			FixedNamespace:              "shard-distributor-canary",
-			EphemeralNamespace:          "shard-distributor-canary-ephemeral",
+		Module(Params{
 			SharddistributorServiceName: "shard-distributor",
+			Config:                      cfg,
 		}),
 	).RequireStart().RequireStop()
 }

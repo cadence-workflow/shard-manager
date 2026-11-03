@@ -205,9 +205,6 @@ const (
 	ShardDistributorStoreDrainHostsScope
 	ShardDistributorStoreUndrainHostsScope
 	ShardDistributorStoreGetDrainedHostsScope
-	ShardDistributorStorePutRangeScope
-	ShardDistributorStoreGetRangeScope
-	ShardDistributorStoreDeleteRangeScope
 	ShardDistributorStoreListRangesScope
 	ShardDistributorStoreAssignRangesScope
 
@@ -284,9 +281,6 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorStoreDrainHostsScope:                       {operation: "StoreDrainHosts"},
 		ShardDistributorStoreUndrainHostsScope:                     {operation: "StoreUndrainHosts"},
 		ShardDistributorStoreGetDrainedHostsScope:                  {operation: "StoreGetDrainedHosts"},
-		ShardDistributorStorePutRangeScope:                         {operation: "StorePutRange"},
-		ShardDistributorStoreGetRangeScope:                         {operation: "StoreGetRange"},
-		ShardDistributorStoreDeleteRangeScope:                      {operation: "StoreDeleteRange"},
 		ShardDistributorStoreListRangesScope:                       {operation: "StoreListRanges"},
 		ShardDistributorStoreAssignRangesScope:                     {operation: "StoreAssignRanges"},
 		ShardDistributorWatchScope:                                 {operation: "Watch"},

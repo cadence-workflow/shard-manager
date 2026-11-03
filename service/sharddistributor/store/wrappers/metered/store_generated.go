@@ -70,16 +70,6 @@ func (c *meteredStore) DeleteExecutors(ctx context.Context, namespace string, ex
 	return
 }
 
-func (c *meteredStore) DeleteRange(ctx context.Context, namespace string, rangeID string) (err error) {
-	op := func() error {
-		err = c.wrapped.DeleteRange(ctx, namespace, rangeID)
-		return err
-	}
-
-	err = c.call(metrics.ShardDistributorStoreDeleteRangeScope, op, metrics.NamespaceTag(namespace))
-	return
-}
-
 func (c *meteredStore) DeleteShardStats(ctx context.Context, namespace string, shardIDs []string, guard _sourceStore.GuardFunc) (err error) {
 	op := func() error {
 		err = c.wrapped.DeleteShardStats(ctx, namespace, shardIDs, guard)
@@ -150,16 +140,6 @@ func (c *meteredStore) GetExecutorState(ctx context.Context, namespace string, e
 	return
 }
 
-func (c *meteredStore) GetRange(ctx context.Context, namespace string, rangeID string) (rp1 *_sourceStore.RangeAssignment, err error) {
-	op := func() error {
-		rp1, err = c.wrapped.GetRange(ctx, namespace, rangeID)
-		return err
-	}
-
-	err = c.call(metrics.ShardDistributorStoreGetRangeScope, op, metrics.NamespaceTag(namespace))
-	return
-}
-
 func (c *meteredStore) GetState(ctx context.Context, namespace string) (np1 *_sourceStore.NamespaceState, err error) {
 	op := func() error {
 		np1, err = c.wrapped.GetState(ctx, namespace)
@@ -177,16 +157,6 @@ func (c *meteredStore) ListRanges(ctx context.Context, namespace string) (rpa1 [
 	}
 
 	err = c.call(metrics.ShardDistributorStoreListRangesScope, op, metrics.NamespaceTag(namespace))
-	return
-}
-
-func (c *meteredStore) PutRange(ctx context.Context, namespace string, assignment *_sourceStore.RangeAssignment) (err error) {
-	op := func() error {
-		err = c.wrapped.PutRange(ctx, namespace, assignment)
-		return err
-	}
-
-	err = c.call(metrics.ShardDistributorStorePutRangeScope, op, metrics.NamespaceTag(namespace))
 	return
 }
 

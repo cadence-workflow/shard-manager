@@ -1,8 +1,6 @@
 package executorstore
 
 import (
-	"bytes"
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -41,9 +39,6 @@ type executorStoreImpl struct {
 	cfg           *config.Config
 	metricsClient metrics.Client
 }
-
-// Ensure *executorStoreImpl implements RangeStore.
-var _ store.RangeStore = (*executorStoreImpl)(nil)
 
 func newExecutorStoreImpl(
 	client etcdclient.Client,
@@ -923,118 +918,4 @@ func (s *executorStoreImpl) RecordShardStatisticsBatch(ctx context.Context, name
 		}
 	}
 	return multiError
-}
-
-// --- Range Implementation ---
-
-func validateRangeAssignment(assignment *store.RangeAssignment) error {
-	if assignment == nil {
-		return errors.New("assignment must not be nil")
-	}
-	if err := etcdkeys.ValidateRangeID(assignment.ID); err != nil {
-		return err
-	}
-	if !assignment.Range.IsValid() {
-		return fmt.Errorf("range is invalid: low=%x high=%x", assignment.Range.LowInclusive, assignment.Range.HighExclusive)
-	}
-	return nil
-}
-
-func (s *executorStoreImpl) PutRange(ctx context.Context, namespace string, assignment *store.RangeAssignment) error {
-	if err := validateRangeAssignment(assignment); err != nil {
-		return fmt.Errorf("put range: %w", err)
-	}
-
-	value, err := json.Marshal(etcdtypes.FromRangeAssignment(assignment))
-	if err != nil {
-		return fmt.Errorf("marshal range assignment: %w", err)
-	}
-
-	key := etcdkeys.BuildRangeKey(s.prefix, namespace, assignment.ID)
-	if _, err := s.client.Put(ctx, key, string(value)); err != nil {
-		return fmt.Errorf("put range: %w", err)
-	}
-	return nil
-}
-
-func (s *executorStoreImpl) GetRange(ctx context.Context, namespace string, rangeID string) (*store.RangeAssignment, error) {
-	if err := etcdkeys.ValidateRangeID(rangeID); err != nil {
-		return nil, fmt.Errorf("get range: %w", err)
-	}
-
-	resp, err := s.client.Get(ctx, etcdkeys.BuildRangeKey(s.prefix, namespace, rangeID))
-	if err != nil {
-		return nil, fmt.Errorf("get range: %w", err)
-	}
-	if resp.Count == 0 {
-		return nil, store.ErrRangeNotFound
-	}
-
-	var stored etcdtypes.RangeAssignment
-	if err := json.Unmarshal(resp.Kvs[0].Value, &stored); err != nil {
-		return nil, fmt.Errorf("unmarshal range assignment: %w", err)
-	}
-
-	assignment, err := stored.ToRangeAssignment(rangeID)
-	if err != nil {
-		return nil, fmt.Errorf("decode range assignment: %w", err)
-	}
-	assignment.ModRevision = resp.Kvs[0].ModRevision
-	return assignment, nil
-}
-
-func (s *executorStoreImpl) DeleteRange(ctx context.Context, namespace string, rangeID string) error {
-	if err := etcdkeys.ValidateRangeID(rangeID); err != nil {
-		return fmt.Errorf("delete range: %w", err)
-	}
-	if _, err := s.client.Delete(ctx, etcdkeys.BuildRangeKey(s.prefix, namespace, rangeID)); err != nil {
-		return fmt.Errorf("delete range: %w", err)
-	}
-	return nil
-}
-
-func (s *executorStoreImpl) ListRanges(ctx context.Context, namespace string) ([]*store.RangeAssignment, error) {
-	resp, err := s.client.Get(ctx, etcdkeys.BuildRangesPrefix(s.prefix, namespace), clientv3.WithPrefix())
-	if err != nil {
-		return nil, fmt.Errorf("list ranges: %w", err)
-	}
-
-	assignments := make([]*store.RangeAssignment, 0, len(resp.Kvs))
-	for _, kv := range resp.Kvs {
-		rangeID, err := etcdkeys.ParseRangeKey(s.prefix, namespace, string(kv.Key))
-		if err != nil {
-			return nil, fmt.Errorf("parse range key %q: %w", string(kv.Key), err)
-		}
-
-		var stored etcdtypes.RangeAssignment
-		if err := json.Unmarshal(kv.Value, &stored); err != nil {
-			return nil, fmt.Errorf("unmarshal range assignment for key %q: %w", string(kv.Key), err)
-		}
-
-		assignment, err := stored.ToRangeAssignment(rangeID)
-		if err != nil {
-			return nil, fmt.Errorf("decode range assignment for key %q: %w", string(kv.Key), err)
-		}
-		assignment.ModRevision = kv.ModRevision
-		assignments = append(assignments, assignment)
-	}
-
-	slices.SortFunc(assignments, sortRangeAssignments)
-	return assignments, nil
-}
-
-// sortRangeAssignments orders assignments by lower bound, then by ID.
-// A write and a cover rewrite can temporarily share the same lower bound, so
-// the ID tie-break keeps the order deterministic.
-func sortRangeAssignments(a, b *store.RangeAssignment) int {
-	if c := bytes.Compare(a.Range.LowInclusive, b.Range.LowInclusive); c != 0 {
-		return c
-	}
-	return cmp.Compare(a.ID, b.ID)
-}
-
-// TODO(range-cover): implement atomic cover rewrites in a single guarded
-// transaction with a per-range ModRevision compare, matching AssignShards.
-func (s *executorStoreImpl) AssignRanges(ctx context.Context, namespace string, request store.AssignRangesRequest, guard store.GuardFunc) error {
-	return store.ErrRangeNotImplemented
 }

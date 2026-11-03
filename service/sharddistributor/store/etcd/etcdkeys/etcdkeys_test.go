@@ -8,12 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	testRangeID = "550e8400-e29b-41d4-a716-446655440000"
-	// A second, distinct ID: round-trip coverage must not depend on one value.
-	testAlternateRangeID = "123e4567-e89b-12d3-a456-426614174000"
-)
-
 func TestBuildNamespacePrefix(t *testing.T) {
 	got := BuildNamespacePrefix("/cadence", "test-ns")
 	assert.Equal(t, "/cadence/test-ns/", got)
@@ -220,8 +214,8 @@ func TestBuildRangesPrefix(t *testing.T) {
 }
 
 func TestBuildRangeKey(t *testing.T) {
-	got := BuildRangeKey("/cadence", "test-ns", testRangeID)
-	assert.Equal(t, "/cadence/test-ns/ranges/"+testRangeID, got)
+	got := BuildRangeKey("/cadence", "test-ns", "range-1")
+	assert.Equal(t, "/cadence/test-ns/ranges/range-1", got)
 }
 
 // The ranges keyspace must not collide with the executor, drained-shard, or
@@ -248,7 +242,7 @@ func TestValidateRangeID(t *testing.T) {
 		rangeID string
 		wantErr string
 	}{
-		{name: "uuid", rangeID: testRangeID},
+		{name: "uuid", rangeID: "00000000-0000-4000-8000-000000000001"},
 		{name: "simple", rangeID: "range-1"},
 		{name: "empty", rangeID: "", wantErr: "must not be empty"},
 		{name: "leading slash", rangeID: "/range-1", wantErr: "must not contain '/'"},
@@ -277,8 +271,8 @@ func TestParseRangeKey(t *testing.T) {
 	}{
 		{
 			name:   "valid uuid",
-			key:    "/cadence/test-ns/ranges/" + testRangeID,
-			wantID: testRangeID,
+			key:    "/cadence/test-ns/ranges/00000000-0000-4000-8000-000000000001",
+			wantID: "00000000-0000-4000-8000-000000000001",
 		},
 		{
 			name:   "valid identifier",
@@ -287,12 +281,12 @@ func TestParseRangeKey(t *testing.T) {
 		},
 		{
 			name:    "wrong prefix",
-			key:     "/wrong/prefix/ranges/" + testRangeID,
+			key:     "/wrong/prefix/ranges/range-1",
 			wantErr: "does not have expected ranges prefix",
 		},
 		{
 			name:    "different namespace",
-			key:     "/cadence/other-ns/ranges/" + testRangeID,
+			key:     "/cadence/other-ns/ranges/range-1",
 			wantErr: "does not have expected ranges prefix",
 		},
 		{
@@ -302,7 +296,7 @@ func TestParseRangeKey(t *testing.T) {
 		},
 		{
 			name:    "extra path segment",
-			key:     "/cadence/test-ns/ranges/" + testRangeID + "/extra",
+			key:     "/cadence/test-ns/ranges/range-1/extra",
 			wantErr: "must not contain '/'",
 		},
 	}
@@ -323,9 +317,9 @@ func TestParseRangeKey(t *testing.T) {
 
 func TestRangeKeyRoundTrip(t *testing.T) {
 	rangeIDs := []string{
-		testRangeID,
-		testAlternateRangeID,
-		"range-0",
+		"range-1",
+		"range-2",
+		"00000000-0000-4000-8000-000000000001",
 	}
 
 	for _, rangeID := range rangeIDs {

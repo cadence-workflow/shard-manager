@@ -48,14 +48,15 @@ type Params struct {
 func New(p Params) *Manager {
 	var namespaces []Namespace
 	for _, nsCfg := range p.Registry.List() {
-		shardCache := cache.NewShardCache(nsCfg.Name, p.Store, p.Logger)
+		shardCache := cache.NewShardCache(nsCfg.Name, p.Store, p.Logger, p.TimeSource)
 
 		var assigner *ephemeralassigner.Assigner
 		if nsCfg.Type == config.NamespaceTypeEphemeral {
 			assigner = ephemeralassigner.New(nsCfg.Name, p.TimeSource, p.Config, p.Store, shardCache, p.MetricsClient)
 		}
 
-		namespaces = append(namespaces, newNamespace(nsCfg, shardCache, assigner))
+		fixedShardNum := p.Config.FixedShardNum
+		namespaces = append(namespaces, newNamespace(nsCfg, fixedShardNum, shardCache, assigner))
 	}
 
 	m := newManager(p.Logger, namespaces)

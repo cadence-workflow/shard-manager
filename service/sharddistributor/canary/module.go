@@ -33,8 +33,6 @@ func opts(params Params) fx.Option {
 	cfg := params.Config.Canary
 
 	return fx.Options(
-		fx.Supply(params.Config),
-
 		fx.Provide(sharddistributorv1.NewFxShardDistributorExecutorAPIYARPCClient(params.SharddistributorServiceName)),
 		fx.Provide(sharddistributorv1.NewFxShardDistributorAPIYARPCClient(params.SharddistributorServiceName)),
 
@@ -51,17 +49,11 @@ func opts(params Params) fx.Option {
 			},
 		),
 
-		// Simple way to instantiate executor if only one namespace is used
-		// executorclient.ModuleWithNamespace[*processor.ShardProcessor](cfg.Fixed.Name),
-		// executorclient.ModuleWithNamespace[*processorephemeral.ShardProcessor](cfg.Ephemeral.Name),
-
-		// Instantiate executors for multiple namespaces
-		executors.Module(),
+		executors.Module(cfg.Fixed, cfg.Ephemeral),
 
 		processorephemeral.ShardCreatorModule([]string{cfg.Ephemeral.Name}),
 
 		load.Module(cfg.Load),
-
 		spectatorclient.Module(),
 		fx.Provide(spectatorclient.NewSpectatorPeerChooser),
 

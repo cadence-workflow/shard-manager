@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"time"
 
 	"github.com/uber-go/tally"
 	"github.com/urfave/cli/v3"

@@ -46,10 +46,9 @@ func (s *executorStoreImpl) ListRanges(ctx context.Context, namespace string) ([
 	return assignments, nil
 }
 
-// TODO(range-cover): write the full resulting state (compressed via s.recordWriter)
-// in one transaction guarded by guard (election.Guard() in production, never NopGuard),
-// after validating the whole resulting cover. Compare ModRevision for existing ranges
-// and respect the txn op limit.
+// TODO(range-cover): write the resulting cover in a single guarded
+// transaction after validating the full cover. Compare ModRevision for
+// existing ranges and respect the transaction op limit.
 func (s *executorStoreImpl) AssignRanges(ctx context.Context, namespace string, request store.AssignRangesRequest, guard store.GuardFunc) error {
 	return store.ErrRangeNotImplemented
 }

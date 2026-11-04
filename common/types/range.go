@@ -6,15 +6,10 @@ import (
 	"errors"
 )
 
-// Range represents a contiguous interval of the key space [LowInclusive, HighExclusive).
-// Ranges are the unit of ownership in the range-based model, replacing discrete shard assignments.
-// Construct Range values with NewRange or NewFinalRange. Contains, Overlaps and Adjacent
-// do not validate their inputs, so call IsValid on ranges of unknown origin.
+// Range is a half-open interval [LowInclusive, HighExclusive) of the key space.
 type Range struct {
-	// LowInclusive is the inclusive lower bound in the ordered key space.
 	LowInclusive []byte
-	// HighExclusive is the exclusive upper bound in the ordered key space, or
-	// nil when the range extends to the end of the key space.
+	// HighExclusive is nil when the range extends to the end of the key space.
 	HighExclusive []byte
 }
 
@@ -23,9 +18,7 @@ var (
 	ErrRangeNilBounds = errors.New("range bounds cannot be nil")
 )
 
-// NewRange creates a finite range [lowInclusive, highExclusive). Both bounds
-// must be non-empty. Use NewFinalRange for a range with an unbounded upper
-// bound.
+// NewRange creates a finite range [lowInclusive, highExclusive).
 func NewRange(lowInclusive, highExclusive []byte) (Range, error) {
 	if lowInclusive == nil || highExclusive == nil {
 		return Range{}, ErrRangeNilBounds
@@ -46,8 +39,7 @@ func NewRange(lowInclusive, highExclusive []byte) (Range, error) {
 	return r, nil
 }
 
-// NewFinalRange creates the final range [lowInclusive, infinity), covering every
-// key greater than or equal to lowInclusive.
+// NewFinalRange creates an unbounded range [lowInclusive, inf).
 func NewFinalRange(lowInclusive []byte) (Range, error) {
 	if lowInclusive == nil {
 		return Range{}, ErrRangeNilBounds
@@ -65,9 +57,7 @@ func NewFinalRange(lowInclusive []byte) (Range, error) {
 	return r, nil
 }
 
-// IsValid reports whether the range is well-formed: LowInclusive is non-empty,
-// and either the range is unbounded above or LowInclusive is strictly less than
-// HighExclusive.
+// IsValid reports whether the lower bound is non-empty and precedes the upper bound.
 func (r Range) IsValid() bool {
 	if len(r.LowInclusive) == 0 {
 		return false
@@ -75,8 +65,7 @@ func (r Range) IsValid() bool {
 	return r.IsFinalRange() || bytes.Compare(r.LowInclusive, r.HighExclusive) < 0
 }
 
-// Contains reports whether key lies in the half-open interval
-// [LowInclusive, HighExclusive). A nil key returns false.
+// Contains reports whether key lies in [LowInclusive, HighExclusive).
 func (r Range) Contains(key []byte) bool {
 	if key == nil {
 		return false
@@ -91,8 +80,7 @@ func (r Range) Overlaps(other Range) bool {
 		(r.IsFinalRange() || bytes.Compare(other.LowInclusive, r.HighExclusive) < 0)
 }
 
-// Adjacent reports whether the two ranges touch at exactly one boundary, with no
-// gap and no overlap.
+// Adjacent reports whether the two ranges touch at one boundary.
 func (r Range) Adjacent(other Range) bool {
 	return (!r.IsFinalRange() && bytes.Equal(r.HighExclusive, other.LowInclusive)) ||
 		(!other.IsFinalRange() && bytes.Equal(other.HighExclusive, r.LowInclusive))

@@ -10,29 +10,23 @@ import (
 // ErrRangeNotImplemented is returned by range operations that are not implemented yet.
 var ErrRangeNotImplemented = fmt.Errorf("range operation not implemented")
 
-// RangeAssignment is the internal representation of range ownership. ID
-// uniquely identifies the assignment record independent of its bounds, and
-// Range defines the keyspace interval it covers.
+// RangeAssignment is the internal representation of range ownership.
 type RangeAssignment struct {
 	ID         string
 	Range      types.Range
 	ExecutorID string
 	Status     types.AssignmentStatus
-	// ModRevision is the etcd modification revision of the range key, used as
-	// the optimistic-lock token for guarded writes. It is 0 for a range that
-	// does not yet exist in etcd and is filled by ListRanges.
+	// ModRevision is the etcd revision of the range key; 0 means the range is new.
 	ModRevision int64
 }
 
 // RangeStore is the set of storage operations for range-based ownership.
-// Embedded in Store.
 type RangeStore interface {
 	// ListRanges returns every range in a namespace, sorted by lower bound.
 	ListRanges(ctx context.Context, namespace string) ([]*RangeAssignment, error)
 
-	// AssignRanges atomically rewrites the full range cover in a single guarded
-	// transaction, failing if the guard or any assignment's ModRevision
-	// precondition fails.
+	// AssignRanges rewrites the full cover in one guarded transaction, failing on
+	// a stale guard or ModRevision.
 	AssignRanges(ctx context.Context, namespace string, request AssignRangesRequest, guard GuardFunc) error
 }
 

@@ -17,7 +17,7 @@ import (
 )
 
 // putRangeFixture writes a range directly to etcd and records its ModRevision.
-// Tests seed etcd this way because AssignRanges is not implemented yet.
+// Tests seed etcd directly because AssignRanges is not implemented yet.
 func putRangeFixture(t *testing.T, tc *testhelper.StoreTestCluster, assignment *store.RangeAssignment, compression string) {
 	t.Helper()
 	payload, err := json.Marshal(etcdtypes.FromRangeAssignment(assignment))
@@ -56,9 +56,8 @@ func TestListRanges(t *testing.T) {
 	require.NotNil(t, empty)
 	require.Empty(t, empty)
 
-	// IDs are ordered opposite to their lower bounds, so the expected order
-	// cannot come from etcd key order. One value is compressed to prove reads
-	// accept the same encoding the store writes elsewhere.
+	// IDs order opposite to their bounds, so the expected order cannot come from
+	// etcd key order. One value is compressed to prove reads accept both.
 	high := &store.RangeAssignment{
 		ID:    "range-high",
 		Range: mustRange(t, []byte{0x80, 0, 0, 0, 0, 0, 0, 0}, []byte{0xc0, 0, 0, 0, 0, 0, 0, 0}),

@@ -87,8 +87,7 @@ func TestNewFinalRange(t *testing.T) {
 	}
 }
 
-// TestRange_IsValid covers shapes the constructors cannot produce, so the rules
-// are pinned independently of NewRange and NewFinalRange.
+// TestRange_IsValid pins the rules for shapes the constructors reject.
 func TestRange_IsValid(t *testing.T) {
 	tests := []struct {
 		name string
@@ -107,8 +106,7 @@ func TestRange_IsValid(t *testing.T) {
 	}
 }
 
-// NewRange and NewFinalRange copy their input bounds. Mutating the original
-// slices must not affect the constructed Range.
+// The constructors copy their bounds, so mutating the input must not change them.
 func TestConstructorsCopyBounds(t *testing.T) {
 	low := []byte{0x40, 0x00}
 	high := []byte{0x80, 0x00}

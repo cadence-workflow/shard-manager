@@ -15,8 +15,7 @@ type RangeCover struct {
 	ranges []*RangeAssignment
 }
 
-// NewRangeCover builds a sorted cover and validates that the ranges form a
-// complete, non-overlapping partition of the key space.
+// NewRangeCover sorts ranges and validates that they form a complete cover.
 func NewRangeCover(ranges []*RangeAssignment) (*RangeCover, error) {
 	for _, r := range ranges {
 		if r == nil {
@@ -52,13 +51,13 @@ func (c *RangeCover) Len() int {
 	return len(c.ranges)
 }
 
-// GetRangeForKey returns the range for a key, guaranteed to succeed.
+// GetRangeForKey returns the range for a key, guaranteed to succeed for any
+// valid fingerprint.
 func (c *RangeCover) GetRangeForKey(key []byte) *RangeAssignment {
 	pos, found := slices.BinarySearchFunc(c.ranges, key, func(a *RangeAssignment, k []byte) int {
 		return bytes.Compare(a.Range.LowInclusive, k)
 	})
-	// BinarySearchFunc returns the insertion point for key. If not found, decrement
-	// to find the range whose lower bound is ≤ key.
+	// A miss means key sits between two bounds, so take the lower one.
 	if !found {
 		pos--
 	}

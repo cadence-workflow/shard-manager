@@ -8,20 +8,16 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
-// RangeAssignment is the persisted ownership record for one range, stored in
-// etcd under ranges/<rangeID> with both bounds hex-encoded in the value.
+// RangeAssignment is the persisted ownership record for a range.
 type RangeAssignment struct {
-	// LowInclusiveHex is the hex-encoded inclusive lower bound.
 	LowInclusiveHex string `json:"low_inclusive"`
-	// HighExclusiveHex is the hex-encoded exclusive upper bound, or the empty
-	// string when the range extends to the end of the key space.
+	// HighExclusiveHex is empty when the range extends to the end of the key space.
 	HighExclusiveHex string                 `json:"high_exclusive"`
 	ExecutorID       string                 `json:"executor_id"`
 	Status           types.AssignmentStatus `json:"status"`
 }
 
-// ToRangeAssignment converts the stored record plus its range ID into the
-// internal representation.
+// ToRangeAssignment converts the stored record into its internal representation.
 func (r *RangeAssignment) ToRangeAssignment(rangeID string) (*store.RangeAssignment, error) {
 	if r == nil {
 		return nil, nil
@@ -57,9 +53,7 @@ func (r *RangeAssignment) ToRangeAssignment(rangeID string) (*store.RangeAssignm
 	}, nil
 }
 
-// FromRangeAssignment converts an internal range assignment to its stored
-// record. The caller must ensure src.Range.IsValid(); otherwise the
-// resulting record cannot be decoded by ToRangeAssignment.
+// FromRangeAssignment converts an internal range assignment to its stored record.
 func FromRangeAssignment(src *store.RangeAssignment) *RangeAssignment {
 	if src == nil {
 		return nil

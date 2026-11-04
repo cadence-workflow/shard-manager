@@ -38,5 +38,5 @@ type RangeStore interface {
 
 // AssignRangesRequest is the complete target cover passed to AssignRanges.
 type AssignRangesRequest struct {
-	Assignments []*RangeAssignment
+	Cover *RangeCover
 }

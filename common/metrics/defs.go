@@ -205,6 +205,8 @@ const (
 	ShardDistributorStoreDrainHostsScope
 	ShardDistributorStoreUndrainHostsScope
 	ShardDistributorStoreGetDrainedHostsScope
+	ShardDistributorStoreListRangesScope
+	ShardDistributorStoreAssignRangesScope
 
 	// ShardDistributorWatchScope tracks etcd watch stream processing
 	ShardDistributorWatchScope
@@ -279,6 +281,8 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorStoreDrainHostsScope:                       {operation: "StoreDrainHosts"},
 		ShardDistributorStoreUndrainHostsScope:                     {operation: "StoreUndrainHosts"},
 		ShardDistributorStoreGetDrainedHostsScope:                  {operation: "StoreGetDrainedHosts"},
+		ShardDistributorStoreListRangesScope:                       {operation: "StoreListRanges"},
+		ShardDistributorStoreAssignRangesScope:                     {operation: "StoreAssignRanges"},
 		ShardDistributorWatchScope:                                 {operation: "Watch"},
 		ShardDistributorLeaderScope:                                {operation: "Leader"},
 		ShardDistributorInspectShardScope:                          {operation: "InspectShard"},

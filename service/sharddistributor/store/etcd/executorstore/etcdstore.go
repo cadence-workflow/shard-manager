@@ -111,8 +111,16 @@ func (s *executorStoreImpl) RecordHeartbeat(ctx context.Context, namespace, exec
 		ops = append(ops, clientv3.OpPut(hostMetadataKey, string(hostMetadataData)))
 	}
 
+	// Metadata reaches spectators, so a heartbeat that changes it also moves the assignment version.
+	// A value compare fails on a missing key, so new metadata moves it too.
+	unchanged := make([]clientv3.Cmp, 0, len(request.Metadata))
+	for key, value := range request.Metadata {
+		metadataKey := etcdkeys.BuildMetadataKey(s.prefix, namespace, executorID, key)
+		unchanged = append(unchanged, clientv3.Compare(clientv3.Value(metadataKey), "=", value))
+	}
+
 	// Atomically update both the timestamp and the state.
-	_, err = s.client.Txn(ctx).Then(ops...).Commit()
+	_, err = s.client.Txn(ctx).If(unchanged...).Then(ops...).Else(append(ops, s.touchAssignmentVersion(namespace))...).Commit()
 
 	if err != nil {
 		return fmt.Errorf("record heartbeat: %w", err)
@@ -302,7 +310,7 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 		return nil, err
 	}
 
-	// The version key is missing until the first write, and after a namespace reset.
+	// The version key is missing until the first write.
 	var assignmentRevision int64
 	if kvs := txnResp.Responses[2].GetResponseRange().Kvs; len(kvs) > 0 {
 		assignmentRevision = kvs[0].ModRevision
@@ -503,7 +511,7 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 		return nil
 	}
 	// Committed with the assignments so readers see the version move with them.
-	ops = append(ops, clientv3.OpPut(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace), ""))
+	ops = append(ops, s.touchAssignmentVersion(namespace))
 
 	// 3. Apply the guard function to get the base transaction, which may already have an 'If' condition for leadership.
 	nativeTxn := s.client.Txn(ctx)
@@ -560,9 +568,14 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 	return nil
 }
 
+// touchAssignmentVersion moves the assignment version when committed with a change spectators can see.
+func (s *executorStoreImpl) touchAssignmentVersion(namespace string) clientv3.Op {
+	return clientv3.OpPut(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace), "")
+}
+
 // commitAssignmentOps commits ops that change assignments or drained shards, moving the assignment version with every batch.
 func (s *executorStoreImpl) commitAssignmentOps(ctx context.Context, namespace string, ops []clientv3.Op, guard store.GuardFunc) ([]*clientv3.TxnResponse, error) {
-	return s.commitOps(ctx, ops, guard, clientv3.OpPut(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace), ""))
+	return s.commitOps(ctx, ops, guard, s.touchAssignmentVersion(namespace))
 }
 
 // commitOps commits the given operations in batches to stay within etcd's
@@ -735,13 +748,17 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 // It is intentionally NOT guarded by leadership: any concurrent leader write
 // will subsequently fail its own leadership-key revision check, which is the
 // desired behaviour.
+// The assignment version is touched in the same transaction, so the reset moves it forward.
 func (s *executorStoreImpl) ResetNamespace(ctx context.Context, namespace string) (int64, error) {
 	prefix := etcdkeys.BuildNamespacePrefix(s.prefix, namespace)
-	resp, err := s.client.Delete(ctx, prefix, clientv3.WithPrefix())
+	resp, err := s.client.Txn(ctx).Then(
+		clientv3.OpDelete(prefix, clientv3.WithPrefix()),
+		s.touchAssignmentVersion(namespace),
+	).Commit()
 	if err != nil {
 		return 0, fmt.Errorf("delete namespace prefix %q: %w", prefix, err)
 	}
-	return resp.Deleted, nil
+	return resp.Responses[0].GetResponseDeleteRange().Deleted, nil
 }
 
 // DrainShards writes one empty-valued key per shard under the namespace's drained

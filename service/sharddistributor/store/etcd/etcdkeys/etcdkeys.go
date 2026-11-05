@@ -80,11 +80,16 @@ func BuildMetadataKey(prefix string, namespace, executorID, metadataKey string) 
 	return fmt.Sprintf("%s/%s", BuildExecutorKey(prefix, namespace, executorID, ExecutorMetadataKey), metadataKey)
 }
 
-// BuildAssignmentVersionKey constructs the etcd key touched by every write that changes assignments or
-// drained shards. Its mod revision versions that state, including deletes.
-// Result: <prefix>/<namespace>/assignment_version
+// AssignmentVersionsDir holds the assignment version keys. It sits beside the namespace prefixes and
+// starts with an underscore, which namespace names may not.
+const AssignmentVersionsDir = "_assignment_versions"
+
+// BuildAssignmentVersionKey constructs the etcd key touched by every write that changes assignments,
+// drained shards or executor metadata. Its mod revision versions that state, including deletes.
+// It lives outside the namespace prefix, so a namespace reset can delete the prefix and touch it atomically.
+// Result: <prefix>/_assignment_versions/<namespace>
 func BuildAssignmentVersionKey(prefix, namespace string) string {
-	return fmt.Sprintf("%sassignment_version", BuildNamespacePrefix(prefix, namespace))
+	return fmt.Sprintf("%s/%s/%s", prefix, AssignmentVersionsDir, namespace)
 }
 
 // BuildDrainedShardsPrefix constructs the etcd key prefix for drained shards within a given namespace.

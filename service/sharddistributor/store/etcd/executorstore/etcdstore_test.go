@@ -403,6 +403,11 @@ func TestAssignmentRevision(t *testing.T) {
 	defer cancel()
 
 	executorID := "exec-TestAssignmentRevision"
+	heartbeat := func(metadata map[string]string) func() error {
+		return func() error {
+			return executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE, Metadata: metadata})
+		}
+	}
 	// Steps run in order against one namespace, each comparing with the previous revision.
 	steps := []struct {
 		name  string
@@ -422,13 +427,10 @@ func TestAssignmentRevision(t *testing.T) {
 			},
 			moves: true,
 		},
-		{
-			name: "heartbeat",
-			write: func() error {
-				return executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE})
-			},
-			moves: false,
-		},
+		{name: "heartbeat without metadata", write: heartbeat(nil), moves: false},
+		{name: "heartbeat with new metadata", write: heartbeat(map[string]string{"addr": "a"}), moves: true},
+		{name: "heartbeat with unchanged metadata", write: heartbeat(map[string]string{"addr": "a"}), moves: false},
+		{name: "heartbeat with changed metadata", write: heartbeat(map[string]string{"addr": "b"}), moves: true},
 		{
 			name: "drain shard",
 			write: func() error {
@@ -449,6 +451,14 @@ func TestAssignmentRevision(t *testing.T) {
 			name: "delete executor",
 			write: func() error {
 				return executorStore.DeleteExecutors(ctx, tc.Namespace, []string{executorID}, store.NopGuard())
+			},
+			moves: true,
+		},
+		{
+			name: "reset namespace",
+			write: func() error {
+				_, err := executorStore.ResetNamespace(ctx, tc.Namespace)
+				return err
 			},
 			moves: true,
 		},

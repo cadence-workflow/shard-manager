@@ -122,8 +122,9 @@ type AssignmentState struct {
 	// state use it to discard a snapshot older than the one they hold.
 	Revision int64
 
-	// AssignmentRevision is the store revision of the latest change to assignments or drained shards.
-	// Heartbeats do not move it, so readers holding the same assignments agree on it.
+	// AssignmentRevision is the store revision of the latest change to assignments, drained shards or
+	// executor metadata. Heartbeats with unchanged metadata do not move it, so readers holding the same
+	// state agree on it.
 	AssignmentRevision int64
 }
 

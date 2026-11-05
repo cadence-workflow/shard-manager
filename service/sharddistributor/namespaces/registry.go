@@ -56,6 +56,10 @@ func validate(ns config.Namespace) error {
 	if ns.Name == "" {
 		return errors.New("name must not be empty")
 	}
+	// Names are etcd key prefixes, and a leading underscore is reserved for keys beside them.
+	if strings.HasPrefix(ns.Name, "_") {
+		return errors.New("name must not start with an underscore")
+	}
 	switch ns.Type {
 	case config.NamespaceTypeFixed:
 		if ns.ShardNum <= 0 {

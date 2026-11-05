@@ -29,6 +29,11 @@ func TestNewRegistryValidation(t *testing.T) {
 			wantErr: `namespace "": name must not be empty`,
 		},
 		{
+			name:    "leading underscore",
+			cfg:     []config.Namespace{{Name: "_assignment_versions", Type: config.NamespaceTypeEphemeral}},
+			wantErr: `namespace "_assignment_versions": name must not start with an underscore`,
+		},
+		{
 			name:    "unknown type",
 			cfg:     []config.Namespace{{Name: "ns", Type: "ephmeral"}},
 			wantErr: `namespace "ns": unknown type "ephmeral"`,

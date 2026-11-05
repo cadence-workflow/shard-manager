@@ -569,8 +569,9 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 }
 
 // touchAssignmentVersion moves the assignment version when committed with a change spectators can see.
+// Only the mod revision is read, and the empty JSON object leaves room to add fields without a migration.
 func (s *executorStoreImpl) touchAssignmentVersion(namespace string) clientv3.Op {
-	return clientv3.OpPut(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace), "")
+	return clientv3.OpPut(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace), "{}")
 }
 
 // commitAssignmentOps commits ops that change assignments or drained shards, moving the assignment version with every batch.

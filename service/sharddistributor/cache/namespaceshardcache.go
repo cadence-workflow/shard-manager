@@ -46,6 +46,7 @@ type shardCache struct {
 	executorRevision map[string]int64
 	drainedShards    map[string]struct{} // set of shard IDs marked drained
 	lastRevision     int64               // etcd store revision of the last applied snapshot
+	assignmentRev    int64               // assignment revision of the last applied snapshot
 	namespace        string
 	stopCh           chan struct{}
 	wg               sync.WaitGroup
@@ -252,15 +253,29 @@ func (c *shardCache) refreshWithTimeout() error {
 func (c *shardCache) GetShardAssignments() store.AssignmentSnapshot {
 	c.RLock()
 	defer c.RUnlock()
+	return c.snapshotLocked()
+}
 
+func (c *shardCache) GetShardAssignmentsIfNewer(known int64) (store.AssignmentSnapshot, bool) {
+	c.RLock()
+	defer c.RUnlock()
+	if c.assignmentRev <= known {
+		return store.AssignmentSnapshot{AssignmentRevision: c.assignmentRev}, false
+	}
+	return c.snapshotLocked(), true
+}
+
+// snapshotLocked copies the cached state. The caller must hold the lock.
+func (c *shardCache) snapshotLocked() store.AssignmentSnapshot {
 	shardAssignments := make(map[*store.ShardOwner][]string, len(c.executorToShards))
 	for executor, shardIDs := range c.executorToShards {
 		shardAssignments[executor] = slices.Clone(shardIDs)
 	}
 
 	return store.AssignmentSnapshot{
-		ExecutorToShards: shardAssignments,
-		DrainedShards:    maps.Clone(c.drainedShards),
+		ExecutorToShards:   shardAssignments,
+		DrainedShards:      maps.Clone(c.drainedShards),
+		AssignmentRevision: c.assignmentRev,
 	}
 }
 
@@ -297,11 +312,12 @@ func (c *shardCache) applyNamespaceState(state *store.AssignmentState) bool {
 		maps.Copy(shardOwner.Metadata, executorMetadata)
 	}
 
-	return c.replaceNamespaceState(state.Revision, shardToExecutor, executorState, executorRevision, shardOwners, state.DrainedShards)
+	return c.replaceNamespaceState(state.Revision, state.AssignmentRevision, shardToExecutor, executorState, executorRevision, shardOwners, state.DrainedShards)
 }
 
 func (c *shardCache) replaceNamespaceState(
 	storeRevision int64,
+	assignmentRevision int64,
 	shardToExecutor map[string]*store.ShardOwner,
 	executorState map[*store.ShardOwner][]string,
 	executorRevision map[string]int64,
@@ -320,6 +336,7 @@ func (c *shardCache) replaceNamespaceState(
 	}
 
 	c.lastRevision = storeRevision
+	c.assignmentRev = assignmentRevision
 	c.shardToExecutor = shardToExecutor
 	c.executorToShards = executorState
 	c.executorRevision = executorRevision

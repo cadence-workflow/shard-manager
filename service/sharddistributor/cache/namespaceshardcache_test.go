@@ -73,6 +73,13 @@ func TestShardCache_SignalAppliesStateAndNotifies(t *testing.T) {
 	verifyExecutorInState(t, snapshot.ExecutorToShards, "executor-1", []string{"shard-1"}, executor1.metadata)
 	verifyExecutorInState(t, snapshot.ExecutorToShards, "executor-2", []string{"shard-2"}, executor2.metadata)
 	verifyShardOwner(t, tc.c, "shard-2", "executor-2", executor2.metadata)
+	assert.Equal(t, int64(20), snapshot.AssignmentRevision)
+	upToDate, newer := tc.c.GetShardAssignmentsIfNewer(20)
+	assert.False(t, newer)
+	assert.Equal(t, store.AssignmentSnapshot{AssignmentRevision: 20}, upToDate)
+	behind, newer := tc.c.GetShardAssignmentsIfNewer(19)
+	assert.True(t, newer)
+	assert.Equal(t, snapshot, behind)
 
 	tc.c.Stop()
 }
@@ -285,7 +292,7 @@ func TestShardCache_replaceNamespaceState_skipsStaleRevision(t *testing.T) {
 // five parallel maps.
 func seedState(c *shardCache, revision int64, executorID, shardID string) {
 	owner := &store.ShardOwner{ExecutorID: executorID, Metadata: map[string]string{}}
-	c.replaceNamespaceState(revision,
+	c.replaceNamespaceState(revision, revision,
 		map[string]*store.ShardOwner{shardID: owner},
 		map[*store.ShardOwner][]string{owner: {shardID}},
 		map[string]int64{executorID: revision},
@@ -490,9 +497,10 @@ type testExecutor struct {
 
 func namespaceState(revision int64, executors map[string]testExecutor) *store.AssignmentState {
 	state := &store.AssignmentState{
-		Revision:         revision,
-		ExecutorMetadata: make(map[string]map[string]string, len(executors)),
-		ShardAssignments: make(map[string]store.AssignedState, len(executors)),
+		Revision:           revision,
+		AssignmentRevision: revision * 10, // distinct from Revision so tests can tell them apart
+		ExecutorMetadata:   make(map[string]map[string]string, len(executors)),
+		ShardAssignments:   make(map[string]store.AssignedState, len(executors)),
 	}
 	for executorID, executor := range executors {
 		assigned := make(map[string]*types.ShardAssignment, len(executor.shards))

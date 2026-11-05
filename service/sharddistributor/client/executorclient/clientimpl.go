@@ -250,7 +250,7 @@ func (e *executorImpl[SP]) updateShardAssignmentMetered(ctx context.Context, sha
 
 	startTime := e.timeSource.Now()
 	defer e.metrics.
-		Histogram(metricsconstants.ShardDistributorExecutorAssignLoopLatency, metricsconstants.ShardDistributorExecutorAssignLoopLatencyBuckets).
+		Histogram(metricsconstants.ShardDistributorExecutorAssignLoopLatency, metricsconstants.ShardDistributorExecutorLatencyBuckets).
 		RecordDuration(e.timeSource.Since(startTime))
 
 	e.updateShardAssignment(ctx, shardAssignment)

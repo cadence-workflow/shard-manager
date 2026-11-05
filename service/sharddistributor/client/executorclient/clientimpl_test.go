@@ -98,6 +98,7 @@ func newTestExecutor(
 		"test-hostname",
 		executor,
 		tally.NoopScope,
+		tally.NoopScope,
 		executor.heartBeatInterval,
 	)
 	return executor

@@ -22,17 +22,27 @@ const (
 	ShardDistributorExecutorProcessorStopTimeout      = "shard_distributor_executor_processor_stop_timeout"
 	ShardDistributorExecutorShardsCleanedUpDone       = "shard_distributor_executor_shards_cleaned_up_done"
 
+	ShardDistributorExecutorHeartbeatCallersJoined   = "shard_distributor_executor_heartbeat_callers_joined"
+	ShardDistributorExecutorHeartbeatFlights         = "shard_distributor_executor_heartbeat_flights"
+	ShardDistributorExecutorHeartbeatFlightFailures  = "shard_distributor_executor_heartbeat_flight_failures"
+	ShardDistributorExecutorHeartbeatBudgetExhausted = "shard_distributor_executor_heartbeat_budget_exhausted"
+	// Attempts are executor client invocations, not transport attempts.
+	ShardDistributorExecutorHeartbeatAttempts = "shard_distributor_executor_heartbeat_attempts"
+	ShardDistributorExecutorHeartbeatRetries  = "shard_distributor_executor_heartbeat_retries"
+
 	// Gauge metrics
 	ShardDistributorExecutorOwnedShards = "shard_distributor_executor_owned_shards"
 
 	// Histogram/Timer metrics
 	ShardDistributorExecutorAssignLoopLatency = "shard_distributor_executor_assign_loop_latency"
 	ShardDistributorExecutorClientLatency     = "shard_distributor_executor_client_latency"
+
+	ShardDistributorExecutorHeartbeatFlightLatency = "shard_distributor_executor_heartbeat_flight_latency"
 )
 
 var (
 	// Histogram buckets for ShardDistributorExecutor metrics
-	ShardDistributorExecutorAssignLoopLatencyBuckets = tally.DurationBuckets([]time.Duration{
+	ShardDistributorExecutorLatencyBuckets = tally.DurationBuckets([]time.Duration{
 		0,
 		1 * time.Millisecond,
 		5 * time.Millisecond,

@@ -716,6 +716,8 @@ type WatchNamespaceStateResponse struct {
 	Executors []*ExecutorShardAssignment
 	// DrainedShardKeys are the shards drained for this namespace
 	DrainedShardKeys []string
+	// AssignmentRevision is the store revision of the latest change to assignments or drained shards
+	AssignmentRevision int64
 }
 
 func (v *WatchNamespaceStateResponse) GetExecutors() (o []*ExecutorShardAssignment) {
@@ -728,6 +730,53 @@ func (v *WatchNamespaceStateResponse) GetExecutors() (o []*ExecutorShardAssignme
 func (v *WatchNamespaceStateResponse) GetDrainedShardKeys() (o []string) {
 	if v != nil {
 		return v.DrainedShardKeys
+	}
+	return
+}
+
+func (v *WatchNamespaceStateResponse) GetAssignmentRevision() (o int64) {
+	if v != nil {
+		return v.AssignmentRevision
+	}
+	return
+}
+
+type GetNamespaceStateIfNewerRequest struct {
+	Namespace string
+	// AssignmentRevision is the assignment revision of the state the caller holds
+	AssignmentRevision int64
+}
+
+func (v *GetNamespaceStateIfNewerRequest) GetNamespace() (o string) {
+	if v != nil {
+		return v.Namespace
+	}
+	return
+}
+
+func (v *GetNamespaceStateIfNewerRequest) GetAssignmentRevision() (o int64) {
+	if v != nil {
+		return v.AssignmentRevision
+	}
+	return
+}
+
+type GetNamespaceStateIfNewerResponse struct {
+	AssignmentRevision int64
+	// State is set only when AssignmentRevision is newer than the request's
+	State *WatchNamespaceStateResponse
+}
+
+func (v *GetNamespaceStateIfNewerResponse) GetAssignmentRevision() (o int64) {
+	if v != nil {
+		return v.AssignmentRevision
+	}
+	return
+}
+
+func (v *GetNamespaceStateIfNewerResponse) GetState() (o *WatchNamespaceStateResponse) {
+	if v != nil {
+		return v.State
 	}
 	return
 }

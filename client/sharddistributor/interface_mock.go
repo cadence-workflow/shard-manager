@@ -201,6 +201,26 @@ func (mr *MockClientMockRecorder) GetNamespaceState(arg0, arg1 any, arg2 ...any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespaceState", reflect.TypeOf((*MockClient)(nil).GetNamespaceState), varargs...)
 }
 
+// GetNamespaceStateIfNewer mocks base method.
+func (m *MockClient) GetNamespaceStateIfNewer(arg0 context.Context, arg1 *types.GetNamespaceStateIfNewerRequest, arg2 ...yarpc.CallOption) (*types.GetNamespaceStateIfNewerResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetNamespaceStateIfNewer", varargs...)
+	ret0, _ := ret[0].(*types.GetNamespaceStateIfNewerResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNamespaceStateIfNewer indicates an expected call of GetNamespaceStateIfNewer.
+func (mr *MockClientMockRecorder) GetNamespaceStateIfNewer(arg0, arg1 any, arg2 ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespaceStateIfNewer", reflect.TypeOf((*MockClient)(nil).GetNamespaceStateIfNewer), varargs...)
+}
+
 // GetShardOwner mocks base method.
 func (m *MockClient) GetShardOwner(arg0 context.Context, arg1 *types.GetShardOwnerRequest, arg2 ...yarpc.CallOption) (*types.GetShardOwnerResponse, error) {
 	m.ctrl.T.Helper()

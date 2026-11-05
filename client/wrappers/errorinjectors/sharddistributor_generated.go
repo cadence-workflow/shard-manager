@@ -200,6 +200,26 @@ func (c *sharddistributorClient) GetNamespaceState(ctx context.Context, gp1 *typ
 	return
 }
 
+func (c *sharddistributorClient) GetNamespaceStateIfNewer(ctx context.Context, gp1 *types.GetNamespaceStateIfNewerRequest, p1 ...yarpc.CallOption) (gp2 *types.GetNamespaceStateIfNewerResponse, err error) {
+	fakeErr := c.fakeErrFn(c.errorRate)
+	var forwardCall bool
+	if forwardCall = c.forwardCallFn(fakeErr); forwardCall {
+		gp2, err = c.client.GetNamespaceStateIfNewer(ctx, gp1, p1...)
+	}
+
+	if fakeErr != nil {
+		c.logger.Error(msgShardDistributorInjectedFakeErr,
+			tag.ShardDistributorClientOperationGetNamespaceStateIfNewer,
+			tag.Error(fakeErr),
+			tag.Bool(forwardCall),
+			tag.ClientError(err),
+		)
+		err = fakeErr
+		return
+	}
+	return
+}
+
 func (c *sharddistributorClient) GetShardOwner(ctx context.Context, gp1 *types.GetShardOwnerRequest, p1 ...yarpc.CallOption) (gp2 *types.GetShardOwnerResponse, err error) {
 	fakeErr := c.fakeErrFn(c.errorRate)
 	var forwardCall bool

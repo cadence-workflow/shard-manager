@@ -111,6 +111,17 @@ func (c *sharddistributorClient) GetNamespaceState(ctx context.Context, gp1 *typ
 	return resp, err
 }
 
+func (c *sharddistributorClient) GetNamespaceStateIfNewer(ctx context.Context, gp1 *types.GetNamespaceStateIfNewerRequest, p1 ...yarpc.CallOption) (gp2 *types.GetNamespaceStateIfNewerResponse, err error) {
+	var resp *types.GetNamespaceStateIfNewerResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.GetNamespaceStateIfNewer(ctx, gp1, p1...)
+		return err
+	}
+	err = c.throttleRetry.Do(ctx, op)
+	return resp, err
+}
+
 func (c *sharddistributorClient) GetShardOwner(ctx context.Context, gp1 *types.GetShardOwnerRequest, p1 ...yarpc.CallOption) (gp2 *types.GetShardOwnerResponse, err error) {
 	var resp *types.GetShardOwnerResponse
 	op := func(ctx context.Context) error {

@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/yarpc/yarpcerrors"
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
@@ -488,6 +489,11 @@ func TestWatchNamespaceStateUnknownNamespace(t *testing.T) {
 	err := handler.WatchNamespaceState(&types.WatchNamespaceStateRequest{Namespace: "unknown"}, NewMockWatchNamespaceStateServer(ctrl))
 
 	require.Equal(t, &types.NamespaceNotFoundError{Namespace: "unknown"}, err)
+}
+
+func TestGetNamespaceStateIfNewerIsUnimplemented(t *testing.T) {
+	_, err := (&handlerImpl{}).GetNamespaceStateIfNewer(context.Background(), &types.GetNamespaceStateIfNewerRequest{})
+	assert.True(t, yarpcerrors.IsUnimplemented(err))
 }
 
 func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {

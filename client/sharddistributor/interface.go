@@ -44,6 +44,7 @@ type Client interface {
 	GetFullNamespaceState(context.Context, *types.GetFullNamespaceStateRequest, ...yarpc.CallOption) (*types.GetFullNamespaceStateResponse, error)
 	GetExecutorState(context.Context, *types.GetExecutorStateRequest, ...yarpc.CallOption) (*types.GetExecutorStateResponse, error)
 	WatchNamespaceState(context.Context, *types.WatchNamespaceStateRequest, ...yarpc.CallOption) (WatchNamespaceStateClient, error)
+	GetNamespaceStateIfNewer(context.Context, *types.GetNamespaceStateIfNewerRequest, ...yarpc.CallOption) (*types.GetNamespaceStateIfNewerResponse, error)
 	DrainShards(context.Context, *types.DrainShardsRequest, ...yarpc.CallOption) error
 	UndrainShards(context.Context, *types.UndrainShardsRequest, ...yarpc.CallOption) (*types.UndrainShardsResponse, error)
 	GetDrainedShards(context.Context, *types.GetDrainedShardsRequest, ...yarpc.CallOption) (*types.GetDrainedShardsResponse, error)

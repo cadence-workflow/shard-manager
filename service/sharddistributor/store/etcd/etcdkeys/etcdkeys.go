@@ -80,6 +80,13 @@ func BuildMetadataKey(prefix string, namespace, executorID, metadataKey string) 
 	return fmt.Sprintf("%s/%s", BuildExecutorKey(prefix, namespace, executorID, ExecutorMetadataKey), metadataKey)
 }
 
+// BuildAssignmentVersionKey constructs the etcd key touched by every write that changes assignments or
+// drained shards. Its mod revision versions that state, including deletes.
+// Result: <prefix>/<namespace>/assignment_version
+func BuildAssignmentVersionKey(prefix, namespace string) string {
+	return fmt.Sprintf("%sassignment_version", BuildNamespacePrefix(prefix, namespace))
+}
+
 // BuildDrainedShardsPrefix constructs the etcd key prefix for drained shards within a given namespace.
 // Drained shards live in their own keyspace, a sibling of executors/, so draining and undraining a
 // shard is a single atomic put or delete.

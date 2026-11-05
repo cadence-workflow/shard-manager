@@ -396,6 +396,74 @@ func TestGetAssignmentState(t *testing.T) {
 	assert.NotZero(t, state.Revision)
 }
 
+func TestAssignmentRevision(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	executorID := "exec-TestAssignmentRevision"
+	// Steps run in order against one namespace, each comparing with the previous revision.
+	steps := []struct {
+		name  string
+		write func() error
+		moves bool
+	}{
+		{
+			name: "assign shards",
+			write: func() error {
+				return executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
+					NewState: &store.NamespaceState{AssignmentState: store.AssignmentState{
+						ShardAssignments: map[string]store.AssignedState{
+							executorID: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
+						},
+					}},
+				}, store.NopGuard())
+			},
+			moves: true,
+		},
+		{
+			name: "heartbeat",
+			write: func() error {
+				return executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE})
+			},
+			moves: false,
+		},
+		{
+			name: "drain shard",
+			write: func() error {
+				return executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-2"})
+			},
+			moves: true,
+		},
+		{
+			name: "undrain shard",
+			write: func() error {
+				removed, err := executorStore.UndrainShards(ctx, tc.Namespace, []string{"shard-2"})
+				assert.Equal(t, []string{"shard-2"}, removed)
+				return err
+			},
+			moves: true,
+		},
+		{
+			name: "delete executor",
+			write: func() error {
+				return executorStore.DeleteExecutors(ctx, tc.Namespace, []string{executorID}, store.NopGuard())
+			},
+			moves: true,
+		},
+	}
+
+	var previous int64
+	for _, step := range steps {
+		require.NoError(t, step.write(), step.name)
+		state, err := executorStore.GetAssignmentState(ctx, tc.Namespace)
+		require.NoError(t, err, step.name)
+		assert.Equal(t, step.moves, state.AssignmentRevision > previous, step.name)
+		previous = state.AssignmentRevision
+	}
+}
+
 func TestGetStateRecordsETCDRoundTripLatencyOnError(t *testing.T) {
 	namespace := "test_namespace"
 	histogramName := "test.shard_distributor_store_get_state_etcd_round_trip_latency+namespace=test_namespace,operation=StoreGetState"

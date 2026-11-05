@@ -4,23 +4,30 @@ package heartbeat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/uber-go/tally"
+	"go.uber.org/yarpc/yarpcerrors"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cadence-workflow/shard-manager/client/sharddistributorexecutor"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/timeout"
+	"github.com/cadence-workflow/shard-manager/common"
+	"github.com/cadence-workflow/shard-manager/common/backoff"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient/metricsconstants"
 )
 
 const drainingHeartbeatTimeout = 5 * time.Second
 
-// minActiveHeartbeatTimeout floors the bound on a coalesced heartbeat RPC, so a
-// very short configured interval cannot cut off heartbeats that would otherwise
-// have succeeded.
-const minActiveHeartbeatTimeout = 1 * time.Second
+const (
+	// activeHeartbeatBudget bounds a whole flight, so blocked callers never wait a full client timeout.
+	activeHeartbeatBudget = timeout.ShardDistributorExecutorDefaultTimeout / 2
+
+	minActiveAttemptTimeout = 1 * time.Second
+)
 
 // StateProvider allows the heartbeat manager to pull dynamic state from the
 // executor without knowing how the executor is implemented.
@@ -33,17 +40,16 @@ type StateProvider interface {
 // through the shard-distributor client, coalescing concurrent callers via
 // singleflight, and emitting the owned-shards gauge.
 type Manager struct {
-	client      sharddistributorexecutor.Client
-	namespace   string
-	executorID  string
-	hostName    string
-	state       StateProvider
-	hostMetrics tally.Scope
-	sf          singleflight.Group
-	// activeHeartbeatTimeout bounds a coalesced active heartbeat RPC. The RPC
-	// is detached from the winning caller's context, so it needs its own
-	// deadline.
-	activeHeartbeatTimeout time.Duration
+	client            sharddistributorexecutor.Client
+	namespace         string
+	executorID        string
+	hostName          string
+	state             StateProvider
+	metrics           tally.Scope
+	hostMetrics       tally.Scope
+	sf                singleflight.Group
+	retrier           *backoff.ThrottleRetry
+	heartbeatInterval time.Duration
 }
 
 func NewManager(
@@ -52,18 +58,32 @@ func NewManager(
 	executorID string,
 	hostName string,
 	state StateProvider,
+	metrics tally.Scope,
 	hostMetrics tally.Scope,
 	heartbeatInterval time.Duration,
 ) *Manager {
 	return &Manager{
-		client:                 client,
-		namespace:              namespace,
-		executorID:             executorID,
-		hostName:               hostName,
-		state:                  state,
-		hostMetrics:            hostMetrics,
-		activeHeartbeatTimeout: max(heartbeatInterval, minActiveHeartbeatTimeout),
+		client:            client,
+		namespace:         namespace,
+		executorID:        executorID,
+		hostName:          hostName,
+		state:             state,
+		metrics:           metrics,
+		hostMetrics:       hostMetrics,
+		retrier:           newRetrier(),
+		heartbeatInterval: heartbeatInterval,
 	}
+}
+
+func newRetrier() *backoff.ThrottleRetry {
+	return backoff.NewThrottleRetry(
+		backoff.WithRetryPolicy(common.CreateShardDistributorServiceRetryPolicy()),
+		backoff.WithRetryableError(func(err error) bool {
+			return common.IsServiceTransientError(err) ||
+				errors.Is(err, context.DeadlineExceeded) ||
+				yarpcerrors.IsDeadlineExceeded(err)
+		}),
+	)
 }
 
 // Heartbeat sends a coalesced active heartbeat. Concurrent callers share a
@@ -103,20 +123,68 @@ func (m *Manager) DrainingHeartbeat() error {
 }
 
 func (m *Manager) doHeartbeat(ctx context.Context) (map[string]*types.ShardAssignment, bool, error) {
+	led := false
 	result, err, shared := m.sf.Do("heartbeat", func() (any, error) {
-		// Detach from the winning caller's context so one caller's
-		// cancellation cannot abort the shared RPC for all piggybacking
-		// callers, but give it a deadline of its own so a hung server cannot
-		// wedge the singleflight indefinitely.
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), m.activeHeartbeatTimeout)
-		defer cancel()
-
-		return m.sendRPC(ctx, types.ExecutorStatusACTIVE)
+		led = true
+		return m.activeFlight(ctx)
 	})
+	if !led {
+		m.metrics.Counter(metricsconstants.ShardDistributorExecutorHeartbeatCallersJoined).Inc(1)
+	}
 	if err != nil {
 		return nil, shared, err
 	}
 	return result.(map[string]*types.ShardAssignment), shared, nil
+}
+
+// activeFlight is detached from the winning caller's context so its cancellation
+// cannot abort the RPC for every joined caller.
+func (m *Manager) activeFlight(ctx context.Context) (map[string]*types.ShardAssignment, error) {
+	budgetCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), activeHeartbeatBudget)
+	defer cancel()
+
+	// Metrics
+	m.metrics.Counter(metricsconstants.ShardDistributorExecutorHeartbeatFlights).Inc(1)
+	start := time.Now()
+	defer func() {
+		m.metrics.
+			Histogram(metricsconstants.ShardDistributorExecutorHeartbeatFlightLatency, metricsconstants.ShardDistributorExecutorLatencyBuckets).
+			RecordDuration(time.Since(start))
+	}()
+
+	// Do the call
+	var assignments map[string]*types.ShardAssignment
+	attempts := 0
+	err := m.retrier.Do(budgetCtx, func(ctx context.Context) error {
+		if attempts > 0 {
+			m.metrics.Counter(metricsconstants.ShardDistributorExecutorHeartbeatRetries).Inc(1)
+		}
+		attempts++
+		var err error
+		assignments, err = m.activeAttempt(ctx)
+		return err
+	})
+	if err == nil {
+		return assignments, nil
+	}
+
+	// Error observability
+	m.metrics.Counter(metricsconstants.ShardDistributorExecutorHeartbeatFlightFailures).Inc(1)
+	if budgetCtx.Err() != nil {
+		m.metrics.Counter(metricsconstants.ShardDistributorExecutorHeartbeatBudgetExhausted).Inc(1)
+		return nil, fmt.Errorf("heartbeat budget %s exhausted after %d attempts: %w", activeHeartbeatBudget, attempts, err)
+	}
+	return nil, err
+}
+
+func (m *Manager) activeAttempt(ctx context.Context) (map[string]*types.ShardAssignment, error) {
+	// Capped at half the budget so a hung attempt leaves room for another.
+	attemptTimeout := min(max(m.heartbeatInterval, minActiveAttemptTimeout), activeHeartbeatBudget/2)
+	ctx, cancel := context.WithTimeout(ctx, attemptTimeout)
+	defer cancel()
+
+	m.metrics.Counter(metricsconstants.ShardDistributorExecutorHeartbeatAttempts).Inc(1)
+	return m.sendRPC(ctx, types.ExecutorStatusACTIVE)
 }
 
 func (m *Manager) sendRPC(ctx context.Context, status types.ExecutorStatus) (map[string]*types.ShardAssignment, error) {

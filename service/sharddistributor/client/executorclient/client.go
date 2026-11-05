@@ -192,6 +192,7 @@ func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig
 		executorID,
 		sanitizedHostname,
 		executor,
+		metricsScope,
 		hostMetricsScope,
 		namespaceConfig.HeartBeatInterval,
 	)

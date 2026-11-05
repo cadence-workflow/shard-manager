@@ -23,7 +23,7 @@ import (
 const drainingHeartbeatTimeout = 5 * time.Second
 
 const (
-	// activeHeartbeatBudget bounds a whole flight, so blocked callers never wait a full client timeout.
+	// activeHeartbeatBudget bounds one flight. A shard lookup can run a second flight to refresh ownership.
 	activeHeartbeatBudget = timeout.ShardDistributorExecutorDefaultTimeout / 2
 
 	minActiveAttemptTimeout = 1 * time.Second

@@ -5,7 +5,10 @@ import (
 	"time"
 )
 
-const defaultPeerTTL = 2 * time.Minute
+const (
+	defaultPeerTTL            = 2 * time.Minute
+	defaultStreamLagThreshold = 5 * time.Second
+)
 
 // NamespaceConfig represents configuration for a single namespace
 type NamespaceConfig struct {
@@ -13,6 +16,15 @@ type NamespaceConfig struct {
 	HeartBeatInterval time.Duration `yaml:"heartbeat_interval"`
 	TTLShard          time.Duration `yaml:"ttl_shard"`  // time after which shards are stopped if they are not used
 	TTLReport         time.Duration `yaml:"ttl_report"` // time after which the shard report status (including load) needs to be updated
+	// StreamLagThreshold is how long a spectator stream may stay behind the shard distributor before reconnecting, default 5s if zero
+	StreamLagThreshold time.Duration `yaml:"stream_lag_threshold"`
+}
+
+func (c *NamespaceConfig) GetStreamLagThreshold() time.Duration {
+	if c.StreamLagThreshold <= 0 {
+		return defaultStreamLagThreshold
+	}
+	return c.StreamLagThreshold
 }
 
 // Config represents configuration for multiple namespaces

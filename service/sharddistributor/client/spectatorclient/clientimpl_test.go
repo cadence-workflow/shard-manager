@@ -11,6 +11,7 @@ import (
 	"github.com/uber-go/tally"
 	"go.uber.org/goleak"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/yarpc/yarpcerrors"
 	"go.uber.org/zap"
 
 	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
@@ -330,9 +331,9 @@ func TestStreamReconnection(t *testing.T) {
 	}()
 
 	// Wait for the goroutine to be blocked in Sleep, then advance time
-	// BlockUntil(2) because connectState creates an AfterFunc timer (waiter #1)
-	// and the retry SleepWithContext creates another (waiter #2)
-	mockTimeSource.BlockUntil(2)
+	// BlockUntil(3) because connectState creates an AfterFunc timer (waiter #1),
+	// enabledState creates the poll timer (waiter #2) and the retry SleepWithContext creates another (waiter #3)
+	mockTimeSource.BlockUntil(3)
 	mockTimeSource.Advance(2 * time.Second)
 
 	require.NoError(t, spectator.firstStateSignal.Wait(context.Background()))
@@ -398,4 +399,101 @@ func TestWatchLoopDisabled(t *testing.T) {
 	// After Stop(), Done() has been called so Wait returns nil
 	err = stateSignal.Wait(context.Background())
 	assert.NoError(t, err)
+}
+
+func TestLagCheckReconnectsStreamThatStaysBehind(t *testing.T) {
+	defer goleak.VerifyNone(t)
+	s, client, timeSource := newLagCheckSpectator(t)
+	client.EXPECT().
+		GetNamespaceStateIfNewer(gomock.Any(), &types.GetNamespaceStateIfNewerRequest{Namespace: "test-ns", AssignmentRevision: 3}).
+		Return(&types.GetNamespaceStateIfNewerResponse{AssignmentRevision: 5, State: &types.WatchNamespaceStateResponse{AssignmentRevision: 5}}, nil)
+
+	received := make(chan *types.WatchNamespaceStateResponse)
+
+	// When watch completes we push the result to the channel,
+	// so we can assert what it returns.
+	next := make(chan stateFn)
+	go func() { next <- s.watch(context.Background(), received) }()
+
+	received <- &types.WatchNamespaceStateResponse{AssignmentRevision: 3}
+	timeSource.Advance(2 * lagCheckInterval) // poll
+	timeSource.BlockUntil(1)                 // lag deadline armed
+	received <- &types.WatchNamespaceStateResponse{AssignmentRevision: 4}
+	timeSource.Advance(s.config.GetStreamLagThreshold())
+
+	assert.NotNil(t, <-next, "reconnects")
+	assert.Equal(t, int64(5), s.appliedRevision, "the polled state is applied")
+}
+
+func TestLagCheckKeepsStreamThatCatchesUp(t *testing.T) {
+	defer goleak.VerifyNone(t)
+	s, client, timeSource := newLagCheckSpectator(t)
+	client.EXPECT().
+		GetNamespaceStateIfNewer(gomock.Any(), &types.GetNamespaceStateIfNewerRequest{Namespace: "test-ns", AssignmentRevision: 3}).
+		Return(&types.GetNamespaceStateIfNewerResponse{AssignmentRevision: 5, State: &types.WatchNamespaceStateResponse{AssignmentRevision: 5}}, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	received := make(chan *types.WatchNamespaceStateResponse)
+
+	// When watch completes we push the result to the channel,
+	// so we can assert what it returns.
+	next := make(chan stateFn)
+	go func() { next <- s.watch(ctx, received) }()
+
+	received <- &types.WatchNamespaceStateResponse{AssignmentRevision: 3}
+	timeSource.Advance(2 * lagCheckInterval) // poll
+	timeSource.BlockUntil(1)                 // lag deadline armed
+	received <- &types.WatchNamespaceStateResponse{AssignmentRevision: 5}
+	timeSource.Advance(s.config.GetStreamLagThreshold())
+	timeSource.BlockUntil(1) // poll timer reset, so the stream was kept
+
+	cancel()
+	close(received)
+	assert.Nil(t, <-next, "keeps the stream until shutdown")
+}
+
+func TestFailedPollIsNotLag(t *testing.T) {
+	s, client, _ := newLagCheckSpectator(t)
+	client.EXPECT().
+		GetNamespaceStateIfNewer(gomock.Any(), gomock.Any()).
+		Return(nil, yarpcerrors.UnimplementedErrorf("unrecognized procedure"))
+
+	_, ok := s.poll(context.Background())
+	assert.False(t, ok)
+}
+
+func TestStreamBehind(t *testing.T) {
+	assert.True(t, streamBehind(-1, 5), "nothing delivered yet")
+	assert.True(t, streamBehind(3, 5))
+	assert.False(t, streamBehind(5, 5))
+	assert.False(t, streamBehind(0, 5), "an older server sends no revision")
+}
+
+func newLagCheckSpectator(t *testing.T) (*spectatorImpl, *sharddistributor.MockClient, clock.MockedTimeSource) {
+	client := sharddistributor.NewMockClient(gomock.NewController(t))
+	timeSource := clock.NewMockedTimeSource()
+	return &spectatorImpl{
+		namespace:        "test-ns",
+		client:           client,
+		logger:           zap.NewNop(),
+		scope:            tally.NoopScope,
+		timeSource:       timeSource,
+		firstStateSignal: csync.NewResettableSignal(),
+		enabled:          func() bool { return true },
+	}, client, timeSource
+}
+
+func TestHandleResponseDiscardsOlderRevision(t *testing.T) {
+	s := &spectatorImpl{namespace: "test-ns", logger: zap.NewNop(), firstStateSignal: csync.NewResettableSignal()}
+	apply := func(revision int64, executorID string) string {
+		s.handleResponse(&types.WatchNamespaceStateResponse{
+			AssignmentRevision: revision,
+			Executors:          []*types.ExecutorShardAssignment{{ExecutorID: executorID, AssignedShards: []*types.Shard{{ShardKey: "shard-1"}}}},
+		})
+		return s.shardToOwner["shard-1"].ExecutorID
+	}
+
+	assert.Equal(t, "executor-1", apply(10, "executor-1"))
+	assert.Equal(t, "executor-1", apply(9, "executor-2"), "a host with an older cache must not roll the state back")
+	assert.Equal(t, "executor-3", apply(0, "executor-3"), "an older server sends no revision and is always applied")
 }

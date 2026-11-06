@@ -28,6 +28,10 @@ type stateFn func(ctx context.Context) stateFn
 const (
 	streamRetryInterval    = 1 * time.Second
 	streamRetryJitterCoeff = 0.1 // 10% jitter (900ms - 1100ms)
+
+	lagCheckInterval    = 10 * time.Second
+	lagCheckJitterCoeff = 0.2
+	lagCheckTimeout     = 2 * time.Second
 )
 
 // ShardOwner contains information about the executor that owns a shard
@@ -55,6 +59,8 @@ type spectatorImpl struct {
 	shardToOwner map[string]*ShardOwner
 	// drainedShards is the local drain set
 	drainedShards map[string]struct{}
+	// appliedRevision is the assignment revision of the applied state, which the stream or a poll may have delivered.
+	appliedRevision int64
 
 	// Signal to notify when first state is received
 	firstStateSignal *csync.ResettableSignal
@@ -127,38 +133,79 @@ func (s *spectatorImpl) connectState(ctx context.Context) stateFn {
 
 func (s *spectatorImpl) enabledState(ctx context.Context) stateFn {
 	defer s.logger.Info("Exiting enabled state", zap.String(tag.Namespace, s.namespace))
+	// Closing the stream ends the reader, so the wait is deferred first.
+	var reader sync.WaitGroup
+	defer reader.Wait()
 	defer s.stream.Close()
 
 	s.logger.Info("Starting enabled state for namespace", zap.String(tag.Namespace, s.namespace))
+
+	// Recv blocks, so a reader forwards the stream and the watch loop owns all the lag check state.
+	received := make(chan *types.WatchNamespaceStateResponse)
+	stream := s.stream
+	reader.Go(func() { stream.forward(received) })
+
+	return s.watch(ctx, received)
+}
+
+// watch applies the stream responses and polls for lag until the stream ends, then returns the next state.
+func (s *spectatorImpl) watch(ctx context.Context, received <-chan *types.WatchNamespaceStateResponse) stateFn {
+	streamed := int64(-1)            // assignment revision the stream last delivered, -1 until it delivers
+	var lagging int64                // polled assignment revision the stream had not delivered
+	var lagDeadline <-chan time.Time // nil unless the stream was behind at the last poll
+	pollTimer := s.timeSource.NewTimer(backoff.JitDuration(lagCheckInterval, lagCheckJitterCoeff))
+	defer pollTimer.Stop()
 
 	for {
 		if !s.enabled() {
 			return s.disabledState
 		}
 
-		response, err := s.stream.Recv()
-		if err != nil {
-			if ctx.Err() != nil {
-				s.logger.Info("Recv interrupted by client shutdown", zap.String(tag.Namespace, s.namespace))
-				return nil
+		select {
+		case response, ok := <-received:
+			if !ok {
+				if ctx.Err() != nil {
+					s.logger.Info("Recv interrupted by client shutdown", zap.String(tag.Namespace, s.namespace))
+					return nil
+				}
+
+				if s.stream.ctx.Err() != nil {
+					s.streamReconnectCounter(metricsconstants.StreamReconnectReasonTimeout).Inc(1)
+				} else {
+					s.streamReconnectCounter(metricsconstants.StreamReconnectReasonError).Inc(1)
+					s.logger.Warn("Stream recv error, will reconnect", zap.Error(s.stream.recvErr), zap.String(tag.Namespace, s.namespace))
+				}
+
+				if err := s.timeSource.SleepWithContext(ctx, backoff.JitDuration(streamRetryInterval, streamRetryJitterCoeff)); err != nil {
+					return nil
+				}
+				return s.connectState
 			}
 
-			if s.stream.ctx.Err() != nil {
-				s.streamReconnectCounter(metricsconstants.StreamReconnectReasonTimeout).Inc(1)
-			} else {
-				s.streamReconnectCounter(metricsconstants.StreamReconnectReasonError).Inc(1)
-				s.logger.Warn("Stream recv error, will reconnect", zap.Error(err), zap.String(tag.Namespace, s.namespace))
-			}
+			// Process the response
+			streamed = response.AssignmentRevision
+			s.handleResponse(response)
 
-			if err := s.timeSource.SleepWithContext(ctx, backoff.JitDuration(streamRetryInterval, streamRetryJitterCoeff)); err != nil {
-				return nil
+		case <-pollTimer.Chan():
+			if polled, ok := s.poll(ctx); ok && streamBehind(streamed, polled) {
+				// The threshold absorbs a push still in flight when the poll was answered.
+				lagging = polled
+				lagDeadline = s.timeSource.After(s.config.GetStreamLagThreshold())
+				continue
 			}
-			return s.connectState
+			pollTimer.Reset(backoff.JitDuration(lagCheckInterval, lagCheckJitterCoeff))
 
+		case <-lagDeadline:
+			if streamBehind(streamed, lagging) {
+				s.logger.Warn("Stream is behind the shard distributor, reconnecting",
+					zap.String(tag.Namespace, s.namespace),
+					zap.Int64("polledAssignmentRevision", lagging))
+				s.streamReconnectCounter(metricsconstants.StreamReconnectReasonLag).Inc(1)
+				return s.connectState
+			}
+			lagDeadline = nil
+			pollTimer.Reset(backoff.JitDuration(lagCheckInterval, lagCheckJitterCoeff))
 		}
-
-		// Process the response
-		s.handleResponse(response)
 	}
 }
 
@@ -204,8 +251,18 @@ func (s *spectatorImpl) handleResponse(response *types.WatchNamespaceStateRespon
 	}
 
 	s.stateMu.Lock()
+	// Older servers send no revision, so their state is always applied.
+	if response.AssignmentRevision != 0 && response.AssignmentRevision < s.appliedRevision {
+		s.stateMu.Unlock()
+		s.logger.Info("Discarding namespace state older than the applied state",
+			zap.String(tag.Namespace, s.namespace),
+			zap.Int64("assignmentRevision", response.AssignmentRevision),
+			zap.Int64("appliedRevision", s.appliedRevision))
+		return
+	}
 	s.shardToOwner = shardToOwner
 	s.drainedShards = drainedShards
+	s.appliedRevision = response.AssignmentRevision
 	s.stateMu.Unlock()
 
 	// Signal that first state has been received - this function is free to call
@@ -215,6 +272,30 @@ func (s *spectatorImpl) handleResponse(response *types.WatchNamespaceStateRespon
 	s.logger.Debug("Received namespace state update",
 		zap.String(tag.Namespace, s.namespace),
 		zap.Int(tag.Count, len(response.Executors)))
+}
+
+func (s *spectatorImpl) poll(ctx context.Context) (int64, bool) {
+	ctx, cancel := context.WithTimeout(ctx, lagCheckTimeout)
+	defer cancel()
+	response, err := s.client.GetNamespaceStateIfNewer(ctx, &types.GetNamespaceStateIfNewerRequest{
+		Namespace:          s.namespace,
+		AssignmentRevision: s.appliedRevision,
+	})
+	if err != nil {
+		s.logger.Error("Lag check poll failed", zap.Error(err), zap.String(tag.Namespace, s.namespace))
+		return 0, false
+	}
+
+	if response.State != nil {
+		s.handleResponse(response.State)
+	}
+	return response.AssignmentRevision, true
+}
+
+// streamBehind reports whether the stream has not delivered the polled assignment revision.
+// State from an older server carries no revision and cannot be compared.
+func streamBehind(streamed, polled int64) bool {
+	return streamed != 0 && streamed < polled
 }
 
 // GetShardOwner returns the full owner information including metadata for a given shard.

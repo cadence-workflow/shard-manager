@@ -19,6 +19,8 @@ type spectatorStream struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	timer  clock.Timer
+	// recvErr is the error that ended the stream, written before forward closes its channel
+	recvErr error
 }
 
 func newSpectatorStream(
@@ -50,4 +52,22 @@ func newSpectatorStream(
 func (ss *spectatorStream) Close() {
 	ss.timer.Stop()
 	ss.cancel()
+}
+
+// forward sends each response on received until the stream ends, then closes received.
+// Closing is a signal the receiver cannot miss, even when the end races a send.
+func (ss *spectatorStream) forward(received chan<- *types.WatchNamespaceStateResponse) {
+	defer close(received)
+	for {
+		response, err := ss.Recv()
+		if err != nil {
+			ss.recvErr = err
+			return
+		}
+		select {
+		case received <- response:
+		case <-ss.ctx.Done():
+			return
+		}
+	}
 }

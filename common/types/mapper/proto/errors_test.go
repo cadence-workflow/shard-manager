@@ -62,6 +62,11 @@ func TestFromUnknownErrorMapsToUnknownError(t *testing.T) {
 	assert.ErrorContains(t, clientErr, err.Error())
 }
 
+func TestFromUnimplementedMapsToItself(t *testing.T) {
+	unimplemented := yarpcerrors.UnimplementedErrorf("not implemented")
+	assert.True(t, yarpcerrors.IsUnimplemented(ToError(FromError(unimplemented))))
+}
+
 func TestToDeadlineExceededMapsToItself(t *testing.T) {
 	timeout := yarpcerrors.DeadlineExceededErrorf("timeout")
 	assert.Equal(t, timeout, ToError(timeout))

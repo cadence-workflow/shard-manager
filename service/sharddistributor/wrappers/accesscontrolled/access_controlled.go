@@ -26,8 +26,8 @@
 // GetDrainedShards and GetDrainedHosts) require PermissionRead, and the administrative APIs
 // (ListNamespaces, ForceResetNamespace, DrainShards, UndrainShards, DrainHosts and UndrainHosts) require
 // PermissionAdmin. The remaining methods (Health, lifecycle Start/Stop, the
-// executor hot-path GetShardOwner, and WatchNamespaceState) flow through the
-// embedded handler.Handler unchecked.
+// executor hot-path GetShardOwner, WatchNamespaceState and GetNamespaceStateIfNewer)
+// flow through the embedded handler.Handler unchecked.
 package accesscontrolled
 
 import (

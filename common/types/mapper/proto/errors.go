@@ -45,6 +45,10 @@ func FromError(err error) error {
 	case *types.ShardDrainedError:
 		return fromShardDrainedErr(e)
 	}
+	// A yarpc status already carries its code, such as Unimplemented.
+	if yarpcerrors.IsStatus(err) {
+		return err
+	}
 
 	return protobuf.NewError(yarpcerrors.CodeUnknown, err.Error())
 }

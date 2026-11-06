@@ -81,6 +81,18 @@ func TestFromShardDistributorWatchNamespaceStateResponse(t *testing.T) {
 	}
 }
 
+func TestFromShardDistributorGetNamespaceStateIfNewerRequest(t *testing.T) {
+	for _, item := range []*types.GetNamespaceStateIfNewerRequest{nil, {}, &testdata.ShardDistributorGetNamespaceStateIfNewerRequest} {
+		assert.Equal(t, item, ToShardDistributorGetNamespaceStateIfNewerRequest(FromShardDistributorGetNamespaceStateIfNewerRequest(item)))
+	}
+}
+
+func TestFromShardDistributorGetNamespaceStateIfNewerResponse(t *testing.T) {
+	for _, item := range []*types.GetNamespaceStateIfNewerResponse{nil, {}, &testdata.ShardDistributorGetNamespaceStateIfNewerResponse} {
+		assert.Equal(t, item, ToShardDistributorGetNamespaceStateIfNewerResponse(FromShardDistributorGetNamespaceStateIfNewerResponse(item)))
+	}
+}
+
 func TestFromShardDistributorGetNamespaceStateRequest(t *testing.T) {
 	for _, item := range []*types.GetNamespaceStateRequest{nil, {}, &testdata.ShardDistributorGetNamespaceStateRequest} {
 		assert.Equal(t, item, ToShardDistributorGetNamespaceStateRequest(FromShardDistributorGetNamespaceStateRequest(item)))
@@ -301,6 +313,16 @@ func TestWatchNamespaceStateResponseFuzz(t *testing.T) {
 	// WatchNamespaceStateResponseFuzzer avoids nil slices/elements because protobuf
 	// cannot distinguish nil from empty repeated fields — both round-trip to non-nil [].
 	testutils.RunMapperFuzzTest(t, FromShardDistributorWatchNamespaceStateResponse, ToShardDistributorWatchNamespaceStateResponse,
+		testutils.WithCustomFuncs(WatchNamespaceStateResponseFuzzer),
+	)
+}
+
+func TestGetNamespaceStateIfNewerRequestFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorGetNamespaceStateIfNewerRequest, ToShardDistributorGetNamespaceStateIfNewerRequest)
+}
+
+func TestGetNamespaceStateIfNewerResponseFuzz(t *testing.T) {
+	testutils.RunMapperFuzzTest(t, FromShardDistributorGetNamespaceStateIfNewerResponse, ToShardDistributorGetNamespaceStateIfNewerResponse,
 		testutils.WithCustomFuncs(WatchNamespaceStateResponseFuzzer),
 	)
 }

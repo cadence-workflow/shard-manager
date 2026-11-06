@@ -31,6 +31,8 @@ import (
 	"strings"
 	"sync"
 
+	"go.uber.org/yarpc/yarpcerrors"
+
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
@@ -336,6 +338,11 @@ func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequ
 			}
 		}
 	}
+}
+
+// GetNamespaceStateIfNewer is not implemented.
+func (h *handlerImpl) GetNamespaceStateIfNewer(context.Context, *types.GetNamespaceStateIfNewerRequest) (*types.GetNamespaceStateIfNewerResponse, error) {
+	return nil, yarpcerrors.UnimplementedErrorf("GetNamespaceStateIfNewer is not implemented")
 }
 
 // DrainShards marks the requested shards as drained for the namespace.

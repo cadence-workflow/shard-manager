@@ -716,7 +716,8 @@ type WatchNamespaceStateResponse struct {
 	Executors []*ExecutorShardAssignment
 	// DrainedShardKeys are the shards drained for this namespace
 	DrainedShardKeys []string
-	// AssignmentRevision is the store revision of the latest change to assignments or drained shards
+	// AssignmentRevision is the store revision of the latest change to assignments, drained shards or
+	// executor metadata, including a namespace reset
 	AssignmentRevision int64
 }
 

@@ -217,8 +217,9 @@ message WatchNamespaceStateResponse {
   repeated ExecutorInfo executors = 1;
   // Shards drained for this namespace
   repeated string drained_shard_keys = 2;
-  // Store revision of the latest change to assignments or drained shards. Hosts holding
-  // the same state report the same value, so it is comparable across hosts.
+  // Store revision of the latest change to assignments, drained shards or executor metadata,
+  // including a namespace reset. Hosts holding the same state report the same value, so it is
+  // comparable across hosts.
   int64 assignment_revision = 3;
 }
 

@@ -1255,8 +1255,9 @@ type WatchNamespaceStateResponse struct {
 	Executors []*ExecutorInfo `protobuf:"bytes,1,rep,name=executors,proto3" json:"executors,omitempty"`
 	// Shards drained for this namespace
 	DrainedShardKeys []string `protobuf:"bytes,2,rep,name=drained_shard_keys,json=drainedShardKeys,proto3" json:"drained_shard_keys,omitempty"`
-	// Store revision of the latest change to assignments or drained shards. Hosts holding
-	// the same state report the same value, so it is comparable across hosts.
+	// Store revision of the latest change to assignments, drained shards or executor metadata,
+	// including a namespace reset. Hosts holding the same state report the same value, so it is
+	// comparable across hosts.
 	AssignmentRevision   int64    `protobuf:"varint,3,opt,name=assignment_revision,json=assignmentRevision,proto3" json:"assignment_revision,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`

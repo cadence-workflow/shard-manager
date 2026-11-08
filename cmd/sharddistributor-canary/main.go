@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/urfave/cli/v3"
 	"net"
 	"os"
 	"time"
 
 	"github.com/uber-go/tally"
-	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/api/peer"
@@ -40,7 +40,7 @@ const (
 	defaultLoadBaselineExecutors  = 1
 	defaultLoadNumExecutors       = 50
 	defaultLoadExecutorsPerSecond = 1
-	defaultLoadHold               = 5 * time.Minute
+	defaultLoadHold               = 30 * time.Minute
 	defaultLoadConvergenceTimeout = time.Minute
 
 	shardDistributorServiceName = "shard-distributor"

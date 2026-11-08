@@ -21,6 +21,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/config"
 	canarymetrics "github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/metrics"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
@@ -28,15 +29,25 @@ const testNamespace = "test-load"
 
 func testLoadConfig() config.LoadConfig {
 	return config.LoadConfig{
-		Namespace:       testNamespace,
-		Interval:        time.Hour,
-		NumShards:       3,
-		ShardsPerSecond: 100,
-		NumExecutors:    2,
-		Hold:            10 * time.Second,
-		// One failure out of three shards is tolerated, two are not.
-		MaxFailureRatio: 0.4,
+		Namespace:          testNamespace,
+		NumShards:          100,
+		Interval:           time.Hour,
+		BaselineExecutors:  1,
+		NumExecutors:       2,
+		ExecutorsPerSecond: 10,
+		Hold:               10 * time.Second,
+		ConvergenceTimeout: 10 * time.Second,
 	}
+}
+
+func newTestController(t *testing.T, timeSource clock.TimeSource, scope tally.Scope) *Controller {
+	c, err := NewController(Params{
+		Logger:       zaptest.NewLogger(t),
+		TimeSource:   timeSource,
+		MetricsScope: scope,
+	}, testLoadConfig())
+	require.NoError(t, err)
+	return c
 }
 
 func TestNewController(t *testing.T) {
@@ -46,10 +57,13 @@ func TestNewController(t *testing.T) {
 		wantErr string
 	}{
 		{name: "valid", modify: func(*config.LoadConfig) {}},
-		{name: "zero rate", modify: func(c *config.LoadConfig) { c.ShardsPerSecond = 0 }, wantErr: "shards per second must be in (0, 1000]"},
-		{name: "rate above max", modify: func(c *config.LoadConfig) { c.ShardsPerSecond = maxShardsPerSecond + 1 }, wantErr: "shards per second must be in (0, 1000]"},
+		{name: "no shards", modify: func(c *config.LoadConfig) { c.NumShards = 0 }, wantErr: "number of shards must be positive"},
+		{name: "no baseline executors", modify: func(c *config.LoadConfig) { c.BaselineExecutors = 0 }, wantErr: "number of baseline executors must be positive"},
 		{name: "no executors", modify: func(c *config.LoadConfig) { c.NumExecutors = 0 }, wantErr: "number of executors must be positive"},
-		{name: "failure ratio above one", modify: func(c *config.LoadConfig) { c.MaxFailureRatio = 1.5 }, wantErr: "max failure ratio must be in [0, 1]"},
+		{name: "zero rate", modify: func(c *config.LoadConfig) { c.ExecutorsPerSecond = 0 }, wantErr: "executors per second must be in (0, 100]"},
+		{name: "rate above max", modify: func(c *config.LoadConfig) { c.ExecutorsPerSecond = maxExecutorsPerSecond + 1 }, wantErr: "executors per second must be in (0, 100]"},
+		{name: "negative hold", modify: func(c *config.LoadConfig) { c.Hold = -time.Second }, wantErr: "hold must not be negative"},
+		{name: "zero convergence timeout", modify: func(c *config.LoadConfig) { c.ConvergenceTimeout = 0 }, wantErr: "convergence timeout must be positive"},
 	}
 
 	for _, tt := range tests {
@@ -94,6 +108,7 @@ func TestModule(t *testing.T) {
 					fx.Annotate(executorclient.NewMockClient(ctrl), fx.As(new(executorclient.Client))),
 					fx.Annotate(clock.NewMockedTimeSource(), fx.As(new(clock.TimeSource))),
 					fx.Annotate(tally.NoopScope, fx.As(new(tally.Scope))),
+					clientcommon.Config{},
 					zaptest.NewLogger(t),
 				),
 				Module(cfg),
@@ -103,127 +118,139 @@ func TestModule(t *testing.T) {
 				}) {
 					controller = p.Controller
 				}),
-			).RequireStart().RequireStop()
+			)
 
 			assert.Equal(t, tt.wantController, controller != nil)
 		})
 	}
 }
 
-func TestRunOnce(t *testing.T) {
-	noActiveExecutors := &types.InternalServiceError{Message: "no active executors available"}
-	unavailable := errors.New("unavailable")
-	owner := &types.GetShardOwnerResponse{}
-
+func TestStartStop(t *testing.T) {
 	tests := []struct {
-		name string
-		// setup sets expectations on the client; cancel stops the run as if the canary shut down.
-		// The first successful GetShardOwner call is the registration probe, the rest create shards.
-		setup             func(client *sharddistributor.MockClient, cancel context.CancelFunc)
-		failExecutorAt    int
-		expectedExecutors int
-		expectedCounters  map[string]int64
+		name    string
+		failAt  int
+		wantErr string
+	}{
+		{name: "baseline executors run until stop"},
+		{name: "baseline executor creation failure", failAt: 2, wantErr: "create baseline load executor"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			c := newTestController(t, clock.NewMockedTimeSource(), tally.NoopScope)
+			c.cfg.BaselineExecutors = 2
+
+			created := 0
+			c.newExecutor = func() (executorclient.Executor[*shardProcessor], error) {
+				created++
+				if created == tt.failAt {
+					return nil, errors.New("create failed")
+				}
+				executor := executorclient.NewMockExecutor[*shardProcessor](ctrl)
+				if tt.wantErr == "" {
+					executor.EXPECT().Start(gomock.Any())
+					executor.EXPECT().Stop()
+				}
+				return executor, nil
+			}
+
+			err := c.Start()
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			c.Stop()
+		})
+	}
+}
+
+func TestShardHolders(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	newExecutor := func(id string, shards ...string) executorclient.Executor[*shardProcessor] {
+		reports := make(map[string]*types.ShardStatusReport, len(shards))
+		for _, shard := range shards {
+			reports[shard] = &types.ShardStatusReport{Status: types.ShardStatusREADY}
+		}
+		executor := executorclient.NewMockExecutor[*shardProcessor](ctrl)
+		executor.EXPECT().GetExecutorID().Return(id)
+		executor.EXPECT().GetShardStatusReports().Return(reports)
+		return executor
+	}
+
+	c := newTestController(t, clock.NewMockedTimeSource(), tally.NoopScope)
+	c.baseline = []executorclient.Executor[*shardProcessor]{newExecutor("baseline", "0", "1")}
+	c.executors = []executorclient.Executor[*shardProcessor]{newExecutor("extra", "2"), newExecutor("idle")}
+
+	assert.ElementsMatch(t, []shardHolder{
+		{shardKey: "0", executorID: "baseline"},
+		{shardKey: "1", executorID: "baseline"},
+		{shardKey: "2", executorID: "extra"},
+	}, c.shardHolders())
+}
+
+func TestRunOnce(t *testing.T) {
+	tests := []struct {
+		name   string
+		failAt int
+		// cancelAt cancels the run when that extra executor starts, as if the canary shut down.
+		cancelAt int
+		// drained drains the switcher shard before the run; drainAt drains it when that extra executor starts.
+		drained          bool
+		drainAt          int
+		expectedCreated  int
+		expectedCounters map[string]int64
 	}{
 		{
-			name: "successful run",
-			setup: func(client *sharddistributor.MockClient, _ context.CancelFunc) {
-				client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(owner, nil).Times(4)
-			},
-			expectedExecutors: 2,
+			name:             "drained switcher shard skips the run",
+			drained:          true,
+			expectedCounters: map[string]int64{canarymetrics.CanaryLoadRunPaused: 1},
+		},
+		{
+			name:            "successful run",
+			expectedCreated: 2,
 			expectedCounters: map[string]int64{
 				canarymetrics.CanaryLoadRunStarted:   1,
 				canarymetrics.CanaryLoadRunCompleted: 1,
-				canarymetrics.CanaryLoadShardCreated: 3,
 			},
 		},
 		{
-			name: "shards are created once the executors register",
-			setup: func(client *sharddistributor.MockClient, _ context.CancelFunc) {
-				gomock.InOrder(
-					client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(nil, noActiveExecutors).Times(2),
-					client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(owner, nil).Times(4),
-				)
-			},
-			expectedExecutors: 2,
+			name:            "draining the switcher shard during scale-up winds the run down",
+			drainAt:         1,
+			expectedCreated: 1,
 			expectedCounters: map[string]int64{
 				canarymetrics.CanaryLoadRunStarted:   1,
+				canarymetrics.CanaryLoadRunPaused:    1,
 				canarymetrics.CanaryLoadRunCompleted: 1,
-				canarymetrics.CanaryLoadShardCreated: 3,
 			},
 		},
 		{
-			name: "executors that never register fail the run",
-			setup: func(client *sharddistributor.MockClient, _ context.CancelFunc) {
-				client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(nil, noActiveExecutors).MinTimes(1)
+			name:            "draining the switcher shard during the hold winds the run down",
+			drainAt:         2,
+			expectedCreated: 2,
+			expectedCounters: map[string]int64{
+				canarymetrics.CanaryLoadRunStarted:   1,
+				canarymetrics.CanaryLoadRunPaused:    1,
+				canarymetrics.CanaryLoadRunCompleted: 1,
 			},
-			expectedExecutors: 2,
+		},
+		{
+			name:            "executor creation failure stops the started executors",
+			failAt:          2,
+			expectedCreated: 1,
 			expectedCounters: map[string]int64{
 				canarymetrics.CanaryLoadRunStarted: 1,
 				canarymetrics.CanaryLoadRunFailed:  1,
 			},
 		},
 		{
-			name: "failures within the max failure ratio complete the run",
-			setup: func(client *sharddistributor.MockClient, _ context.CancelFunc) {
-				gomock.InOrder(
-					client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(owner, nil),
-					client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(nil, unavailable),
-					client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(owner, nil).Times(2),
-				)
-			},
-			expectedExecutors: 2,
-			expectedCounters: map[string]int64{
-				canarymetrics.CanaryLoadRunStarted:         1,
-				canarymetrics.CanaryLoadRunCompleted:       1,
-				canarymetrics.CanaryLoadShardCreated:       2,
-				canarymetrics.CanaryLoadShardCreateFailure: 1,
-			},
-		},
-		{
-			name: "failures above the max failure ratio fail the run",
-			setup: func(client *sharddistributor.MockClient, _ context.CancelFunc) {
-				gomock.InOrder(
-					client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(owner, nil),
-					client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(nil, unavailable).Times(2),
-					client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).Return(owner, nil),
-				)
-			},
-			expectedExecutors: 2,
-			expectedCounters: map[string]int64{
-				canarymetrics.CanaryLoadRunStarted:         1,
-				canarymetrics.CanaryLoadRunFailed:          1,
-				canarymetrics.CanaryLoadShardCreated:       1,
-				canarymetrics.CanaryLoadShardCreateFailure: 2,
-			},
-		},
-		{
-			name:              "executor creation failure stops the started executors",
-			setup:             func(*sharddistributor.MockClient, context.CancelFunc) {},
-			failExecutorAt:    2,
-			expectedExecutors: 1,
+			name:            "shutdown during the run still stops the executors",
+			cancelAt:        2,
+			expectedCreated: 2,
 			expectedCounters: map[string]int64{
 				canarymetrics.CanaryLoadRunStarted: 1,
 				canarymetrics.CanaryLoadRunFailed:  1,
-			},
-		},
-		{
-			name: "shutdown during the run still stops the executors",
-			setup: func(client *sharddistributor.MockClient, cancel context.CancelFunc) {
-				var calls atomic.Int32
-				client.EXPECT().GetShardOwner(gomock.Any(), gomock.Any()).DoAndReturn(
-					func(context.Context, *types.GetShardOwnerRequest, ...yarpc.CallOption) (*types.GetShardOwnerResponse, error) {
-						if calls.Add(1) == 4 {
-							cancel()
-						}
-						return owner, nil
-					},
-				).Times(4)
-			},
-			expectedExecutors: 2,
-			expectedCounters: map[string]int64{
-				canarymetrics.CanaryLoadRunStarted:   1,
-				canarymetrics.CanaryLoadRunFailed:    1,
-				canarymetrics.CanaryLoadShardCreated: 3,
 			},
 		},
 	}
@@ -231,43 +258,66 @@ func TestRunOnce(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			client := sharddistributor.NewMockClient(ctrl)
 			timeSource := clock.NewMockedTimeSource()
 			scope := tally.NewTestScope("", nil)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			tt.setup(client, cancel)
 
-			c, err := NewController(Params{
-				ShardDistributorClient: client,
-				Logger:                 zaptest.NewLogger(t),
-				TimeSource:             timeSource,
-				MetricsScope:           scope,
-			}, testLoadConfig())
-			require.NoError(t, err)
+			var drained atomic.Bool
+			drained.Store(tt.drained)
+			client := sharddistributor.NewMockClient(ctrl)
+			client.EXPECT().GetShardOwner(gomock.Any(), &types.GetShardOwnerRequest{Namespace: testNamespace, ShardKey: switcherShardID}).DoAndReturn(
+				func(context.Context, *types.GetShardOwnerRequest, ...yarpc.CallOption) (*types.GetShardOwnerResponse, error) {
+					if !drained.Load() {
+						return &types.GetShardOwnerResponse{}, nil
+					}
+					return nil, &types.ShardDrainedError{Namespace: testNamespace, ShardKey: switcherShardID}
+				},
+			).AnyTimes()
 
-			created := 0
-			c.newExecutor = func(executorclient.ShardProcessorFactory[*shardProcessor]) (executorclient.Executor[*shardProcessor], error) {
-				created++
-				if created == tt.failExecutorAt {
+			c := newTestController(t, timeSource, scope)
+			c.client = client
+			c.convergence.client = client
+			if tt.drainAt > 0 {
+				// A run that ignored the drain would hold far longer than the elapsed time asserted below
+				c.cfg.Hold = time.Hour
+			}
+
+			calls, created := 0, 0
+			c.newExecutor = func() (executorclient.Executor[*shardProcessor], error) {
+				calls++
+				if calls == tt.failAt {
 					return nil, errors.New("create failed")
 				}
+				created++
 				executor := executorclient.NewMockExecutor[*shardProcessor](ctrl)
-				executor.EXPECT().Start(gomock.Any())
+				executor.EXPECT().GetExecutorID().Return("executor").AnyTimes()
 				executor.EXPECT().GetShardStatusReports().Return(nil).AnyTimes()
+				start := executor.EXPECT().Start(gomock.Any())
+				switch calls {
+				case tt.cancelAt:
+					start.Do(func(context.Context) { cancel() })
+				case tt.drainAt:
+					start.Do(func(context.Context) { drained.Store(true) })
+				}
 				executor.EXPECT().Stop()
 				return executor, nil
 			}
 
+			start := timeSource.Now()
 			runUntilDone(timeSource, func() { c.runOnce(ctx) })
+			if tt.drainAt > 0 {
+				assert.Less(t, timeSource.Since(start), c.cfg.Hold, "the run must not wait out the hold once drained")
+			}
 
+			assert.Equal(t, tt.expectedCreated, created)
+			assert.Empty(t, c.executors)
 			counters := scope.Snapshot().Counters()
 			for _, name := range []string{
 				canarymetrics.CanaryLoadRunStarted,
+				canarymetrics.CanaryLoadRunPaused,
 				canarymetrics.CanaryLoadRunCompleted,
 				canarymetrics.CanaryLoadRunFailed,
-				canarymetrics.CanaryLoadShardCreated,
-				canarymetrics.CanaryLoadShardCreateFailure,
 			} {
 				var got int64
 				if counter, ok := counters[name+"+namespace="+testNamespace]; ok {
@@ -276,35 +326,13 @@ func TestRunOnce(t *testing.T) {
 				assert.Equal(t, tt.expectedCounters[name], got, name)
 			}
 
-			if tt.expectedExecutors > 0 {
+			if tt.expectedCreated > 0 {
 				gauge := scope.Snapshot().Gauges()[canarymetrics.CanaryLoadExecutorsActive+"+namespace="+testNamespace]
 				require.NotNil(t, gauge)
 				assert.Zero(t, gauge.Value(), "executors must be stopped after the run")
 			}
 		})
 	}
-}
-
-func TestStartStop(t *testing.T) {
-	c, err := NewController(Params{
-		Logger:       zaptest.NewLogger(t),
-		TimeSource:   clock.NewMockedTimeSource(),
-		MetricsScope: tally.NoopScope,
-	}, testLoadConfig())
-	require.NoError(t, err)
-
-	c.Start()
-	c.Stop()
-}
-
-func TestShardProcessorReportsDoneAfterRelease(t *testing.T) {
-	factory := &shardProcessorFactory{released: new(atomic.Bool)}
-	processor, err := factory.NewShardProcessor("shard")
-	require.NoError(t, err)
-
-	assert.Equal(t, types.ShardStatusREADY, processor.GetShardReport().Status)
-	factory.released.Store(true)
-	assert.Equal(t, types.ShardStatusDONE, processor.GetShardReport().Status)
 }
 
 // runUntilDone runs f and keeps advancing the mocked clock until f returns.

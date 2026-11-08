@@ -36,38 +36,43 @@ type NamespaceConfig struct {
 }
 
 // ClientConfig returns the executor and spectator client config for the canary namespaces.
-// The load namespace is not included: load executors are built per run with their own config.
 func (c CanaryConfig) ClientConfig() clientcommon.Config {
-	return clientcommon.Config{
-		Namespaces: []clientcommon.NamespaceConfig{
-			{Namespace: c.Fixed.Name, HeartBeatInterval: heartBeatInterval},
-			{Namespace: c.Ephemeral.Name, HeartBeatInterval: heartBeatInterval},
-		},
+	namespaces := []clientcommon.NamespaceConfig{
+		{Namespace: c.Fixed.Name, HeartBeatInterval: heartBeatInterval},
+		{Namespace: c.Ephemeral.Name, HeartBeatInterval: heartBeatInterval},
 	}
+	if c.Load.Namespace != "" {
+		namespaces = append(namespaces, clientcommon.NamespaceConfig{Namespace: c.Load.Namespace, HeartBeatInterval: heartBeatInterval})
+	}
+	return clientcommon.Config{Namespaces: namespaces}
 }
 
-// LoadConfig configures the periodic load run against a dedicated ephemeral namespace.
+// LoadConfig configures the periodic load run against a dedicated fixed namespace.
 type LoadConfig struct {
-	// Namespace is the namespace the load run targets. The shard distributor must
-	// have it configured as an ephemeral namespace. Empty disables the load run.
+	// Namespace is the namespace the load run targets
+	// Empty disables the load run.
 	Namespace string `yaml:"namespace"`
+
+	// NumShards is the number of shards for the namespace
+	NumShards int `yaml:"numShards"`
 
 	// Interval is the time between runs, before jitter
 	Interval time.Duration `yaml:"interval"`
 
-	// NumShards is the number of shard keys each run creates
-	NumShards int `yaml:"numShards"`
+	// BaselineExecutors is the number of executors each canary instance runs constantly
+	BaselineExecutors int `yaml:"baselineExecutors"`
 
-	// ShardsPerSecond is the rate at which a run creates shard keys
-	ShardsPerSecond int `yaml:"shardsPerSecond"`
-
-	// NumExecutors is the number of extra executors each run starts
+	// NumExecutors is the number of executors each canary instance adds on top
+	// of its baseline during a run
 	NumExecutors int `yaml:"numExecutors"`
 
-	// Hold is how long a run keeps its peak before releasing the shards
+	// ExecutorsPerSecond is the rate at which a run starts and stops the extra executors
+	ExecutorsPerSecond int `yaml:"executorsPerSecond"`
+
+	// Hold is how long a run keeps extra executors running before stopping them
 	Hold time.Duration `yaml:"hold"`
 
-	// MaxFailureRatio is the fraction of shard creations, in [0, 1], that may
-	// fail before the run is reported as failed
-	MaxFailureRatio float64 `yaml:"maxFailureRatio"`
+	// ConvergenceTimeout is how long a run waits, after scaling up and after
+	// scaling down, for GetShardOwner to agree with the local shard holders
+	ConvergenceTimeout time.Duration `yaml:"convergenceTimeout"`
 }

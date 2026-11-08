@@ -1,9 +1,17 @@
-// Package load runs a periodic load test against a dedicated canary namespace.
+// Package load runs a periodic load test against a dedicated fixed canary namespace.
 //
-// Each run starts extra executors, creates shards through GetShardOwner at a
-// fixed rate, holds the peak, and then releases the shards and stops the
-// executors. It surfaces how shard distributor refresh, store and etcd latency
-// behave as shard and executor count grow.
+// Baseline executors keep the namespace's shards owned. Each run starts extra
+// executors at a fixed rate, holds the peak, and then stops them at the same
+// rate. Every join and leave makes the shard distributor reassign the
+// namespace's shards, which surfaces how refresh, store and etcd latency
+// behave as executor count and churn grow.
+//
+// After scaling up and after scaling down, the run waits for the shard
+// distributor's cache to converge, see convergenceChecker.
+//
+// Draining switcherShardID pauses the load: no new run starts, and a run in
+// progress skips the rest of its scale-up and hold and scales down at the
+// usual rate.
 package load
 
 import (
@@ -11,10 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/uber-go/tally"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -30,13 +36,15 @@ import (
 )
 
 const (
-	intervalJitterCoeff = 0.1
-	maxInFlightCreates  = 64
-	maxShardsPerSecond  = 1000
-	heartbeatInterval   = time.Second
-	pollInterval        = time.Second
-	registerTimeout     = 30 * time.Second
-	releaseTimeout      = time.Minute
+	intervalJitterCoeff   = 0.1
+	maxExecutorsPerSecond = 100
+	pollInterval          = time.Second
+
+	phaseScaleUp   = "scale_up"
+	phaseScaleDown = "scale_down"
+
+	// switcherShardID is the load namespace shard that pauses the load while drained
+	switcherShardID = "0"
 )
 
 // Params are the dependencies of the load Controller.
@@ -45,19 +53,26 @@ type Params struct {
 
 	ShardDistributorClient sharddistributor.Client
 	ExecutorClient         executorclient.Client
+	Config                 clientcommon.Config
+	Metadata               executorclient.ExecutorMetadata `optional:"true"`
 	Logger                 *zap.Logger
 	TimeSource             clock.TimeSource
 	MetricsScope           tally.Scope
 }
 
-// Controller starts one load run per interval. Runs never overlap.
+// Controller keeps the baseline executors running and starts one load run per interval
 type Controller struct {
 	cfg         config.LoadConfig
 	client      sharddistributor.Client
-	newExecutor func(executorclient.ShardProcessorFactory[*shardProcessor]) (executorclient.Executor[*shardProcessor], error)
+	newExecutor func() (executorclient.Executor[*shardProcessor], error)
+	convergence *convergenceChecker
 	logger      *zap.Logger
 	timeSource  clock.TimeSource
 	scope       tally.Scope
+
+	mu        sync.RWMutex
+	baseline  []executorclient.Executor[*shardProcessor]
+	executors []executorclient.Executor[*shardProcessor]
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -69,54 +84,61 @@ func NewController(params Params, cfg config.LoadConfig) (*Controller, error) {
 		return nil, fmt.Errorf("invalid load config: %w", err)
 	}
 
-	// Load executors get their own config so the load namespace is not added
-	// to the spectators and executors built from the shared canary config.
-	executorConfig := clientcommon.Config{
-		Namespaces: []clientcommon.NamespaceConfig{{Namespace: cfg.Namespace, HeartBeatInterval: heartbeatInterval}},
-	}
-
-	return &Controller{
+	logger := params.Logger.With(zap.String("namespace", cfg.Namespace))
+	scope := params.MetricsScope.Tagged(map[string]string{"namespace": cfg.Namespace})
+	c := &Controller{
 		cfg:    cfg,
 		client: params.ShardDistributorClient,
-		newExecutor: func(factory executorclient.ShardProcessorFactory[*shardProcessor]) (executorclient.Executor[*shardProcessor], error) {
+		newExecutor: func() (executorclient.Executor[*shardProcessor], error) {
 			return executorclient.NewExecutorWithNamespace(executorclient.Params[*shardProcessor]{
 				ExecutorClient:        params.ExecutorClient,
 				MetricsScope:          params.MetricsScope,
 				Logger:                params.Logger,
-				ShardProcessorFactory: factory,
-				Config:                executorConfig,
+				ShardProcessorFactory: &shardProcessorFactory{},
+				Config:                params.Config,
 				TimeSource:            params.TimeSource,
-				Enabled:               func() bool { return true },
+				Metadata:              params.Metadata,
 			}, cfg.Namespace)
 		},
-		logger:     params.Logger.With(zap.String("namespace", cfg.Namespace)),
+		logger:     logger,
 		timeSource: params.TimeSource,
-		scope:      params.MetricsScope.Tagged(map[string]string{"namespace": cfg.Namespace}),
-	}, nil
+		scope:      scope,
+	}
+	c.convergence = &convergenceChecker{
+		client:     params.ShardDistributorClient,
+		namespace:  cfg.Namespace,
+		holders:    c.shardHolders,
+		timeout:    cfg.ConvergenceTimeout,
+		logger:     logger,
+		timeSource: params.TimeSource,
+		scope:      scope,
+	}
+	return c, nil
 }
 
 func validate(cfg config.LoadConfig) error {
 	switch {
 	case cfg.Namespace == "":
 		return errors.New("namespace must be set")
-	case cfg.Interval <= 0:
-		return errors.New("interval must be positive")
 	case cfg.NumShards <= 0:
 		return errors.New("number of shards must be positive")
-	case cfg.ShardsPerSecond <= 0 || cfg.ShardsPerSecond > maxShardsPerSecond:
-		return fmt.Errorf("shards per second must be in (0, %d]", maxShardsPerSecond)
+	case cfg.Interval <= 0:
+		return errors.New("interval must be positive")
+	case cfg.BaselineExecutors <= 0:
+		return errors.New("number of baseline executors must be positive")
 	case cfg.NumExecutors <= 0:
 		return errors.New("number of executors must be positive")
+	case cfg.ExecutorsPerSecond <= 0 || cfg.ExecutorsPerSecond > maxExecutorsPerSecond:
+		return fmt.Errorf("executors per second must be in (0, %d]", maxExecutorsPerSecond)
 	case cfg.Hold < 0:
 		return errors.New("hold must not be negative")
-	case cfg.MaxFailureRatio < 0 || cfg.MaxFailureRatio > 1:
-		return errors.New("max failure ratio must be in [0, 1]")
+	case cfg.ConvergenceTimeout <= 0:
+		return errors.New("convergence timeout must be positive")
 	}
 	return nil
 }
 
-// Module provides the load Controller and ties it to the fx lifecycle.
-// It provides nothing when cfg.Namespace is empty, which disables the load run.
+// Module provides the load Controller and starts it
 func Module(cfg config.LoadConfig) fx.Option {
 	if cfg.Namespace == "" {
 		return fx.Options()
@@ -132,21 +154,45 @@ func Module(cfg config.LoadConfig) fx.Option {
 	)
 }
 
-// Start begins the run loop in a background goroutine.
-func (c *Controller) Start() {
+// Start starts the baseline executors and the run loop
+func (c *Controller) Start() error {
+	baseline := make([]executorclient.Executor[*shardProcessor], 0, c.cfg.BaselineExecutors)
+	for range c.cfg.BaselineExecutors {
+		executor, err := c.newExecutor()
+		if err != nil {
+			return fmt.Errorf("create baseline load executor: %w", err)
+		}
+		baseline = append(baseline, executor)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
+	for _, executor := range baseline {
+		executor.Start(ctx)
+	}
+	c.mu.Lock()
+	c.baseline = baseline
+	c.mu.Unlock()
+
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
 		c.loop(ctx)
 	}()
+	return nil
 }
 
-// Stop cancels any in-progress run and waits for its cleanup to finish.
+// Stop cancels any in-progress run, waits for its cleanup and stops the
+// baseline executors
 func (c *Controller) Stop() {
 	c.cancel()
 	c.wg.Wait()
+
+	c.mu.Lock()
+	baseline := c.baseline
+	c.baseline = nil
+	c.mu.Unlock()
+	stopExecutors(baseline)
 }
 
 func (c *Controller) loop(ctx context.Context) {
@@ -161,6 +207,12 @@ func (c *Controller) loop(ctx context.Context) {
 }
 
 func (c *Controller) runOnce(ctx context.Context) {
+	if c.isPaused(ctx) {
+		c.scope.Counter(canarymetrics.CanaryLoadRunPaused).Inc(1)
+		c.logger.Info("load run skipped, the switcher shard is drained")
+		return
+	}
+
 	c.scope.Counter(canarymetrics.CanaryLoadRunStarted).Inc(1)
 	c.logger.Info("load run started")
 	start := c.timeSource.Now()
@@ -177,180 +229,152 @@ func (c *Controller) runOnce(ctx context.Context) {
 }
 
 func (c *Controller) run(ctx context.Context) error {
-	released := &atomic.Bool{}
-	executors, err := c.startExecutors(ctx, released)
-	// On shutdown waitForRelease returns early and the executors stop while still
-	// owning shards. The shard distributor reassigns those shards to the next
-	// run's executors, which release them when that run ends.
+	// On errors and shutdown, the remaining extra executors stop at once.
+	// The shard distributor reassigns their shards to the baseline executors
 	defer func() {
-		released.Store(true)
-		c.waitForRelease(ctx, executors)
-		c.stopExecutors(executors)
+		c.mu.Lock()
+		executors := c.executors
+		c.executors = nil
+		c.mu.Unlock()
+		stopExecutors(executors)
+		c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(0)
 	}()
+
+	ticker := c.timeSource.NewTicker(time.Second / time.Duration(c.cfg.ExecutorsPerSecond))
+	defer ticker.Stop()
+
+	started, err := c.scaleUp(ctx, ticker)
 	if err != nil {
 		return err
 	}
-
-	if err := c.waitForExecutors(ctx); err != nil {
-		return err
+	// A drained switcher shard cuts the scale-up short, the run then scales down straight away
+	if started == c.cfg.NumExecutors {
+		if err := c.convergence.await(ctx, phaseScaleUp); err != nil {
+			return err
+		}
+		if err := c.hold(ctx); err != nil {
+			return err
+		}
 	}
 
-	failures := c.createShards(ctx)
-	if err := ctx.Err(); err != nil {
-		return err
+	for range started {
+		if err := waitTick(ctx, ticker); err != nil {
+			return err
+		}
+		var stopped executorclient.Executor[*shardProcessor]
+		c.updateExecutors(func(executors []executorclient.Executor[*shardProcessor]) []executorclient.Executor[*shardProcessor] {
+			last := len(executors) - 1
+			stopped = executors[last]
+			return executors[:last]
+		})
+		stopped.Stop()
 	}
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-c.timeSource.After(c.cfg.Hold):
-	}
-
-	if float64(failures)/float64(c.cfg.NumShards) > c.cfg.MaxFailureRatio {
-		return fmt.Errorf("%d of %d shard creations failed, above the max failure ratio %v", failures, c.cfg.NumShards, c.cfg.MaxFailureRatio)
-	}
-	return nil
+	return c.convergence.await(ctx, phaseScaleDown)
 }
 
-func (c *Controller) startExecutors(ctx context.Context, released *atomic.Bool) ([]executorclient.Executor[*shardProcessor], error) {
-	factory := &shardProcessorFactory{released: released}
-	executors := make([]executorclient.Executor[*shardProcessor], 0, c.cfg.NumExecutors)
-	defer func() {
-		c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(float64(len(executors)))
-	}()
-
-	for range c.cfg.NumExecutors {
-		executor, err := c.newExecutor(factory)
+// scaleUp starts up to cfg.NumExecutors executors, one per tick, and stops
+// early once the switcher shard is drained
+// It returns how many it started
+func (c *Controller) scaleUp(ctx context.Context, ticker clock.Ticker) (int, error) {
+	for started := range c.cfg.NumExecutors {
+		if err := waitTick(ctx, ticker); err != nil {
+			return started, err
+		}
+		if c.windingDown(ctx) {
+			return started, nil
+		}
+		executor, err := c.newExecutor()
 		if err != nil {
-			return executors, fmt.Errorf("create load executor: %w", err)
+			return started, fmt.Errorf("create load executor: %w", err)
 		}
 		executor.Start(ctx)
-		executors = append(executors, executor)
+		c.updateExecutors(func(executors []executorclient.Executor[*shardProcessor]) []executorclient.Executor[*shardProcessor] {
+			return append(executors, executor)
+		})
 	}
-	return executors, nil
+	return c.cfg.NumExecutors, nil
 }
 
-// waitForExecutors waits until the shard distributor can assign a shard in the
-// load namespace. Executors become assignable only after their first heartbeat,
-// so shards created before then fail with no active executors.
-func (c *Controller) waitForExecutors(ctx context.Context) error {
-	timeout := c.timeSource.After(registerTimeout)
+// hold waits for cfg.Hold, returning early once the switcher shard is drained
+func (c *Controller) hold(ctx context.Context) error {
+	deadline := c.timeSource.After(c.cfg.Hold)
 	ticker := c.timeSource.NewTicker(pollInterval)
 	defer ticker.Stop()
-
-	probe := &types.GetShardOwnerRequest{Namespace: c.cfg.Namespace, ShardKey: uuid.New().String()}
 	for {
-		_, err := c.client.GetShardOwner(ctx, probe)
-		if err == nil {
-			return nil
-		}
-
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-timeout:
-			return fmt.Errorf("load executors did not register within %s: %w", registerTimeout, err)
+		case <-deadline:
+			return nil
 		case <-ticker.Chan():
-		}
-	}
-}
-
-// createShards creates NumShards shard keys at ShardsPerSecond and returns
-// how many creations failed.
-func (c *Controller) createShards(ctx context.Context) int64 {
-	ticker := c.timeSource.NewTicker(time.Second / time.Duration(c.cfg.ShardsPerSecond))
-	defer ticker.Stop()
-
-	var (
-		wg       sync.WaitGroup
-		failures atomic.Int64
-		inFlight = make(chan struct{}, maxInFlightCreates)
-	)
-
-	for range c.cfg.NumShards {
-		select {
-		case <-ctx.Done():
-			wg.Wait()
-			return failures.Load()
-		case <-ticker.Chan():
-		}
-
-		select {
-		case <-ctx.Done():
-			wg.Wait()
-			return failures.Load()
-		case inFlight <- struct{}{}:
-		}
-
-		wg.Go(func() {
-			defer func() { <-inFlight }()
-			if err := c.createShard(ctx); err != nil {
-				failures.Add(1)
+			if c.windingDown(ctx) {
+				return nil
 			}
-		})
-	}
-
-	wg.Wait()
-	return failures.Load()
-}
-
-func (c *Controller) createShard(ctx context.Context) error {
-	start := c.timeSource.Now()
-	_, err := c.client.GetShardOwner(ctx, &types.GetShardOwnerRequest{Namespace: c.cfg.Namespace, ShardKey: uuid.New().String()})
-	c.scope.Histogram(canarymetrics.CanaryLoadShardCreateLatency, canarymetrics.CanaryPingLatencyBuckets).
-		RecordDuration(c.timeSource.Since(start))
-
-	if err != nil {
-		c.scope.Counter(canarymetrics.CanaryLoadShardCreateFailure).Inc(1)
-		c.logger.Debug("failed to create load shard", zap.Error(err))
-		return err
-	}
-	c.scope.Counter(canarymetrics.CanaryLoadShardCreated).Inc(1)
-	return nil
-}
-
-// waitForRelease waits until the shard distributor has dropped the released
-// shards from every executor, the timeout passes, or ctx is done.
-func (c *Controller) waitForRelease(ctx context.Context, executors []executorclient.Executor[*shardProcessor]) {
-	timeout := c.timeSource.After(releaseTimeout)
-	ticker := c.timeSource.NewTicker(pollInterval)
-	defer ticker.Stop()
-
-	for ownsShards(executors) {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timeout:
-			c.logger.Warn("load shards were not released before the timeout, stopping executors anyway")
-			return
-		case <-ticker.Chan():
 		}
 	}
 }
 
-func ownsShards(executors []executorclient.Executor[*shardProcessor]) bool {
-	for _, executor := range executors {
-		if len(executor.GetShardStatusReports()) > 0 {
-			return true
-		}
+// windingDown reports whether the switcher shard is drained, recording that
+// the run is cutting its load short
+func (c *Controller) windingDown(ctx context.Context) bool {
+	if !c.isPaused(ctx) {
+		return false
 	}
-	return false
+	c.scope.Counter(canarymetrics.CanaryLoadRunPaused).Inc(1)
+	c.logger.Info("load run winding down, the switcher shard is drained")
+	return true
 }
 
-func (c *Controller) stopExecutors(executors []executorclient.Executor[*shardProcessor]) {
+func waitTick(ctx context.Context, ticker clock.Ticker) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-ticker.Chan():
+		return nil
+	}
+}
+
+func (c *Controller) shardHolders() []shardHolder {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var holders []shardHolder
+	for _, executors := range [][]executorclient.Executor[*shardProcessor]{c.baseline, c.executors} {
+		for _, executor := range executors {
+			executorID := executor.GetExecutorID()
+			for shardKey := range executor.GetShardStatusReports() {
+				holders = append(holders, shardHolder{shardKey: shardKey, executorID: executorID})
+			}
+		}
+	}
+	return holders
+}
+
+// isPaused reports whether switcherShardID is drained
+func (c *Controller) isPaused(ctx context.Context) bool {
+	_, err := c.client.GetShardOwner(ctx, &types.GetShardOwnerRequest{Namespace: c.cfg.Namespace, ShardKey: switcherShardID})
+	var drained *types.ShardDrainedError
+	return errors.As(err, &drained)
+}
+
+func (c *Controller) updateExecutors(update func([]executorclient.Executor[*shardProcessor]) []executorclient.Executor[*shardProcessor]) {
+	c.mu.Lock()
+	c.executors = update(c.executors)
+	active := len(c.executors)
+	c.mu.Unlock()
+	c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(float64(active))
+}
+
+func stopExecutors(executors []executorclient.Executor[*shardProcessor]) {
 	var wg sync.WaitGroup
 	for _, executor := range executors {
 		wg.Go(executor.Stop)
 	}
 	wg.Wait()
-	c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(0)
 }
 
-// shardProcessor is a load shard that does no work. It reports READY until
-// its run is released and DONE afterwards, so the shard distributor drops it.
-type shardProcessor struct {
-	released *atomic.Bool
-}
+// shardProcessor is a load shard that does no work and always reports READY.
+type shardProcessor struct{}
 
 var _ executorclient.ShardProcessor = (*shardProcessor)(nil)
 
@@ -359,20 +383,13 @@ func (p *shardProcessor) Start(context.Context) error { return nil }
 func (p *shardProcessor) Stop() {}
 
 func (p *shardProcessor) GetShardReport() executorclient.ShardReport {
-	status := types.ShardStatusREADY
-	if p.released.Load() {
-		status = types.ShardStatusDONE
-	}
-	return executorclient.ShardReport{ShardLoad: 1.0, Status: status}
+	return executorclient.ShardReport{ShardLoad: 1.0, Status: types.ShardStatusREADY}
 }
 
-// SetShardStatus is a no-op: load shards finish only when their run is released.
 func (p *shardProcessor) SetShardStatus(types.ShardStatus) {}
 
-type shardProcessorFactory struct {
-	released *atomic.Bool
-}
+type shardProcessorFactory struct{}
 
 func (f *shardProcessorFactory) NewShardProcessor(string) (*shardProcessor, error) {
-	return &shardProcessor{released: f.released}, nil
+	return &shardProcessor{}, nil
 }

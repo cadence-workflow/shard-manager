@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	"github.com/uber-go/tally"
 	"github.com/urfave/cli/v3"
@@ -33,13 +34,14 @@ const (
 	defaultCanaryGRPCPort           = 7953 // Port for canary to receive ping requests
 	defaultNumExecutors             = 1
 
-	defaultLoadNamespace       = ""
-	defaultLoadInterval        = time.Hour
-	defaultLoadNumShards       = 10000
-	defaultLoadShardsPerSecond = 200
-	defaultLoadNumExecutors    = 50
-	defaultLoadHold            = 5 * time.Minute
-	defaultLoadMaxFailureRatio = 0.01
+	defaultLoadNamespace          = ""
+	defaultLoadNumShards          = 10000
+	defaultLoadInterval           = time.Hour
+	defaultLoadBaselineExecutors  = 1
+	defaultLoadNumExecutors       = 50
+	defaultLoadExecutorsPerSecond = 1
+	defaultLoadHold               = 5 * time.Minute
+	defaultLoadConvergenceTimeout = time.Minute
 
 	shardDistributorServiceName = "shard-distributor"
 )
@@ -56,13 +58,14 @@ func runApp(c *cli.Command) {
 				NumExecutors: c.Int("num-ephemeral-executors"),
 			},
 			Load: canaryConfig.LoadConfig{
-				Namespace:       c.String("load-namespace"),
-				Interval:        c.Duration("load-interval"),
-				NumShards:       c.Int("load-num-shards"),
-				ShardsPerSecond: c.Int("load-shards-per-second"),
-				NumExecutors:    c.Int("load-num-executors"),
-				Hold:            c.Duration("load-hold"),
-				MaxFailureRatio: c.Float64("load-max-failure-ratio"),
+				Namespace:          c.String("load-namespace"),
+				NumShards:          c.Int("load-num-shards"),
+				Interval:           c.Duration("load-interval"),
+				BaselineExecutors:  c.Int("load-baseline-executors"),
+				NumExecutors:       c.Int("load-num-executors"),
+				ExecutorsPerSecond: c.Int("load-executors-per-second"),
+				Hold:               c.Duration("load-hold"),
+				ConvergenceTimeout: c.Duration("load-convergence-timeout"),
 			},
 		},
 	}
@@ -207,7 +210,12 @@ func buildCLI() *cli.Command {
 				&cli.StringFlag{
 					Name:  "load-namespace",
 					Value: defaultLoadNamespace,
-					Usage: "ephemeral namespace for the periodic load run. The shard distributor must have this namespace configured. Empty (default) disables the load run",
+					Usage: "fixed namespace for the periodic load run. Draining shard 0 of the namespace pauses it",
+				},
+				&cli.IntFlag{
+					Name:  "load-num-shards",
+					Value: defaultLoadNumShards,
+					Usage: "number of shards of the load namespace",
 				},
 				&cli.DurationFlag{
 					Name:  "load-interval",
@@ -215,29 +223,29 @@ func buildCLI() *cli.Command {
 					Usage: "time between load runs, before jitter",
 				},
 				&cli.IntFlag{
-					Name:  "load-num-shards",
-					Value: defaultLoadNumShards,
-					Usage: "number of shards each load run creates",
-				},
-				&cli.IntFlag{
-					Name:  "load-shards-per-second",
-					Value: defaultLoadShardsPerSecond,
-					Usage: "rate at which a load run creates shards",
+					Name:  "load-baseline-executors",
+					Value: defaultLoadBaselineExecutors,
+					Usage: "number of executors each canary instance always runs in the load namespace",
 				},
 				&cli.IntFlag{
 					Name:  "load-num-executors",
 					Value: defaultLoadNumExecutors,
 					Usage: "number of extra executors each load run starts",
 				},
+				&cli.IntFlag{
+					Name:  "load-executors-per-second",
+					Value: defaultLoadExecutorsPerSecond,
+					Usage: "rate at which a load run starts and stops its extra executors",
+				},
 				&cli.DurationFlag{
 					Name:  "load-hold",
 					Value: defaultLoadHold,
-					Usage: "how long a load run holds its peak before releasing the shards",
+					Usage: "how long a load run keeps extra executors running before stopping them",
 				},
-				&cli.Float64Flag{
-					Name:  "load-max-failure-ratio",
-					Value: defaultLoadMaxFailureRatio,
-					Usage: "fraction of shard creations, in [0, 1], that may fail before a load run is reported as failed",
+				&cli.DurationFlag{
+					Name:  "load-convergence-timeout",
+					Value: defaultLoadConvergenceTimeout,
+					Usage: "how long a load run waits, after scaling up and after scaling down, for GetShardOwner to agree with the local shard holders",
 				},
 			},
 			Action: func(_ context.Context, c *cli.Command) error {

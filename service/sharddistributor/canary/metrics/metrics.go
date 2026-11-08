@@ -32,14 +32,18 @@ const (
 	CanaryShardStopLatency = "canary_shard_stop_latency"
 
 	// Load run metrics, tagged by namespace.
-	CanaryLoadRunStarted         = "canary_load_run_started"
-	CanaryLoadRunCompleted       = "canary_load_run_completed"
-	CanaryLoadRunFailed          = "canary_load_run_failed"
-	CanaryLoadRunDuration        = "canary_load_run_duration"
-	CanaryLoadShardCreated       = "canary_load_shard_created"
-	CanaryLoadShardCreateFailure = "canary_load_shard_create_failure"
-	CanaryLoadShardCreateLatency = "canary_load_shard_create_latency"
-	CanaryLoadExecutorsActive    = "canary_load_executors_active"
+	CanaryLoadRunStarted      = "canary_load_run_started"
+	CanaryLoadRunPaused       = "canary_load_run_paused"
+	CanaryLoadRunCompleted    = "canary_load_run_completed"
+	CanaryLoadRunFailed       = "canary_load_run_failed"
+	CanaryLoadRunDuration     = "canary_load_run_duration"
+	CanaryLoadExecutorsActive = "canary_load_executors_active"
+	// CanaryLoadConvergenceLatency is how long GetShardOwner took to agree
+	// with the local shard holders after a scale phase, tagged by phase.
+	CanaryLoadConvergenceLatency = "canary_load_convergence_latency"
+	// CanaryLoadConvergenceTimeout counts scale phases after which
+	// GetShardOwner still disagreed with the local shard holders.
+	CanaryLoadConvergenceTimeout = "canary_load_convergence_timeout"
 )
 
 var (

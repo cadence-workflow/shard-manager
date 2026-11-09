@@ -72,18 +72,18 @@ func (mr *MockShardCacheMockRecorder) GetShardAssignments() *gomock.Call {
 }
 
 // GetShardAssignmentsIfNewer mocks base method.
-func (m *MockShardCache) GetShardAssignmentsIfNewer(known int64) (store.AssignmentSnapshot, bool) {
+func (m *MockShardCache) GetShardAssignmentsIfNewer(knownRevision int64) (store.AssignmentSnapshot, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetShardAssignmentsIfNewer", known)
+	ret := m.ctrl.Call(m, "GetShardAssignmentsIfNewer", knownRevision)
 	ret0, _ := ret[0].(store.AssignmentSnapshot)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
 // GetShardAssignmentsIfNewer indicates an expected call of GetShardAssignmentsIfNewer.
-func (mr *MockShardCacheMockRecorder) GetShardAssignmentsIfNewer(known any) *gomock.Call {
+func (mr *MockShardCacheMockRecorder) GetShardAssignmentsIfNewer(knownRevision any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardAssignmentsIfNewer", reflect.TypeOf((*MockShardCache)(nil).GetShardAssignmentsIfNewer), known)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardAssignmentsIfNewer", reflect.TypeOf((*MockShardCache)(nil).GetShardAssignmentsIfNewer), knownRevision)
 }
 
 // GetShardOwner mocks base method.

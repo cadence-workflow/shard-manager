@@ -256,10 +256,10 @@ func (c *shardCache) GetShardAssignments() store.AssignmentSnapshot {
 	return c.snapshotLocked()
 }
 
-func (c *shardCache) GetShardAssignmentsIfNewer(known int64) (store.AssignmentSnapshot, bool) {
+func (c *shardCache) GetShardAssignmentsIfNewer(knownRevision int64) (store.AssignmentSnapshot, bool) {
 	c.RLock()
 	defer c.RUnlock()
-	if c.assignmentRev <= known {
+	if c.assignmentRev <= knownRevision {
 		return store.AssignmentSnapshot{AssignmentRevision: c.assignmentRev}, false
 	}
 	return c.snapshotLocked(), true

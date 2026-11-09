@@ -73,11 +73,12 @@ func TestShardCache_SignalAppliesStateAndNotifies(t *testing.T) {
 	verifyExecutorInState(t, snapshot.ExecutorToShards, "executor-1", []string{"shard-1"}, executor1.metadata)
 	verifyExecutorInState(t, snapshot.ExecutorToShards, "executor-2", []string{"shard-2"}, executor2.metadata)
 	verifyShardOwner(t, tc.c, "shard-2", "executor-2", executor2.metadata)
-	assert.Equal(t, int64(20), snapshot.AssignmentRevision)
-	upToDate, newer := tc.c.GetShardAssignmentsIfNewer(20)
+	appliedRevision := int64(20) // namespaceState sets AssignmentRevision to revision * 10
+	assert.Equal(t, appliedRevision, snapshot.AssignmentRevision)
+	upToDate, newer := tc.c.GetShardAssignmentsIfNewer(appliedRevision)
 	assert.False(t, newer)
-	assert.Equal(t, store.AssignmentSnapshot{AssignmentRevision: 20}, upToDate)
-	behind, newer := tc.c.GetShardAssignmentsIfNewer(19)
+	assert.Equal(t, store.AssignmentSnapshot{AssignmentRevision: appliedRevision}, upToDate)
+	behind, newer := tc.c.GetShardAssignmentsIfNewer(appliedRevision - 1)
 	assert.True(t, newer)
 	assert.Equal(t, snapshot, behind)
 

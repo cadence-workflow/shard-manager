@@ -28,11 +28,13 @@ const (
 )
 
 // streamWatcher keeps a watch stream open and applies what it delivers to the registry. It reconnects
-// when the stream fails or reaches its timeout.
+// when the stream fails, reaches its timeout, or the poller finds it behind.
 type streamWatcher struct {
-	namespace  string
-	client     sharddistributor.Client
-	registry   *registry
+	namespace string
+	client    sharddistributor.Client
+	registry  *registry
+	// reconnect is where the poller asks for a new stream
+	reconnect  <-chan struct{}
 	enabled    EnabledFunc
 	scope      tally.Scope
 	logger     *zap.Logger
@@ -94,44 +96,82 @@ func (w *streamWatcher) connectState(ctx context.Context) stateFn {
 	}
 
 	w.stream = stream
+	w.registry.resetStreamed()
+	// Drain the reconnect channel to make sure old requests are dropped.
+	select {
+	case <-w.reconnect:
+	default:
+	}
 
 	return w.enabledState
 }
 
 func (w *streamWatcher) enabledState(ctx context.Context) stateFn {
 	defer w.logger.Info("Exiting enabled state", zap.String(tag.Namespace, w.namespace))
-	defer w.stream.Close()
 
 	w.logger.Info("Starting enabled state for namespace", zap.String(tag.Namespace, w.namespace))
+
+	// Recv blocks, so a reader forwards the stream and this loop can also wait for the poller.
+	received := make(chan *types.WatchNamespaceStateResponse)
+	stream := w.stream
+	var recvErr error
+	var reader sync.WaitGroup
+	reader.Go(func() {
+		// Closed after recvErr is written, so the loop can read it once received is closed.
+		defer close(received)
+		recvErr = forward(stream, received)
+	})
+	// Closing the stream ends the reader, so the wait is deferred first.
+	defer reader.Wait()
+	defer w.stream.Close()
 
 	for {
 		if !w.enabled() {
 			return w.disabledState
 		}
 
-		response, err := w.stream.Recv()
-		if err != nil {
-			if ctx.Err() != nil {
-				w.logger.Info("Recv interrupted by client shutdown", zap.String(tag.Namespace, w.namespace))
-				return nil
+		select {
+		case response, ok := <-received:
+			if !ok {
+				if ctx.Err() != nil {
+					w.logger.Info("Recv interrupted by client shutdown", zap.String(tag.Namespace, w.namespace))
+					return nil
+				}
+
+				if w.stream.ctx.Err() != nil {
+					w.streamReconnectCounter(metricsconstants.StreamReconnectReasonTimeout).Inc(1)
+				} else {
+					w.streamReconnectCounter(metricsconstants.StreamReconnectReasonError).Inc(1)
+					w.logger.Warn("Stream recv error, will reconnect", zap.Error(recvErr), zap.String(tag.Namespace, w.namespace))
+				}
+
+				if err := w.timeSource.SleepWithContext(ctx, backoff.JitDuration(streamRetryInterval, streamRetryJitterCoeff)); err != nil {
+					return nil
+				}
+				return w.connectState
 			}
 
-			if w.stream.ctx.Err() != nil {
-				w.streamReconnectCounter(metricsconstants.StreamReconnectReasonTimeout).Inc(1)
-			} else {
-				w.streamReconnectCounter(metricsconstants.StreamReconnectReasonError).Inc(1)
-				w.logger.Warn("Stream recv error, will reconnect", zap.Error(err), zap.String(tag.Namespace, w.namespace))
-			}
+			w.handleResponse(response)
 
-			if err := w.timeSource.SleepWithContext(ctx, backoff.JitDuration(streamRetryInterval, streamRetryJitterCoeff)); err != nil {
-				return nil
-			}
+		case <-w.reconnect:
+			w.streamReconnectCounter(metricsconstants.StreamReconnectReasonLag).Inc(1)
 			return w.connectState
-
 		}
+	}
+}
 
-		// Process the response
-		w.handleResponse(response)
+// forward sends each response on received until the stream ends and returns the error that ended it.
+func forward(stream *spectatorStream, received chan<- *types.WatchNamespaceStateResponse) error {
+	for {
+		response, err := stream.Recv()
+		if err != nil {
+			return err
+		}
+		select {
+		case received <- response:
+		case <-stream.ctx.Done():
+			return stream.ctx.Err()
+		}
 	}
 }
 
@@ -154,7 +194,12 @@ func (w *streamWatcher) disabledState(ctx context.Context) stateFn {
 }
 
 func (w *streamWatcher) handleResponse(response *types.WatchNamespaceStateResponse) {
-	w.registry.apply(response)
+	if !w.registry.applyStreamed(response) {
+		w.logger.Info("Discarding namespace state older than the applied state",
+			zap.String(tag.Namespace, w.namespace),
+			zap.Int64("assignmentRevision", response.AssignmentRevision))
+		return
+	}
 
 	w.logger.Debug("Received namespace state update",
 		zap.String(tag.Namespace, w.namespace),

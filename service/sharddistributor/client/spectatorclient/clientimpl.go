@@ -17,22 +17,25 @@ type ShardOwner struct {
 	Metadata   map[string]string
 }
 
-// spectatorImpl answers shard owner lookups from the registry. The stream watcher keeps the registry
-// current.
+// spectatorImpl answers shard owner lookups from the registry. The stream watcher and the poller keep
+// the registry current.
 type spectatorImpl struct {
 	namespace string
 	client    sharddistributor.Client
 	logger    *zap.Logger
 	registry  *registry
 	watcher   *streamWatcher
+	poller    *poller
 }
 
 func (s *spectatorImpl) Start(ctx context.Context) error {
 	s.watcher.Start(ctx)
+	s.poller.Start(ctx)
 	return nil
 }
 
 func (s *spectatorImpl) Stop() {
+	s.poller.Stop()
 	s.watcher.Stop()
 	s.registry.close()
 }

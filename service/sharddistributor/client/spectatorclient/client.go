@@ -110,6 +110,8 @@ func newSpectatorWithConfig(params Params, namespaceConfig *clientcommon.Namespa
 	}
 
 	registry := newRegistry()
+	// Buffered, so the poller never blocks and a request already pending covers a new one.
+	reconnect := make(chan struct{}, 1)
 
 	impl := &spectatorImpl{
 		namespace: namespaceConfig.Namespace,
@@ -120,10 +122,20 @@ func newSpectatorWithConfig(params Params, namespaceConfig *clientcommon.Namespa
 			namespace:  namespaceConfig.Namespace,
 			client:     params.Client,
 			registry:   registry,
+			reconnect:  reconnect,
 			enabled:    enabled,
 			scope:      params.MetricsScope,
 			logger:     params.Logger,
 			timeSource: params.TimeSource,
+		},
+		poller: &poller{
+			namespace:  namespaceConfig.Namespace,
+			client:     params.Client,
+			registry:   registry,
+			timeSource: params.TimeSource,
+			logger:     params.Logger,
+			enabled:    enabled,
+			reconnect:  reconnect,
 		},
 	}
 

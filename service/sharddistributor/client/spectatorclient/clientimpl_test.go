@@ -266,11 +266,11 @@ func TestWatchLoopDisabled(t *testing.T) {
 	err := spectator.Start(context.Background())
 	assert.NoError(t, err)
 
-	// Disabled state enters a sleep loop, verify it sleeps periodically
-	timeSource.BlockUntil(1)
+	// Disabled state enters a sleep loop, verify it sleeps periodically. The poller waits on its timer too.
+	timeSource.BlockUntil(2)
 	timeSource.Advance(1200 * time.Millisecond)
 
-	timeSource.BlockUntil(1)
+	timeSource.BlockUntil(2)
 	timeSource.Advance(1200 * time.Millisecond)
 
 	// Stop exits cleanly and calls Done() on the signal

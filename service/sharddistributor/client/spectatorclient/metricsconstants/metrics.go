@@ -31,7 +31,9 @@ const (
 	StreamReconnectReasonTagName = "reason"
 
 	// Tag values for StreamReconnectReasonTagName: timeout is the periodic forced reconnect,
-	// error is an unexpected stream failure (network, server issue, etc.).
+	// error is an unexpected stream failure (network, server issue, etc.), lag is a stream
+	// that stayed behind the shard distributor.
 	StreamReconnectReasonTimeout = "timeout"
 	StreamReconnectReasonError   = "error"
+	StreamReconnectReasonLag     = "lag"
 )

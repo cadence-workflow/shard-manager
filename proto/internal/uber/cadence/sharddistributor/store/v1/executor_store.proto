@@ -24,9 +24,10 @@ package uber.cadence.sharddistributor.store.v1;
 
 option go_package = "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/store/v1;storev1";
 
-// These messages are the values the shard distributor stores in etcd. They are kept
-// separate from the RPC messages so the stored format and the API can change
-// independently. Timestamps are milliseconds since the Unix epoch, and 0 means unset.
+// These messages are only stored in etcd as key values. They are never sent over RPC,
+// and they are kept separate from the API messages in sharddistributor/v1, so the
+// stored format and the API can change independently. Timestamps are milliseconds
+// since the Unix epoch, and 0 means unset.
 
 // ExecutorStatusValue is stored under executors/<executor ID>/status.
 message ExecutorStatusValue {

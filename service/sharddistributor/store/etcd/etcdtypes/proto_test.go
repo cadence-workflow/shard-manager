@@ -293,7 +293,8 @@ func TestProtoMappersReducePrecision(t *testing.T) {
 	timeWithMillis := time.Date(2026, 11, 8, 12, 0, 0, 123000000, time.UTC)
 
 	loadWithDoublePrecision := 412.738109123
-	loadWithFloatPrecision := float64(float32(loadWithDoublePrecision))
+	// The nearest float32 to loadWithDoublePrecision.
+	loadWithFloatPrecision := 412.73809814453125
 
 	t.Run("assigned state timestamps keep milliseconds", func(t *testing.T) {
 		value, err := AssignedStateToProto(&store.AssignedState{

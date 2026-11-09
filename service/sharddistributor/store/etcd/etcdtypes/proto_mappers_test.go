@@ -47,7 +47,7 @@ func TestProtoMappersCoverAllFields(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			require.Equal(t, tt.mappedFieldCount, tt.storedType.NumField(),
-				"%s changed; update the protobuf schema and mappers in proto.go, then this count", name)
+				"%s changed; update the protobuf schema and mappers in proto_mappers.go, then this count", name)
 		})
 	}
 }

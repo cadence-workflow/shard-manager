@@ -110,15 +110,25 @@ func newSpectatorWithConfig(params Params, namespaceConfig *clientcommon.Namespa
 		enabled = func() bool { return true }
 	}
 
+	registry := &registry{}
+	firstStateSignal := csync.NewResettableSignal()
+
 	impl := &spectatorImpl{
 		namespace:        namespaceConfig.Namespace,
-		config:           *namespaceConfig,
 		client:           params.Client,
 		logger:           params.Logger,
-		scope:            params.MetricsScope,
-		timeSource:       params.TimeSource,
-		firstStateSignal: csync.NewResettableSignal(),
-		enabled:          enabled,
+		registry:         registry,
+		firstStateSignal: firstStateSignal,
+		watcher: &streamWatcher{
+			namespace:        namespaceConfig.Namespace,
+			client:           params.Client,
+			registry:         registry,
+			firstStateSignal: firstStateSignal,
+			enabled:          enabled,
+			scope:            params.MetricsScope,
+			logger:           params.Logger,
+			timeSource:       params.TimeSource,
+		},
 	}
 
 	return impl, nil

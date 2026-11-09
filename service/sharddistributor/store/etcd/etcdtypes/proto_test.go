@@ -210,12 +210,14 @@ func TestReportedShardsProtoRoundTrip(t *testing.T) {
 }
 
 func TestAssignedStateProtoRoundTrip(t *testing.T) {
-	lastUpdated := time.Date(2026, 11, 8, 12, 0, 0, 123*int(time.Millisecond), time.UTC)
-	previousExecutorLastHeartbeat := time.Date(2026, 11, 8, 11, 59, 58, 456*int(time.Millisecond), time.UTC)
+	lastUpdated := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC).Add(123 * time.Millisecond)
+	previousExecutorLastHeartbeat := time.Date(2026, 11, 8, 11, 59, 58, 0, time.UTC).Add(456 * time.Millisecond)
 
 	tests := map[string]struct {
 		assignedState *store.AssignedState
 	}{
+		// The decoded protobuf message holds nil maps here, and AssignedStateFromProto
+		// must still return empty maps.
 		"empty": {
 			assignedState: &store.AssignedState{
 				AssignedShards:     map[string]*types.ShardAssignment{},
@@ -254,28 +256,22 @@ func TestAssignedStateProtoRoundTrip(t *testing.T) {
 	}
 }
 
-func TestAssignedStateFromProtoWithoutShardsReturnsEmptyMaps(t *testing.T) {
-	got, err := AssignedStateFromProto(&storev1.AssignedStateValue{})
-	require.NoError(t, err)
-
-	assert.NotNil(t, got.AssignedShards)
-	assert.NotNil(t, got.ShardHandoverStats)
-	assert.Empty(t, got.AssignedShards)
-	assert.Empty(t, got.ShardHandoverStats)
-}
-
 func TestShardStatisticsProtoRoundTrip(t *testing.T) {
-	lastUpdate := time.Date(2026, 11, 8, 12, 0, 0, 789*int(time.Millisecond), time.UTC)
+	// float32 represents these loads exactly, so they finish the round trip unchanged.
+	movedShardLoad := 412.5
+	neverMovedShardLoad := 3.25
+
+	lastUpdate := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC).Add(789 * time.Millisecond)
 	lastMove := time.Date(2026, 11, 7, 3, 15, 0, 0, time.UTC)
 
 	statistics := map[string]store.ShardStatistics{
 		"moved-shard": {
-			SmoothedLoad:   412.5,
+			SmoothedLoad:   movedShardLoad,
 			LastUpdateTime: lastUpdate,
 			LastMoveTime:   lastMove,
 		},
 		"never-moved-shard": {
-			SmoothedLoad:   3.25,
+			SmoothedLoad:   neverMovedShardLoad,
 			LastUpdateTime: lastUpdate,
 		},
 	}

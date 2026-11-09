@@ -12,7 +12,7 @@ import (
 // The mappers below convert between the store types and the protobuf values stored in
 // etcd. Enum values without a stored equivalent return an error in both directions, so
 // a value added on one side fails loudly instead of being stored or read as INVALID.
-// Timestamps are stored with millisecond precision, and the smoothed load as a float32.
+// Timestamps are stored with millisecond precision, and loads as float32.
 
 // ExecutorStatusToProto converts an executor status to its stored value.
 func ExecutorStatusToProto(status types.ExecutorStatus) (*storev1.ExecutorStatusValue, error) {
@@ -38,7 +38,7 @@ func ReportedShardsToProto(reportedShards map[string]*types.ShardStatusReport) (
 		}
 		shards[shardID] = &storev1.ReportedShard{
 			Status: status,
-			Load:   report.GetShardLoad(),
+			Load:   float32(report.GetShardLoad()),
 		}
 	}
 	return &storev1.ReportedShardsValue{Shards: shards}, nil
@@ -55,7 +55,7 @@ func ReportedShardsFromProto(value *storev1.ReportedShardsValue) (map[string]*ty
 		}
 		reportedShards[shardID] = &types.ShardStatusReport{
 			Status:    status,
-			ShardLoad: shard.GetLoad(),
+			ShardLoad: float64(shard.GetLoad()),
 		}
 	}
 	return reportedShards, nil

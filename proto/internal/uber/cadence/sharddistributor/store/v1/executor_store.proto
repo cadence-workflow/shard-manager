@@ -41,7 +41,7 @@ message ReportedShardsValue {
 
 message ReportedShard {
   ShardStatus status = 1;
-  double load = 2;
+  float load = 2;
 }
 
 // AssignedStateValue is stored under executors/<executor ID>/assigned_state.

@@ -193,8 +193,11 @@ func TestProtoMappersRejectUnknownEnums(t *testing.T) {
 }
 
 func TestReportedShardsProtoRoundTrip(t *testing.T) {
+	// float32 represents this load exactly, so it finishes the round trip unchanged.
+	readyShardLoad := 412.5
+
 	reportedShards := map[string]*types.ShardStatusReport{
-		"shard-1": {Status: types.ShardStatusREADY, ShardLoad: 412.738109},
+		"shard-1": {Status: types.ShardStatusREADY, ShardLoad: readyShardLoad},
 		"shard-2": {Status: types.ShardStatusDONE, ShardLoad: 0},
 	}
 
@@ -305,6 +308,17 @@ func TestProtoMappersReducePrecision(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, timeWithMillis, got.LastUpdated)
 		assert.Equal(t, timeWithMillis, got.ShardHandoverStats["shard-1"].PreviousExecutorLastHeartbeatTime)
+	})
+
+	t.Run("reported load keeps float precision", func(t *testing.T) {
+		value, err := ReportedShardsToProto(map[string]*types.ShardStatusReport{
+			"shard-1": {Status: types.ShardStatusREADY, ShardLoad: loadWithDoublePrecision},
+		})
+		require.NoError(t, err)
+
+		got, err := ReportedShardsFromProto(value)
+		require.NoError(t, err)
+		assert.Equal(t, loadWithFloatPrecision, got["shard-1"].ShardLoad)
 	})
 
 	t.Run("statistics keep milliseconds and float precision", func(t *testing.T) {

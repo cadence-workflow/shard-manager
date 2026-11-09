@@ -164,8 +164,9 @@ type ShardOwner struct {
 }
 
 type AssignmentSnapshot struct {
-	ExecutorToShards map[*ShardOwner][]string
-	DrainedShards    map[string]struct{}
+	ExecutorToShards   map[*ShardOwner][]string
+	DrainedShards      map[string]struct{}
+	AssignmentRevision int64
 }
 
 // CountExecutorsByStatus returns a map of executor status to the count of executors with that status

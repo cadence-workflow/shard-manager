@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package uber.cadence.sharddistributor.store.v1;
+
+option go_package = "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/store/v1;storev1";
+
+// These messages are only stored in etcd as key values. They are never sent over RPC,
+// and they are kept separate from the API messages in sharddistributor/v1, so the
+// stored format and the API can change independently. Timestamps are milliseconds
+// since the Unix epoch, and 0 means unset.
+
+// ExecutorStatusValue is stored under executors/<executor ID>/status.
+message ExecutorStatusValue {
+  ExecutorStatus status = 1;
+}
+
+// ReportedShardsValue is stored under executors/<executor ID>/reported_shards.
+message ReportedShardsValue {
+  // Key: shard ID
+  map<string, ReportedShard> shards = 1;
+}
+
+message ReportedShard {
+  ShardStatus status = 1;
+  float load = 2;
+}
+
+// AssignedStateValue is stored under executors/<executor ID>/assigned_state.
+message AssignedStateValue {
+  // Key: shard ID
+  map<string, AssignedShard> shards = 1;
+  // Key: shard ID
+  map<string, ShardHandover> handovers = 2;
+  int64 last_updated_unix_millis = 3;
+}
+
+message AssignedShard {
+  AssignmentStatus status = 1;
+}
+
+message ShardHandover {
+  int64 previous_executor_last_heartbeat_unix_millis = 1;
+  HandoverType type = 2;
+}
+
+// ShardStatisticsValue is stored under executors/<executor ID>/statistics.
+message ShardStatisticsValue {
+  // Key: shard ID
+  map<string, ShardStatistics> shards = 1;
+}
+
+message ShardStatistics {
+  float smoothed_load = 1;
+  int64 last_update_unix_millis = 2;
+  int64 last_move_unix_millis = 3;
+}
+
+enum ExecutorStatus {
+  EXECUTOR_STATUS_INVALID = 0;
+  EXECUTOR_STATUS_ACTIVE = 1;
+  EXECUTOR_STATUS_DRAINING = 2;
+  EXECUTOR_STATUS_DRAINED = 3;
+}
+
+enum ShardStatus {
+  SHARD_STATUS_INVALID = 0;
+  SHARD_STATUS_READY = 1;
+  SHARD_STATUS_DONE = 2;
+}
+
+enum AssignmentStatus {
+  ASSIGNMENT_STATUS_INVALID = 0;
+  ASSIGNMENT_STATUS_READY = 1;
+}
+
+enum HandoverType {
+  HANDOVER_TYPE_INVALID = 0;
+  HANDOVER_TYPE_GRACEFUL = 1;
+  HANDOVER_TYPE_EMERGENCY = 2;
+}

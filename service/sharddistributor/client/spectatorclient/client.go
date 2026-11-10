@@ -11,7 +11,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
-	csync "github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient/sync"
 )
 
 //go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination interface_mock.go . Spectator
@@ -110,15 +109,22 @@ func newSpectatorWithConfig(params Params, namespaceConfig *clientcommon.Namespa
 		enabled = func() bool { return true }
 	}
 
+	registry := newRegistry()
+
 	impl := &spectatorImpl{
-		namespace:        namespaceConfig.Namespace,
-		config:           *namespaceConfig,
-		client:           params.Client,
-		logger:           params.Logger,
-		scope:            params.MetricsScope,
-		timeSource:       params.TimeSource,
-		firstStateSignal: csync.NewResettableSignal(),
-		enabled:          enabled,
+		namespace: namespaceConfig.Namespace,
+		client:    params.Client,
+		logger:    params.Logger,
+		registry:  registry,
+		watcher: &streamWatcher{
+			namespace:  namespaceConfig.Namespace,
+			client:     params.Client,
+			registry:   registry,
+			enabled:    enabled,
+			scope:      params.MetricsScope,
+			logger:     params.Logger,
+			timeSource: params.TimeSource,
+		},
 	}
 
 	return impl, nil

@@ -82,6 +82,40 @@ func TestWatcherReconnectsAfterStreamError(t *testing.T) {
 	assert.Equal(t, int64(1), errorReconnects.Value())
 }
 
+func TestWatcherReconnectsWhenPollerAsks(t *testing.T) {
+	defer goleak.VerifyNone(t)
+	ctrl := gomock.NewController(t)
+	client := sharddistributor.NewMockClient(ctrl)
+	stream := sharddistributor.NewMockWatchNamespaceStateClient(ctrl)
+	reconnect := make(chan struct{}, 1)
+	w := newTestWatcher(client)
+	w.reconnect = reconnect
+
+	client.EXPECT().WatchNamespaceState(gomock.Any(), gomock.Any()).Return(stream, nil)
+	stream.EXPECT().Recv().Return(&types.WatchNamespaceStateResponse{AssignmentRevision: 10}, nil)
+	stream.EXPECT().Recv().DoAndReturn(func(...interface{}) (*types.WatchNamespaceStateResponse, error) {
+		<-w.stream.ctx.Done()
+		return nil, w.stream.ctx.Err()
+	})
+
+	w.registry.applyStreamed(&types.WatchNamespaceStateResponse{AssignmentRevision: 9}) // the previous stream
+	reconnect <- struct{}{}                                                             // The poller is asking for a new stream
+	enabledState := w.connectState(context.Background())                                // Connect the new stream
+	streamed, _ := w.registry.streamBehind(1)
+	assert.Equal(t, int64(-1), streamed, "the new stream has delivered nothing yet")
+	assert.Empty(t, reconnect, "a request meant for the previous stream is dropped")
+
+	next := make(chan stateFn)
+	go func() { next <- enabledState(context.Background()) }()
+	assert.Eventually(t, func() bool {
+		streamed, _ := w.registry.streamBehind(10)
+		return streamed == 10
+	}, time.Second, time.Millisecond, "the stream delivered 10")
+
+	reconnect <- struct{}{}
+	assert.NotNil(t, <-next, "reconnects")
+}
+
 func newTestWatcher(client sharddistributor.Client) *streamWatcher {
 	return &streamWatcher{
 		namespace:  "test-ns",

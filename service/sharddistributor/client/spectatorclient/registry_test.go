@@ -88,15 +88,16 @@ func TestRegistryRefusesOlderState(t *testing.T) {
 
 func TestRegistryStreamBehind(t *testing.T) {
 	tests := []struct {
-		name      string
-		delivered []int64
-		want      bool
+		name         string
+		delivered    []int64
+		wantStreamed int64
+		wantBehind   bool
 	}{
-		{name: "nothing delivered yet", want: true},
-		{name: "behind", delivered: []int64{3}, want: true},
-		{name: "caught up", delivered: []int64{5}},
-		{name: "refused state still counts as delivered", delivered: []int64{6, 4}, want: true},
-		{name: "older server sends no revision", delivered: []int64{0}},
+		{name: "nothing delivered yet", wantStreamed: -1, wantBehind: true},
+		{name: "behind", delivered: []int64{3}, wantStreamed: 3, wantBehind: true},
+		{name: "caught up", delivered: []int64{5}, wantStreamed: 5},
+		{name: "refused state still counts as delivered", delivered: []int64{6, 4}, wantStreamed: 4, wantBehind: true},
+		{name: "older server sends no revision", delivered: []int64{0}, wantStreamed: 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -105,7 +106,9 @@ func TestRegistryStreamBehind(t *testing.T) {
 			for _, revision := range tt.delivered {
 				r.applyStreamed(&types.WatchNamespaceStateResponse{AssignmentRevision: revision})
 			}
-			assert.Equal(t, tt.want, r.streamBehind(5))
+			streamed, behind := r.streamBehind(5)
+			assert.Equal(t, tt.wantStreamed, streamed)
+			assert.Equal(t, tt.wantBehind, behind)
 		})
 	}
 }

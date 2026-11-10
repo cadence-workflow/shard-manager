@@ -101,12 +101,16 @@ func TestWatcherReconnectsWhenPollerAsks(t *testing.T) {
 	w.registry.applyStreamed(&types.WatchNamespaceStateResponse{AssignmentRevision: 9}) // the previous stream
 	reconnect <- struct{}{}                                                             // The poller is asking for a new stream
 	enabledState := w.connectState(context.Background())                                // Connect the new stream
-	assert.True(t, w.registry.streamBehind(1), "the new stream has delivered nothing yet")
+	streamed, _ := w.registry.streamBehind(1)
+	assert.Equal(t, int64(-1), streamed, "the new stream has delivered nothing yet")
 	assert.Empty(t, reconnect, "a request meant for the previous stream is dropped")
 
 	next := make(chan stateFn)
 	go func() { next <- enabledState(context.Background()) }()
-	assert.Eventually(t, func() bool { return !w.registry.streamBehind(10) }, time.Second, time.Millisecond, "the stream delivered 10")
+	assert.Eventually(t, func() bool {
+		streamed, _ := w.registry.streamBehind(10)
+		return streamed == 10
+	}, time.Second, time.Millisecond, "the stream delivered 10")
 
 	reconnect <- struct{}{}
 	assert.NotNil(t, <-next, "reconnects")

@@ -122,11 +122,11 @@ func (r *registry) appliedRevision() int64 {
 	return r.applied
 }
 
-// streamBehind reports whether the current stream has not delivered the polled assignment revision.
-// State from an older server carries no revision and cannot be compared.
-func (r *registry) streamBehind(polled int64) bool {
+// streamBehind reports whether the current stream has not delivered the polled assignment revision,
+// and the revision it last delivered. State from an older server carries no revision and cannot be compared.
+func (r *registry) streamBehind(polled int64) (streamed int64, behind bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	return r.streamed != 0 && r.streamed < polled
+	return r.streamed, r.streamed != 0 && r.streamed < polled
 }

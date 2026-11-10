@@ -133,24 +133,8 @@ func (w *streamWatcher) enabledState(ctx context.Context) stateFn {
 		select {
 		case response, ok := <-received:
 			if !ok {
-				if ctx.Err() != nil {
-					w.logger.Info("Recv interrupted by client shutdown", zap.String(tag.Namespace, w.namespace))
-					return nil
-				}
-
-				if w.stream.ctx.Err() != nil {
-					w.streamReconnectCounter(metricsconstants.StreamReconnectReasonTimeout).Inc(1)
-				} else {
-					w.streamReconnectCounter(metricsconstants.StreamReconnectReasonError).Inc(1)
-					w.logger.Warn("Stream recv error, will reconnect", zap.Error(recvErr), zap.String(tag.Namespace, w.namespace))
-				}
-
-				if err := w.timeSource.SleepWithContext(ctx, backoff.JitDuration(streamRetryInterval, streamRetryJitterCoeff)); err != nil {
-					return nil
-				}
-				return w.connectState
+				return w.streamEnded(ctx, recvErr)
 			}
-
 			w.handleResponse(response)
 
 		case <-w.reconnect:
@@ -158,6 +142,26 @@ func (w *streamWatcher) enabledState(ctx context.Context) stateFn {
 			return w.connectState
 		}
 	}
+}
+
+// streamEnded picks the next state once the stream has stopped delivering.
+func (w *streamWatcher) streamEnded(ctx context.Context, recvErr error) stateFn {
+	if ctx.Err() != nil {
+		w.logger.Info("Recv interrupted by client shutdown", zap.String(tag.Namespace, w.namespace))
+		return nil
+	}
+
+	if w.stream.ctx.Err() != nil {
+		w.streamReconnectCounter(metricsconstants.StreamReconnectReasonTimeout).Inc(1)
+	} else {
+		w.streamReconnectCounter(metricsconstants.StreamReconnectReasonError).Inc(1)
+		w.logger.Warn("Stream recv error, will reconnect", zap.Error(recvErr), zap.String(tag.Namespace, w.namespace))
+	}
+
+	if err := w.timeSource.SleepWithContext(ctx, backoff.JitDuration(streamRetryInterval, streamRetryJitterCoeff)); err != nil {
+		return nil
+	}
+	return w.connectState
 }
 
 // forward sends each response on received until the stream ends and returns the error that ended it.

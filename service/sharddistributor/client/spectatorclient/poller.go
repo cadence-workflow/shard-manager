@@ -72,8 +72,9 @@ func (p *poller) run(ctx context.Context) {
 				continue
 			}
 			polled, ok := p.poll(ctx)
+			_, behind := p.registry.streamBehind(polled)
 			// If the stream is behind, and we are not already detecting it, set the lag deadline
-			if ok && lagDeadline == nil && p.registry.streamBehind(polled) {
+			if ok && lagDeadline == nil && behind {
 				lagging = polled
 				lagDeadline = p.timeSource.After(lagThreshold)
 			}
@@ -81,10 +82,12 @@ func (p *poller) run(ctx context.Context) {
 		case <-lagDeadline:
 			lagDeadline = nil
 			// If the stream is still behind, ask it to reconnect (this avoids reconnecting due to races between poller and stream)
-			if p.registry.streamBehind(lagging) {
+			// streamed is -1 when the stream has delivered nothing
+			if streamed, behind := p.registry.streamBehind(lagging); behind {
 				p.logger.Warn("Stream is behind the shard distributor, reconnecting",
 					zap.String(tag.Namespace, p.namespace),
-					zap.Int64("polledAssignmentRevision", lagging))
+					zap.Int64("polledAssignmentRevision", lagging),
+					zap.Int64("streamedAssignmentRevision", streamed))
 				// If a reconnect is already pending, this one will be ignored.
 				select {
 				case p.reconnect <- struct{}{}:

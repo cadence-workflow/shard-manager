@@ -16,7 +16,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient/metricsconstants"
 )
 
-// stateFn represents a state in the election state machine.
+// stateFn represents a state in the watch state machine.
 // Each state is a function that blocks until a transition occurs
 // and returns the next state function, or nil to stop.
 // Note this is a recursive type definition.
@@ -136,11 +136,6 @@ func (w *streamWatcher) enabledState(ctx context.Context) stateFn {
 }
 
 func (w *streamWatcher) disabledState(ctx context.Context) stateFn {
-	if ctx.Err() != nil {
-		// shutting down — Reset() would replace doneCh with a new channel
-		// nobody will close, causing Wait() callers to block forever
-		return nil
-	}
 	defer w.logger.Info("Exiting disabled state", zap.String(tag.Namespace, w.namespace))
 	w.logger.Info("Starting disabled state for namespace", zap.String(tag.Namespace, w.namespace))
 	// Reset so lookups wait for the first state again when we re-enable.

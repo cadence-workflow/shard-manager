@@ -16,7 +16,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/types"
-	csync "github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient/sync"
 )
 
 func TestWatcherAppliesStreamedState(t *testing.T) {
@@ -39,12 +38,12 @@ func TestWatcherAppliesStreamedState(t *testing.T) {
 	})
 
 	w.Start(context.Background())
-	require.NoError(t, w.firstStateSignal.Wait(context.Background()))
-	w.Stop()
+	defer w.Stop()
 
-	owner, _ := w.registry.lookup("shard-1")
+	owner, _, err := w.registry.lookup(context.Background(), "shard-1")
+	require.NoError(t, err)
 	assert.Equal(t, "executor-1", owner.ExecutorID)
-	_, drained := w.registry.lookup("shard-2")
+	_, drained, _ := w.registry.lookup(context.Background(), "shard-2")
 	assert.True(t, drained)
 }
 
@@ -75,7 +74,8 @@ func TestWatcherReconnectsAfterStreamError(t *testing.T) {
 	// The failed stream's timeout timer and the retry sleep
 	timeSource.BlockUntil(2)
 	timeSource.Advance(2 * time.Second)
-	require.NoError(t, w.firstStateSignal.Wait(context.Background()))
+	_, _, err := w.registry.lookup(context.Background(), "shard-1")
+	require.NoError(t, err)
 
 	errorReconnects := testScope.Snapshot().Counters()["shard_distributor_spectator_stream_reconnects+reason=error"]
 	require.NotNil(t, errorReconnects)
@@ -84,13 +84,12 @@ func TestWatcherReconnectsAfterStreamError(t *testing.T) {
 
 func newTestWatcher(client sharddistributor.Client) *streamWatcher {
 	return &streamWatcher{
-		namespace:        "test-ns",
-		client:           client,
-		registry:         &registry{},
-		firstStateSignal: csync.NewResettableSignal(),
-		enabled:          func() bool { return true },
-		scope:            tally.NoopScope,
-		logger:           zap.NewNop(),
-		timeSource:       clock.NewRealTimeSource(),
+		namespace:  "test-ns",
+		client:     client,
+		registry:   newRegistry(),
+		enabled:    func() bool { return true },
+		scope:      tally.NoopScope,
+		logger:     zap.NewNop(),
+		timeSource: clock.NewRealTimeSource(),
 	}
 }

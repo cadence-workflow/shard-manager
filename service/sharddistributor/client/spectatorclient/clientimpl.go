@@ -9,7 +9,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon/tag"
-	csync "github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient/sync"
 )
 
 // ShardOwner contains information about the executor that owns a shard
@@ -26,9 +25,6 @@ type spectatorImpl struct {
 	logger    *zap.Logger
 	registry  *registry
 	watcher   *streamWatcher
-
-	// Signal to notify when first state is received
-	firstStateSignal *csync.ResettableSignal
 }
 
 func (s *spectatorImpl) Start(ctx context.Context) error {
@@ -38,8 +34,7 @@ func (s *spectatorImpl) Start(ctx context.Context) error {
 
 func (s *spectatorImpl) Stop() {
 	s.watcher.Stop()
-	// Close the firstStateSignal to unblock any goroutines waiting for first state
-	s.firstStateSignal.Done()
+	s.registry.close()
 }
 
 // GetShardOwner returns the full owner information including metadata for a given shard.
@@ -50,13 +45,11 @@ func (s *spectatorImpl) Stop() {
 // before ownership so the answer matches the shard distributor, which also refuses a
 // drained shard while it still has an owner.
 func (s *spectatorImpl) GetShardOwner(ctx context.Context, shardKey string) (*ShardOwner, error) {
-	// Wait for first state to be received to avoid flooding shard distributor on startup
-	if err := s.firstStateSignal.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("wait for first state: %w", err)
+	// Waits for the first state, to avoid flooding the shard distributor on startup
+	owner, drained, err := s.registry.lookup(ctx, shardKey)
+	if err != nil {
+		return nil, fmt.Errorf("lookup shard owner: %w", err)
 	}
-
-	// Check cache first
-	owner, drained := s.registry.lookup(shardKey)
 
 	if drained {
 		return nil, &types.ShardDrainedError{

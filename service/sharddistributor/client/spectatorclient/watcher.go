@@ -14,7 +14,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon/tag"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient/metricsconstants"
-	csync "github.com/cadence-workflow/shard-manager/service/sharddistributor/client/spectatorclient/sync"
 )
 
 // stateFn represents a state in the election state machine.
@@ -31,14 +30,13 @@ const (
 // streamWatcher keeps a watch stream open and applies what it delivers to the registry. It reconnects
 // when the stream fails or reaches its timeout.
 type streamWatcher struct {
-	namespace        string
-	client           sharddistributor.Client
-	registry         *registry
-	firstStateSignal *csync.ResettableSignal
-	enabled          EnabledFunc
-	scope            tally.Scope
-	logger           *zap.Logger
-	timeSource       clock.TimeSource
+	namespace  string
+	client     sharddistributor.Client
+	registry   *registry
+	enabled    EnabledFunc
+	scope      tally.Scope
+	logger     *zap.Logger
+	timeSource clock.TimeSource
 
 	cancel context.CancelFunc
 	stream *spectatorStream
@@ -145,8 +143,8 @@ func (w *streamWatcher) disabledState(ctx context.Context) stateFn {
 	}
 	defer w.logger.Info("Exiting disabled state", zap.String(tag.Namespace, w.namespace))
 	w.logger.Info("Starting disabled state for namespace", zap.String(tag.Namespace, w.namespace))
-	// We reset the first state signal to ensure we wait for the first state to be received when we re-enable.
-	w.firstStateSignal.Reset()
+	// Reset so lookups wait for the first state again when we re-enable.
+	w.registry.resetReady()
 
 	for {
 		// Sleep for a short period of time before checking again.
@@ -162,10 +160,6 @@ func (w *streamWatcher) disabledState(ctx context.Context) stateFn {
 
 func (w *streamWatcher) handleResponse(response *types.WatchNamespaceStateResponse) {
 	w.registry.apply(response)
-
-	// Signal that first state has been received - this function is free to call
-	// multiple times.
-	w.firstStateSignal.Done()
 
 	w.logger.Debug("Received namespace state update",
 		zap.String(tag.Namespace, w.namespace),

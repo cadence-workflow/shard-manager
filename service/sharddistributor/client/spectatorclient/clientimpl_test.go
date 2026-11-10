@@ -66,9 +66,6 @@ func TestWatchLoopBasicFlow(t *testing.T) {
 		spectator.Stop()
 	}()
 
-	// Wait for first state
-	require.NoError(t, spectator.firstStateSignal.Wait(context.Background()))
-
 	// Query shard owner
 	owner, err := spectator.GetShardOwner(context.Background(), "shard-1")
 	assert.NoError(t, err)
@@ -135,8 +132,6 @@ func TestGetShardOwner_CacheMiss_FallbackToRPC(t *testing.T) {
 		cancelStream()
 		spectator.Stop()
 	}()
-
-	require.NoError(t, spectator.firstStateSignal.Wait(context.Background()))
 
 	// Cache hit
 	owner, err := spectator.GetShardOwner(context.Background(), "shard-1")
@@ -267,7 +262,6 @@ func TestWatchLoopDisabled(t *testing.T) {
 
 	timeSource := clock.NewMockedTimeSource()
 	spectator := newTestSpectator(t, Params{TimeSource: timeSource, Enabled: func() bool { return false }})
-	stateSignal := spectator.firstStateSignal
 
 	err := spectator.Start(context.Background())
 	assert.NoError(t, err)
@@ -282,8 +276,8 @@ func TestWatchLoopDisabled(t *testing.T) {
 	// Stop exits cleanly and calls Done() on the signal
 	spectator.Stop()
 
-	// After Stop(), Done() has been called so Wait returns nil
-	err = stateSignal.Wait(context.Background())
+	// After Stop(), waiters are released
+	_, _, err = spectator.registry.lookup(context.Background(), "shard-1")
 	assert.NoError(t, err)
 }
 

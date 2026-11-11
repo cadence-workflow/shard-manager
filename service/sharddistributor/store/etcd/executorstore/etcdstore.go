@@ -1,6 +1,7 @@
 package executorstore
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -421,8 +422,8 @@ func (s *executorStoreImpl) hasExecutorStatusChanged(watchResp clientv3.WatchRes
 			continue
 		}
 
-		// If the previous value is the same as the new value, it means the status didn't actually change
-		if event.PrevKv != nil && string(event.PrevKv.Value) == string(event.Kv.Value) {
+		// If the previous value holds the same status as the new value, the status didn't actually change
+		if event.PrevKv != nil && sameExecutorStatus(event.PrevKv.Value, event.Kv.Value) {
 			continue
 		}
 
@@ -430,6 +431,23 @@ func (s *executorStoreImpl) hasExecutorStatusChanged(watchResp clientv3.WatchRes
 	}
 
 	return false
+}
+
+// One status can be stored as different bytes, so the decoded values are compared.
+func sameExecutorStatus(previous, current []byte) bool {
+	if bytes.Equal(previous, current) {
+		return true
+	}
+
+	previousStatus, err := common.DecodeExecutorStatus(previous)
+	if err != nil {
+		return false
+	}
+	currentStatus, err := common.DecodeExecutorStatus(current)
+	if err != nil {
+		return false
+	}
+	return previousStatus == currentStatus
 }
 
 func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, request store.AssignShardsRequest, guard store.GuardFunc) error {

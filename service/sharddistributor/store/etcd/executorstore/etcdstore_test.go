@@ -947,6 +947,49 @@ func TestSubscribeToExecutorStatusChanges(t *testing.T) {
 	}
 }
 
+func TestSameExecutorStatus(t *testing.T) {
+	encode := func(encoding common.Encoding, status types.ExecutorStatus) []byte {
+		encoder, err := common.NewExecutorValueEncoder(common.CompressionSnappy, encoding)
+		require.NoError(t, err)
+		encoded, err := encoder.EncodeExecutorStatus(status)
+		require.NoError(t, err)
+		return encoded
+	}
+
+	tests := map[string]struct {
+		previous []byte
+		current  []byte
+		want     bool
+	}{
+		"same status in the same encoding": {
+			previous: encode(common.EncodingJSON, types.ExecutorStatusACTIVE),
+			current:  encode(common.EncodingJSON, types.ExecutorStatusACTIVE),
+			want:     true,
+		},
+		"same status in different encodings": {
+			previous: encode(common.EncodingJSON, types.ExecutorStatusACTIVE),
+			current:  encode(common.EncodingProtobuf, types.ExecutorStatusACTIVE),
+			want:     true,
+		},
+		"different status in different encodings": {
+			previous: encode(common.EncodingJSON, types.ExecutorStatusACTIVE),
+			current:  encode(common.EncodingProtobuf, types.ExecutorStatusDRAINING),
+			want:     false,
+		},
+		"deleted status": {
+			previous: encode(common.EncodingProtobuf, types.ExecutorStatusACTIVE),
+			current:  nil,
+			want:     false,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.want, sameExecutorStatus(tt.previous, tt.current))
+		})
+	}
+}
+
 func TestDeleteExecutors_Empty(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)

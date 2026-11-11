@@ -38,27 +38,33 @@ func ParseExecutorKVs(etcdPrefix, namespace string, kvs []*mvccpb.KeyValue) (map
 			}
 			execData.LastHeartbeat = etcdtypes.Time(heartbeatTime)
 		case etcdkeys.ExecutorStatusKey:
-			if err := DecompressAndUnmarshal(kv.Value, &execData.Status); err != nil {
+			status, err := DecodeExecutorStatus(kv.Value)
+			if err != nil {
 				return nil, fmt.Errorf("parse executor status for %s: %w", executorID, err)
 			}
+			execData.Status = status
 		case etcdkeys.ExecutorReportedShardsKey:
-			if err := DecompressAndUnmarshal(kv.Value, &execData.ReportedShards); err != nil {
+			reportedShards, err := DecodeReportedShards(kv.Value)
+			if err != nil {
 				return nil, fmt.Errorf("parse reported shards for %s: %w", executorID, err)
 			}
+			execData.ReportedShards = reportedShards
 		case etcdkeys.ExecutorAssignedStateKey:
-			var assignedState etcdtypes.AssignedState
-			if err := DecompressAndUnmarshal(kv.Value, &assignedState); err != nil {
+			assignedState, err := DecodeAssignedState(kv.Value)
+			if err != nil {
 				return nil, fmt.Errorf("parse assigned state for %s: %w", executorID, err)
 			}
 			assignedState.ModRevision = kv.ModRevision
-			execData.AssignedState = &assignedState
+			execData.AssignedState = assignedState
 		case etcdkeys.ExecutorMetadataKey:
 			metadataKey := strings.TrimPrefix(string(kv.Key), etcdkeys.BuildMetadataKey(etcdPrefix, namespace, executorID, ""))
 			execData.Metadata[metadataKey] = string(kv.Value)
 		case etcdkeys.ExecutorShardStatisticsKey:
-			if err := DecompressAndUnmarshal(kv.Value, &execData.Statistics); err != nil {
+			statistics, err := DecodeShardStatistics(kv.Value)
+			if err != nil {
 				return nil, fmt.Errorf("parse shard statistics for %s: %w", executorID, err)
 			}
+			execData.Statistics = statistics
 		case etcdkeys.ExecutorHostMetadataKey:
 			var hostMetadata types.HostMetadata
 			if err := json.Unmarshal(kv.Value, &hostMetadata); err != nil {
@@ -80,7 +86,7 @@ func newParsedExecutorData() *etcdtypes.ParsedExecutorData {
 	return &etcdtypes.ParsedExecutorData{
 		ReportedShards: make(map[string]*types.ShardStatusReport),
 		Metadata:       make(map[string]string),
-		Statistics:     make(map[string]etcdtypes.ShardStatistics),
+		Statistics:     make(map[string]store.ShardStatistics),
 	}
 }
 
@@ -104,12 +110,12 @@ func ParseExecutorAssignmentKVs(etcdPrefix, namespace string, kvs []*mvccpb.KeyV
 
 		switch keyType {
 		case etcdkeys.ExecutorAssignedStateKey:
-			var assignedState etcdtypes.AssignedState
-			if err := DecompressAndUnmarshal(kv.Value, &assignedState); err != nil {
+			assignedState, err := DecodeAssignedState(kv.Value)
+			if err != nil {
 				return nil, nil, fmt.Errorf("parse assigned state for %s: %w", executorID, err)
 			}
 			assignedState.ModRevision = kv.ModRevision
-			assignments[executorID] = *assignedState.ToAssignedState()
+			assignments[executorID] = *assignedState
 		case etcdkeys.ExecutorMetadataKey:
 			metadataKey := strings.TrimPrefix(string(kv.Key), etcdkeys.BuildMetadataKey(etcdPrefix, namespace, executorID, ""))
 			executorMetadata[metadataKey] = string(kv.Value)

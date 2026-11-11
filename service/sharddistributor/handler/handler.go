@@ -284,14 +284,16 @@ func (h *handlerImpl) ListNamespaces(_ context.Context, _ *types.ListNamespacesR
 	return &types.ListNamespacesResponse{Namespaces: result}, nil
 }
 
-func (h *handlerImpl) sendWatchResponse(nsCache cache.ShardCache, server WatchNamespaceStateServer) error {
-	state := nsCache.GetShardAssignments()
-	response := &types.WatchNamespaceStateResponse{
-		Executors:        toTypesExecutorShardAssignments(state.ExecutorToShards),
-		DrainedShardKeys: slices.Sorted(maps.Keys(state.DrainedShards)),
+func toWatchNamespaceStateResponse(state store.AssignmentSnapshot) *types.WatchNamespaceStateResponse {
+	return &types.WatchNamespaceStateResponse{
+		Executors:          toTypesExecutorShardAssignments(state.ExecutorToShards),
+		DrainedShardKeys:   slices.Sorted(maps.Keys(state.DrainedShards)),
+		AssignmentRevision: state.AssignmentRevision,
 	}
+}
 
-	err := server.Send(response)
+func (h *handlerImpl) sendWatchResponse(nsCache cache.ShardCache, server WatchNamespaceStateServer) error {
+	err := server.Send(toWatchNamespaceStateResponse(nsCache.GetShardAssignments()))
 	if err != nil {
 		return fmt.Errorf("send response: %w", err)
 	}
@@ -336,6 +338,27 @@ func (h *handlerImpl) WatchNamespaceState(request *types.WatchNamespaceStateRequ
 			}
 		}
 	}
+}
+
+// GetNamespaceStateIfNewer answers from the namespace cache, the same state WatchNamespaceState streams.
+// The cache only copies the state when the caller is behind, so polling an up to date caller stays cheap.
+func (h *handlerImpl) GetNamespaceStateIfNewer(_ context.Context, request *types.GetNamespaceStateIfNewerRequest) (resp *types.GetNamespaceStateIfNewerResponse, retError error) {
+	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
+
+	h.startWG.Wait()
+
+	namespace := request.GetNamespace()
+	ns, err := h.namespaces.Get(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	snapshot, newer := ns.Cache().GetShardAssignmentsIfNewer(request.GetAssignmentRevision())
+	if !newer {
+		return &types.GetNamespaceStateIfNewerResponse{AssignmentRevision: snapshot.AssignmentRevision}, nil
+	}
+	state := toWatchNamespaceStateResponse(snapshot)
+	return &types.GetNamespaceStateIfNewerResponse{AssignmentRevision: state.AssignmentRevision, State: state}, nil
 }
 
 // DrainShards marks the requested shards as drained for the namespace.

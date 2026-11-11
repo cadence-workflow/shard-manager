@@ -111,8 +111,16 @@ func (s *executorStoreImpl) RecordHeartbeat(ctx context.Context, namespace, exec
 		ops = append(ops, clientv3.OpPut(hostMetadataKey, string(hostMetadataData)))
 	}
 
+	// Metadata reaches spectators, so a heartbeat that changes it also moves the assignment version.
+	// A value compare fails on a missing key, so new metadata moves it too.
+	unchanged := make([]clientv3.Cmp, 0, len(request.Metadata))
+	for key, value := range request.Metadata {
+		metadataKey := etcdkeys.BuildMetadataKey(s.prefix, namespace, executorID, key)
+		unchanged = append(unchanged, clientv3.Compare(clientv3.Value(metadataKey), "=", value))
+	}
+
 	// Atomically update both the timestamp and the state.
-	_, err = s.client.Txn(ctx).Then(ops...).Commit()
+	_, err = s.client.Txn(ctx).If(unchanged...).Then(ops...).Else(append(ops, s.touchAssignmentVersion(namespace))...).Commit()
 
 	if err != nil {
 		return fmt.Errorf("record heartbeat: %w", err)
@@ -283,6 +291,7 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 	txn := s.client.Txn(ctx).Then(
 		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
+		clientv3.OpGet(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace)),
 	)
 	roundTripStart := s.timeSource.Now()
 	txnResp, err := txn.Commit()
@@ -290,8 +299,8 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 	if err != nil {
 		return nil, fmt.Errorf("get namespace assignment state: %w", err)
 	}
-	if len(txnResp.Responses) != 2 {
-		return nil, fmt.Errorf("get namespace assignment state: expected 2 responses, got %d", len(txnResp.Responses))
+	if len(txnResp.Responses) != 3 {
+		return nil, fmt.Errorf("get namespace assignment state: expected 3 responses, got %d", len(txnResp.Responses))
 	}
 
 	parseStart := s.timeSource.Now()
@@ -301,11 +310,18 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 		return nil, err
 	}
 
+	// The version key is missing until the first write.
+	var assignmentRevision int64
+	if kvs := txnResp.Responses[2].GetResponseRange().Kvs; len(kvs) > 0 {
+		assignmentRevision = kvs[0].ModRevision
+	}
+
 	return &store.AssignmentState{
-		ExecutorMetadata: metadata,
-		ShardAssignments: assignments,
-		DrainedShards:    s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
-		Revision:         txnResp.Header.Revision,
+		ExecutorMetadata:   metadata,
+		ShardAssignments:   assignments,
+		DrainedShards:      s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+		Revision:           txnResp.Header.Revision,
+		AssignmentRevision: assignmentRevision,
 	}, nil
 }
 
@@ -494,6 +510,8 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 	if len(ops) == 0 {
 		return nil
 	}
+	// Committed with the assignments so readers see the version move with them.
+	ops = append(ops, s.touchAssignmentVersion(namespace))
 
 	// 3. Apply the guard function to get the base transaction, which may already have an 'If' condition for leadership.
 	nativeTxn := s.client.Txn(ctx)
@@ -550,17 +568,30 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 	return nil
 }
 
+// touchAssignmentVersion moves the assignment version when committed with a change spectators can see.
+// Only the mod revision is read, and the empty JSON object leaves room to add fields without a migration.
+func (s *executorStoreImpl) touchAssignmentVersion(namespace string) clientv3.Op {
+	return clientv3.OpPut(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace), "{}")
+}
+
+// commitAssignmentOps commits ops that change assignments or drained shards, moving the assignment version with every batch.
+func (s *executorStoreImpl) commitAssignmentOps(ctx context.Context, namespace string, ops []clientv3.Op, guard store.GuardFunc) ([]*clientv3.TxnResponse, error) {
+	return s.commitOps(ctx, ops, guard, s.touchAssignmentVersion(namespace))
+}
+
 // commitOps commits the given operations in batches to stay within etcd's
 // per-transaction operation limit, returning each batch's response in submission
 // order so callers can inspect per-op outcomes.
 //
 // Each batch is a separate guarded transaction, so a failure part-way through returns
 // immediately and leaves earlier batches committed.
-func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc) ([]*clientv3.TxnResponse, error) {
+//
+// extraOps are added to every batch and their responses are left out of the returned responses.
+func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc, extraOps ...clientv3.Op) ([]*clientv3.TxnResponse, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
-	maxOpsPerTxn := s.cfg.MaxEtcdTxnOps() - guardOpOverhead
+	maxOpsPerTxn := s.cfg.MaxEtcdTxnOps() - guardOpOverhead - len(extraOps)
 	if maxOpsPerTxn < 1 {
 		maxOpsPerTxn = 1
 	}
@@ -581,13 +612,14 @@ func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, gu
 			return nil, fmt.Errorf("guard function returned invalid transaction type")
 		}
 
-		resp, err := etcdGuardedTxn.Then(ops[i:end]...).Commit()
+		resp, err := etcdGuardedTxn.Then(append(ops[i:end:end], extraOps...)...).Commit()
 		if err != nil {
 			return nil, fmt.Errorf("commit batch: %w", err)
 		}
 		if !resp.Succeeded {
 			return nil, fmt.Errorf("transaction failed, leadership may have changed")
 		}
+		resp.Responses = resp.Responses[:len(resp.Responses)-len(extraOps)]
 		responses = append(responses, resp)
 	}
 	return responses, nil
@@ -625,7 +657,7 @@ func (s *executorStoreImpl) DeleteExecutors(ctx context.Context, namespace strin
 		ops = append(ops, clientv3.OpDelete(executorIDPrefix, clientv3.WithPrefix()))
 	}
 
-	if _, err := s.commitOps(ctx, ops, guard); err != nil {
+	if _, err := s.commitAssignmentOps(ctx, namespace, ops, guard); err != nil {
 		return fmt.Errorf("delete executors: %w", err)
 	}
 	return nil
@@ -717,13 +749,17 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 // It is intentionally NOT guarded by leadership: any concurrent leader write
 // will subsequently fail its own leadership-key revision check, which is the
 // desired behaviour.
+// The assignment version is touched in the same transaction, so the reset moves it forward.
 func (s *executorStoreImpl) ResetNamespace(ctx context.Context, namespace string) (int64, error) {
 	prefix := etcdkeys.BuildNamespacePrefix(s.prefix, namespace)
-	resp, err := s.client.Delete(ctx, prefix, clientv3.WithPrefix())
+	resp, err := s.client.Txn(ctx).Then(
+		clientv3.OpDelete(prefix, clientv3.WithPrefix()),
+		s.touchAssignmentVersion(namespace),
+	).Commit()
 	if err != nil {
 		return 0, fmt.Errorf("delete namespace prefix %q: %w", prefix, err)
 	}
-	return resp.Deleted, nil
+	return resp.Responses[0].GetResponseDeleteRange().Deleted, nil
 }
 
 // DrainShards writes one empty-valued key per shard under the namespace's drained
@@ -744,7 +780,7 @@ func (s *executorStoreImpl) DrainShards(ctx context.Context, namespace string, s
 		ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID), ""))
 	}
 
-	if _, err := s.commitOps(ctx, ops, store.NopGuard()); err != nil {
+	if _, err := s.commitAssignmentOps(ctx, namespace, ops, store.NopGuard()); err != nil {
 		return fmt.Errorf("drain shards: %w", err)
 	}
 	return nil
@@ -769,7 +805,7 @@ func (s *executorStoreImpl) UndrainShards(ctx context.Context, namespace string,
 		ops = append(ops, clientv3.OpDelete(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID)))
 	}
 
-	responses, err := s.commitOps(ctx, ops, store.NopGuard())
+	responses, err := s.commitAssignmentOps(ctx, namespace, ops, store.NopGuard())
 	if err != nil {
 		return nil, fmt.Errorf("undrain shards: %w", err)
 	}

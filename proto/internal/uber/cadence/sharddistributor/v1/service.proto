@@ -50,6 +50,10 @@ service ShardDistributorAPI {
   // WatchNamespaceState streams updates about executors and their assigned shards for a namespace
   rpc WatchNamespaceState(WatchNamespaceStateRequest) returns (stream WatchNamespaceStateResponse);
 
+  // GetNamespaceStateIfNewer returns the assignment revision of the serving host's namespace cache,
+  // and its state when newer than the caller's. Spectators use it to catch up and detect a lagging stream.
+  rpc GetNamespaceStateIfNewer(GetNamespaceStateIfNewerRequest) returns (GetNamespaceStateIfNewerResponse);
+
   // ListNamespaces returns the static namespace configuration of the shard-manager fleet.
   // This reflects the server's loaded shardDistribution.namespaces config
   rpc ListNamespaces(ListNamespacesRequest) returns (ListNamespacesResponse);
@@ -213,6 +217,22 @@ message WatchNamespaceStateResponse {
   repeated ExecutorInfo executors = 1;
   // Shards drained for this namespace
   repeated string drained_shard_keys = 2;
+  // Store revision of the latest change to assignments, drained shards or executor metadata,
+  // including a namespace reset. Hosts holding the same state report the same value, so it is
+  // comparable across hosts.
+  int64 assignment_revision = 3;
+}
+
+message GetNamespaceStateIfNewerRequest {
+  string namespace = 1;
+  // Assignment revision of the state the caller holds.
+  int64 assignment_revision = 2;
+}
+
+message GetNamespaceStateIfNewerResponse {
+  int64 assignment_revision = 1;
+  // Set only when assignment_revision is newer than the request's.
+  WatchNamespaceStateResponse state = 2;
 }
 
 message ExecutorInfo {

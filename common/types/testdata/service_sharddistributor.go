@@ -86,7 +86,16 @@ var (
 				Metadata:       map[string]string{"key-2": "value-2"},
 			},
 		},
-		DrainedShardKeys: []string{"shard-4", "shard-5"},
+		DrainedShardKeys:   []string{"shard-4", "shard-5"},
+		AssignmentRevision: 5,
+	}
+	ShardDistributorGetNamespaceStateIfNewerRequest = types.GetNamespaceStateIfNewerRequest{
+		Namespace:          "namespace",
+		AssignmentRevision: 4,
+	}
+	ShardDistributorGetNamespaceStateIfNewerResponse = types.GetNamespaceStateIfNewerResponse{
+		AssignmentRevision: 5,
+		State:              &ShardDistributorWatchNamespaceStateResponse,
 	}
 	ShardDistributorGetNamespaceStateRequest = types.GetNamespaceStateRequest{
 		Namespace: "namespace",

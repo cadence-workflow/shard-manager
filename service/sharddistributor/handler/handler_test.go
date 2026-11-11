@@ -429,7 +429,8 @@ func TestWatchNamespaceState(t *testing.T) {
 			ExecutorToShards: map[*store.ShardOwner][]string{
 				{ExecutorID: "executor-1", Metadata: map[string]string{}}: {"shard-1"},
 			},
-			DrainedShards: map[string]struct{}{"shard-drained": {}},
+			DrainedShards:      map[string]struct{}{"shard-drained": {}},
+			AssignmentRevision: 5,
 		},
 	)
 
@@ -437,6 +438,7 @@ func TestWatchNamespaceState(t *testing.T) {
 		require.Len(t, resp.Executors, 1)
 		assert.Equal(t, "executor-1", resp.Executors[0].ExecutorID)
 		assert.Equal(t, []string{"shard-drained"}, resp.DrainedShardKeys)
+		assert.Equal(t, int64(5), resp.AssignmentRevision)
 		return nil
 	})
 
@@ -488,6 +490,51 @@ func TestWatchNamespaceStateUnknownNamespace(t *testing.T) {
 	err := handler.WatchNamespaceState(&types.WatchNamespaceStateRequest{Namespace: "unknown"}, NewMockWatchNamespaceStateServer(ctrl))
 
 	require.Equal(t, &types.NamespaceNotFoundError{Namespace: "unknown"}, err)
+}
+
+func TestGetNamespaceStateIfNewer(t *testing.T) {
+	tests := []struct {
+		name      string
+		namespace string
+		known     int64
+		snapshot  store.AssignmentSnapshot
+		newer     bool
+		want      *types.GetNamespaceStateIfNewerResponse
+		wantErr   error
+	}{
+		{
+			name:      "caller up to date",
+			namespace: "test-ns",
+			known:     42,
+			snapshot:  store.AssignmentSnapshot{AssignmentRevision: 42},
+			want:      &types.GetNamespaceStateIfNewerResponse{AssignmentRevision: 42},
+		},
+		{
+			name:      "caller behind gets the state",
+			namespace: "test-ns",
+			known:     41,
+			snapshot:  store.AssignmentSnapshot{DrainedShards: map[string]struct{}{"shard-1": {}}, AssignmentRevision: 43},
+			newer:     true,
+			want: &types.GetNamespaceStateIfNewerResponse{
+				AssignmentRevision: 43,
+				State:              &types.WatchNamespaceStateResponse{Executors: []*types.ExecutorShardAssignment{}, DrainedShardKeys: []string{"shard-1"}, AssignmentRevision: 43},
+			},
+		},
+		{name: "unknown namespace", namespace: "unknown", wantErr: &types.NamespaceNotFoundError{Namespace: "unknown"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCache := cache.NewMockShardCache(gomock.NewController(t))
+			mockCache.EXPECT().GetShardAssignmentsIfNewer(tt.known).Return(tt.snapshot, tt.newer).AnyTimes()
+			cfg := config.ShardDistribution{Namespaces: []config.Namespace{{Name: "test-ns", Type: config.NamespaceTypeFixed, ShardNum: 2}}}
+			handler := &handlerImpl{logger: testlogger.New(t), namespaces: newTestManager(t, cfg, nil, mockCache)}
+
+			got, err := handler.GetNamespaceStateIfNewer(context.Background(), &types.GetNamespaceStateIfNewerRequest{Namespace: tt.namespace, AssignmentRevision: tt.known})
+
+			assert.Equal(t, tt.wantErr, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestWatchNamespaceStateStopsOnHandlerStop(t *testing.T) {

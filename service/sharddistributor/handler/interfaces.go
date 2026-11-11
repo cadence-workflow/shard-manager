@@ -53,6 +53,8 @@ type Handler interface {
 
 	WatchNamespaceState(*types.WatchNamespaceStateRequest, WatchNamespaceStateServer) error
 
+	GetNamespaceStateIfNewer(context.Context, *types.GetNamespaceStateIfNewerRequest) (*types.GetNamespaceStateIfNewerResponse, error)
+
 	ListNamespaces(context.Context, *types.ListNamespacesRequest) (*types.ListNamespacesResponse, error)
 
 	DrainShards(context.Context, *types.DrainShardsRequest) error

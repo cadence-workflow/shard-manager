@@ -160,6 +160,21 @@ func (mr *MockHandlerMockRecorder) GetNamespaceState(arg0, arg1 any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespaceState", reflect.TypeOf((*MockHandler)(nil).GetNamespaceState), arg0, arg1)
 }
 
+// GetNamespaceStateIfNewer mocks base method.
+func (m *MockHandler) GetNamespaceStateIfNewer(arg0 context.Context, arg1 *types.GetNamespaceStateIfNewerRequest) (*types.GetNamespaceStateIfNewerResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNamespaceStateIfNewer", arg0, arg1)
+	ret0, _ := ret[0].(*types.GetNamespaceStateIfNewerResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNamespaceStateIfNewer indicates an expected call of GetNamespaceStateIfNewer.
+func (mr *MockHandlerMockRecorder) GetNamespaceStateIfNewer(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespaceStateIfNewer", reflect.TypeOf((*MockHandler)(nil).GetNamespaceStateIfNewer), arg0, arg1)
+}
+
 // GetShardOwner mocks base method.
 func (m *MockHandler) GetShardOwner(arg0 context.Context, arg1 *types.GetShardOwnerRequest) (*types.GetShardOwnerResponse, error) {
 	m.ctrl.T.Helper()

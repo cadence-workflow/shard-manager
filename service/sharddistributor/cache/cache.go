@@ -31,6 +31,10 @@ type ShardCache interface {
 	// GetShardAssignments returns a snapshot of assignments and drained shards.
 	GetShardAssignments() store.AssignmentSnapshot
 
+	// GetShardAssignmentsIfNewer returns the snapshot only when its assignment revision is newer than knownRevision.
+	// Otherwise the snapshot carries just the assignment revision.
+	GetShardAssignmentsIfNewer(knownRevision int64) (store.AssignmentSnapshot, bool)
+
 	// Subscribe signals when assignments, executor metadata or drained shards
 	// change. The returned function unsubscribes.
 	Subscribe() (<-chan struct{}, func())

@@ -419,8 +419,9 @@ func FromShardDistributorWatchNamespaceStateResponse(t *types.WatchNamespaceStat
 	}
 
 	return &sharddistributorv1.WatchNamespaceStateResponse{
-		Executors:        executors,
-		DrainedShardKeys: t.GetDrainedShardKeys(),
+		Executors:          executors,
+		DrainedShardKeys:   t.GetDrainedShardKeys(),
+		AssignmentRevision: t.GetAssignmentRevision(),
 	}
 }
 
@@ -451,8 +452,53 @@ func ToShardDistributorWatchNamespaceStateResponse(t *sharddistributorv1.WatchNa
 	}
 
 	return &types.WatchNamespaceStateResponse{
-		Executors:        executors,
-		DrainedShardKeys: t.GetDrainedShardKeys(),
+		Executors:          executors,
+		DrainedShardKeys:   t.GetDrainedShardKeys(),
+		AssignmentRevision: t.GetAssignmentRevision(),
+	}
+}
+
+// FromShardDistributorGetNamespaceStateIfNewerRequest converts a types.GetNamespaceStateIfNewerRequest to a sharddistributor GetNamespaceStateIfNewerRequest.
+func FromShardDistributorGetNamespaceStateIfNewerRequest(t *types.GetNamespaceStateIfNewerRequest) *sharddistributorv1.GetNamespaceStateIfNewerRequest {
+	if t == nil {
+		return nil
+	}
+	return &sharddistributorv1.GetNamespaceStateIfNewerRequest{
+		Namespace:          t.GetNamespace(),
+		AssignmentRevision: t.GetAssignmentRevision(),
+	}
+}
+
+// ToShardDistributorGetNamespaceStateIfNewerRequest converts a sharddistributor GetNamespaceStateIfNewerRequest to a types.GetNamespaceStateIfNewerRequest.
+func ToShardDistributorGetNamespaceStateIfNewerRequest(t *sharddistributorv1.GetNamespaceStateIfNewerRequest) *types.GetNamespaceStateIfNewerRequest {
+	if t == nil {
+		return nil
+	}
+	return &types.GetNamespaceStateIfNewerRequest{
+		Namespace:          t.GetNamespace(),
+		AssignmentRevision: t.GetAssignmentRevision(),
+	}
+}
+
+// FromShardDistributorGetNamespaceStateIfNewerResponse converts a types.GetNamespaceStateIfNewerResponse to a sharddistributor GetNamespaceStateIfNewerResponse.
+func FromShardDistributorGetNamespaceStateIfNewerResponse(t *types.GetNamespaceStateIfNewerResponse) *sharddistributorv1.GetNamespaceStateIfNewerResponse {
+	if t == nil {
+		return nil
+	}
+	return &sharddistributorv1.GetNamespaceStateIfNewerResponse{
+		AssignmentRevision: t.GetAssignmentRevision(),
+		State:              FromShardDistributorWatchNamespaceStateResponse(t.GetState()),
+	}
+}
+
+// ToShardDistributorGetNamespaceStateIfNewerResponse converts a sharddistributor GetNamespaceStateIfNewerResponse to a types.GetNamespaceStateIfNewerResponse.
+func ToShardDistributorGetNamespaceStateIfNewerResponse(t *sharddistributorv1.GetNamespaceStateIfNewerResponse) *types.GetNamespaceStateIfNewerResponse {
+	if t == nil {
+		return nil
+	}
+	return &types.GetNamespaceStateIfNewerResponse{
+		AssignmentRevision: t.GetAssignmentRevision(),
+		State:              ToShardDistributorWatchNamespaceStateResponse(t.GetState()),
 	}
 }
 

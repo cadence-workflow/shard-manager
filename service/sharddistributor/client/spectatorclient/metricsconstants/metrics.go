@@ -2,21 +2,22 @@ package metricsconstants
 
 const (
 	// Operation tag names for ShardDistributorSpectator metrics
-	ShardDistributorSpectatorOperationTagName                      = "ShardDistributorSpectator"
-	ShardDistributorSpectatorGetShardOwnerOperationTagName         = "ShardDistributorSpectatorGetShardOwner"
-	ShardDistributorSpectatorInspectShardOperationTagName          = "ShardDistributorSpectatorInspectShard"
-	ShardDistributorSpectatorGetNamespaceStateOperationTagName     = "ShardDistributorSpectatorGetNamespaceState"
-	ShardDistributorSpectatorGetFullNamespaceStateOperationTagName = "ShardDistributorSpectatorGetFullNamespaceState"
-	ShardDistributorSpectatorGetExecutorStateOperationTagName      = "ShardDistributorSpectatorGetExecutorState"
-	ShardDistributorSpectatorListNamespacesOperationTagName        = "ShardDistributorSpectatorListNamespaces"
-	ShardDistributorSpectatorWatchNamespaceStateOperationTagName   = "ShardDistributorSpectatorWatchNamespaceState"
-	ShardDistributorSpectatorDrainShardsOperationTagName           = "ShardDistributorSpectatorDrainShards"
-	ShardDistributorSpectatorUndrainShardsOperationTagName         = "ShardDistributorSpectatorUndrainShards"
-	ShardDistributorSpectatorGetDrainedShardsOperationTagName      = "ShardDistributorSpectatorGetDrainedShards"
-	ShardDistributorSpectatorDrainHostsOperationTagName            = "ShardDistributorSpectatorDrainHosts"
-	ShardDistributorSpectatorUndrainHostsOperationTagName          = "ShardDistributorSpectatorUndrainHosts"
-	ShardDistributorSpectatorGetDrainedHostsOperationTagName       = "ShardDistributorSpectatorGetDrainedHosts"
-	ShardDistributorSpectatorForceResetNamespaceOperationTagName   = "ShardDistributorSpectatorForceResetNamespace"
+	ShardDistributorSpectatorOperationTagName                         = "ShardDistributorSpectator"
+	ShardDistributorSpectatorGetShardOwnerOperationTagName            = "ShardDistributorSpectatorGetShardOwner"
+	ShardDistributorSpectatorInspectShardOperationTagName             = "ShardDistributorSpectatorInspectShard"
+	ShardDistributorSpectatorGetNamespaceStateOperationTagName        = "ShardDistributorSpectatorGetNamespaceState"
+	ShardDistributorSpectatorGetFullNamespaceStateOperationTagName    = "ShardDistributorSpectatorGetFullNamespaceState"
+	ShardDistributorSpectatorGetExecutorStateOperationTagName         = "ShardDistributorSpectatorGetExecutorState"
+	ShardDistributorSpectatorListNamespacesOperationTagName           = "ShardDistributorSpectatorListNamespaces"
+	ShardDistributorSpectatorWatchNamespaceStateOperationTagName      = "ShardDistributorSpectatorWatchNamespaceState"
+	ShardDistributorSpectatorGetNamespaceStateIfNewerOperationTagName = "ShardDistributorSpectatorGetNamespaceStateIfNewer"
+	ShardDistributorSpectatorDrainShardsOperationTagName              = "ShardDistributorSpectatorDrainShards"
+	ShardDistributorSpectatorUndrainShardsOperationTagName            = "ShardDistributorSpectatorUndrainShards"
+	ShardDistributorSpectatorGetDrainedShardsOperationTagName         = "ShardDistributorSpectatorGetDrainedShards"
+	ShardDistributorSpectatorDrainHostsOperationTagName               = "ShardDistributorSpectatorDrainHosts"
+	ShardDistributorSpectatorUndrainHostsOperationTagName             = "ShardDistributorSpectatorUndrainHosts"
+	ShardDistributorSpectatorGetDrainedHostsOperationTagName          = "ShardDistributorSpectatorGetDrainedHosts"
+	ShardDistributorSpectatorForceResetNamespaceOperationTagName      = "ShardDistributorSpectatorForceResetNamespace"
 
 	// Counter metrics
 	ShardDistributorSpectatorClientRequests   = "shard_distributor_spectator_client_requests"
@@ -30,7 +31,9 @@ const (
 	StreamReconnectReasonTagName = "reason"
 
 	// Tag values for StreamReconnectReasonTagName: timeout is the periodic forced reconnect,
-	// error is an unexpected stream failure (network, server issue, etc.).
+	// error is an unexpected stream failure (network, server issue, etc.), lag is a stream
+	// that stayed behind the shard distributor.
 	StreamReconnectReasonTimeout = "timeout"
 	StreamReconnectReasonError   = "error"
+	StreamReconnectReasonLag     = "lag"
 )

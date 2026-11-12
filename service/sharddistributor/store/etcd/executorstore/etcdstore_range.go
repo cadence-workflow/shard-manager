@@ -3,6 +3,7 @@ package executorstore
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/common"
 )
 
 func (s *executorStoreImpl) ListRanges(ctx context.Context, namespace string) ([]*store.RangeAssignment, error) {
@@ -28,7 +28,7 @@ func (s *executorStoreImpl) ListRanges(ctx context.Context, namespace string) ([
 		}
 
 		var stored etcdtypes.RangeAssignment
-		if err := common.DecompressAndUnmarshal(kv.Value, &stored); err != nil {
+		if err := json.Unmarshal(kv.Value, &stored); err != nil {
 			return nil, fmt.Errorf("unmarshal range assignment for key %q: %w", string(kv.Key), err)
 		}
 

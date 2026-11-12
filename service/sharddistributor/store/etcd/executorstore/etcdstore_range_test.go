@@ -12,21 +12,16 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/executorstore/common"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/testhelper"
 )
 
 // putRangeFixture writes a range directly to etcd and records its ModRevision.
 // Tests seed etcd directly because AssignRanges is not implemented yet.
-func putRangeFixture(t *testing.T, tc *testhelper.StoreTestCluster, assignment *store.RangeAssignment, compression string) {
+func putRangeFixture(t *testing.T, tc *testhelper.StoreTestCluster, assignment *store.RangeAssignment) {
 	t.Helper()
 	payload, err := json.Marshal(etcdtypes.FromRangeAssignment(assignment))
 	require.NoError(t, err)
-	writer, err := common.NewRecordWriter(compression)
-	require.NoError(t, err)
-	value, err := writer.Write(payload)
-	require.NoError(t, err)
-	resp, err := tc.Client.Put(context.Background(), etcdkeys.BuildRangeKey(tc.EtcdPrefix, tc.Namespace, assignment.ID), string(value))
+	resp, err := tc.Client.Put(context.Background(), etcdkeys.BuildRangeKey(tc.EtcdPrefix, tc.Namespace, assignment.ID), string(payload))
 	require.NoError(t, err)
 	assignment.ModRevision = resp.Header.Revision
 }
@@ -57,7 +52,7 @@ func TestListRanges(t *testing.T) {
 	require.Empty(t, empty)
 
 	// IDs order opposite to their bounds, so the expected order cannot come from
-	// etcd key order. One value is compressed to prove reads accept both.
+	// etcd key order.
 	high := &store.RangeAssignment{
 		ID:    "range-high",
 		Range: mustRange(t, []byte{0x80, 0, 0, 0, 0, 0, 0, 0}, []byte{0xc0, 0, 0, 0, 0, 0, 0, 0}),
@@ -75,9 +70,9 @@ func TestListRanges(t *testing.T) {
 		a.ExecutorID = "host-1@uuid-1"
 		a.Status = types.AssignmentStatusREADY
 	}
-	putRangeFixture(t, tc, low, "")
-	putRangeFixture(t, tc, high, "")
-	putRangeFixture(t, tc, final, common.CompressionSnappy)
+	putRangeFixture(t, tc, low)
+	putRangeFixture(t, tc, high)
+	putRangeFixture(t, tc, final)
 
 	got, err := s.ListRanges(ctx, tc.Namespace)
 	require.NoError(t, err)
@@ -92,7 +87,7 @@ func TestListRanges_RejectsKeyWithSlashInID(t *testing.T) {
 		ID:         "bad/id",
 		Range:      mustFinalRange(t, []byte{0x00, 0, 0, 0, 0, 0, 0, 0}),
 		ExecutorID: "host-1@uuid-1",
-	}, "")
+	})
 
 	_, err := s.ListRanges(context.Background(), tc.Namespace)
 	require.ErrorContains(t, err, "must not contain '/'")

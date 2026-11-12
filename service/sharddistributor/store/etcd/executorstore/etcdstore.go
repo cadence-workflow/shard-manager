@@ -433,7 +433,8 @@ func (s *executorStoreImpl) hasExecutorStatusChanged(watchResp clientv3.WatchRes
 	return false
 }
 
-// One status can be stored as different bytes, so the decoded values are compared.
+// The same status is stored as different bytes depending on the encoding and compression
+// of the writer, so values that differ are decoded and compared.
 func sameExecutorStatus(previous, current []byte) bool {
 	if bytes.Equal(previous, current) {
 		return true

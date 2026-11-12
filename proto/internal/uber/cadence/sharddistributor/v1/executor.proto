@@ -20,6 +20,8 @@ message HeartbeatRequest {
   reserved 6;
   reserved "host_id";
   HostMetadata host_metadata = 7;
+  // Keyed by range ID and replaces shard_status_reports in range mode.
+  map<string, RangeLoadReport> range_load_reports = 8;
 }
 
 // HostMetadata carries host-level attributes reported on each heartbeat
@@ -54,6 +56,7 @@ enum ShardStatus {
 message HeartbeatResponse {
   map<string, ShardAssignment> shard_assignments = 1;
   MigrationMode migration_mode = 2;
+  repeated RangeAssignment range_assignments = 3;
 }
 
 message ShardAssignment {
@@ -76,4 +79,23 @@ enum MigrationMode {
   MIGRATION_MODE_INVALID = 0;
   MIGRATION_MODE_LOCAL_PASSTHROUGH = 1;
   MIGRATION_MODE_ONBOARDED = 4;
+}
+
+message Range {
+  bytes low_inclusive = 1;
+  // Empty means the range extends to the end of the key space.
+  bytes high_exclusive = 2;
+}
+
+message RangeAssignment {
+  string id = 1;
+  Range range = 2;
+  string executor_id = 3;
+  AssignmentStatus status = 4;
+}
+
+message RangeLoadReport {
+  double range_load = 1;
+  // Unordered bounded top-N by tasklist name.
+  map<string, double> top_tasklists = 2;
 }

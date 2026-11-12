@@ -14,6 +14,7 @@ import (
 //go:generate gowrap gen -g -p . -i Client -t ../templates/errorinjectors.tmpl -o ../wrappers/errorinjectors/sharddistributorexecutor_generated.go -v client=ShardDistributorExecutor
 //go:generate gowrap gen -g -p . -i Client -t ../templates/grpc.tmpl -o ../wrappers/grpc/sharddistributorexecutor_generated.go -v client=ShardDistributorExecutor -v package=apiv1 -v path=github.com/cadence-workflow/shard-manager/proto/internal/uber/cadence/sharddistributor/v1 -v prefix=ShardDistributorExecutor
 //go:generate gowrap gen -g -p . -i Client -t ../templates/timeout.tmpl -o ../wrappers/timeout/sharddistributorexecutor_generated.go -v client=ShardDistributorExecutor
+//go:generate gowrap gen -g -p . -i Client -t ../templates/hedge.tmpl -o ../wrappers/hedged/sharddistributorexecutor_generated.go -v client=ShardDistributorExecutor -v operation=ShardDistributorExecutor
 
 type Client interface {
 	Heartbeat(context.Context, *types.ExecutorHeartbeatRequest, ...yarpc.CallOption) (*types.ExecutorHeartbeatResponse, error)

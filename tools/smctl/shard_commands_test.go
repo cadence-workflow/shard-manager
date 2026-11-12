@@ -360,7 +360,7 @@ func TestDrainShards(t *testing.T) {
 func TestUndrainShards(t *testing.T) {
 	runShardCommandTests(t, []shardCommandTest{
 		{
-			name: "success: prints only shards actually undrained",
+			name: "success: prints the requested shard keys",
 			args: []string{
 				"smctl",
 				"--" + FlagNamespace, "ns-1",
@@ -376,7 +376,7 @@ func TestUndrainShards(t *testing.T) {
 						ShardKeys: []string{"shard-1", "shard-2"},
 					}).
 					Return(&types.UndrainShardsResponse{
-						UndrainedShardKeys: []string{"shard-1"},
+						UndrainedShardKeys: []string{"shard-1", "shard-2"},
 					}, nil)
 				return setupResult{client: mc}
 			},
@@ -385,7 +385,7 @@ func TestUndrainShards(t *testing.T) {
 				if err := json.Unmarshal([]byte(stdout), &resp); err != nil {
 					t.Fatalf("output is not valid JSON: %v\nout: %s", err, stdout)
 				}
-				if got, want := strings.Join(resp.UndrainedShardKeys, ","), "shard-1"; got != want {
+				if got, want := strings.Join(resp.UndrainedShardKeys, ","), "shard-1,shard-2"; got != want {
 					t.Errorf("UndrainedShardKeys: got %q want %q", got, want)
 				}
 			},

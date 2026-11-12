@@ -370,7 +370,7 @@ func (h *handlerImpl) DrainShards(ctx context.Context, request *types.DrainShard
 }
 
 // UndrainShards removes the requested shards from the namespace's drained set
-// The call is idempotent, and the response returns only the shards this call removed
+// The call is idempotent, so the response lists every requested shard, whether or not it was drained
 func (h *handlerImpl) UndrainShards(ctx context.Context, request *types.UndrainShardsRequest) (resp *types.UndrainShardsResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 
@@ -396,7 +396,7 @@ func (h *handlerImpl) UndrainShards(ctx context.Context, request *types.UndrainS
 		tag.Dynamic("undrained_shards", undrained),
 	)
 
-	return &types.UndrainShardsResponse{UndrainedShardKeys: undrained}, nil
+	return &types.UndrainShardsResponse{UndrainedShardKeys: shardKeys}, nil
 }
 
 // GetDrainedShards returns the shards currently drained for the namespace.
@@ -456,7 +456,7 @@ func (h *handlerImpl) DrainHosts(ctx context.Context, request *types.DrainHostsR
 }
 
 // UndrainHosts removes the requested hosts from the namespace's drained set.
-// The call is idempotent, and the response returns only the hosts this call removed.
+// The call is idempotent, so the response lists every requested host, whether or not it was drained.
 func (h *handlerImpl) UndrainHosts(ctx context.Context, request *types.UndrainHostsRequest) (resp *types.UndrainHostsResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 
@@ -482,7 +482,7 @@ func (h *handlerImpl) UndrainHosts(ctx context.Context, request *types.UndrainHo
 		tag.Dynamic("undrained_hosts", undrained),
 	)
 
-	return &types.UndrainHostsResponse{UndrainedHostnames: undrained}, nil
+	return &types.UndrainHostsResponse{UndrainedHostnames: hostnames}, nil
 }
 
 // GetDrainedHosts returns the hosts currently drained for the namespace.

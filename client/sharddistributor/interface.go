@@ -14,6 +14,7 @@ import (
 //go:generate gowrap gen -g -p . -i Client -t ../templates/errorinjectors.tmpl -o ../wrappers/errorinjectors/sharddistributor_generated.go -v client=ShardDistributor
 //go:generate gowrap gen -g -p . -i Client -t ../templates/grpc.tmpl -o ../wrappers/grpc/sharddistributor_generated.go -v client=ShardDistributor -v package=sharddistributorv1 -v path=github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1 -v prefix=ShardDistributor
 //go:generate gowrap gen -g -p . -i Client -t ../templates/timeout.tmpl -o ../wrappers/timeout/sharddistributor_generated.go -v client=ShardDistributor
+//go:generate gowrap gen -g -p . -i Client -t ../templates/hedge.tmpl -o ../wrappers/hedged/sharddistributor_generated.go -v client=ShardDistributor -v operation=ShardDistributorSpectator
 
 type Client interface {
 	GetShardOwner(context.Context, *types.GetShardOwnerRequest, ...yarpc.CallOption) (*types.GetShardOwnerResponse, error)

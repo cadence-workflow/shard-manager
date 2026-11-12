@@ -133,4 +133,7 @@ type Store interface {
 
 	// GetDrainedHosts returns the hosts currently drained for the namespace.
 	GetDrainedHosts(ctx context.Context, namespace string) ([]DrainedHost, error)
+
+	// RangeStore provides storage operations for range-based namespaces.
+	RangeStore
 }

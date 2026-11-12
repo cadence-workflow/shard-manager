@@ -40,6 +40,16 @@ func NewStore(
 	}
 }
 
+func (c *meteredStore) AssignRanges(ctx context.Context, namespace string, request _sourceStore.AssignRangesRequest, guard _sourceStore.GuardFunc) (err error) {
+	op := func() error {
+		err = c.wrapped.AssignRanges(ctx, namespace, request, guard)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreAssignRangesScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
 func (c *meteredStore) AssignShards(ctx context.Context, namespace string, request _sourceStore.AssignShardsRequest, guard _sourceStore.GuardFunc) (err error) {
 	op := func() error {
 		err = c.wrapped.AssignShards(ctx, namespace, request, guard)
@@ -137,6 +147,16 @@ func (c *meteredStore) GetState(ctx context.Context, namespace string) (np1 *_so
 	}
 
 	err = c.call(metrics.ShardDistributorStoreGetStateScope, op, metrics.NamespaceTag(namespace))
+	return
+}
+
+func (c *meteredStore) ListRanges(ctx context.Context, namespace string) (rpa1 []*_sourceStore.RangeAssignment, err error) {
+	op := func() error {
+		rpa1, err = c.wrapped.ListRanges(ctx, namespace)
+		return err
+	}
+
+	err = c.call(metrics.ShardDistributorStoreListRangesScope, op, metrics.NamespaceTag(namespace))
 	return
 }
 

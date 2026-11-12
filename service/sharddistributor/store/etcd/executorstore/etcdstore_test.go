@@ -396,6 +396,98 @@ func TestGetAssignmentState(t *testing.T) {
 	assert.NotZero(t, state.Revision)
 }
 
+// Values written as JSON and as protobuf can sit side by side in one namespace while
+// writes move from one encoding to the other, so the reads must accept both.
+func TestReadsJSONAndProtobufValues(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	jsonStore := createStore(t, tc)
+	protobufStore := createStore(t, tc)
+	protobufEncoder, err := common.NewExecutorValueEncoder(tc.Compression, common.EncodingProtobuf)
+	require.NoError(t, err)
+	protobufStore.encoder = protobufEncoder
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Protobuf stores milliseconds and float32, so these values survive both encodings.
+	now := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC).Add(123 * time.Millisecond)
+	shardLoad := 412.5
+
+	writers := map[string]*executorStoreImpl{
+		"exec-json":     jsonStore,
+		"exec-protobuf": protobufStore,
+	}
+
+	for executorID, writer := range writers {
+		shardID := "shard-" + executorID
+
+		heartbeat := store.HeartbeatState{
+			LastHeartbeat: now,
+			Status:        types.ExecutorStatusACTIVE,
+			ReportedShards: map[string]*types.ShardStatusReport{
+				shardID: {Status: types.ShardStatusREADY, ShardLoad: shardLoad},
+			},
+		}
+		err := writer.RecordHeartbeat(ctx, tc.Namespace, executorID, heartbeat)
+		require.NoError(t, err)
+
+		assignment := store.AssignShardsRequest{
+			NewState: &store.NamespaceState{
+				AssignmentState: store.AssignmentState{
+					ShardAssignments: map[string]store.AssignedState{
+						executorID: {
+							AssignedShards: map[string]*types.ShardAssignment{shardID: {Status: types.AssignmentStatusREADY}},
+							LastUpdated:    now,
+						},
+					},
+				},
+			},
+		}
+		err = writer.AssignShards(ctx, tc.Namespace, assignment, store.NopGuard())
+		require.NoError(t, err)
+
+		executorState, err := writer.GetExecutorState(ctx, tc.Namespace, executorID)
+		require.NoError(t, err)
+		require.NotNil(t, executorState.Assignment)
+
+		statistics := map[string]store.ShardStatistics{
+			shardID: {SmoothedLoad: shardLoad, LastUpdateTime: now, LastMoveTime: now},
+		}
+		err = writer.RecordShardStatistics(ctx, tc.Namespace, executorID, executorState.Assignment.ModRevision, statistics)
+		require.NoError(t, err)
+	}
+
+	namespaceState, err := jsonStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	assignmentState, err := jsonStore.GetAssignmentState(ctx, tc.Namespace)
+	require.NoError(t, err)
+
+	for executorID := range writers {
+		t.Run(executorID, func(t *testing.T) {
+			shardID := "shard-" + executorID
+			wantAssignedShards := map[string]*types.ShardAssignment{shardID: {Status: types.AssignmentStatusREADY}}
+
+			heartbeat := namespaceState.Executors[executorID]
+			assert.Equal(t, types.ExecutorStatusACTIVE, heartbeat.Status)
+			assert.Equal(t, map[string]*types.ShardStatusReport{
+				shardID: {Status: types.ShardStatusREADY, ShardLoad: shardLoad},
+			}, heartbeat.ReportedShards)
+
+			assignedState := namespaceState.ShardAssignments[executorID]
+			assert.Equal(t, wantAssignedShards, assignedState.AssignedShards)
+			assert.Equal(t, now, assignedState.LastUpdated)
+
+			assert.Equal(t, store.ShardStatistics{
+				SmoothedLoad:   shardLoad,
+				LastUpdateTime: now,
+				LastMoveTime:   now,
+			}, namespaceState.ShardStats[shardID])
+
+			assert.Equal(t, wantAssignedShards, assignmentState.ShardAssignments[executorID].AssignedShards)
+		})
+	}
+}
+
 func TestAssignmentRevision(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	executorStore := createStore(t, tc)
@@ -852,6 +944,49 @@ func TestSubscribeToExecutorStatusChanges(t *testing.T) {
 		case <-time.After(1 * time.Second):
 			t.Fatal("Should have received a notification for a status change")
 		}
+	}
+}
+
+func TestSameExecutorStatus(t *testing.T) {
+	encode := func(encoding common.Encoding, status types.ExecutorStatus) []byte {
+		encoder, err := common.NewExecutorValueEncoder(common.CompressionSnappy, encoding)
+		require.NoError(t, err)
+		encoded, err := encoder.EncodeExecutorStatus(status)
+		require.NoError(t, err)
+		return encoded
+	}
+
+	tests := map[string]struct {
+		previous []byte
+		current  []byte
+		want     bool
+	}{
+		"same status in the same encoding": {
+			previous: encode(common.EncodingJSON, types.ExecutorStatusACTIVE),
+			current:  encode(common.EncodingJSON, types.ExecutorStatusACTIVE),
+			want:     true,
+		},
+		"same status in different encodings": {
+			previous: encode(common.EncodingJSON, types.ExecutorStatusACTIVE),
+			current:  encode(common.EncodingProtobuf, types.ExecutorStatusACTIVE),
+			want:     true,
+		},
+		"different status in different encodings": {
+			previous: encode(common.EncodingJSON, types.ExecutorStatusACTIVE),
+			current:  encode(common.EncodingProtobuf, types.ExecutorStatusDRAINING),
+			want:     false,
+		},
+		"deleted status": {
+			previous: encode(common.EncodingProtobuf, types.ExecutorStatusACTIVE),
+			current:  nil,
+			want:     false,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.want, sameExecutorStatus(tt.previous, tt.current))
+		})
 	}
 }
 

@@ -259,7 +259,7 @@ message UndrainShardsRequest {
 }
 
 message UndrainShardsResponse {
-  // shard_keys that were actually removed from the drained list by this call.
+  // The request shard_keys, none of which are drained after the call.
   repeated string undrained_shard_keys = 1;
 }
 
@@ -294,7 +294,7 @@ message UndrainHostsRequest {
 }
 
 message UndrainHostsResponse {
-  // hostnames that were actually removed from the drained list by this call.
+  // The request hostnames, none of which are drained after the call.
   repeated string undrained_hostnames = 1;
 }
 

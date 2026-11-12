@@ -12,6 +12,7 @@ import (
 	"go.uber.org/yarpc"
 	"go.uber.org/zap"
 
+	"github.com/cadence-workflow/shard-manager/client/wrappers/hedged"
 	timeoutwrapper "github.com/cadence-workflow/shard-manager/client/wrappers/timeout"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/metrics"
@@ -139,7 +140,7 @@ func NewExecutor[SP ShardProcessor](params Params[SP]) (Executor[SP], error) {
 }
 
 func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig *clientcommon.NamespaceConfig) (Executor[SP], error) {
-	shardDistributorClient, err := createShardDistributorExecutorClient(params.ExecutorClient, params.MetricsScope)
+	shardDistributorClient, err := createShardDistributorExecutorClient(params.ExecutorClient, params.TimeSource, params.MetricsScope)
 	if err != nil {
 		return nil, fmt.Errorf("create shard distributor executor client: %w", err)
 	}
@@ -203,12 +204,14 @@ func buildExecutorID(normalizedHostname, uniqueID string) string {
 	return normalizedHostname + "@" + uniqueID
 }
 
-func createShardDistributorExecutorClient(client Client, metricsScope tally.Scope) (Client, error) {
+func createShardDistributorExecutorClient(client Client, timeSource clock.TimeSource, metricsScope tally.Scope) (Client, error) {
 	if client == nil {
 		return nil, fmt.Errorf("executor client is nil: ensure the shard-distributor YARPC outbound is configured")
 	}
 
-	shardDistributorExecutorClient := timeoutwrapper.NewShardDistributorExecutorClient(client, timeoutwrapper.ShardDistributorExecutorDefaultTimeout)
+	// Hedging sits inside the timeout so all attempts share one deadline.
+	hedgedClient := hedged.NewShardDistributorExecutorClient(client, timeSource, metricsScope)
+	shardDistributorExecutorClient := timeoutwrapper.NewShardDistributorExecutorClient(hedgedClient, timeoutwrapper.ShardDistributorExecutorDefaultTimeout)
 
 	if metricsScope != nil {
 		shardDistributorExecutorClient = NewMeteredShardDistributorExecutorClient(shardDistributorExecutorClient, metricsScope)

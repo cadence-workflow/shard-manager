@@ -1231,13 +1231,13 @@ func TestUndrainShards(t *testing.T) {
 			wantErrContains: "failed to undrain shards",
 		},
 		{
-			name:    "success reports only what was removed",
+			name:    "success reports every requested shard",
 			request: &types.UndrainShardsRequest{Namespace: _testNamespaceFixed, ShardKeys: []string{"1", "2"}},
 			setupMocks: func(m *store.MockStore) {
 				m.EXPECT().UndrainShards(gomock.Any(), _testNamespaceFixed, []string{"1", "2"}).
 					Return([]string{"1"}, nil)
 			},
-			wantUndrained: []string{"1"},
+			wantUndrained: []string{"1", "2"},
 		},
 		{
 			name:    "nothing was drained",
@@ -1246,7 +1246,7 @@ func TestUndrainShards(t *testing.T) {
 				m.EXPECT().UndrainShards(gomock.Any(), _testNamespaceFixed, []string{"1"}).
 					Return(nil, nil)
 			},
-			wantUndrained: nil,
+			wantUndrained: []string{"1"},
 		},
 	}
 
@@ -1465,13 +1465,13 @@ func TestUndrainHosts(t *testing.T) {
 			wantErrContains: "failed to undrain hosts",
 		},
 		{
-			name:    "success reports only what was removed",
+			name:    "success reports every requested host",
 			request: &types.UndrainHostsRequest{Namespace: _testNamespaceFixed, Hostnames: []string{"host-a", "host-b"}},
 			setupMocks: func(m *store.MockStore) {
 				m.EXPECT().UndrainHosts(gomock.Any(), _testNamespaceFixed, []string{"host-a", "host-b"}).
 					Return([]string{"host-a"}, nil)
 			},
-			wantUndrained: []string{"host-a"},
+			wantUndrained: []string{"host-a", "host-b"},
 		},
 		{
 			name:    "nothing was drained",
@@ -1480,7 +1480,7 @@ func TestUndrainHosts(t *testing.T) {
 				m.EXPECT().UndrainHosts(gomock.Any(), _testNamespaceFixed, []string{"host-a"}).
 					Return(nil, nil)
 			},
-			wantUndrained: nil,
+			wantUndrained: []string{"host-a"},
 		},
 	}
 

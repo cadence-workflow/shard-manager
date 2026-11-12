@@ -1855,7 +1855,7 @@ func (m *UndrainShardsRequest) GetShardKeys() []string {
 }
 
 type UndrainShardsResponse struct {
-	// shard_keys that were actually removed from the drained list by this call.
+	// The request shard_keys, none of which are drained after the call.
 	UndrainedShardKeys   []string `protobuf:"bytes,1,rep,name=undrained_shard_keys,json=undrainedShardKeys,proto3" json:"undrained_shard_keys,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -2227,7 +2227,7 @@ func (m *UndrainHostsRequest) GetHostnames() []string {
 }
 
 type UndrainHostsResponse struct {
-	// hostnames that were actually removed from the drained list by this call.
+	// The request hostnames, none of which are drained after the call.
 	UndrainedHostnames   []string `protobuf:"bytes,1,rep,name=undrained_hostnames,json=undrainedHostnames,proto3" json:"undrained_hostnames,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`

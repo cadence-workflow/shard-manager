@@ -1,0 +1,55 @@
+import (
+	"context"
+
+	"github.com/uber-go/tally"
+	"go.uber.org/yarpc"
+
+	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/types"
+)
+
+{{$clientName := (index .Vars "client")}}
+{{$operation := (index .Vars "operation")}}
+{{ $decorator := (printf "%s%s" (down $clientName) .Interface.Name) }}
+{{ $Decorator := (printf "%s%s" $clientName .Interface.Name) }}
+
+// {{$decorator}} implements {{.Interface.Type}} interface with request hedging
+type {{$decorator}} struct {
+	client {{.Interface.Type}}
+	hedger hedger
+}
+
+// New{{$Decorator}} creates a new instance of {{$decorator}} that hedges unary calls.
+// yarpc.ResponseHeaders is not supported, as concurrent attempts would both write to the caller's map.
+func New{{$Decorator}}(client {{.Interface.Type}}, timeSource clock.TimeSource, metricsScope tally.Scope) {{.Interface.Type}} {
+	return &{{$decorator}}{
+		client: client,
+		hedger: hedger{timeSource: timeSource, metrics: metricsScope},
+	}
+}
+
+{{range $method := .Interface.Methods}}
+{{- $isStreaming := false}}
+{{- range $method.Results}}
+	{{- if contains "Client" .Type}}
+		{{- $isStreaming = true}}
+	{{- end}}
+{{- end}}
+
+func (c *{{$decorator}}) {{$method.Declaration}} {
+	{{- if $isStreaming}}
+	{{$method.Pass "c.client."}}
+	{{- else}}
+	{{- if eq (len $method.Results) 1}}
+	_, err = hedge(ctx, c.hedger, "{{$operation}}{{$method.Name}}", func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, c.client.{{$method.Call}}
+	})
+	return err
+	{{- else}}
+	return hedge(ctx, c.hedger, "{{$operation}}{{$method.Name}}", func(ctx context.Context) ({{(index $method.Results 0).Type}}, error) {
+		return c.client.{{$method.Call}}
+	})
+	{{- end}}
+	{{- end}}
+}
+{{end}}

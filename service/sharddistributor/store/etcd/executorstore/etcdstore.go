@@ -387,6 +387,25 @@ func (s *executorStoreImpl) parseDrainedHostKVs(namespace string, kvs []*mvccpb.
 }
 
 func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {
+	// Start the watch in a blocking way, so the watch is live before returning.
+	watchChan := s.client.Watch(ctx,
+		etcdkeys.BuildExecutorsPrefix(s.prefix, namespace),
+		clientv3.WithPrefix(),
+		clientv3.WithPrevKV(),
+		clientv3.WithCreatedNotify(),
+	)
+	// Check the server has started the watch before returning.
+	created, ok := <-watchChan
+	if !ok {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("watch closed before it was created: %w", err)
+		}
+		return nil, errors.New("watch closed before it was created")
+	}
+	if err := created.Err(); err != nil {
+		return nil, fmt.Errorf("create watch: %w", err)
+	}
+
 	revisionChan := make(chan int64, 1)
 
 	go func() {
@@ -395,12 +414,6 @@ func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context
 		scope := s.metricsClient.Scope(metrics.ShardDistributorWatchScope).
 			Tagged(metrics.NamespaceTag(namespace)).
 			Tagged(metrics.ShardDistributorWatchTypeTag("rebalance"))
-
-		watchChan := s.client.Watch(ctx,
-			etcdkeys.BuildExecutorsPrefix(s.prefix, namespace),
-			clientv3.WithPrefix(),
-			clientv3.WithPrevKV(),
-		)
 
 		for watchResp := range watchChan {
 			if err := watchResp.Err(); err != nil {

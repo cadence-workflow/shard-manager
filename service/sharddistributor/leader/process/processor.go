@@ -156,16 +156,16 @@ func (p *namespaceProcessor) Terminate(ctx context.Context) error {
 // runTerm rebalances and cleans up shard stats once, then rebalances on executor changes until the term ends.
 // A failed rebalance is not retried, the next term starts with a fresh one.
 func (p *namespaceProcessor) runTerm(ctx context.Context) {
-	// Perform an initial rebalance on startup.
-	err := p.rebalanceShards(ctx)
-	if err != nil {
+	// Subscribing before the initial rebalance so we don't miss any changes.
+	updateChan, subscribeErr := p.shardStore.SubscribeToExecutorStatusChanges(ctx, p.namespaceCfg.Name)
+
+	// Perform an initial rebalance on startup, even without a subscription.
+	if err := p.rebalanceShards(ctx); err != nil {
 		p.logRebalanceError("initial rebalance failed", "initial rebalance version conflict", err)
 	}
 
-	// The subscription keeps at most one pending change, so it never blocks the watch.
-	updateChan, err := p.shardStore.SubscribeToExecutorStatusChanges(ctx, p.namespaceCfg.Name)
-	if err != nil {
-		p.logger.Error("Failed to subscribe to state changes, stopping rebalancing loop.", tag.Error(err))
+	if subscribeErr != nil {
+		p.logger.Error("Failed to subscribe to state changes, stopping rebalancing loop.", tag.Error(subscribeErr))
 		return
 	}
 

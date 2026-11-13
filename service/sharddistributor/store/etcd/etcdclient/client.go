@@ -2,13 +2,11 @@ package etcdclient
 
 import (
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/client/v3/concurrency"
 )
 
 //go:generate mockgen -package $GOPACKAGE -source $GOFILE -destination=client_mock.go Client
 
-// Client is an interface that groups the etcd clientv3 interfaces
-// and provides session creation for distributed coordination.
+// Client is an interface that groups the etcd clientv3 interfaces.
 type Client interface {
 	clientv3.Cluster
 	clientv3.KV
@@ -19,10 +17,6 @@ type Client interface {
 
 	// Close closes the client connection.
 	Close() error
-
-	// NewSession creates a new etcd session for distributed coordination.
-	// This enables leader election and distributed locking via the concurrency package.
-	NewSession(opts ...concurrency.SessionOption) (*concurrency.Session, error)
 }
 
 // Ensure *clientv3.Client can be wrapped to implement Client.
@@ -36,9 +30,4 @@ type clientWrapper struct {
 // NewClient wraps a clientv3.Client to implement the Client interface.
 func NewClient(c *clientv3.Client) Client {
 	return &clientWrapper{Client: c}
-}
-
-// NewSession creates a new etcd session for distributed coordination.
-func (c *clientWrapper) NewSession(opts ...concurrency.SessionOption) (*concurrency.Session, error) {
-	return concurrency.NewSession(c.Client, opts...)
 }

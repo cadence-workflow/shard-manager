@@ -209,10 +209,10 @@ func (h *namespaceHandler) campaigning(ctx context.Context) stateFn {
 				return h.campaigning
 			}
 			if isLeader {
-				h.logger.Info("Became leader for namespace")
+				h.logger.Debug("Became leader for namespace")
 				h.leaderScope.UpdateGauge(metrics.ShardDistributorIsLeader, 1)
 			} else {
-				h.logger.Info("Lost leadership for namespace")
+				h.logger.Debug("Lost leadership for namespace")
 				h.leaderScope.UpdateGauge(metrics.ShardDistributorIsLeader, 0)
 			}
 		case <-metricsTicker.C:

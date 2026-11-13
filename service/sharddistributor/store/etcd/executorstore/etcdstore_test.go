@@ -720,14 +720,14 @@ func TestGuardedOperations(t *testing.T) {
 	elector, err := leaderstore.NewLeaderStore(leaderstore.StoreParams{Client: tc.Client, Cfg: leaderCfg})
 	require.NoError(t, err)
 	election1, err := elector.CreateElection(ctx, namespace)
-	defer election1.Cleanup(ctx)
-	defer func() { _ = election1.Cleanup(ctx) }()
+	require.NoError(t, err)
 	election2, err := elector.CreateElection(ctx, namespace)
-	defer election2.Cleanup(ctx)
-	defer func() { _ = election2.Cleanup(ctx) }()
+	require.NoError(t, err)
+	defer func() { _ = election2.Resign(ctx) }()
 
 	// 2. First node becomes leader
-	require.NoError(t, election1.Campaign(ctx, "host-1"))
+	_, err = election1.Campaign(ctx, "host-1")
+	require.NoError(t, err)
 	validGuard := election1.Guard()
 
 	// 3. Use the valid guard to assign shards - should succeed
@@ -741,7 +741,8 @@ func TestGuardedOperations(t *testing.T) {
 
 	// 4. First node resigns, second node becomes leader
 	require.NoError(t, election1.Resign(ctx))
-	require.NoError(t, election2.Campaign(ctx, "host-2"))
+	_, err = election2.Campaign(ctx, "host-2")
+	require.NoError(t, err)
 
 	// 5. Use the now-invalid guard from the first leader - should fail
 	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{

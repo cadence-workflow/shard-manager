@@ -9,189 +9,102 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
 	"github.com/cadence-workflow/shard-manager/testflags"
 )
 
-// TestCreateElection tests that an election can be created successfully
-func TestCreateElection(t *testing.T) {
+const _testTerm = 2 * time.Second
+
+// TestTermExpiresWithoutRenewal checks that etcd ends a term the holder never touches again,
+// and that the holder's writes are fenced once another instance takes over.
+func TestTermExpiresWithoutRenewal(t *testing.T) {
 	tc := setupETCDCluster(t)
-
-	timeout := 5 * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	namespace := "test-namespace"
-	elect, err := tc.store.CreateElection(ctx, namespace)
-	require.NoError(t, err)
-	require.NotNil(t, elect)
-
-	// Clean up
-	err = elect.Cleanup(ctx)
-	require.NoError(t, err)
-}
-
-// TestCampaign tests that a node can campaign for leadership
-func TestCampaign(t *testing.T) {
-	tc := setupETCDCluster(t)
-
-	// Use a separate context for test operations
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	namespace := "test-namespace-campaign"
-	election, err := tc.store.CreateElection(ctx, namespace)
+	stalled := tc.newElection(ctx, t)
+	stalledTerm, err := stalled.Campaign(ctx, "stalled-host")
 	require.NoError(t, err)
-	defer election.Cleanup(ctx)
+	assert.True(t, tc.guardedPut(ctx, t, stalled.Guard()))
 
-	// Start campaigning for leadership
-	host := "test-host-1"
-	err = election.Campaign(ctx, host)
+	start := time.Now()
+	healthy := tc.newElection(ctx, t)
+	_, err = healthy.Campaign(ctx, "healthy-host")
 	require.NoError(t, err)
+	assert.Greater(t, time.Since(start), _testTerm/2, "takeover should wait for lease expiry")
+	assert.Less(t, time.Since(start), _testTerm+time.Second, "takeover should follow lease expiry")
 
-	// Verify leadership was obtained by checking the key in etcd
-	// First create a client to connect to etcd
-	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   tc.endpoints,
-		DialTimeout: 5 * time.Second,
+	assert.ErrorIs(t, stalledTerm.Err(), context.DeadlineExceeded, "the stalled term should have ended before the takeover")
+	assert.False(t, tc.guardedPut(ctx, t, stalled.Guard()), "a stale holder must not commit")
+	assert.True(t, tc.guardedPut(ctx, t, healthy.Guard()))
+}
+
+func TestCampaignWaitsForLeader(t *testing.T) {
+	t.Run("resign hands over before the term ends", func(t *testing.T) {
+		tc, ctx := setupETCDCluster(t), t.Context()
+		leader := tc.newElection(ctx, t)
+		_, err := leader.Campaign(ctx, "leader")
+		require.NoError(t, err)
+
+		tc.campaignAfter(ctx, t, func() { require.NoError(t, leader.Resign(ctx)) })
 	})
-	require.NoError(t, err)
-	defer client.Close()
+	t.Run("key from the previous election code blocks until deleted", func(t *testing.T) {
+		tc, ctx := setupETCDCluster(t), t.Context()
+		key := fmt.Sprintf("%s/%s/leader/694d7f3a", tc.storeConfig.Prefix, _testNamespace)
+		_, err := tc.client.Put(ctx, key, "old-host")
+		require.NoError(t, err)
 
-	// Get the key and verify it exists
-	key := fmt.Sprintf("%s/%s/leader", tc.storeConfig.Prefix, namespace)
-	resp, err := client.Get(ctx, key)
-	require.NoError(t, err)
-	require.NotEqual(t, 0, resp.Count, "Leader key should exist")
+		tc.campaignAfter(ctx, t, func() {
+			_, err := tc.client.Delete(ctx, key)
+			require.NoError(t, err)
+		})
+	})
 }
 
-// TestResign tests resigning leadership
-func TestResign(t *testing.T) {
-	tc := setupETCDCluster(t)
-
-	// Use a separate context for test operations
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+// campaignAfter checks that a campaign waits for release and wins well before the term ends.
+func (tc *testCluster) campaignAfter(ctx context.Context, t *testing.T, release func()) {
+	contender := tc.newElection(ctx, t)
+	campaignCtx, cancel := context.WithTimeout(ctx, _testTerm/2)
 	defer cancel()
-
-	namespace := "test-namespace-resign"
-	election, err := tc.store.CreateElection(ctx, namespace)
-	require.NoError(t, err)
-	defer election.Cleanup(ctx)
-
-	// Start campaigning for leadership
-	host := "test-host-1"
-	err = election.Campaign(ctx, host)
-	require.NoError(t, err)
-
-	// Resign the leadership
-	err = election.Resign(ctx)
-	require.NoError(t, err)
-
-	// Verify leadership was resigned by checking that someone else can become leader
-	election2, err := tc.store.CreateElection(ctx, namespace)
-	require.NoError(t, err)
-	defer election2.Cleanup(ctx)
-
-	err = election2.Campaign(ctx, "host-2")
-	require.NoError(t, err, "Second host should be able to become leader after first resigned")
-}
-
-// TestMultipleNodes tests multiple nodes competing for leadership
-func TestMultipleNodes(t *testing.T) {
-	tc := setupETCDCluster(t)
-
-	// Use a separate context for test operations
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	namespace := "test-namespace-multiple"
-
-	// Create first election
-	election1, err := tc.store.CreateElection(ctx, namespace)
-	require.NoError(t, err)
-	defer election1.Cleanup(ctx)
-
-	// Create second election
-	election2, err := tc.store.CreateElection(ctx, namespace)
-	require.NoError(t, err)
-	defer election2.Cleanup(ctx)
-
-	// First node campaigns
-	err = election1.Campaign(ctx, "host1")
-	require.NoError(t, err)
-
-	// Second node campaigns - this should block as first node already has leadership
-	// We'll use a channel to track when it's done and a shorter context to timeout
-	campaignResult := make(chan error, 1)
-
-	ctxTimeout, cancelTimeout := context.WithTimeout(ctx, 1*time.Second)
-	defer cancelTimeout()
-
+	result := make(chan error, 1)
 	go func() {
-		campaignResult <- election2.Campaign(ctxTimeout, "host2")
+		_, err := contender.Campaign(campaignCtx, "contender")
+		result <- err
 	}()
 
-	// Verify second node is blocked (should timeout)
-	select {
-	case err := <-campaignResult:
-		// Expected to get a timeout error
-		require.Error(t, err, "Expected a timeout error for the second campaign")
-		require.Contains(t, err.Error(), "context deadline exceeded", "Expected a context deadline error")
-	case <-time.After(3 * time.Second):
-		t.Error("Expected the second campaign to timeout quickly")
-	}
-
-	// First node resigns
-	err = election1.Resign(ctx)
-	require.NoError(t, err)
-
-	// Now the second node should be able to become leader
-	// Create a new election for the second host
-	election3, err := tc.store.CreateElection(ctx, namespace)
-	require.NoError(t, err)
-	defer election3.Cleanup(ctx)
-
-	err = election3.Campaign(ctx, "host3")
-	require.NoError(t, err, "Third host should be able to become leader after first host resigned")
+	time.Sleep(100 * time.Millisecond)
+	require.Empty(t, result, "campaign should wait for release")
+	release()
+	assert.NoError(t, <-result)
 }
 
-// TestSessionDone tests the Done channel behavior
-func TestSessionDone(t *testing.T) {
-	tc := setupETCDCluster(t)
+const _testNamespace = "test-namespace"
 
-	// Use a separate context for test operations
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	namespace := "test-namespace-done"
-	election, err := tc.store.CreateElection(ctx, namespace)
+func (tc *testCluster) newElection(ctx context.Context, t *testing.T) store.Election {
+	election, err := tc.store.CreateElection(ctx, _testNamespace)
 	require.NoError(t, err)
+	return election
+}
 
-	doneCh := election.Done()
-	require.NotNil(t, doneCh)
-
-	// Clean up should close the session, which should close the Done channel
-	err = election.Cleanup(ctx)
+func (tc *testCluster) guardedPut(ctx context.Context, t *testing.T, guard store.GuardFunc) bool {
+	txn, err := guard(tc.client.Txn(ctx))
 	require.NoError(t, err)
-
-	// Verify the Done channel is closed
-	select {
-	case <-doneCh:
-		// Expected - channel should be closed
-	case <-time.After(2 * time.Second):
-		t.Error("Done channel should be closed after Cleanup")
-	}
+	resp, err := txn.(clientv3.Txn).Then(clientv3.OpPut(tc.storeConfig.Prefix+"/data", "value")).Commit()
+	require.NoError(t, err)
+	return resp.Succeeded
 }
 
 // testCluster represents a test etcd cluster with its resources
 type testCluster struct {
 	store       store.Elector
 	storeConfig etcdclient.LeaderStoreConfig
-	endpoints   []string
+	client      *clientv3.Client
 }
 
 // setupETCDCluster initializes an etcd cluster for testing
@@ -215,7 +128,6 @@ func setupETCDCluster(t *testing.T) *testCluster {
 			DialTimeout: 5 * time.Second,
 			Prefix:      fmt.Sprintf("/election/%s", t.Name()),
 		},
-		ElectionTTL: 5 * time.Second,
 	}
 
 	// Create etcd client
@@ -225,11 +137,14 @@ func setupETCDCluster(t *testing.T) *testCluster {
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { rawClient.Close() })
+	_, err = rawClient.Delete(context.Background(), testConfig.Prefix, clientv3.WithPrefix())
+	require.NoError(t, err)
 
 	// Create store
 	storeParams := StoreParams{
-		Client: etcdclient.NewClient(rawClient),
-		Cfg:    testConfig,
+		Client:            etcdclient.NewClient(rawClient),
+		Cfg:               testConfig,
+		ShardDistribution: config.ShardDistribution{Process: config.LeaderProcess{Period: _testTerm}},
 	}
 
 	store, err := NewLeaderStore(storeParams)
@@ -238,6 +153,6 @@ func setupETCDCluster(t *testing.T) *testCluster {
 	return &testCluster{
 		store:       store,
 		storeConfig: testConfig,
-		endpoints:   endpoints,
+		client:      rawClient,
 	}
 }

@@ -21,8 +21,6 @@ dynamicconfig:
 
 shardDistribution:
   election:
-    leaderPeriod: 60s
-    maxRandomDelay: 1s
     failedElectionCooldown: 1s
   namespaces:
     - name: shard-distributor-canary

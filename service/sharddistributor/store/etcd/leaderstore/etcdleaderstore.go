@@ -80,7 +80,8 @@ func (e *election) Campaign(ctx context.Context, host string) (context.Context, 
 		if err != nil {
 			return nil, fmt.Errorf("grant lease: %w", err)
 		}
-		// If the put applied despite an error, the key expires with the lease.
+		// Recorded before the put, so Resign revokes the lease if the put applied despite an error.
+		e.leaseID = lease.ID
 		resp, err := e.client.Txn(ctx).
 			If(clientv3.Compare(clientv3.CreateRevision(e.prefix), "=", 0).WithPrefix()).
 			Then(clientv3.OpPut(e.key(lease.ID), host, clientv3.WithLease(lease.ID))).
@@ -93,7 +94,7 @@ func (e *election) Campaign(ctx context.Context, host string) (context.Context, 
 			continue
 		}
 
-		e.leaseID, e.rev = lease.ID, resp.Header.Revision
+		e.rev = resp.Header.Revision
 		// Measured from before the grant so the term ends here before etcd expires the lease.
 		termCtx, endTerm := context.WithDeadline(ctx, start.Add(time.Duration(lease.TTL)*time.Second))
 		e.endTerm = endTerm
@@ -145,7 +146,9 @@ func (e *election) Resign(ctx context.Context) error {
 	if e.leaseID == clientv3.NoLease {
 		return nil
 	}
-	e.endTerm()
+	if e.endTerm != nil {
+		e.endTerm()
+	}
 	// Revoking deletes the leader key. A lease that already expired took the key with it.
 	if _, err := e.client.Revoke(ctx, e.leaseID); err != nil && !errors.Is(err, rpctypes.ErrLeaseNotFound) {
 		return fmt.Errorf("revoke lease: %w", err)
@@ -155,6 +158,10 @@ func (e *election) Resign(ctx context.Context) error {
 
 func (e *election) Guard() store.GuardFunc {
 	return func(txn store.Txn) (store.Txn, error) {
+		// Without a term the compare would match the missing key's zero create revision.
+		if e.rev == 0 {
+			return nil, errors.New("guard used without a leadership term")
+		}
 		// The guard receives the generic Txn and asserts it to the concrete type it expects.
 		etcdTxn, ok := txn.(clientv3.Txn)
 		if !ok {

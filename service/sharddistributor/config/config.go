@@ -67,7 +67,7 @@ type (
 
 	LeaderProcess struct {
 		// Period is the leadership term, and each term starts with a shard rebalance.
-		// Minimum 2 seconds, etcd's minimum lease TTL.
+		// Minimum 2 seconds, which is etcd's default minimum lease TTL.
 		Period time.Duration `yaml:"period"`
 
 		// RebalanceCooldown is the minimum duration between shard rebalance operations

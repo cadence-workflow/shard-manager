@@ -2,6 +2,7 @@ package leaderstore
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.uber.org/mock/gomock"
 
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -82,6 +84,33 @@ func (tc *testCluster) campaignAfter(ctx context.Context, t *testing.T, release 
 	require.Empty(t, result, "campaign should wait for release")
 	release()
 	assert.NoError(t, <-result)
+}
+
+func TestResignRevokesLeaseAfterFailedCommit(t *testing.T) {
+	client := etcdclient.NewMockClient(gomock.NewController(t))
+	client.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&clientv3.GetResponse{}, nil)
+	client.EXPECT().Grant(gomock.Any(), gomock.Any()).Return(&clientv3.LeaseGrantResponse{ID: 7, TTL: 2}, nil)
+	client.EXPECT().Txn(gomock.Any()).Return(failingTxn{})
+	client.EXPECT().Revoke(gomock.Any(), clientv3.LeaseID(7)).Return(&clientv3.LeaseRevokeResponse{}, nil)
+
+	e := &election{client: client, prefix: "leader/ns/leader/", term: _testTerm}
+	_, err := e.Campaign(t.Context(), "host")
+	require.Error(t, err)
+	require.NoError(t, e.Resign(t.Context()))
+}
+
+func TestGuardRejectsElectionWithoutTerm(t *testing.T) {
+	_, err := (&election{}).Guard()(failingTxn{})
+	assert.Error(t, err)
+}
+
+// failingTxn is a transaction whose commit fails, as on a timeout where the put may still apply.
+type failingTxn struct{ clientv3.Txn }
+
+func (t failingTxn) If(...clientv3.Cmp) clientv3.Txn  { return t }
+func (t failingTxn) Then(...clientv3.Op) clientv3.Txn { return t }
+func (failingTxn) Commit() (*clientv3.TxnResponse, error) {
+	return nil, errors.New("commit timed out")
 }
 
 const _testNamespace = "test-namespace"

@@ -18,6 +18,9 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
 )
 
+// _minTerm matches etcd's default minimum lease TTL.
+const _minTerm = 2 * time.Second
+
 type LeaderStore struct {
 	client etcdclient.Client
 	config etcdclient.LeaderStoreConfig
@@ -40,7 +43,7 @@ func NewLeaderStore(p StoreParams) (store.Elector, error) {
 	return &LeaderStore{
 		client: p.Client,
 		config: p.Cfg,
-		term:   p.ShardDistribution.Process.Period,
+		term:   max(p.ShardDistribution.Process.Period, _minTerm),
 	}, nil
 }
 

@@ -139,13 +139,8 @@ func (w *namespaceWatcher) watchNamespace(namespace string, changeChan chan<- st
 		etcdkeys.BuildNamespacePrefix(w.prefix, namespace),
 		clientv3.WithPrefix(),
 		clientv3.WithPrevKV(),
+		clientv3.WithCreatedNotify(),
 	)
-
-	// A reconnected watch resumes at the current revision, so anything written while
-	// it was down is never delivered. Signalling here makes the subscriber re-read and
-	// pick those changes up. It must follow the Watch call: a read the subscriber
-	// starts before the watch exists could miss writes that land in between.
-	w.signalNamespaceChange(changeChan)
 
 	for watchResp := range watchChan {
 		if err := watchResp.Err(); err != nil {
@@ -155,7 +150,10 @@ func (w *namespaceWatcher) watchNamespace(namespace string, changeChan chan<- st
 		sw := scope.StartTimer(metrics.ShardDistributorWatchProcessingLatency)
 		scope.AddCounter(metrics.ShardDistributorWatchEventsReceived, int64(len(watchResp.Events)))
 
-		if w.hasNamespaceStateChanged(watchResp, namespace) {
+		// A reconnected watch resumes at the current revision, so anything written while
+		// it was down is never delivered. Signalling once etcd confirms the watch is created
+		// makes the subscriber re-read, and every write after that read is delivered.
+		if watchResp.Created || w.hasNamespaceStateChanged(watchResp, namespace) {
 			w.signalNamespaceChange(changeChan)
 		}
 		sw.Stop()

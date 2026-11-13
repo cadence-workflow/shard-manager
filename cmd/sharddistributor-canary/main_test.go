@@ -26,7 +26,6 @@ func TestDependenciesAreSatisfied(t *testing.T) {
 					Ephemeral: canaryConfig.NamespaceConfig{Name: defaultEphemeralNamespace, NumExecutors: defaultNumExecutors},
 					Load: canaryConfig.LoadConfig{
 						Namespace:          tt.loadNamespace,
-						NumShards:          defaultLoadNumShards,
 						Interval:           defaultLoadInterval,
 						BaselineExecutors:  defaultLoadBaselineExecutors,
 						NumExecutors:       defaultLoadNumExecutors,

@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/urfave/cli/v3"
 	"net"
 	"os"
 	"time"
 
 	"github.com/uber-go/tally"
-	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/api/peer"
@@ -35,7 +35,6 @@ const (
 	defaultNumExecutors             = 1
 
 	defaultLoadNamespace          = ""
-	defaultLoadNumShards          = 10000
 	defaultLoadInterval           = time.Hour
 	defaultLoadBaselineExecutors  = 1
 	defaultLoadNumExecutors       = 50
@@ -59,7 +58,6 @@ func runApp(c *cli.Command) {
 			},
 			Load: canaryConfig.LoadConfig{
 				Namespace:          c.String("load-namespace"),
-				NumShards:          c.Int("load-num-shards"),
 				Interval:           c.Duration("load-interval"),
 				BaselineExecutors:  c.Int("load-baseline-executors"),
 				NumExecutors:       c.Int("load-num-executors"),
@@ -210,12 +208,7 @@ func buildCLI() *cli.Command {
 				&cli.StringFlag{
 					Name:  "load-namespace",
 					Value: defaultLoadNamespace,
-					Usage: "fixed namespace for the periodic load run. Draining shard 0 of the namespace pauses it",
-				},
-				&cli.IntFlag{
-					Name:  "load-num-shards",
-					Value: defaultLoadNumShards,
-					Usage: "number of shards of the load namespace",
+					Usage: "fixed namespace for the periodic load run, empty string disables the run. Draining shard 0 of the namespace pauses it",
 				},
 				&cli.DurationFlag{
 					Name:  "load-interval",
@@ -235,7 +228,7 @@ func buildCLI() *cli.Command {
 				&cli.IntFlag{
 					Name:  "load-executors-per-second",
 					Value: defaultLoadExecutorsPerSecond,
-					Usage: "rate at which a load run starts and stops its extra executors",
+					Usage: "highest rate at which a load run starts and stops its extra executors",
 				},
 				&cli.DurationFlag{
 					Name:  "load-hold",
@@ -245,7 +238,7 @@ func buildCLI() *cli.Command {
 				&cli.DurationFlag{
 					Name:  "load-convergence-timeout",
 					Value: defaultLoadConvergenceTimeout,
-					Usage: "how long a load run waits, after scaling up and after scaling down, for GetShardOwner to agree with the local shard holders",
+					Usage: "how long a load run waits, after scaling up and after scaling down, for the shard distributor's namespace state to agree with the local shard holders",
 				},
 			},
 			Action: func(_ context.Context, c *cli.Command) error {

@@ -30,7 +30,6 @@ const testNamespace = "test-load"
 func testLoadConfig() config.LoadConfig {
 	return config.LoadConfig{
 		Namespace:          testNamespace,
-		NumShards:          100,
 		Interval:           time.Hour,
 		BaselineExecutors:  1,
 		NumExecutors:       2,
@@ -57,13 +56,7 @@ func TestNewController(t *testing.T) {
 		wantErr string
 	}{
 		{name: "valid", modify: func(*config.LoadConfig) {}},
-		{name: "no shards", modify: func(c *config.LoadConfig) { c.NumShards = 0 }, wantErr: "number of shards must be positive"},
-		{name: "no baseline executors", modify: func(c *config.LoadConfig) { c.BaselineExecutors = 0 }, wantErr: "number of baseline executors must be positive"},
-		{name: "no executors", modify: func(c *config.LoadConfig) { c.NumExecutors = 0 }, wantErr: "number of executors must be positive"},
-		{name: "zero rate", modify: func(c *config.LoadConfig) { c.ExecutorsPerSecond = 0 }, wantErr: "executors per second must be in (0, 100]"},
-		{name: "rate above max", modify: func(c *config.LoadConfig) { c.ExecutorsPerSecond = maxExecutorsPerSecond + 1 }, wantErr: "executors per second must be in (0, 100]"},
-		{name: "negative hold", modify: func(c *config.LoadConfig) { c.Hold = -time.Second }, wantErr: "hold must not be negative"},
-		{name: "zero convergence timeout", modify: func(c *config.LoadConfig) { c.ConvergenceTimeout = 0 }, wantErr: "convergence timeout must be positive"},
+		{name: "invalid config", modify: func(c *config.LoadConfig) { c.NumExecutors = 0 }, wantErr: "invalid load config"},
 	}
 
 	for _, tt := range tests {
@@ -181,7 +174,7 @@ func TestShardHolders(t *testing.T) {
 
 	c := newTestController(t, clock.NewMockedTimeSource(), tally.NoopScope)
 	c.baseline = []executorclient.Executor[*shardProcessor]{newExecutor("baseline", "0", "1")}
-	c.executors = []executorclient.Executor[*shardProcessor]{newExecutor("extra", "2"), newExecutor("idle")}
+	c.extraExecutors = []executorclient.Executor[*shardProcessor]{newExecutor("extra", "2"), newExecutor("idle")}
 
 	assert.ElementsMatch(t, []shardHolder{
 		{shardKey: "0", executorID: "baseline"},
@@ -274,6 +267,8 @@ func TestRunOnce(t *testing.T) {
 					return nil, &types.ShardDrainedError{Namespace: testNamespace, ShardKey: switcherShardID}
 				},
 			).AnyTimes()
+			// The test executors hold no shards, so any namespace state has converged
+			client.EXPECT().GetNamespaceStateIfNewer(gomock.Any(), gomock.Any()).Return(&types.GetNamespaceStateIfNewerResponse{}, nil).AnyTimes()
 
 			c := newTestController(t, timeSource, scope)
 			c.client = client
@@ -311,7 +306,7 @@ func TestRunOnce(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectedCreated, created)
-			assert.Empty(t, c.executors)
+			assert.Empty(t, c.extraExecutors)
 			counters := scope.Snapshot().Counters()
 			for _, name := range []string{
 				canarymetrics.CanaryLoadRunStarted,

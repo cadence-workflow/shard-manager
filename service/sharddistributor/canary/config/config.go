@@ -1,12 +1,18 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 )
 
-const heartBeatInterval = time.Second
+const (
+	heartBeatInterval = time.Second
+
+	maxLoadExecutorsPerSecond = 100
+)
 
 // Config is the configuration for the shard distributor canary
 type Config struct {
@@ -53,9 +59,6 @@ type LoadConfig struct {
 	// Empty disables the load run.
 	Namespace string `yaml:"namespace"`
 
-	// NumShards is the number of shards for the namespace
-	NumShards int `yaml:"numShards"`
-
 	// Interval is the time between runs, before jitter
 	Interval time.Duration `yaml:"interval"`
 
@@ -66,13 +69,36 @@ type LoadConfig struct {
 	// of its baseline during a run
 	NumExecutors int `yaml:"numExecutors"`
 
-	// ExecutorsPerSecond is the rate at which a run starts and stops the extra executors
+	// ExecutorsPerSecond is the highest rate at which a run starts and stops the
+	// extra executors
 	ExecutorsPerSecond int `yaml:"executorsPerSecond"`
 
 	// Hold is how long a run keeps extra executors running before stopping them
 	Hold time.Duration `yaml:"hold"`
 
 	// ConvergenceTimeout is how long a run waits, after scaling up and after
-	// scaling down, for GetShardOwner to agree with the local shard holders
+	// scaling down, for the shard distributor's namespace state to agree with
+	// the local shard holders
 	ConvergenceTimeout time.Duration `yaml:"convergenceTimeout"`
+}
+
+// Validate reports the first invalid setting of an enabled load run
+func (c LoadConfig) Validate() error {
+	switch {
+	case c.Namespace == "":
+		return errors.New("namespace must be set")
+	case c.Interval <= 0:
+		return errors.New("interval must be positive")
+	case c.BaselineExecutors <= 0:
+		return errors.New("number of baseline executors must be positive")
+	case c.NumExecutors <= 0:
+		return errors.New("number of executors must be positive")
+	case c.ExecutorsPerSecond <= 0 || c.ExecutorsPerSecond > maxLoadExecutorsPerSecond:
+		return fmt.Errorf("executors per second must be in (0, %d]", maxLoadExecutorsPerSecond)
+	case c.Hold < 0:
+		return errors.New("hold must not be negative")
+	case c.ConvergenceTimeout <= 0:
+		return errors.New("convergence timeout must be positive")
+	}
+	return nil
 }

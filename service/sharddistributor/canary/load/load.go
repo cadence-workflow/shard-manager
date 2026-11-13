@@ -10,8 +10,8 @@
 // distributor's cache to converge, see convergenceChecker.
 //
 // Draining switcherShardID pauses the load: no new run starts, and a run in
-// progress skips the rest of its scale-up and hold and scales down at the
-// usual rate.
+// progress skips the rest of its scale-up, hold and convergence checks and
+// scales down at the usual rate.
 package load
 
 import (
@@ -36,9 +36,9 @@ import (
 )
 
 const (
-	intervalJitterCoeff   = 0.1
-	maxExecutorsPerSecond = 100
-	pollInterval          = time.Second
+	intervalJitterCoeff = 0.1
+	pollJitterCoeff     = 0.5
+	pollInterval        = time.Second
 
 	phaseScaleUp   = "scale_up"
 	phaseScaleDown = "scale_down"
@@ -70,9 +70,10 @@ type Controller struct {
 	timeSource  clock.TimeSource
 	scope       tally.Scope
 
-	mu        sync.RWMutex
-	baseline  []executorclient.Executor[*shardProcessor]
-	executors []executorclient.Executor[*shardProcessor]
+	baseline []executorclient.Executor[*shardProcessor]
+
+	mu             sync.RWMutex
+	extraExecutors []executorclient.Executor[*shardProcessor]
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -80,7 +81,7 @@ type Controller struct {
 
 // NewController creates a Controller that runs load against cfg.Namespace.
 func NewController(params Params, cfg config.LoadConfig) (*Controller, error) {
-	if err := validate(cfg); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid load config: %w", err)
 	}
 
@@ -116,28 +117,6 @@ func NewController(params Params, cfg config.LoadConfig) (*Controller, error) {
 	return c, nil
 }
 
-func validate(cfg config.LoadConfig) error {
-	switch {
-	case cfg.Namespace == "":
-		return errors.New("namespace must be set")
-	case cfg.NumShards <= 0:
-		return errors.New("number of shards must be positive")
-	case cfg.Interval <= 0:
-		return errors.New("interval must be positive")
-	case cfg.BaselineExecutors <= 0:
-		return errors.New("number of baseline executors must be positive")
-	case cfg.NumExecutors <= 0:
-		return errors.New("number of executors must be positive")
-	case cfg.ExecutorsPerSecond <= 0 || cfg.ExecutorsPerSecond > maxExecutorsPerSecond:
-		return fmt.Errorf("executors per second must be in (0, %d]", maxExecutorsPerSecond)
-	case cfg.Hold < 0:
-		return errors.New("hold must not be negative")
-	case cfg.ConvergenceTimeout <= 0:
-		return errors.New("convergence timeout must be positive")
-	}
-	return nil
-}
-
 // Module provides the load Controller and starts it
 func Module(cfg config.LoadConfig) fx.Option {
 	if cfg.Namespace == "" {
@@ -170,9 +149,7 @@ func (c *Controller) Start() error {
 	for _, executor := range baseline {
 		executor.Start(ctx)
 	}
-	c.mu.Lock()
 	c.baseline = baseline
-	c.mu.Unlock()
 
 	c.wg.Add(1)
 	go func() {
@@ -187,12 +164,7 @@ func (c *Controller) Start() error {
 func (c *Controller) Stop() {
 	c.cancel()
 	c.wg.Wait()
-
-	c.mu.Lock()
-	baseline := c.baseline
-	c.baseline = nil
-	c.mu.Unlock()
-	stopExecutors(baseline)
+	stopExecutors(c.baseline)
 }
 
 func (c *Controller) loop(ctx context.Context) {
@@ -217,7 +189,7 @@ func (c *Controller) runOnce(ctx context.Context) {
 	c.logger.Info("load run started")
 	start := c.timeSource.Now()
 	err := c.run(ctx)
-	c.scope.Timer(canarymetrics.CanaryLoadRunDuration).Record(c.timeSource.Since(start))
+	c.scope.Histogram(canarymetrics.CanaryLoadRunDuration, canarymetrics.CanaryLoadDurationBuckets).RecordDuration(c.timeSource.Since(start))
 
 	if err != nil {
 		c.scope.Counter(canarymetrics.CanaryLoadRunFailed).Inc(1)
@@ -229,26 +201,14 @@ func (c *Controller) runOnce(ctx context.Context) {
 }
 
 func (c *Controller) run(ctx context.Context) error {
-	// On errors and shutdown, the remaining extra executors stop at once.
-	// The shard distributor reassigns their shards to the baseline executors
-	defer func() {
-		c.mu.Lock()
-		executors := c.executors
-		c.executors = nil
-		c.mu.Unlock()
-		stopExecutors(executors)
-		c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(0)
-	}()
+	defer c.stopExtraExecutors()
 
-	ticker := c.timeSource.NewTicker(time.Second / time.Duration(c.cfg.ExecutorsPerSecond))
-	defer ticker.Stop()
-
-	started, err := c.scaleUp(ctx, ticker)
+	paused, err := c.scaleUp(ctx)
 	if err != nil {
 		return err
 	}
 	// A drained switcher shard cuts the scale-up short, the run then scales down straight away
-	if started == c.cfg.NumExecutors {
+	if !paused {
 		if err := c.convergence.await(ctx, phaseScaleUp); err != nil {
 			return err
 		}
@@ -256,43 +216,46 @@ func (c *Controller) run(ctx context.Context) error {
 			return err
 		}
 	}
-
-	for range started {
-		if err := waitTick(ctx, ticker); err != nil {
-			return err
-		}
-		var stopped executorclient.Executor[*shardProcessor]
-		c.updateExecutors(func(executors []executorclient.Executor[*shardProcessor]) []executorclient.Executor[*shardProcessor] {
-			last := len(executors) - 1
-			stopped = executors[last]
-			return executors[:last]
-		})
-		stopped.Stop()
+	if err := c.scaleDown(ctx); err != nil {
+		return err
 	}
 	return c.convergence.await(ctx, phaseScaleDown)
 }
 
-// scaleUp starts up to cfg.NumExecutors executors, one per tick, and stops
-// early once the switcher shard is drained
-// It returns how many it started
-func (c *Controller) scaleUp(ctx context.Context, ticker clock.Ticker) (int, error) {
-	for started := range c.cfg.NumExecutors {
-		if err := waitTick(ctx, ticker); err != nil {
-			return started, err
+// scaleUp starts cfg.NumExecutors executors at cfg.ExecutorsPerSecond and
+// reports whether it stopped early because the switcher shard is drained
+func (c *Controller) scaleUp(ctx context.Context) (paused bool, err error) {
+	for range c.cfg.NumExecutors {
+		if err := c.timeSource.SleepWithContext(ctx, c.executorStep()); err != nil {
+			return false, err
 		}
 		if c.windingDown(ctx) {
-			return started, nil
+			return true, nil
 		}
 		executor, err := c.newExecutor()
 		if err != nil {
-			return started, fmt.Errorf("create load executor: %w", err)
+			return false, fmt.Errorf("create load executor: %w", err)
 		}
 		executor.Start(ctx)
-		c.updateExecutors(func(executors []executorclient.Executor[*shardProcessor]) []executorclient.Executor[*shardProcessor] {
-			return append(executors, executor)
-		})
+		c.addExtraExecutor(executor)
 	}
-	return c.cfg.NumExecutors, nil
+	return false, nil
+}
+
+// scaleDown stops the extra executors at cfg.ExecutorsPerSecond
+func (c *Controller) scaleDown(ctx context.Context) error {
+	for c.numExtraExecutors() > 0 {
+		if err := c.timeSource.SleepWithContext(ctx, c.executorStep()); err != nil {
+			return err
+		}
+		c.popLastExtraExecutor().Stop()
+	}
+	return nil
+}
+
+// executorStep is the wait before each executor start or stop
+func (c *Controller) executorStep() time.Duration {
+	return time.Second / time.Duration(c.cfg.ExecutorsPerSecond)
 }
 
 // hold waits for cfg.Hold, returning early once the switcher shard is drained
@@ -325,21 +288,12 @@ func (c *Controller) windingDown(ctx context.Context) bool {
 	return true
 }
 
-func waitTick(ctx context.Context, ticker clock.Ticker) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-ticker.Chan():
-		return nil
-	}
-}
-
 func (c *Controller) shardHolders() []shardHolder {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	var holders []shardHolder
-	for _, executors := range [][]executorclient.Executor[*shardProcessor]{c.baseline, c.executors} {
+	for _, executors := range [][]executorclient.Executor[*shardProcessor]{c.baseline, c.extraExecutors} {
 		for _, executor := range executors {
 			executorID := executor.GetExecutorID()
 			for shardKey := range executor.GetShardStatusReports() {
@@ -357,12 +311,40 @@ func (c *Controller) isPaused(ctx context.Context) bool {
 	return errors.As(err, &drained)
 }
 
-func (c *Controller) updateExecutors(update func([]executorclient.Executor[*shardProcessor]) []executorclient.Executor[*shardProcessor]) {
+func (c *Controller) addExtraExecutor(executor executorclient.Executor[*shardProcessor]) {
 	c.mu.Lock()
-	c.executors = update(c.executors)
-	active := len(c.executors)
+	c.extraExecutors = append(c.extraExecutors, executor)
+	active := len(c.extraExecutors)
 	c.mu.Unlock()
 	c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(float64(active))
+}
+
+// popLastExtraExecutor removes the most recently started extra executor without stopping it
+func (c *Controller) popLastExtraExecutor() executorclient.Executor[*shardProcessor] {
+	c.mu.Lock()
+	last := len(c.extraExecutors) - 1
+	executor := c.extraExecutors[last]
+	c.extraExecutors = c.extraExecutors[:last]
+	c.mu.Unlock()
+	c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(float64(last))
+	return executor
+}
+
+func (c *Controller) numExtraExecutors() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.extraExecutors)
+}
+
+// stopExtraExecutors stops all extra executors at once
+// The shard distributor reassigns their shards to the baseline executors
+func (c *Controller) stopExtraExecutors() {
+	c.mu.Lock()
+	executors := c.extraExecutors
+	c.extraExecutors = nil
+	c.mu.Unlock()
+	stopExecutors(executors)
+	c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(0)
 }
 
 func stopExecutors(executors []executorclient.Executor[*shardProcessor]) {

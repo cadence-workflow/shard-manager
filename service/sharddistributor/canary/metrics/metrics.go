@@ -61,4 +61,23 @@ var (
 		5 * time.Second,
 		10 * time.Second,
 	})
+
+	// CanaryLoadDurationBuckets cover load convergence, from seconds, and whole
+	// load runs, which last about as long as their hold.
+	CanaryLoadDurationBuckets = tally.DurationBuckets([]time.Duration{
+		1 * time.Second,
+		2 * time.Second,
+		5 * time.Second,
+		10 * time.Second,
+		30 * time.Second,
+		1 * time.Minute,
+		2 * time.Minute,
+		5 * time.Minute,
+		10 * time.Minute,
+		20 * time.Minute,
+		30 * time.Minute,
+		45 * time.Minute,
+		1 * time.Hour,
+		2 * time.Hour,
+	})
 )

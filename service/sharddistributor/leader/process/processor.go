@@ -47,7 +47,6 @@ type Factory interface {
 }
 
 const (
-	_defaultPeriod       = time.Second
 	_defaultHeartbeatTTL = 10 * time.Second
 	_defaultTimeout      = 1 * time.Second
 	_defaultCooldown     = 250 * time.Millisecond
@@ -83,9 +82,6 @@ func NewProcessorFactory(
 	cfg config.ShardDistribution,
 	sdConfig *config.Config,
 ) Factory {
-	if cfg.Process.Period <= 0 {
-		cfg.Process.Period = _defaultPeriod
-	}
 	if cfg.Process.HeartbeatTTL <= 0 {
 		cfg.Process.HeartbeatTTL = _defaultHeartbeatTTL
 	}
@@ -129,11 +125,9 @@ func (p *namespaceProcessor) Run(ctx context.Context) error {
 	p.cancel = cancel
 	p.running = true
 
-	p.logger.Info("Starting")
+	p.logger.Debug("Starting")
 
-	p.wg.Add(1)
-	// Start the process in a goroutine
-	go p.runProcess(pCtx)
+	p.wg.Go(func() { p.runTerm(pCtx) })
 
 	return nil
 }
@@ -144,7 +138,7 @@ func (p *namespaceProcessor) Terminate(ctx context.Context) error {
 		return fmt.Errorf("processor has not been started")
 	}
 
-	p.logger.Info("Stopping")
+	p.logger.Debug("Stopping")
 
 	if p.cancel != nil {
 		p.cancel()
@@ -159,162 +153,70 @@ func (p *namespaceProcessor) Terminate(ctx context.Context) error {
 	return nil
 }
 
-// runProcess launches and manages the processing loops.
-func (p *namespaceProcessor) runProcess(ctx context.Context) {
-	defer p.wg.Done()
+// runTerm rebalances and cleans up shard stats once, then rebalances on executor changes until the term ends.
+// A failed rebalance is not retried, the next term starts with a fresh one.
+func (p *namespaceProcessor) runTerm(ctx context.Context) {
+	// Subscribing before the initial rebalance so we don't miss any changes.
+	updateChan, subscribeErr := p.shardStore.SubscribeToExecutorStatusChanges(ctx, p.namespaceCfg.Name)
 
-	var loopWg sync.WaitGroup
-	loopWg.Add(2) // We have two loops to manage.
-
-	// Launch the assignment and executor cleanup process in its own goroutine.
-	go func() {
-		defer loopWg.Done()
-		p.runRebalancingLoop(ctx)
-	}()
-
-	// Launch the shard stats cleanup process in its own goroutine.
-	go func() {
-		defer loopWg.Done()
-		p.runShardStatsCleanupLoop(ctx)
-	}()
-
-	// Wait for both loops to exit.
-	loopWg.Wait()
-}
-
-// runRebalancingLoop handles shard assignment and redistribution.
-func (p *namespaceProcessor) runRebalancingLoop(ctx context.Context) {
-	// Buffered channel to allow one pending rebalance trigger.
-	triggerChan := make(chan string, 1)
-
-	// Perform an initial rebalance on startup.
-	err := p.rebalanceShards(ctx)
-	if err != nil {
+	// Perform an initial rebalance on startup, even without a subscription.
+	if err := p.rebalanceShards(ctx); err != nil {
 		p.logRebalanceError("initial rebalance failed", "initial rebalance version conflict", err)
 	}
 
-	if err := p.runRebalanceTriggeringLoop(ctx, triggerChan); err != nil {
-		p.logger.Error("failed to start rebalance triggering loop", tag.Error(err))
+	if subscribeErr != nil {
+		p.logger.Error("Failed to subscribe to state changes, stopping rebalancing loop.", tag.Error(subscribeErr))
 		return
 	}
 
+	// Once per term, after the initial rebalance so it never delays it.
+	p.cleanupShardStats(ctx)
+
 	nextRebalanceAllowedAt := p.timeSource.Now()
 
-	for {
-		select {
-		case <-ctx.Done():
-			p.logger.Info("Rebalancing loop cancelled")
+	// The channel closes when the term ends or the watch fails.
+	for range updateChan {
+		// If an update comes in before the cooldown has expired,
+		// we wait until the cooldown has passed since the last rebalance before processing it.
+		// This ensures that we don't rebalance too frequently in response to a flurry of updates
+		p.timeSource.Sleep(nextRebalanceAllowedAt.Sub(p.timeSource.Now()))
+		nextRebalanceAllowedAt = p.timeSource.Now().Add(p.cfg.RebalanceCooldown)
+
+		// A change left pending when the term ends would only fail against the cancelled context.
+		if ctx.Err() != nil {
 			return
-
-		case triggerReason := <-triggerChan:
-			// If an update comes in before the cooldown has expired,
-			// we wait until the cooldown has passed since the last rebalance before processing it.
-			// This ensures that we don't rebalance too frequently in response to a flurry of updates
-			p.timeSource.Sleep(nextRebalanceAllowedAt.Sub(p.timeSource.Now()))
-			nextRebalanceAllowedAt = p.timeSource.Now().Add(p.cfg.RebalanceCooldown)
-
-			p.logger.Info("Rebalancing triggered", tag.Dynamic("triggerReason", triggerReason))
-			if err := p.rebalanceShards(ctx); err != nil {
-				p.logRebalanceError("rebalance failed", "rebalance version conflict", err)
-
-				// If rebalance fails, we want to trigger another rebalance ASAP,
-				// but with a cooldown to avoid rebalance storms if the underlying issue is persistent.
-				select {
-				case triggerChan <- "Previous rebalance failed":
-				default:
-					// If the channel is full, we skip sending the update to avoid blocking the loop.
-				}
-			}
 		}
+
+		p.logger.Info("Rebalancing triggered by state change")
+		if err := p.rebalanceShards(ctx); err != nil {
+			p.logRebalanceError("rebalance failed", "rebalance version conflict", err)
+		}
+	}
+	if ctx.Err() == nil {
+		p.logger.Info("Update channel closed, stopping rebalancing loop")
 	}
 }
 
-// runRebalanceTriggeringLoop monitors for state changes and periodic triggers to initiate rebalancing.
-// it doesn't block Subscribe calls to avoid a growing backlog of updates.
-func (p *namespaceProcessor) runRebalanceTriggeringLoop(ctx context.Context, triggerChan chan<- string) error {
-	updateChan, err := p.shardStore.SubscribeToExecutorStatusChanges(ctx, p.namespaceCfg.Name)
+// cleanupShardStats removes stale shard statistics.
+func (p *namespaceProcessor) cleanupShardStats(ctx context.Context) {
+	// Only perform shard stats cleanup in GREEDY load balancing mode
+	if p.sdConfig.GetLoadBalancingMode(p.namespaceCfg.Name) != types.LoadBalancingModeGREEDY {
+		return
+	}
+
+	namespaceState, err := p.shardStore.GetState(ctx, p.namespaceCfg.Name)
 	if err != nil {
-		p.logger.Error("Failed to subscribe to state changes, stopping rebalancing loop.", tag.Error(err))
-		return err
-	}
-
-	go p.rebalanceTriggeringLoop(ctx, updateChan, triggerChan)
-	return nil
-}
-
-func (p *namespaceProcessor) rebalanceTriggeringLoop(ctx context.Context, updateChan <-chan int64, triggerChan chan<- string) {
-	ticker := p.timeSource.NewTicker(p.cfg.Period)
-	defer ticker.Stop()
-
-	tryTriggerRebalancing := func(reason string) {
-		select {
-		case triggerChan <- reason:
-		default:
-			p.logger.Info("Rebalance already pending, skipping trigger attempt", tag.Dynamic("reason", reason))
+		if ctx.Err() == nil {
+			p.logger.Error("Failed to get state for shard stats cleanup", tag.Error(err))
 		}
+		return
 	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			p.logger.Info("Rebalance triggering loop cancelled")
-			return
-
-		case <-ticker.Chan():
-			tryTriggerRebalancing("Periodic reconciliation triggered")
-
-		case _, ok := <-updateChan:
-			if !ok {
-				p.logger.Info("Update channel closed, stopping rebalance triggering loop")
-				return
-			}
-
-			tryTriggerRebalancing("State change detected")
-		}
+	staleShardStats := p.identifyStaleShardStats(namespaceState)
+	if len(staleShardStats) == 0 {
+		return
 	}
-}
-
-// runShardStatsCleanupLoop periodically removes stale shard statistics.
-func (p *namespaceProcessor) runShardStatsCleanupLoop(ctx context.Context) {
-	ticker := p.timeSource.NewTicker(p.cfg.HeartbeatTTL)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			p.logger.Info("Shard stats cleanup loop cancelled.")
-			return
-		case <-ticker.Chan():
-			// Only perform shard stats cleanup in GREEDY load balancing mode
-			// TODO: refactor this to not have this loop for non-GREEDY modes
-			if p.sdConfig.GetLoadBalancingMode(p.namespaceCfg.Name) != types.LoadBalancingModeGREEDY {
-				p.logger.Debug("Load balancing mode is not GREEDY, skipping shard stats cleanup.", tag.ShardNamespace(p.namespaceCfg.Name))
-				continue
-			}
-
-			p.logger.Info("Periodic shard stats cleanup triggered.")
-			namespaceState, err := p.shardStore.GetState(ctx, p.namespaceCfg.Name)
-			if err != nil {
-				if ctx.Err() != nil {
-					p.logger.Info("Shard stats cleanup loop cancelled")
-					return
-				}
-				p.logger.Error("Failed to get state for shard stats cleanup", tag.Error(err))
-				continue
-			}
-			staleShardStats := p.identifyStaleShardStats(namespaceState)
-			if len(staleShardStats) == 0 {
-				// No stale shard stats to delete
-				continue
-			}
-			if err := p.shardStore.DeleteShardStats(ctx, p.namespaceCfg.Name, staleShardStats, p.election.Guard()); err != nil {
-				if ctx.Err() != nil {
-					p.logger.Info("Shard stats cleanup loop cancelled")
-					return
-				}
-				p.logger.Error("Failed to delete stale shard stats", tag.Error(err))
-			}
-		}
+	if err := p.shardStore.DeleteShardStats(ctx, p.namespaceCfg.Name, staleShardStats, p.election.Guard()); err != nil && ctx.Err() == nil {
+		p.logger.Error("Failed to delete stale shard stats", tag.Error(err))
 	}
 }
 

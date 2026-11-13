@@ -6,7 +6,6 @@ import (
 	"maps"
 	"slices"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -91,7 +90,11 @@ func TestRunAndTerminate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil).AnyTimes()
-	mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(make(chan int64), nil).AnyTimes()
+	// The term only ends when the store closes the channel, which it does when ctx ends.
+	// A closed channel lets the term finish so Terminate does not block.
+	updateChan := make(chan int64)
+	close(updateChan)
+	mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(updateChan, nil).AnyTimes()
 
 	err := processor.Run(ctx)
 	require.NoError(t, err)
@@ -546,6 +549,21 @@ func TestCleanupStaleShardStats(t *testing.T) {
 
 }
 
+func TestCleanupShardStats(t *testing.T) {
+	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+	mocks.sdConfig.LoadBalancingMode = func(string) string { return config.LoadBalancingModeGREEDY }
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+
+	stale := mocks.timeSource.Now().Add(-_defaultHeartbeatTTL).Add(-time.Second)
+	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+		ShardStats: map[string]store.ShardStatistics{"shard-1": {LastUpdateTime: stale, LastMoveTime: stale}},
+	}, nil)
+	mocks.election.EXPECT().Guard().Return(store.NopGuard())
+	mocks.store.EXPECT().DeleteShardStats(gomock.Any(), mocks.cfg.Name, []string{"shard-1"}, gomock.Any()).Return(nil)
+
+	processor.cleanupShardStats(context.Background())
+}
+
 func TestRebalance_StoreErrors(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
@@ -571,40 +589,12 @@ func TestRunLoop_SubscriptionError(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
-	expectedErr := errors.New("subscription failed")
-	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil)
-	mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(nil, expectedErr)
+	gomock.InOrder(
+		mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(nil, errors.New("subscription failed")),
+		mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil),
+	)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		processor.runRebalancingLoop(context.Background())
-	}()
-	wg.Wait()
-}
-
-func TestRunLoop_ContextCancellation(t *testing.T) {
-	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Setup for the initial call to rebalanceShards and the subscription
-	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil)
-	mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(make(chan int64), nil)
-
-	processor.wg.Add(1)
-	// Run the process in a separate goroutine to avoid blocking the test
-	go processor.runProcess(ctx)
-
-	// Wait for the two loops (rebalance and cleanup) to create their tickers
-	mocks.timeSource.BlockUntil(2)
-
-	// Now, cancel the context to signal the loops to stop
-	cancel()
-
-	// Wait for the main process loop to exit gracefully
-	processor.wg.Wait()
+	processor.runTerm(context.Background())
 }
 
 func TestRebalanceShards_NoShardsToReassign(t *testing.T) {
@@ -1708,143 +1698,27 @@ func TestEmitMaxOwnersPerShardMetric(t *testing.T) {
 	}
 }
 
-func TestRunRebalanceTriggeringLoop(t *testing.T) {
-	t.Run("no events from subscribe, trigger from ticker", func(t *testing.T) {
-		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+func TestRunTerm_RebalancesOnStateChange(t *testing.T) {
+	for name, changes := range map[string]int{
+		"state change triggers a rebalance":           1,
+		"no state change, only the initial rebalance": 0,
+	} {
+		t.Run(name, func(t *testing.T) {
+			mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
+			processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		updateChan := make(chan int64)
-		triggerChan := make(chan string, 1)
-
-		go processor.rebalanceTriggeringLoop(ctx, updateChan, triggerChan)
-
-		// Wait for ticker to be created
-		mocks.timeSource.BlockUntil(1)
-
-		// Advance time to trigger the ticker
-		mocks.timeSource.Advance(processor.cfg.Period)
-
-		// Expect trigger from periodic reconciliation
-		select {
-		case reason := <-triggerChan:
-			assert.Equal(t, "Periodic reconciliation triggered", reason)
-		case <-time.After(time.Second):
-			t.Fatal("expected trigger from ticker, but timed out")
-		}
-
-		cancel()
-	})
-
-	t.Run("events from subscribe before period, trigger from state change", func(t *testing.T) {
-		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		updateChan := make(chan int64, 1)
-		triggerChan := make(chan string, 1)
-
-		go processor.rebalanceTriggeringLoop(ctx, updateChan, triggerChan)
-
-		// Wait for ticker to be created
-		mocks.timeSource.BlockUntil(1)
-
-		// Send a state change event before the ticker fires
-		updateChan <- 1
-
-		// Expect trigger from state change
-		select {
-		case reason := <-triggerChan:
-			assert.Equal(t, "State change detected", reason)
-		case <-time.After(time.Second):
-			t.Fatal("expected trigger from state change, but timed out")
-		}
-
-		cancel()
-	})
-
-	t.Run("triggerChan full, multiple subscribe events, loop not stuck", func(t *testing.T) {
-		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
-
-		ctx, cancel := context.WithCancel(context.Background())
-
-		// Use unbuffered channel for updates to ensure they are processed one at a time
-		updateChan := make(chan int64)
-		triggerChan := make(chan string, 1)
-
-		var loopWg sync.WaitGroup
-		loopWg.Add(1)
-		go func() {
-			defer loopWg.Done()
-			processor.rebalanceTriggeringLoop(ctx, updateChan, triggerChan)
-		}()
-		defer func() {
-			cancel()
-			loopWg.Wait()
-		}()
-
-		// Wait for ticker to be created
-		mocks.timeSource.BlockUntil(1)
-
-		// Don't read from triggerChan yet to keep it full
-		// Send multiple state change events
-		for i := int64(0); i <= 10; i++ {
-			select {
-			case updateChan <- i:
-			case <-time.After(time.Second):
-				// Expect that the loop is not stuck
-				t.Fatalf("failed to send update %d, channel blocked", i)
+			updateChan := make(chan int64, 1)
+			for i := range changes {
+				updateChan <- int64(i)
 			}
-		}
+			// Closing the channel ends the term once the pending change is handled.
+			close(updateChan)
+			gomock.InOrder(
+				mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(updateChan, nil),
+				mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil).Times(1+changes),
+			)
 
-		// Expect trigger from state change
-		select {
-		case reason := <-triggerChan:
-			assert.Equal(t, "State change detected", reason)
-		case <-time.After(time.Second):
-			t.Fatal("expected trigger from state change, but timed out")
-		}
-	})
-
-	t.Run("update channel closed stops loop", func(t *testing.T) {
-		mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
-		processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
-
-		ctx := context.Background()
-
-		updateChan := make(chan int64)
-		triggerChan := make(chan string, 1)
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			processor.rebalanceTriggeringLoop(ctx, updateChan, triggerChan)
-		}()
-
-		// Wait for ticker to be created
-		mocks.timeSource.BlockUntil(1)
-
-		// Close update channel
-		close(updateChan)
-
-		// Wait for loop to exit
-		done := make(chan struct{})
-		go func() {
-			wg.Wait()
-			close(done)
-		}()
-
-		select {
-		case <-done:
-			// Loop exited as expected
-		case <-time.After(time.Second):
-			t.Fatal("loop did not exit after updateChan closed")
-		}
-	})
+			processor.runTerm(context.Background())
+		})
+	}
 }

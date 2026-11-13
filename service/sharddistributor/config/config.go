@@ -62,14 +62,12 @@ type (
 	}
 
 	Election struct {
-		LeaderPeriod           time.Duration `yaml:"leaderPeriod"`           // Time to hold leadership before resigning
-		MaxRandomDelay         time.Duration `yaml:"maxRandomDelay"`         // Maximum random delay before campaigning
 		FailedElectionCooldown time.Duration `yaml:"failedElectionCooldown"` // wait between election attempts with unhandled errors
 	}
 
 	LeaderProcess struct {
-		// Period is the maximum duration between shard rebalance operations
-		// Default: 1 second
+		// Period is the leadership term, and each term starts with a shard rebalance.
+		// Minimum 2 seconds, which is etcd's default minimum lease TTL.
 		Period time.Duration `yaml:"period"`
 
 		// RebalanceCooldown is the minimum duration between shard rebalance operations

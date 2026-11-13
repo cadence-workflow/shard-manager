@@ -720,14 +720,14 @@ func TestGuardedOperations(t *testing.T) {
 	elector, err := leaderstore.NewLeaderStore(leaderstore.StoreParams{Client: tc.Client, Cfg: leaderCfg})
 	require.NoError(t, err)
 	election1, err := elector.CreateElection(ctx, namespace)
-	defer election1.Cleanup(ctx)
-	defer func() { _ = election1.Cleanup(ctx) }()
+	require.NoError(t, err)
 	election2, err := elector.CreateElection(ctx, namespace)
-	defer election2.Cleanup(ctx)
-	defer func() { _ = election2.Cleanup(ctx) }()
+	require.NoError(t, err)
+	defer func() { _ = election2.Resign(ctx) }()
 
 	// 2. First node becomes leader
-	require.NoError(t, election1.Campaign(ctx, "host-1"))
+	_, err = election1.Campaign(ctx, "host-1")
+	require.NoError(t, err)
 	validGuard := election1.Guard()
 
 	// 3. Use the valid guard to assign shards - should succeed
@@ -741,7 +741,8 @@ func TestGuardedOperations(t *testing.T) {
 
 	// 4. First node resigns, second node becomes leader
 	require.NoError(t, election1.Resign(ctx))
-	require.NoError(t, election2.Campaign(ctx, "host-2"))
+	_, err = election2.Campaign(ctx, "host-2")
+	require.NoError(t, err)
 
 	// 5. Use the now-invalid guard from the first leader - should fail
 	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{
@@ -853,6 +854,29 @@ func TestSubscribeToExecutorStatusChanges(t *testing.T) {
 			t.Fatal("Should have received a notification for a status change")
 		}
 	}
+}
+
+// TestSubscribeReturnsOnceWatchIsCreated fails if the subscription returns before the watch is registered.
+func TestSubscribeReturnsOnceWatchIsCreated(t *testing.T) {
+	mockClient := etcdclient.NewMockClient(gomock.NewController(t))
+	watchChan := make(chan clientv3.WatchResponse)
+	defer close(watchChan)
+	mockClient.EXPECT().Watch(gomock.Any(), gomock.Any(), gomock.Any()).Return(clientv3.WatchChan(watchChan))
+	executorStore := &executorStoreImpl{client: mockClient, prefix: "test-prefix", metricsClient: metrics.NewNoopMetricsClient()}
+
+	var sub <-chan int64
+	result := make(chan error, 1)
+	go func() {
+		var err error
+		sub, err = executorStore.SubscribeToExecutorStatusChanges(t.Context(), "test-namespace")
+		result <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	require.Empty(t, result, "subscription should wait for the watch to be created")
+	watchChan <- clientv3.WatchResponse{Created: true}
+	require.NoError(t, <-result)
+	assert.Empty(t, sub, "the created response is not a status change")
 }
 
 func TestDeleteExecutors_Empty(t *testing.T) {

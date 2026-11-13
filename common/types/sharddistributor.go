@@ -101,6 +101,7 @@ type GetFullNamespaceStateResponse struct {
 	ShardAssignments map[string]*AssignedState
 	DrainedShards    []string
 	DrainedHosts     map[string]*DrainedHost
+	RangeAssignments []*RangeAssignment
 }
 
 func (v *GetFullNamespaceStateResponse) GetNamespace() (o string) {
@@ -141,6 +142,13 @@ func (v *GetFullNamespaceStateResponse) GetDrainedShards() (o []string) {
 func (v *GetFullNamespaceStateResponse) GetDrainedHosts() (o map[string]*DrainedHost) {
 	if v != nil {
 		return v.DrainedHosts
+	}
+	return
+}
+
+func (v *GetFullNamespaceStateResponse) GetRangeAssignments() (o []*RangeAssignment) {
+	if v != nil {
+		return v.RangeAssignments
 	}
 	return
 }
@@ -501,8 +509,10 @@ type ExecutorHeartbeatRequest struct {
 	ExecutorID         string
 	Status             ExecutorStatus
 	ShardStatusReports map[string]*ShardStatusReport
-	Metadata           map[string]string
-	HostMetadata       *HostMetadata
+	// RangeLoadReports is keyed by range ID and replaces ShardStatusReports in range mode.
+	RangeLoadReports map[string]*RangeLoadReport
+	Metadata         map[string]string
+	HostMetadata     *HostMetadata
 }
 
 // HostMetadata carries host-level attributes reported on each heartbeat
@@ -534,6 +544,13 @@ func (v *ExecutorHeartbeatRequest) GetStatus() (o ExecutorStatus) {
 func (v *ExecutorHeartbeatRequest) GetShardStatusReports() (o map[string]*ShardStatusReport) {
 	if v != nil {
 		return v.ShardStatusReports
+	}
+	return
+}
+
+func (v *ExecutorHeartbeatRequest) GetRangeLoadReports() (o map[string]*RangeLoadReport) {
+	if v != nil {
+		return v.RangeLoadReports
 	}
 	return
 }
@@ -601,12 +618,20 @@ const (
 
 type ExecutorHeartbeatResponse struct {
 	ShardAssignments map[string]*ShardAssignment
+	RangeAssignments []*RangeAssignment
 	MigrationMode    MigrationMode
 }
 
 func (v *ExecutorHeartbeatResponse) GetShardAssignments() (o map[string]*ShardAssignment) {
 	if v != nil {
 		return v.ShardAssignments
+	}
+	return
+}
+
+func (v *ExecutorHeartbeatResponse) GetRangeAssignments() (o []*RangeAssignment) {
+	if v != nil {
+		return v.RangeAssignments
 	}
 	return
 }
@@ -697,6 +722,7 @@ type WatchNamespaceStateResponse struct {
 	// AssignmentRevision is the store revision of the latest change to assignments, drained shards or
 	// executor metadata, including a namespace reset
 	AssignmentRevision int64
+	RangeAssignments   []*RangeAssignment
 }
 
 func (v *WatchNamespaceStateResponse) GetExecutors() (o []*ExecutorShardAssignment) {
@@ -716,6 +742,13 @@ func (v *WatchNamespaceStateResponse) GetDrainedShardKeys() (o []string) {
 func (v *WatchNamespaceStateResponse) GetAssignmentRevision() (o int64) {
 	if v != nil {
 		return v.AssignmentRevision
+	}
+	return
+}
+
+func (v *WatchNamespaceStateResponse) GetRangeAssignments() (o []*RangeAssignment) {
+	if v != nil {
+		return v.RangeAssignments
 	}
 	return
 }
@@ -991,6 +1024,61 @@ func (v *GetDrainedHostsResponse) GetNamespace() (o string) {
 func (v *GetDrainedHostsResponse) GetHosts() (o []*DrainedHost) {
 	if v != nil {
 		return v.Hosts
+	}
+	return
+}
+
+type RangeAssignment struct {
+	ID         string
+	Range      Range
+	ExecutorID string
+	Status     AssignmentStatus
+}
+
+func (v *RangeAssignment) GetID() (o string) {
+	if v != nil {
+		return v.ID
+	}
+	return
+}
+
+func (v *RangeAssignment) GetRange() (o Range) {
+	if v != nil {
+		return v.Range
+	}
+	return
+}
+
+func (v *RangeAssignment) GetExecutorID() (o string) {
+	if v != nil {
+		return v.ExecutorID
+	}
+	return
+}
+
+func (v *RangeAssignment) GetStatus() (o AssignmentStatus) {
+	if v != nil {
+		return v.Status
+	}
+	return
+}
+
+type RangeLoadReport struct {
+	RangeLoad float64
+	// TopTasklists is an unordered bounded top-N by tasklist name.
+	TopTasklists map[string]float64
+}
+
+func (v *RangeLoadReport) GetRangeLoad() (o float64) {
+	if v != nil {
+		return v.RangeLoad
+	}
+	return
+}
+
+func (v *RangeLoadReport) GetTopTasklists() (o map[string]float64) {
+	if v != nil {
+		return v.TopTasklists
 	}
 	return
 }

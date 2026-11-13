@@ -1,6 +1,9 @@
 package proto
 
 import (
+	"bytes"
+	"maps"
+
 	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
 	"github.com/cadence-workflow/shard-manager/common/types"
 )
@@ -104,12 +107,14 @@ func FromShardDistributorExecutorHeartbeatRequest(t *types.ExecutorHeartbeatRequ
 
 	status := fromShardDistributorExecutorStatus(t.GetStatus())
 	shardStatusReports := fromShardDistributorShardStatusReports(t.GetShardStatusReports())
+	rangeLoadReports := fromShardDistributorRangeLoadReports(t.GetRangeLoadReports())
 
 	return &sharddistributorv1.HeartbeatRequest{
 		Namespace:          t.GetNamespace(),
 		ExecutorId:         t.GetExecutorID(),
 		Status:             status,
 		ShardStatusReports: shardStatusReports,
+		RangeLoadReports:   rangeLoadReports,
 		Metadata:           t.GetMetadata(),
 		HostMetadata:       fromShardDistributorHostMetadata(t.GetHostMetadata()),
 	}
@@ -122,12 +127,14 @@ func ToShardDistributorExecutorHeartbeatRequest(t *sharddistributorv1.HeartbeatR
 
 	status := toShardDistributorExecutorStatus(t.GetStatus())
 	shardStatusReports := toShardDistributorShardStatusReports(t.GetShardStatusReports())
+	rangeLoadReports := toShardDistributorRangeLoadReports(t.GetRangeLoadReports())
 
 	return &types.ExecutorHeartbeatRequest{
 		Namespace:          t.GetNamespace(),
 		ExecutorID:         t.GetExecutorId(),
 		Status:             status,
 		ShardStatusReports: shardStatusReports,
+		RangeLoadReports:   rangeLoadReports,
 		Metadata:           t.GetMetadata(),
 		HostMetadata:       toShardDistributorHostMetadata(t.GetHostMetadata()),
 	}
@@ -157,10 +164,12 @@ func FromShardDistributorExecutorHeartbeatResponse(t *types.ExecutorHeartbeatRes
 	}
 
 	shardAssignments := fromShardDistributorShardAssignments(t.GetShardAssignments())
+	rangeAssignments := fromShardDistributorRangeAssignments(t.GetRangeAssignments())
 	migrationMode := fromShardDistributorMigrationMode(t.GetMigrationMode())
 
 	return &sharddistributorv1.HeartbeatResponse{
 		ShardAssignments: shardAssignments,
+		RangeAssignments: rangeAssignments,
 		MigrationMode:    migrationMode,
 	}
 }
@@ -171,10 +180,12 @@ func ToShardDistributorExecutorHeartbeatResponse(t *sharddistributorv1.Heartbeat
 	}
 
 	shardAssignments := toShardDistributorShardAssignments(t.GetShardAssignments())
+	rangeAssignments := toShardDistributorRangeAssignments(t.GetRangeAssignments())
 	migrationMode := toShardDistributorMigrationMode(t.GetMigrationMode())
 
 	return &types.ExecutorHeartbeatResponse{
 		ShardAssignments: shardAssignments,
+		RangeAssignments: rangeAssignments,
 		MigrationMode:    migrationMode,
 	}
 }
@@ -396,10 +407,13 @@ func FromShardDistributorWatchNamespaceStateResponse(t *types.WatchNamespaceStat
 		})
 	}
 
+	rangeAssignments := fromShardDistributorRangeAssignments(t.GetRangeAssignments())
+
 	return &sharddistributorv1.WatchNamespaceStateResponse{
 		Executors:          executors,
 		DrainedShardKeys:   t.GetDrainedShardKeys(),
 		AssignmentRevision: t.GetAssignmentRevision(),
+		RangeAssignments:   rangeAssignments,
 	}
 }
 
@@ -429,10 +443,13 @@ func ToShardDistributorWatchNamespaceStateResponse(t *sharddistributorv1.WatchNa
 		}
 	}
 
+	rangeAssignments := toShardDistributorRangeAssignments(t.GetRangeAssignments())
+
 	return &types.WatchNamespaceStateResponse{
 		Executors:          executors,
 		DrainedShardKeys:   t.GetDrainedShardKeys(),
 		AssignmentRevision: t.GetAssignmentRevision(),
+		RangeAssignments:   rangeAssignments,
 	}
 }
 
@@ -660,6 +677,8 @@ func FromShardDistributorGetFullNamespaceStateResponse(t *types.GetFullNamespace
 		}
 	}
 
+	rangeAssignments := fromShardDistributorRangeAssignments(t.GetRangeAssignments())
+
 	return &sharddistributorv1.GetFullNamespaceStateResponse{
 		Namespace:        t.GetNamespace(),
 		Executors:        executors,
@@ -667,6 +686,7 @@ func FromShardDistributorGetFullNamespaceStateResponse(t *types.GetFullNamespace
 		ShardAssignments: shardAssignments,
 		DrainedShards:    t.GetDrainedShards(),
 		DrainedHosts:     drainedHosts,
+		RangeAssignments: rangeAssignments,
 	}
 }
 
@@ -775,6 +795,8 @@ func ToShardDistributorGetFullNamespaceStateResponse(t *sharddistributorv1.GetFu
 		}
 	}
 
+	rangeAssignments := toShardDistributorRangeAssignments(t.GetRangeAssignments())
+
 	return &types.GetFullNamespaceStateResponse{
 		Namespace:        t.GetNamespace(),
 		Executors:        executors,
@@ -782,6 +804,7 @@ func ToShardDistributorGetFullNamespaceStateResponse(t *sharddistributorv1.GetFu
 		ShardAssignments: shardAssignments,
 		DrainedShards:    t.GetDrainedShards(),
 		DrainedHosts:     drainedHosts,
+		RangeAssignments: rangeAssignments,
 	}
 }
 
@@ -1262,4 +1285,82 @@ func ToShardDistributorForceResetNamespaceResponse(t *sharddistributorv1.ForceRe
 	return &types.ForceResetNamespaceResponse{
 		DeletedKeys: t.GetDeletedKeys(),
 	}
+}
+
+// fromShardDistributorRange encodes an unbounded upper bound as an empty high_exclusive.
+func fromShardDistributorRange(t types.Range) *sharddistributorv1.Range {
+	r := &sharddistributorv1.Range{LowInclusive: bytes.Clone(t.LowInclusive)}
+	if !t.IsFinalRange() {
+		r.HighExclusive = bytes.Clone(t.HighExclusive)
+	}
+	return r
+}
+
+// toShardDistributorRange decodes an empty high_exclusive as an unbounded range.
+func toShardDistributorRange(t *sharddistributorv1.Range) types.Range {
+	r := types.Range{LowInclusive: bytes.Clone(t.GetLowInclusive())}
+	if len(t.GetHighExclusive()) != 0 {
+		r.HighExclusive = bytes.Clone(t.GetHighExclusive())
+	}
+	return r
+}
+
+func fromShardDistributorRangeAssignments(assignments []*types.RangeAssignment) []*sharddistributorv1.RangeAssignment {
+	if assignments == nil {
+		return nil
+	}
+	out := make([]*sharddistributorv1.RangeAssignment, 0, len(assignments))
+	for _, a := range assignments {
+		out = append(out, &sharddistributorv1.RangeAssignment{
+			Id:         a.GetID(),
+			Range:      fromShardDistributorRange(a.GetRange()),
+			ExecutorId: a.GetExecutorID(),
+			Status:     fromShardDistributorAssignmentStatus(a.GetStatus()),
+		})
+	}
+	return out
+}
+
+func toShardDistributorRangeAssignments(assignments []*sharddistributorv1.RangeAssignment) []*types.RangeAssignment {
+	if assignments == nil {
+		return nil
+	}
+	out := make([]*types.RangeAssignment, 0, len(assignments))
+	for _, a := range assignments {
+		out = append(out, &types.RangeAssignment{
+			ID:         a.GetId(),
+			Range:      toShardDistributorRange(a.GetRange()),
+			ExecutorID: a.GetExecutorId(),
+			Status:     toShardDistributorAssignmentStatus(a.GetStatus()),
+		})
+	}
+	return out
+}
+
+func fromShardDistributorRangeLoadReports(reports map[string]*types.RangeLoadReport) map[string]*sharddistributorv1.RangeLoadReport {
+	if reports == nil {
+		return nil
+	}
+	out := make(map[string]*sharddistributorv1.RangeLoadReport, len(reports))
+	for id, report := range reports {
+		out[id] = &sharddistributorv1.RangeLoadReport{
+			RangeLoad:    report.GetRangeLoad(),
+			TopTasklists: maps.Clone(report.GetTopTasklists()),
+		}
+	}
+	return out
+}
+
+func toShardDistributorRangeLoadReports(reports map[string]*sharddistributorv1.RangeLoadReport) map[string]*types.RangeLoadReport {
+	if reports == nil {
+		return nil
+	}
+	out := make(map[string]*types.RangeLoadReport, len(reports))
+	for id, report := range reports {
+		out[id] = &types.RangeLoadReport{
+			RangeLoad:    report.GetRangeLoad(),
+			TopTasklists: maps.Clone(report.GetTopTasklists()),
+		}
+	}
+	return out
 }

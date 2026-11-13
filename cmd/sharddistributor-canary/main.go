@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/urfave/cli/v3"
 	"net"
 	"os"
+	"time"
 
 	"github.com/uber-go/tally"
-	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/api/peer"
@@ -33,6 +34,14 @@ const (
 	defaultCanaryGRPCPort           = 7953 // Port for canary to receive ping requests
 	defaultNumExecutors             = 1
 
+	defaultLoadNamespace          = ""
+	defaultLoadInterval           = time.Hour
+	defaultLoadBaselineExecutors  = 1
+	defaultLoadNumExecutors       = 50
+	defaultLoadExecutorsPerSecond = 1
+	defaultLoadHold               = 30 * time.Minute
+	defaultLoadConvergenceTimeout = time.Minute
+
 	shardDistributorServiceName = "shard-distributor"
 )
 
@@ -46,6 +55,15 @@ func runApp(c *cli.Command) {
 			Ephemeral: canaryConfig.NamespaceConfig{
 				Name:         c.String("ephemeral-namespace"),
 				NumExecutors: c.Int("num-ephemeral-executors"),
+			},
+			Load: canaryConfig.LoadConfig{
+				Namespace:          c.String("load-namespace"),
+				Interval:           c.Duration("load-interval"),
+				BaselineExecutors:  c.Int("load-baseline-executors"),
+				NumExecutors:       c.Int("load-num-executors"),
+				ExecutorsPerSecond: c.Int("load-executors-per-second"),
+				Hold:               c.Duration("load-hold"),
+				ConvergenceTimeout: c.Duration("load-convergence-timeout"),
 			},
 		},
 	}
@@ -186,6 +204,41 @@ func buildCLI() *cli.Command {
 					Name:  "num-ephemeral-executors",
 					Value: defaultNumExecutors,
 					Usage: "number of executors of ephemeral namespace to start. Don't use with num-executors",
+				},
+				&cli.StringFlag{
+					Name:  "load-namespace",
+					Value: defaultLoadNamespace,
+					Usage: "fixed namespace for the periodic load run, empty string disables the run. Draining shard 0 of the namespace pauses it",
+				},
+				&cli.DurationFlag{
+					Name:  "load-interval",
+					Value: defaultLoadInterval,
+					Usage: "time between load runs, before jitter",
+				},
+				&cli.IntFlag{
+					Name:  "load-baseline-executors",
+					Value: defaultLoadBaselineExecutors,
+					Usage: "number of executors each canary instance always runs in the load namespace",
+				},
+				&cli.IntFlag{
+					Name:  "load-num-executors",
+					Value: defaultLoadNumExecutors,
+					Usage: "number of extra executors each load run starts",
+				},
+				&cli.IntFlag{
+					Name:  "load-executors-per-second",
+					Value: defaultLoadExecutorsPerSecond,
+					Usage: "highest rate at which a load run starts and stops its extra executors",
+				},
+				&cli.DurationFlag{
+					Name:  "load-hold",
+					Value: defaultLoadHold,
+					Usage: "how long a load run keeps extra executors running before stopping them",
+				},
+				&cli.DurationFlag{
+					Name:  "load-convergence-timeout",
+					Value: defaultLoadConvergenceTimeout,
+					Usage: "how long a load run waits, after scaling up and after scaling down, for the shard distributor's namespace state to agree with the local shard holders",
 				},
 			},
 			Action: func(_ context.Context, c *cli.Command) error {

@@ -182,12 +182,15 @@ func TestWatchNamespace_SignalsOnEstablishAndNeverBlocks(t *testing.T) {
 		watchDone <- w.watchNamespace(_watchTestNamespace, changeChan)
 	}()
 
-	// A reconnected watch resumes at the current revision, so establishing one has to
+	// A reconnected watch resumes at the current revision, so a created watch has to
 	// signal on its own for the subscriber to pick up what it missed.
+	time.Sleep(50 * time.Millisecond)
+	require.Empty(t, changeChan, "the signal must wait until etcd confirms the watch is created")
+	watchChan <- clientv3.WatchResponse{Created: true}
 	select {
 	case <-changeChan:
 	case <-time.After(time.Second):
-		t.Fatal("establishing the watch should signal the subscriber")
+		t.Fatal("a created watch should signal the subscriber")
 	}
 
 	assignedStateKey := etcdkeys.BuildExecutorKey(_watchTestPrefix, _watchTestNamespace, _watchTestExecutor, etcdkeys.ExecutorAssignedStateKey)
@@ -259,11 +262,12 @@ func TestNamespaceWatcher_StopsOnLifecycleShutdown(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	mockClient := etcdclient.NewMockClient(gomock.NewController(t))
-	// etcd closes the watch channel when its context is cancelled; the mock must too,
-	// or the watch goroutine could never exit.
+	// Like etcd, the mock confirms the watch is created and closes the channel when its
+	// context is cancelled, or the watch goroutine could never exit.
 	mockClient.EXPECT().Watch(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, _ string, _ ...clientv3.OpOption) clientv3.WatchChan {
-			ch := make(chan clientv3.WatchResponse)
+			ch := make(chan clientv3.WatchResponse, 1)
+			ch <- clientv3.WatchResponse{Created: true}
 			go func() {
 				<-ctx.Done()
 				close(ch)
@@ -285,8 +289,8 @@ func TestNamespaceWatcher_StopsOnLifecycleShutdown(t *testing.T) {
 	require.NoError(t, err)
 	lifecycle.RequireStart()
 
-	// Establishing the watch already signalled, so the channel has to be drained to
-	// reach the close that tells a subscriber the watcher is gone.
+	// A created watch signals, so the channel is drained to reach the close that tells
+	// a subscriber the watcher is gone.
 	drained := make(chan struct{})
 	go func() {
 		defer close(drained)

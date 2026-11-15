@@ -305,9 +305,9 @@ func TestResetNamespace(t *testing.T) {
 
 	removed, err := s.ResetNamespace(ctx, testNamespace)
 	require.NoError(t, err)
-	// Heartbeat (3), host metadata, metadata key, assignment, drained shard,
-	// drained host and the assignment version.
-	assert.Equal(t, int64(9), removed)
+	// Heartbeat (3), host metadata, metadata key, assignment, drained shard and
+	// drained host.
+	assert.Equal(t, int64(8), removed)
 
 	state, err := s.GetState(ctx, testNamespace)
 	require.NoError(t, err)
@@ -315,6 +315,11 @@ func TestResetNamespace(t *testing.T) {
 	assert.Empty(t, state.DrainedShards)
 	assert.Empty(t, state.DrainedHosts)
 	assert.Greater(t, state.AssignmentRevision, before.AssignmentRevision)
+
+	// The assignment version moves on every reset but is never counted as removed.
+	removed, err = s.ResetNamespace(ctx, testNamespace)
+	require.NoError(t, err)
+	assert.Zero(t, removed)
 }
 
 func TestReadsReturnCopies(t *testing.T) {

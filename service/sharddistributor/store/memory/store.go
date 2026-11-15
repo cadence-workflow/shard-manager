@@ -381,7 +381,8 @@ func (s *Store) DeleteShardStats(_ context.Context, namespace string, shardIDs [
 }
 
 // ResetNamespace removes all of the namespace's records. The count it returns follows
-// the etcd store's key layout, so reset output reads the same on either backend.
+// the etcd store's key layout, so reset output reads the same on either backend. The
+// assignment version is moved rather than removed, so it is not counted.
 func (s *Store) ResetNamespace(_ context.Context, namespace string) (int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -389,9 +390,6 @@ func (s *Store) ResetNamespace(_ context.Context, namespace string) (int64, erro
 	ns := s.read(namespace)
 	c := changes{visible: len(ns.drainedShards) > 0}
 	removed := int64(len(ns.drainedShards) + len(ns.drainedHosts))
-	if ns.assignmentRevision > 0 {
-		removed++
-	}
 	for _, executor := range ns.executors {
 		c.removeExecutor(executor)
 		removed += executor.recordCount()

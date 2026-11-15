@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/urfave/cli/v3"
 	"net"
 	"os"
 	"time"
 
 	"github.com/uber-go/tally"
+	"github.com/urfave/cli/v3"
 	"go.uber.org/fx"
 	"go.uber.org/yarpc"
 	"go.uber.org/yarpc/api/peer"

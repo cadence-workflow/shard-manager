@@ -163,6 +163,8 @@ func (p *namespaceProcessor) runTerm(ctx context.Context) {
 	if err := p.rebalanceShards(ctx); err != nil {
 		p.logRebalanceError("initial rebalance failed", "initial rebalance version conflict", err)
 	}
+	// Changes that arrived during the initial rebalance are queued, so they wait for the cooldown too.
+	nextRebalanceAllowedAt := p.timeSource.Now().Add(p.cfg.RebalanceCooldown)
 
 	if subscribeErr != nil {
 		p.logger.Error("Failed to subscribe to state changes, stopping rebalancing loop.", tag.Error(subscribeErr))
@@ -171,8 +173,6 @@ func (p *namespaceProcessor) runTerm(ctx context.Context) {
 
 	// Once per term, after the initial rebalance so it never delays it.
 	p.cleanupShardStats(ctx)
-
-	nextRebalanceAllowedAt := p.timeSource.Now()
 
 	// The channel closes when the term ends or the watch fails.
 	for range updateChan {

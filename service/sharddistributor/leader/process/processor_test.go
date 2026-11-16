@@ -1718,7 +1718,17 @@ func TestRunTerm_RebalancesOnStateChange(t *testing.T) {
 				mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil).Times(1+changes),
 			)
 
-			processor.runTerm(context.Background())
+			done := make(chan struct{})
+			go func() {
+				processor.runTerm(context.Background())
+				close(done)
+			}()
+			// Each triggered rebalance waits for the cooldown, counted from the previous rebalance.
+			for range changes {
+				mocks.timeSource.BlockUntil(1)
+				mocks.timeSource.Advance(processor.cfg.RebalanceCooldown)
+			}
+			<-done
 		})
 	}
 }

@@ -49,7 +49,7 @@ func newExecutorStoreImpl(
 	cfg *config.Config,
 	metricsClient metrics.Client,
 ) (*executorStoreImpl, error) {
-	encoder, err := common.NewExecutorValueEncoder(etcdCfg.Compression, common.EncodingJSON)
+	encoder, err := common.NewExecutorValueEncoder(etcdCfg.Compression, common.EncodingProtobuf)
 	if err != nil {
 		return nil, fmt.Errorf("create executor value encoder: %w", err)
 	}

@@ -837,8 +837,7 @@ func (v *UndrainShardsRequest) GetShardKeys() (o []string) {
 }
 
 type UndrainShardsResponse struct {
-	// UndrainedShardKeys is the subset of the request shard keys that were
-	// actually removed from the drained list by this call.
+	// UndrainedShardKeys are the request shard keys, none of which are drained after the call.
 	UndrainedShardKeys []string
 }
 
@@ -953,8 +952,7 @@ func (v *UndrainHostsRequest) GetHostnames() (o []string) {
 }
 
 type UndrainHostsResponse struct {
-	// UndrainedHostnames is the subset of the request hostnames that were
-	// actually removed from the drained list by this call.
+	// UndrainedHostnames are the request hostnames, none of which are drained after the call.
 	UndrainedHostnames []string
 }
 

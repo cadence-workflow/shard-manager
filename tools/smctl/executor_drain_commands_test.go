@@ -310,7 +310,7 @@ func TestUndrainHosts(t *testing.T) {
 						Namespace: "ns-1",
 						Hostnames: []string{"host-1", "host-2"},
 					}).
-					Return(&types.UndrainHostsResponse{UndrainedHostnames: []string{"host-1"}}, nil)
+					Return(&types.UndrainHostsResponse{UndrainedHostnames: []string{"host-1", "host-2"}}, nil)
 				return mc
 			},
 			check: func(t *testing.T, stdout string) {
@@ -318,8 +318,8 @@ func TestUndrainHosts(t *testing.T) {
 				if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 					t.Fatalf("output is not valid JSON: %v\nout: %s", err, stdout)
 				}
-				if strings.Join(got.UndrainedHostnames, ",") != "host-1" {
-					t.Errorf("UndrainedHostnames: got %v want [host-1]", got.UndrainedHostnames)
+				if strings.Join(got.UndrainedHostnames, ",") != "host-1,host-2" {
+					t.Errorf("UndrainedHostnames: got %v want [host-1 host-2]", got.UndrainedHostnames)
 				}
 			},
 		},

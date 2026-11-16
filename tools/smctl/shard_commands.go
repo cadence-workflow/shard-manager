@@ -132,7 +132,7 @@ func shardUndrainCommand(cf ClientFactory) *cliv3.Command {
 	return &cliv3.Command{
 		Name:        "undrain",
 		Usage:       "Remove shards from the drained set so they can be assigned again",
-		Description: "Calls UndrainShards on shard-manager and prints the shard keys this call actually undrained. Repeat --shard-key for multiple shards. The call is idempotent.",
+		Description: "Calls UndrainShards on shard-manager and prints the requested shard keys, none of which are drained after the call. Repeat --shard-key for multiple shards. The call is idempotent.",
 		Flags: []cliv3.Flag{
 			&cliv3.StringSliceFlag{
 				Name:      FlagShardKey,

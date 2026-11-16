@@ -14,14 +14,10 @@ type Elector interface {
 
 // Election is an interface that establishes leader campaign.
 type Election interface {
-	// Campaign is a blocking call that will block until either leadership is acquired and return nil or block.
-	Campaign(ctx context.Context, hostname string) error
-	// Resign resigns from leadership.
+	// Campaign blocks until leadership is acquired. The returned context is cancelled when the term ends.
+	Campaign(ctx context.Context, hostname string) (context.Context, error)
+	// Resign releases leadership early so another instance can take over.
 	Resign(ctx context.Context) error
-	// Done returns a channel that notifies that the election session closed.
-	Done() <-chan struct{}
-	// Cleanup stops internal processes and releases keys.
-	Cleanup(ctx context.Context) error
 	// Guard returns a transaction guard representing the current leadership term.
 	// This guard can be passed to the generic store to perform leader-protected writes.
 	Guard() GuardFunc

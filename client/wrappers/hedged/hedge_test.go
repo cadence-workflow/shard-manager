@@ -96,7 +96,7 @@ func TestHedge(t *testing.T) {
 		resp, err := hedge(context.Background(), h, "op", func(context.Context) (string, error) {
 			timeSource.BlockUntil(1)
 			timeSource.Advance(hedgeDelay)
-			require.Eventually(t, func() bool { return counter(scope, hedgesSkipped) == 1 }, time.Second, time.Millisecond)
+			assert.Eventually(t, func() bool { return counter(scope, hedgesSkipped) == 1 }, time.Second, time.Millisecond)
 			return "first", nil
 		})
 

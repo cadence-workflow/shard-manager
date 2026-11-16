@@ -105,6 +105,10 @@ type Params[SP ShardProcessor] struct {
 	// in and out at runtime (e.g. a percentage-based onboarding guard). When
 	// nil the executor is always enabled.
 	Enabled func() bool `optional:"true"`
+
+	// HedgeShare is the share of calls to the shard distributor that may be hedged. It is
+	// read on every call, so callers can back it with dynamic config. When nil it is 0.1.
+	HedgeShare func() float64 `optional:"true"`
 }
 
 // NewExecutorWithNamespace creates an executor for a specific namespace
@@ -140,7 +144,12 @@ func NewExecutor[SP ShardProcessor](params Params[SP]) (Executor[SP], error) {
 }
 
 func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig *clientcommon.NamespaceConfig) (Executor[SP], error) {
-	shardDistributorClient, err := createShardDistributorExecutorClient(params.ExecutorClient, params.TimeSource, params.MetricsScope)
+	hedgeShare := params.HedgeShare
+	if hedgeShare == nil {
+		hedgeShare = func() float64 { return 0.1 }
+	}
+
+	shardDistributorClient, err := createShardDistributorExecutorClient(params.ExecutorClient, params.TimeSource, params.MetricsScope, hedgeShare)
 	if err != nil {
 		return nil, fmt.Errorf("create shard distributor executor client: %w", err)
 	}
@@ -204,13 +213,13 @@ func buildExecutorID(normalizedHostname, uniqueID string) string {
 	return normalizedHostname + "@" + uniqueID
 }
 
-func createShardDistributorExecutorClient(client Client, timeSource clock.TimeSource, metricsScope tally.Scope) (Client, error) {
+func createShardDistributorExecutorClient(client Client, timeSource clock.TimeSource, metricsScope tally.Scope, hedgeShare func() float64) (Client, error) {
 	if client == nil {
 		return nil, fmt.Errorf("executor client is nil: ensure the shard-distributor YARPC outbound is configured")
 	}
 
 	// Hedging sits inside the timeout so all attempts share one deadline.
-	hedgedClient := hedged.NewShardDistributorExecutorClient(client, timeSource, metricsScope)
+	hedgedClient := hedged.NewShardDistributorExecutorClient(client, timeSource, metricsScope, hedgeShare)
 	shardDistributorExecutorClient := timeoutwrapper.NewShardDistributorExecutorClient(hedgedClient, timeoutwrapper.ShardDistributorExecutorDefaultTimeout)
 
 	if metricsScope != nil {

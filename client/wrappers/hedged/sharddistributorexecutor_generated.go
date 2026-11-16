@@ -18,15 +18,16 @@ import (
 // sharddistributorexecutorClient implements _sourceSharddistributorexecutor.Client interface with request hedging
 type sharddistributorexecutorClient struct {
 	client _sourceSharddistributorexecutor.Client
-	hedger hedger
+	hedger *hedger
 }
 
 // NewShardDistributorExecutorClient creates a new instance of sharddistributorexecutorClient that hedges unary calls.
+// hedgeShare is the share of calls that may be hedged, read on every call.
 // yarpc.ResponseHeaders is not supported, as concurrent attempts would both write to the caller's map.
-func NewShardDistributorExecutorClient(client _sourceSharddistributorexecutor.Client, timeSource clock.TimeSource, metricsScope tally.Scope) _sourceSharddistributorexecutor.Client {
+func NewShardDistributorExecutorClient(client _sourceSharddistributorexecutor.Client, timeSource clock.TimeSource, metricsScope tally.Scope, hedgeShare func() float64) _sourceSharddistributorexecutor.Client {
 	return &sharddistributorexecutorClient{
 		client: client,
-		hedger: hedger{timeSource: timeSource, metrics: metricsScope},
+		hedger: newHedger(timeSource, metricsScope, hedgeShare),
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,12 +87,29 @@ func TestHedge(t *testing.T) {
 		assert.Equal(t, int64(1), counter(scope, hedgesSent))
 		assert.Zero(t, counter(scope, hedgeWins))
 	})
+
+	t.Run("zero share skips the hedge", func(t *testing.T) {
+		timeSource := clock.NewMockedTimeSource()
+		scope := tally.NewTestScope("", nil)
+		h := newHedger(timeSource, scope, func() float64 { return 0 })
+
+		resp, err := hedge(context.Background(), h, "op", func(context.Context) (string, error) {
+			timeSource.BlockUntil(1)
+			timeSource.Advance(hedgeDelay)
+			assert.Eventually(t, func() bool { return counter(scope, hedgesSkipped) == 1 }, time.Second, time.Millisecond)
+			return "first", nil
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "first", resp)
+		assert.Zero(t, counter(scope, hedgesSent))
+	})
 }
 
-func newTestHedger() (hedger, clock.MockedTimeSource, tally.TestScope) {
+func newTestHedger() (*hedger, clock.MockedTimeSource, tally.TestScope) {
 	timeSource := clock.NewMockedTimeSource()
 	scope := tally.NewTestScope("", nil)
-	return hedger{timeSource: timeSource, metrics: scope}, timeSource, scope
+	return newHedger(timeSource, scope, func() float64 { return 0.1 }), timeSource, scope
 }
 
 // slowFirstAttempt returns an op whose first call fires the hedge timer and then waits to be cancelled,

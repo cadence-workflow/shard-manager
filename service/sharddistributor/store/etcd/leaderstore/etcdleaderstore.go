@@ -13,6 +13,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/cadence-workflow/shard-manager/common/log"
+	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdclient"
@@ -40,10 +41,15 @@ type StoreParams struct {
 
 // NewLeaderStore creates a new leaderstore backed by ETCD.
 func NewLeaderStore(p StoreParams) (store.Elector, error) {
+	period := p.ShardDistribution.Process.Period
+	if period < _minTerm {
+		p.Logger.Warn("process.period is below the minimum leadership term, using the minimum",
+			tag.Dynamic("period", period), tag.Dynamic("minimum", _minTerm))
+	}
 	return &LeaderStore{
 		client: p.Client,
 		config: p.Cfg,
-		term:   max(p.ShardDistribution.Process.Period, _minTerm),
+		term:   max(period, _minTerm),
 	}, nil
 }
 

@@ -717,7 +717,7 @@ func TestGuardedOperations(t *testing.T) {
 	// 1. Create two potential leaders
 	leaderCfg, err := etcdclient.NewLeaderStoreConfig(tc.SDConfig)
 	require.NoError(t, err)
-	elector, err := leaderstore.NewLeaderStore(leaderstore.StoreParams{Client: tc.Client, Cfg: leaderCfg})
+	elector, err := leaderstore.NewLeaderStore(leaderstore.StoreParams{Client: tc.Client, Cfg: leaderCfg, Logger: testlogger.New(t)})
 	require.NoError(t, err)
 	election1, err := elector.CreateElection(ctx, namespace)
 	require.NoError(t, err)

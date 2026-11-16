@@ -6,7 +6,6 @@ import (
 	"maps"
 	"slices"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -590,17 +589,12 @@ func TestRunLoop_SubscriptionError(t *testing.T) {
 	mocks := setupProcessorTest(t, config.NamespaceTypeFixed)
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
-	expectedErr := errors.New("subscription failed")
-	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil)
-	mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(nil, expectedErr)
+	gomock.InOrder(
+		mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(nil, errors.New("subscription failed")),
+		mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil),
+	)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		processor.runTerm(context.Background())
-	}()
-	wg.Wait()
+	processor.runTerm(context.Background())
 }
 
 func TestRebalanceShards_NoShardsToReassign(t *testing.T) {
@@ -1719,10 +1713,22 @@ func TestRunTerm_RebalancesOnStateChange(t *testing.T) {
 			}
 			// Closing the channel ends the term once the pending change is handled.
 			close(updateChan)
-			mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(updateChan, nil)
-			mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil).Times(1 + changes)
+			gomock.InOrder(
+				mocks.store.EXPECT().SubscribeToExecutorStatusChanges(gomock.Any(), mocks.cfg.Name).Return(updateChan, nil),
+				mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{}, nil).Times(1+changes),
+			)
 
-			processor.runTerm(context.Background())
+			done := make(chan struct{})
+			go func() {
+				processor.runTerm(context.Background())
+				close(done)
+			}()
+			// Each triggered rebalance waits for the cooldown, counted from the previous rebalance.
+			for range changes {
+				mocks.timeSource.BlockUntil(1)
+				mocks.timeSource.Advance(processor.cfg.RebalanceCooldown)
+			}
+			<-done
 		})
 	}
 }

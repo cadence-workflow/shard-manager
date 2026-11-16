@@ -16,15 +16,16 @@ import (
 // {{$decorator}} implements {{.Interface.Type}} interface with request hedging
 type {{$decorator}} struct {
 	client {{.Interface.Type}}
-	hedger hedger
+	hedger *hedger
 }
 
 // New{{$Decorator}} creates a new instance of {{$decorator}} that hedges unary calls.
+// hedgeBudget is the share of calls that may be hedged, read on every call.
 // yarpc.ResponseHeaders is not supported, as concurrent attempts would both write to the caller's map.
-func New{{$Decorator}}(client {{.Interface.Type}}, timeSource clock.TimeSource, metricsScope tally.Scope) {{.Interface.Type}} {
+func New{{$Decorator}}(client {{.Interface.Type}}, timeSource clock.TimeSource, metricsScope tally.Scope, hedgeBudget func() float64) {{.Interface.Type}} {
 	return &{{$decorator}}{
 		client: client,
-		hedger: hedger{timeSource: timeSource, metrics: metricsScope},
+		hedger: newHedger(timeSource, metricsScope, hedgeBudget),
 	}
 }
 

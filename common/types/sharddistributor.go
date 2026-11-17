@@ -1065,8 +1065,8 @@ func (v *RangeAssignment) GetStatus() (o AssignmentStatus) {
 
 type RangeLoadReport struct {
 	RangeLoad float64
-	// TopTasklists is an unordered bounded top-N by tasklist name.
-	TopTasklists map[string]float64
+	// The N highest-load shard keys; ties at the bound are broken by key.
+	TopShardKeys map[string]float64
 }
 
 func (v *RangeLoadReport) GetRangeLoad() (o float64) {
@@ -1076,9 +1076,9 @@ func (v *RangeLoadReport) GetRangeLoad() (o float64) {
 	return
 }
 
-func (v *RangeLoadReport) GetTopTasklists() (o map[string]float64) {
+func (v *RangeLoadReport) GetTopShardKeys() (o map[string]float64) {
 	if v != nil {
-		return v.TopTasklists
+		return v.TopShardKeys
 	}
 	return
 }

@@ -1345,7 +1345,7 @@ func fromShardDistributorRangeLoadReports(reports map[string]*types.RangeLoadRep
 	for id, report := range reports {
 		out[id] = &sharddistributorv1.RangeLoadReport{
 			RangeLoad:    report.GetRangeLoad(),
-			TopTasklists: maps.Clone(report.GetTopTasklists()),
+			TopShardKeys: maps.Clone(report.GetTopShardKeys()),
 		}
 	}
 	return out
@@ -1359,7 +1359,7 @@ func toShardDistributorRangeLoadReports(reports map[string]*sharddistributorv1.R
 	for id, report := range reports {
 		out[id] = &types.RangeLoadReport{
 			RangeLoad:    report.GetRangeLoad(),
-			TopTasklists: maps.Clone(report.GetTopTasklists()),
+			TopShardKeys: maps.Clone(report.GetTopShardKeys()),
 		}
 	}
 	return out

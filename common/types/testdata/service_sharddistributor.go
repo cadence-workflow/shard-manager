@@ -33,7 +33,7 @@ var (
 		RangeLoadReports: map[string]*types.RangeLoadReport{
 			"range-1": {
 				RangeLoad:    1.5,
-				TopTasklists: map[string]float64{"tasklist-1": 0.9, "tasklist-2": 0.6},
+				TopShardKeys: map[string]float64{"shard-1": 0.9, "shard-2": 0.6},
 			},
 		},
 		Metadata: map[string]string{

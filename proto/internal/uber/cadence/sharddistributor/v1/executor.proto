@@ -96,6 +96,6 @@ message RangeAssignment {
 
 message RangeLoadReport {
   double range_load = 1;
-  // Unordered bounded top-N by tasklist name.
-  map<string, double> top_tasklists = 2;
+  // The N highest-load shard keys; ties at the bound are broken by key.
+  map<string, double> top_shard_keys = 2;
 }

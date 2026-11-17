@@ -16,6 +16,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	canarymetrics "github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/metrics"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 var (
@@ -82,9 +83,10 @@ func TestConvergenceCheckerAwait(t *testing.T) {
 			timeSource := clock.NewMockedTimeSource()
 			scope := tally.NewTestScope("", nil)
 			checker := newTestConvergenceChecker(t, client, timeSource, scope)
+			executors := testHoldingExecutors(ctrl)
 
 			var err error
-			runUntilDone(timeSource, func() { err = checker.await(context.Background(), phaseScaleUp) })
+			runUntilDone(timeSource, func() { err = checker.await(context.Background(), phaseScaleUp, executors) })
 
 			assert.NoError(t, err)
 			converged, timeouts := convergenceOutcome(scope)
@@ -103,9 +105,10 @@ func TestConvergenceCheckerAwaitPollErrors(t *testing.T) {
 	timeSource := clock.NewMockedTimeSource()
 	scope := tally.NewTestScope("", nil)
 	checker := newTestConvergenceChecker(t, client, timeSource, scope)
+	executors := testHoldingExecutors(ctrl)
 
 	var err error
-	runUntilDone(timeSource, func() { err = checker.await(context.Background(), phaseScaleUp) })
+	runUntilDone(timeSource, func() { err = checker.await(context.Background(), phaseScaleUp, executors) })
 
 	assert.NoError(t, err)
 	converged, timeouts := convergenceOutcome(scope)
@@ -127,9 +130,10 @@ func TestConvergenceCheckerAwaitShutdown(t *testing.T) {
 	timeSource := clock.NewMockedTimeSource()
 	scope := tally.NewTestScope("", nil)
 	checker := newTestConvergenceChecker(t, client, timeSource, scope)
+	executors := testHoldingExecutors(ctrl)
 
 	var err error
-	runUntilDone(timeSource, func() { err = checker.await(ctx, phaseScaleUp) })
+	runUntilDone(timeSource, func() { err = checker.await(ctx, phaseScaleUp, executors) })
 
 	assert.ErrorIs(t, err, context.Canceled)
 	converged, timeouts := convergenceOutcome(scope)
@@ -139,16 +143,34 @@ func TestConvergenceCheckerAwaitShutdown(t *testing.T) {
 
 func newTestConvergenceChecker(t *testing.T, client sharddistributor.Client, timeSource clock.TimeSource, scope tally.Scope) *convergenceChecker {
 	return &convergenceChecker{
-		client:    client,
-		namespace: testNamespace,
-		holders: func() []shardHolder {
-			return []shardHolder{{shardKey: "1", executorID: "executor-a"}, {shardKey: "2", executorID: "executor-b"}}
-		},
+		client:     client,
+		namespace:  testNamespace,
 		timeout:    10 * time.Second,
 		logger:     zaptest.NewLogger(t),
 		timeSource: timeSource,
 		scope:      scope,
 	}
+}
+
+// testHoldingExecutors returns executors that hold shard "1" on executor-a and
+// shard "2" on executor-b, plus an idle executor that holds no shards.
+func testHoldingExecutors(ctrl *gomock.Controller) []loadExecutor {
+	return []loadExecutor{
+		holdingExecutor(ctrl, "executor-a", "1"),
+		holdingExecutor(ctrl, "executor-b", "2"),
+		holdingExecutor(ctrl, "executor-idle"),
+	}
+}
+
+func holdingExecutor(ctrl *gomock.Controller, executorID string, shardKeys ...string) loadExecutor {
+	reports := make(map[string]*types.ShardStatusReport, len(shardKeys))
+	for _, shardKey := range shardKeys {
+		reports[shardKey] = &types.ShardStatusReport{Status: types.ShardStatusREADY}
+	}
+	executor := executorclient.NewMockExecutor[*shardProcessor](ctrl)
+	executor.EXPECT().GetExecutorID().Return(executorID).AnyTimes()
+	executor.EXPECT().GetShardStatusReports().Return(reports).AnyTimes()
+	return executor
 }
 
 // convergenceOutcome reports whether a scale-up convergence was recorded and how many timed out.

@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -60,20 +61,19 @@ type Params struct {
 	MetricsScope           tally.Scope
 }
 
+type loadExecutor = executorclient.Executor[*shardProcessor]
+
 // Controller keeps the baseline executors running and starts one load run per interval
 type Controller struct {
 	cfg         config.LoadConfig
 	client      sharddistributor.Client
-	newExecutor func() (executorclient.Executor[*shardProcessor], error)
+	newExecutor func() (loadExecutor, error)
 	convergence *convergenceChecker
 	logger      *zap.Logger
 	timeSource  clock.TimeSource
 	scope       tally.Scope
 
-	baseline []executorclient.Executor[*shardProcessor]
-
-	mu             sync.RWMutex
-	extraExecutors []executorclient.Executor[*shardProcessor]
+	baseline []loadExecutor
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -87,10 +87,10 @@ func NewController(params Params, cfg config.LoadConfig) (*Controller, error) {
 
 	logger := params.Logger.With(zap.String("namespace", cfg.Namespace))
 	scope := params.MetricsScope.Tagged(map[string]string{"namespace": cfg.Namespace})
-	c := &Controller{
+	return &Controller{
 		cfg:    cfg,
 		client: params.ShardDistributorClient,
-		newExecutor: func() (executorclient.Executor[*shardProcessor], error) {
+		newExecutor: func() (loadExecutor, error) {
 			return executorclient.NewExecutorWithNamespace(executorclient.Params[*shardProcessor]{
 				ExecutorClient:        params.ExecutorClient,
 				MetricsScope:          params.MetricsScope,
@@ -101,20 +101,18 @@ func NewController(params Params, cfg config.LoadConfig) (*Controller, error) {
 				Metadata:              params.Metadata,
 			}, cfg.Namespace)
 		},
+		convergence: &convergenceChecker{
+			client:     params.ShardDistributorClient,
+			namespace:  cfg.Namespace,
+			timeout:    cfg.ConvergenceTimeout,
+			logger:     logger,
+			timeSource: params.TimeSource,
+			scope:      scope,
+		},
 		logger:     logger,
 		timeSource: params.TimeSource,
 		scope:      scope,
-	}
-	c.convergence = &convergenceChecker{
-		client:     params.ShardDistributorClient,
-		namespace:  cfg.Namespace,
-		holders:    c.shardHolders,
-		timeout:    cfg.ConvergenceTimeout,
-		logger:     logger,
-		timeSource: params.TimeSource,
-		scope:      scope,
-	}
-	return c, nil
+	}, nil
 }
 
 // Module provides the load Controller and starts it
@@ -135,7 +133,7 @@ func Module(cfg config.LoadConfig) fx.Option {
 
 // Start starts the baseline executors and the run loop
 func (c *Controller) Start() error {
-	baseline := make([]executorclient.Executor[*shardProcessor], 0, c.cfg.BaselineExecutors)
+	baseline := make([]loadExecutor, 0, c.cfg.BaselineExecutors)
 	for range c.cfg.BaselineExecutors {
 		executor, err := c.newExecutor()
 		if err != nil {
@@ -200,57 +198,69 @@ func (c *Controller) runOnce(ctx context.Context) {
 	c.logger.Info("load run completed")
 }
 
+// run scales the extra executors up and back down.
 func (c *Controller) run(ctx context.Context) error {
-	defer c.stopExtraExecutors()
+	var extra []loadExecutor
+	defer func() {
+		stopExecutors(extra)
+		c.reportActiveExecutors(0)
+	}()
 
-	paused, err := c.scaleUp(ctx)
+	extra, paused, err := c.scaleUp(ctx)
 	if err != nil {
 		return err
 	}
 	// A drained switcher shard cuts the scale-up short, the run then scales down straight away
 	if !paused {
-		if err := c.convergence.await(ctx, phaseScaleUp); err != nil {
+		if err := c.convergence.await(ctx, phaseScaleUp, slices.Concat(c.baseline, extra)); err != nil {
 			return err
 		}
 		if err := c.hold(ctx); err != nil {
 			return err
 		}
 	}
-	if err := c.scaleDown(ctx); err != nil {
+	if extra, err = c.scaleDown(ctx, extra); err != nil {
 		return err
 	}
-	return c.convergence.await(ctx, phaseScaleDown)
+	return c.convergence.await(ctx, phaseScaleDown, c.baseline)
 }
 
-// scaleUp starts cfg.NumExecutors executors at cfg.ExecutorsPerSecond and
-// reports whether it stopped early because the switcher shard is drained
-func (c *Controller) scaleUp(ctx context.Context) (paused bool, err error) {
+// scaleUp starts cfg.NumExecutors extra executors at cfg.ExecutorsPerSecond.
+// It returns the executors it started, even on error, and whether it stopped
+// early because the switcher shard is drained.
+func (c *Controller) scaleUp(ctx context.Context) (extra []loadExecutor, paused bool, err error) {
+	extra = make([]loadExecutor, 0, c.cfg.NumExecutors)
 	for range c.cfg.NumExecutors {
 		if err := c.timeSource.SleepWithContext(ctx, c.executorStep()); err != nil {
-			return false, err
+			return extra, false, err
 		}
 		if c.windingDown(ctx) {
-			return true, nil
+			return extra, true, nil
 		}
 		executor, err := c.newExecutor()
 		if err != nil {
-			return false, fmt.Errorf("create load executor: %w", err)
+			return extra, false, fmt.Errorf("create load executor: %w", err)
 		}
 		executor.Start(ctx)
-		c.addExtraExecutor(executor)
+		extra = append(extra, executor)
+		c.reportActiveExecutors(len(extra))
 	}
-	return false, nil
+	return extra, false, nil
 }
 
 // scaleDown stops the extra executors at cfg.ExecutorsPerSecond
-func (c *Controller) scaleDown(ctx context.Context) error {
-	for c.numExtraExecutors() > 0 {
+// most recently started first, and returns the ones still running.
+func (c *Controller) scaleDown(ctx context.Context, extra []loadExecutor) ([]loadExecutor, error) {
+	for len(extra) > 0 {
 		if err := c.timeSource.SleepWithContext(ctx, c.executorStep()); err != nil {
-			return err
+			return extra, err
 		}
-		c.popLastExtraExecutor().Stop()
+		last := len(extra) - 1
+		extra[last].Stop()
+		extra = extra[:last]
+		c.reportActiveExecutors(len(extra))
 	}
-	return nil
+	return extra, nil
 }
 
 // executorStep is the wait before each executor start or stop
@@ -288,22 +298,6 @@ func (c *Controller) windingDown(ctx context.Context) bool {
 	return true
 }
 
-func (c *Controller) shardHolders() []shardHolder {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	var holders []shardHolder
-	for _, executors := range [][]executorclient.Executor[*shardProcessor]{c.baseline, c.extraExecutors} {
-		for _, executor := range executors {
-			executorID := executor.GetExecutorID()
-			for shardKey := range executor.GetShardStatusReports() {
-				holders = append(holders, shardHolder{shardKey: shardKey, executorID: executorID})
-			}
-		}
-	}
-	return holders
-}
-
 // isPaused reports whether switcherShardID is drained
 func (c *Controller) isPaused(ctx context.Context) bool {
 	_, err := c.client.GetShardOwner(ctx, &types.GetShardOwnerRequest{Namespace: c.cfg.Namespace, ShardKey: switcherShardID})
@@ -311,43 +305,11 @@ func (c *Controller) isPaused(ctx context.Context) bool {
 	return errors.As(err, &drained)
 }
 
-func (c *Controller) addExtraExecutor(executor executorclient.Executor[*shardProcessor]) {
-	c.mu.Lock()
-	c.extraExecutors = append(c.extraExecutors, executor)
-	active := len(c.extraExecutors)
-	c.mu.Unlock()
+func (c *Controller) reportActiveExecutors(active int) {
 	c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(float64(active))
 }
 
-// popLastExtraExecutor removes the most recently started extra executor without stopping it
-func (c *Controller) popLastExtraExecutor() executorclient.Executor[*shardProcessor] {
-	c.mu.Lock()
-	last := len(c.extraExecutors) - 1
-	executor := c.extraExecutors[last]
-	c.extraExecutors = c.extraExecutors[:last]
-	c.mu.Unlock()
-	c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(float64(last))
-	return executor
-}
-
-func (c *Controller) numExtraExecutors() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return len(c.extraExecutors)
-}
-
-// stopExtraExecutors stops all extra executors at once
-// The shard distributor reassigns their shards to the baseline executors
-func (c *Controller) stopExtraExecutors() {
-	c.mu.Lock()
-	executors := c.extraExecutors
-	c.extraExecutors = nil
-	c.mu.Unlock()
-	stopExecutors(executors)
-	c.scope.Gauge(canarymetrics.CanaryLoadExecutorsActive).Update(0)
-}
-
-func stopExecutors(executors []executorclient.Executor[*shardProcessor]) {
+func stopExecutors(executors []loadExecutor) {
 	var wg sync.WaitGroup
 	for _, executor := range executors {
 		wg.Go(executor.Stop)

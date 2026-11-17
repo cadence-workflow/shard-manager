@@ -15,12 +15,6 @@ import (
 	canarymetrics "github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/metrics"
 )
 
-// shardHolder is a shard and the local executor that holds it.
-type shardHolder struct {
-	shardKey   string
-	executorID string
-}
-
 // convergenceChecker waits for the shard distributor's cache to agree with the
 // local executors: the namespace state served by GetNamespaceStateIfNewer must
 // assign each shard to the executor that holds it.
@@ -29,17 +23,16 @@ type shardHolder struct {
 type convergenceChecker struct {
 	client     sharddistributor.Client
 	namespace  string
-	holders    func() []shardHolder
 	timeout    time.Duration
 	logger     *zap.Logger
 	timeSource clock.TimeSource
 	scope      tally.Scope
 }
 
-// await polls until the cached namespace state assigns every shard held
-// locally to its holding executor, until the timeout passes, or until the
+// await polls until the cached namespace state assigns every shard held by
+// executors to its holding executor, until the timeout passes, or until the
 // switcher shard is drained
-func (c *convergenceChecker) await(ctx context.Context, phase string) error {
+func (c *convergenceChecker) await(ctx context.Context, phase string, executors []loadExecutor) error {
 	logger := c.logger.With(zap.String("phase", phase))
 	scope := c.scope.Tagged(map[string]string{"phase": phase})
 	start := c.timeSource.Now()
@@ -52,7 +45,7 @@ func (c *convergenceChecker) await(ctx context.Context, phase string) error {
 			return nil
 		}
 
-		mismatched := c.countMismatched(view.owners)
+		mismatched := countMismatched(view.owners, executors)
 		elapsed := c.timeSource.Since(start)
 		switch {
 		case mismatched == 0:
@@ -94,13 +87,16 @@ func (c *convergenceChecker) refresh(ctx context.Context, view *assignmentView, 
 	view.switcherDrained = slices.Contains(state.GetDrainedShardKeys(), switcherShardID)
 }
 
-// countMismatched counts the locally held shards that owners does not assign
-// to their holder
-func (c *convergenceChecker) countMismatched(owners map[string]string) int {
+// countMismatched counts the shards held by executors that owners do not
+// assign to their holder
+func countMismatched(owners map[string]string, executors []loadExecutor) int {
 	mismatched := 0
-	for _, holder := range c.holders() {
-		if owners[holder.shardKey] != holder.executorID {
-			mismatched++
+	for _, executor := range executors {
+		executorID := executor.GetExecutorID()
+		for shardKey := range executor.GetShardStatusReports() {
+			if owners[shardKey] != executorID {
+				mismatched++
+			}
 		}
 	}
 	return mismatched

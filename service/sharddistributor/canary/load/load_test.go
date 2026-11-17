@@ -135,7 +135,7 @@ func TestStartStop(t *testing.T) {
 			c.cfg.BaselineExecutors = 2
 
 			created := 0
-			c.newExecutor = func() (executorclient.Executor[*shardProcessor], error) {
+			c.newExecutor = func() (loadExecutor, error) {
 				created++
 				if created == tt.failAt {
 					return nil, errors.New("create failed")
@@ -157,30 +157,6 @@ func TestStartStop(t *testing.T) {
 			c.Stop()
 		})
 	}
-}
-
-func TestShardHolders(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	newExecutor := func(id string, shards ...string) executorclient.Executor[*shardProcessor] {
-		reports := make(map[string]*types.ShardStatusReport, len(shards))
-		for _, shard := range shards {
-			reports[shard] = &types.ShardStatusReport{Status: types.ShardStatusREADY}
-		}
-		executor := executorclient.NewMockExecutor[*shardProcessor](ctrl)
-		executor.EXPECT().GetExecutorID().Return(id)
-		executor.EXPECT().GetShardStatusReports().Return(reports)
-		return executor
-	}
-
-	c := newTestController(t, clock.NewMockedTimeSource(), tally.NoopScope)
-	c.baseline = []executorclient.Executor[*shardProcessor]{newExecutor("baseline", "0", "1")}
-	c.extraExecutors = []executorclient.Executor[*shardProcessor]{newExecutor("extra", "2"), newExecutor("idle")}
-
-	assert.ElementsMatch(t, []shardHolder{
-		{shardKey: "0", executorID: "baseline"},
-		{shardKey: "1", executorID: "baseline"},
-		{shardKey: "2", executorID: "extra"},
-	}, c.shardHolders())
 }
 
 func TestRunOnce(t *testing.T) {
@@ -279,7 +255,7 @@ func TestRunOnce(t *testing.T) {
 			}
 
 			calls, created := 0, 0
-			c.newExecutor = func() (executorclient.Executor[*shardProcessor], error) {
+			c.newExecutor = func() (loadExecutor, error) {
 				calls++
 				if calls == tt.failAt {
 					return nil, errors.New("create failed")
@@ -306,7 +282,6 @@ func TestRunOnce(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectedCreated, created)
-			assert.Empty(t, c.extraExecutors)
 			counters := scope.Snapshot().Counters()
 			for _, name := range []string{
 				canarymetrics.CanaryLoadRunStarted,

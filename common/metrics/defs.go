@@ -71,34 +71,12 @@ const (
 
 // Common service base metrics
 const (
-	RestartCount         = "restarts"
-	NumGoRoutinesGauge   = "num_goroutines"
-	GoMaxProcsGauge      = "gomaxprocs"
-	MemoryAllocatedGauge = "memory_allocated"
-	MemoryHeapGauge      = "memory_heap"
-	MemoryHeapIdleGauge  = "memory_heapidle"
-	MemoryHeapInuseGauge = "memory_heapinuse"
-	MemoryStackGauge     = "memory_stack"
-	NumGCCounter         = "memory_num_gc"
-	GcPauseMsTimer       = "memory_gc_pause_ms"
+	RestartCount = "restarts"
 )
 
 // ServiceMetrics are types for common service base metrics
 var ServiceMetrics = map[MetricName]MetricType{
 	RestartCount: Counter,
-}
-
-// GoRuntimeMetrics represent the runtime stats from go runtime
-var GoRuntimeMetrics = map[MetricName]MetricType{
-	NumGoRoutinesGauge:   Gauge,
-	GoMaxProcsGauge:      Gauge,
-	MemoryAllocatedGauge: Gauge,
-	MemoryHeapGauge:      Gauge,
-	MemoryHeapIdleGauge:  Gauge,
-	MemoryHeapInuseGauge: Gauge,
-	MemoryStackGauge:     Gauge,
-	NumGCCounter:         Counter,
-	GcPauseMsTimer:       Timer,
 }
 
 // Scopes enum

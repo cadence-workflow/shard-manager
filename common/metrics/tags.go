@@ -10,13 +10,6 @@ const (
 	ShardDistributorAssignmentWriteResultVersionConflict = "version_conflict"
 	ShardDistributorAssignmentWriteResultError           = "error"
 
-	revisionTag       = "revision"
-	branchTag         = "branch"
-	buildDateTag      = "build_date"
-	buildVersionTag   = "build_version"
-	goVersionTag      = "go_version"
-	cadenceVersionTag = "cadence_version"
-
 	instance                  = "instance"
 	domain                    = "domain"
 	domainType                = "domain_type"

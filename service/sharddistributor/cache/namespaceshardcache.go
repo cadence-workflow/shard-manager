@@ -25,7 +25,7 @@ const (
 	// refreshOperationTimeout caps how long a singleflighted refresh can keep
 	// the singleflight key occupied. The etcd client config
 	// only sets DialTimeout, so without this bound a hung Get would block
-	// every joiner indefinitely (until stopCh closes).
+	// every joiner indefinitely.
 	refreshOperationTimeout = 5 * time.Second
 
 	// Retry bounds for a failed refresh.
@@ -48,7 +48,7 @@ type shardCache struct {
 	lastRevision     int64               // etcd store revision of the last applied snapshot
 	assignmentRev    int64               // assignment revision of the last applied snapshot
 	namespace        string
-	stopCh           chan struct{}
+	cancel           context.CancelFunc
 	wg               sync.WaitGroup
 	logger           log.Logger
 	executorStore    store.Store
@@ -79,7 +79,6 @@ func newShardCache(namespace string, executorStore store.Store, logger log.Logge
 		shardOwners:      make(map[string]*store.ShardOwner),
 		drainedShards:    make(map[string]struct{}),
 		namespace:        namespace,
-		stopCh:           make(chan struct{}),
 		logger:           logger.WithTags(tag.ShardNamespace(namespace)),
 		executorStore:    executorStore,
 		pubSub:           newExecutorStatePubSub(),
@@ -94,17 +93,17 @@ func (c *shardCache) Start() error {
 		return fmt.Errorf("subscribe to namespace changes: %w", err)
 	}
 
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		c.namespaceRefreshLoop(changeCh)
-	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	c.cancel = cancel
+	c.wg.Go(func() { c.namespaceRefreshLoop(ctx, changeCh) })
 
 	return nil
 }
 
 func (c *shardCache) Stop() {
-	close(c.stopCh)
+	if c.cancel != nil {
+		c.cancel()
+	}
 	c.wg.Wait()
 }
 
@@ -178,25 +177,24 @@ func newRefreshRetrier(timeSource clock.TimeSource) backoff.Retrier {
 	return backoff.NewRetrier(retryPolicy, timeSource)
 }
 
-func (c *shardCache) namespaceRefreshLoop(changeCh <-chan struct{}) {
+func (c *shardCache) namespaceRefreshLoop(ctx context.Context, changeCh <-chan struct{}) {
 	retrier := newRefreshRetrier(c.timeSource)
 
 	delay := c.nextDelay(nil, retrier)
-	for c.waitForRefresh(changeCh, delay) {
-		// Bounded so a stuck etcd call can't block this loop from observing stopCh.
-		err := c.refreshWithTimeout()
+	for c.waitForRefresh(ctx, changeCh, delay) {
+		err := c.refreshWithTimeout(ctx)
 		delay = c.nextDelay(err, retrier)
 	}
 }
 
 // waitForRefresh waits for a change signal or delay, returning false on stop.
-func (c *shardCache) waitForRefresh(changeCh <-chan struct{}, delay time.Duration) bool {
+func (c *shardCache) waitForRefresh(ctx context.Context, changeCh <-chan struct{}, delay time.Duration) bool {
 	timer := c.timeSource.NewTimer(delay)
 	defer timer.Stop()
 
 	select {
-	case <-c.stopCh:
-		c.logger.Info("stop channel closed, exiting namespaceRefreshLoop")
+	case <-ctx.Done():
+		c.logger.Info("context done, exiting namespaceRefreshLoop")
 		return false
 
 	case _, ok := <-changeCh:
@@ -243,9 +241,9 @@ func (c *shardCache) refresh(ctx context.Context) error {
 	return nil
 }
 
-// refreshWithTimeout refreshes under a fresh background context bounded by refreshTimeout.
-func (c *shardCache) refreshWithTimeout() error {
-	refreshCtx, cancel := context.WithTimeout(context.Background(), c.refreshTimeout)
+// refreshWithTimeout refreshes under ctx bounded by refreshTimeout.
+func (c *shardCache) refreshWithTimeout(ctx context.Context) error {
+	refreshCtx, cancel := context.WithTimeout(ctx, c.refreshTimeout)
 	defer cancel()
 	return c.refresh(refreshCtx)
 }
@@ -389,7 +387,7 @@ func (c *shardCache) getShardOwnerInMap(ctx context.Context, m *map[string]*stor
 // key indefinitely.
 func (c *shardCache) refreshSingleFlight(ctx context.Context) error {
 	ch := c.refreshSF.DoChan(refreshSingleFlightKey, func() (interface{}, error) {
-		return nil, c.refreshWithTimeout()
+		return nil, c.refreshWithTimeout(context.Background())
 	})
 
 	select {

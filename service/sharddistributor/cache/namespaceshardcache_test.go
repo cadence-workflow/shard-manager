@@ -104,28 +104,27 @@ func TestShardCache_GetShardOwner_DrainedShard(t *testing.T) {
 	assert.ErrorIs(t, err, store.ErrShardDrained)
 }
 
-func TestShardCache_namespaceRefreshLoop_HungRefreshDoesNotBlockStop(t *testing.T) {
+func TestShardCache_StopCancelsInFlightRefresh(t *testing.T) {
 	tc := setupShardCacheTestCase(t)
 	defer goleak.VerifyNone(t)
-	tc.c.refreshTimeout = 50 * time.Millisecond
 
-	gatedGetState(tc, nil)
+	calls := gatedGetState(tc, nil)
 
-	done := make(chan struct{})
+	require.NoError(t, tc.c.Start())
+	tc.changeCh <- struct{}{}
+	require.Eventually(t, func() bool { return calls.Load() == 1 }, time.Second, time.Millisecond)
+
+	stopped := make(chan struct{})
 	go func() {
-		defer close(done)
-		tc.c.namespaceRefreshLoop(tc.changeCh)
+		defer close(stopped)
+		tc.c.Stop()
 	}()
 
-	tc.changeCh <- struct{}{}
-
-	time.Sleep(10 * time.Millisecond)
-	tc.c.Stop()
-
+	// Shorter than refreshTimeout, so only the cancellation can end the refresh in time.
 	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("namespaceRefreshLoop did not exit after stopCh was closed while a refresh was in flight")
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("Stop did not cancel the in-flight refresh")
 	}
 }
 
@@ -333,12 +332,8 @@ func TestShardCache_namespaceRefreshLoop_refreshesDrainedShards(t *testing.T) {
 		After(drainedGet).
 		Times(1)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		tc.c.namespaceRefreshLoop(tc.changeCh)
-	}()
+	require.NoError(t, tc.c.Start())
+	defer tc.c.Stop()
 
 	// Read the map directly rather than through IsShardDrained, so polling cannot itself
 	// trigger a refresh and consume an expected GetState.
@@ -354,9 +349,6 @@ func TestShardCache_namespaceRefreshLoop_refreshesDrainedShards(t *testing.T) {
 
 	tc.changeCh <- struct{}{}
 	require.Eventually(t, func() bool { return !isDrained() }, time.Second, time.Millisecond, "expected the undrained shard to leave the cache")
-
-	tc.c.Stop()
-	wg.Wait()
 }
 
 // An empty drained set is a loaded state, not a miss, so it must not re-read the store.

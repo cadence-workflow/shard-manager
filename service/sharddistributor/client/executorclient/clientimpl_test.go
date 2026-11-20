@@ -85,7 +85,6 @@ func newTestExecutor(
 		shardProcessorFactory: factory,
 		namespace:             "test-namespace",
 		executorID:            "test-executor-id",
-		stopC:                 make(chan struct{}),
 		heartBeatInterval:     10 * time.Second,
 		managedProcessors:     syncgeneric.Map[string, *managedProcessor[*MockShardProcessor]]{},
 		timeSource:            timeSource,
@@ -266,30 +265,6 @@ func TestHeartBeatLoop_ShardAssignmentChange(t *testing.T) {
 	// we lookup directly since we don't want to trigger a heartbeat
 	_, ok := executor.managedProcessors.Load("test-shard-id1")
 	assert.False(t, ok)
-}
-
-func TestHeartbeatLoop_StopSignalSendsDrainingHeartbeat(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
-	ctrl := gomock.NewController(t)
-	mockShardDistributorClient := sharddistributorexecutor.NewMockClient(ctrl)
-	expectDrainingHeartbeat(t, mockShardDistributorClient)
-
-	mockTimeSource := clock.NewMockedTimeSource()
-
-	executor := newTestExecutor(mockShardDistributorClient, nil, mockTimeSource)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	done := make(chan struct{})
-	go func() {
-		executor.heartbeatloop(ctx)
-		close(done)
-	}()
-
-	close(executor.stopC)
-	<-done
 }
 
 func TestHeartbeatLoop_ContextCancelSendsDrainingHeartbeat(t *testing.T) {
@@ -837,37 +812,6 @@ func TestShardCleanupLoop_StopsOnContextCancel(t *testing.T) {
 	<-done
 }
 
-func TestShardCleanupLoop_StopsOnStopChannel(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
-	ctrl := gomock.NewController(t)
-
-	mockTimeSource := clock.NewMockedTimeSource()
-	executor := newTestExecutor(nil, nil, mockTimeSource)
-	executor.ttlShard = 10 * time.Second
-
-	processor := NewMockShardProcessor(ctrl)
-	executor.managedProcessors.Store("shard-1", newManagedProcessor(processor, processorStateStarted))
-	executor.processorsToLastUse.Store("shard-1", executor.timeSource.Now())
-
-	ctx := context.Background()
-
-	done := make(chan struct{})
-	go func() {
-		executor.shardCleanUpLoop(ctx)
-		close(done)
-	}()
-
-	// Wait for timer
-	mockTimeSource.BlockUntil(1)
-
-	// Close stop channel
-	close(executor.stopC)
-
-	// Wait for loop to exit
-	<-done
-}
-
 func TestHeartbeatLoop_DrainSignal(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -1073,33 +1017,6 @@ func TestHeartbeatLoop_DrainSignal(t *testing.T) {
 
 				// Cancel while waiting for undrain #2
 				cancel()
-				<-done
-			},
-		},
-		{
-			name: "drain then executor stops",
-			setup: func(
-				t *testing.T,
-				ctrl *gomock.Controller,
-				executor *executorImpl[*MockShardProcessor],
-				observer *closeDrainObserver,
-				mockTimeSource clock.MockedTimeSource,
-				mockClient *sharddistributorexecutor.MockClient,
-			) {
-				expectDrainingHeartbeat(t, mockClient)
-
-				done := make(chan struct{})
-				go func() {
-					executor.heartbeatloop(context.Background())
-					close(done)
-				}()
-
-				mockTimeSource.BlockUntil(1)
-
-				observer.SignalDrain()
-				time.Sleep(50 * time.Millisecond)
-
-				close(executor.stopC)
 				<-done
 			},
 		},

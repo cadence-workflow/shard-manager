@@ -157,3 +157,42 @@ func ParseDrainedHostKey(prefix, namespace, key string) (string, error) {
 	}
 	return parsed, nil
 }
+
+// BuildRangesPrefix constructs the etcd key prefix for range assignments within
+// a given namespace.
+// Expected format: <prefix>/<namespace>/ranges/
+func BuildRangesPrefix(prefix, namespace string) string {
+	return fmt.Sprintf("%sranges/", BuildNamespacePrefix(prefix, namespace))
+}
+
+// BuildRangeKey constructs the etcd key for a single range assignment.
+// It does not validate rangeID; callers must validate it with ValidateRangeID.
+// Expected format: <prefix>/<namespace>/ranges/<rangeID>
+func BuildRangeKey(prefix, namespace, rangeID string) string {
+	return fmt.Sprintf("%s%s", BuildRangesPrefix(prefix, namespace), rangeID)
+}
+
+// ValidateRangeID rejects range IDs that cannot survive a key round trip.
+func ValidateRangeID(rangeID string) error {
+	if rangeID == "" {
+		return errors.New("range ID must not be empty")
+	}
+	if strings.Contains(rangeID, "/") {
+		return fmt.Errorf("range ID '%s' must not contain '/'", rangeID)
+	}
+	return nil
+}
+
+// ParseRangeKey extracts the range ID from a range etcd key.
+// Expected format: <prefix>/<namespace>/ranges/<rangeID>
+func ParseRangeKey(prefix, namespace, key string) (string, error) {
+	rangesPrefix := BuildRangesPrefix(prefix, namespace)
+	if !strings.HasPrefix(key, rangesPrefix) {
+		return "", fmt.Errorf("key '%s' does not have expected ranges prefix '%s'", key, rangesPrefix)
+	}
+	rangeID := strings.TrimPrefix(key, rangesPrefix)
+	if err := ValidateRangeID(rangeID); err != nil {
+		return "", fmt.Errorf("unexpected range key format '%s': %w", key, err)
+	}
+	return rangeID, nil
+}

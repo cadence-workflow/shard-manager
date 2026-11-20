@@ -64,6 +64,20 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
+// AssignRanges mocks base method.
+func (m *MockStore) AssignRanges(ctx context.Context, namespace string, request AssignRangesRequest, guard GuardFunc) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AssignRanges", ctx, namespace, request, guard)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AssignRanges indicates an expected call of AssignRanges.
+func (mr *MockStoreMockRecorder) AssignRanges(ctx, namespace, request, guard any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssignRanges", reflect.TypeOf((*MockStore)(nil).AssignRanges), ctx, namespace, request, guard)
+}
+
 // AssignShards mocks base method.
 func (m *MockStore) AssignShards(ctx context.Context, namespace string, request AssignShardsRequest, guard GuardFunc) error {
 	m.ctrl.T.Helper()
@@ -207,6 +221,21 @@ func (m *MockStore) GetState(ctx context.Context, namespace string) (*NamespaceS
 func (mr *MockStoreMockRecorder) GetState(ctx, namespace any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetState", reflect.TypeOf((*MockStore)(nil).GetState), ctx, namespace)
+}
+
+// ListRanges mocks base method.
+func (m *MockStore) ListRanges(ctx context.Context, namespace string) ([]*RangeAssignment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRanges", ctx, namespace)
+	ret0, _ := ret[0].([]*RangeAssignment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRanges indicates an expected call of ListRanges.
+func (mr *MockStoreMockRecorder) ListRanges(ctx, namespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRanges", reflect.TypeOf((*MockStore)(nil).ListRanges), ctx, namespace)
 }
 
 // RecordHeartbeat mocks base method.

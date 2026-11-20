@@ -21,10 +21,6 @@ analyze:
     type: go
     target: github.com/cadence-workflow/shard-manager/cmd/tools/cli
     path: cmd/tools/cli
-  - name: github.com/cadence-workflow/shard-manager/cmd/tools/copyright
-    type: go
-    target: github.com/cadence-workflow/shard-manager/cmd/tools/copyright
-    path: cmd/tools/copyright
   - name: github.com/cadence-workflow/shard-manager/cmd/tools/sql
     type: go
     target: github.com/cadence-workflow/shard-manager/cmd/tools/sql

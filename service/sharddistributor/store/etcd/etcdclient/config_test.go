@@ -43,7 +43,6 @@ func TestNewLeaderStoreConfig(t *testing.T) {
 			DialTimeout: 5 * time.Second,
 			Prefix:      "/election",
 		},
-		ElectionTTL: 10 * time.Second,
 	}
 
 	sdConfig := createSDConfigLeader(t, expected)

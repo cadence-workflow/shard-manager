@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"go.uber.org/fx"
@@ -153,21 +152,7 @@ func (e *elector) Run(ctx context.Context) <-chan bool {
 
 // runElection runs a single election attempt
 func (e *elector) runElection(ctx context.Context, leaderCh chan<- bool) (err error) {
-	e.logger.Info("Run election")
-	// Add random delay before campaigning to spread load across instances
-	delay := time.Duration(rand.Intn(int(e.cfg.MaxRandomDelay)))
-
-	e.logger.Debug("Adding random delay before campaigning", tag.ElectionDelay(delay))
-
-	select {
-	case <-e.clock.After(delay):
-		e.logger.Debug("Random delay before campaigning completed")
-		// Continue after delay
-	case <-ctx.Done():
-		return fmt.Errorf("context cancelled during pre-campaign delay: %w", ctx.Err())
-	}
-
-	e.logger.Info("Creating election")
+	e.logger.Debug("Creating election")
 	election, err := e.leaderStore.CreateElection(ctx, e.namespace.Name)
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
@@ -191,16 +176,17 @@ func (e *elector) runElection(ctx context.Context, leaderCh chan<- bool) (err er
 		leaderCh <- false
 	}()
 
-	e.logger.Info("Starting campaign for leader")
+	e.logger.Debug("Starting campaign for leader")
 	// Campaign to become leader
-	if err := election.Campaign(ctx, e.hostname); err != nil {
+	termCtx, err := election.Campaign(ctx, e.hostname)
+	if err != nil {
 		return fmt.Errorf("failed to campaign: %w", err)
 	}
 
 	leaderProcess = e.processFactory.CreateProcessor(e.namespace, e.store, election)
 
 	e.logger.Debug("Run leader process")
-	err = leaderProcess.Run(ctx)
+	err = leaderProcess.Run(termCtx)
 	if err != nil {
 		return fmt.Errorf("onLeader: %w", err)
 	}
@@ -209,26 +195,16 @@ func (e *elector) runElection(ctx context.Context, leaderCh chan<- bool) (err er
 	e.leaderStarted = e.clock.Now()
 	leaderCh <- true
 
-	e.logger.Info("Became leader")
+	e.logger.Debug("Became leader")
 
-	// Start a timer to voluntarily resign after the leadership period
-	leaderTimer := e.clock.NewTimer(e.cfg.LeaderPeriod)
-	defer leaderTimer.Stop()
-
-	// Watch for session expiration, context cancellation, or timer expiration
-	select {
-	case <-ctx.Done():
+	// The term context ends when we lose leadership or on shutdown.
+	<-termCtx.Done()
+	if ctx.Err() != nil {
 		e.logger.Info("Context cancelled while leader")
 		return nil
-
-	case <-election.Done():
-		e.logger.Info("Session expired while leader")
-		return fmt.Errorf("session expired")
-
-	case <-leaderTimer.Chan():
-		e.logger.Info("Leadership period ended, voluntarily resigning")
-		return errSelfResign
 	}
+	e.logger.Debug("Leadership term ended")
+	return errSelfResign
 }
 
 func (e *elector) resign(election store.Election, processor process.Processor) error {
@@ -247,12 +223,6 @@ func (e *elector) resign(election store.Election, processor process.Processor) e
 	// Then try to resign leadership
 	if err := election.Resign(ctx); err != nil {
 		resignErr = multierr.Append(resignErr, fmt.Errorf("resign election: %w", err))
-	}
-
-	// Finally, try to clean up the election
-	// to be sure all resources are released
-	if err := election.Cleanup(ctx); err != nil {
-		resignErr = multierr.Append(resignErr, fmt.Errorf("cleanup election: %w", err))
 	}
 
 	return resignErr

@@ -80,45 +80,18 @@ func (m *MockElection) EXPECT() *MockElectionMockRecorder {
 }
 
 // Campaign mocks base method.
-func (m *MockElection) Campaign(ctx context.Context, hostname string) error {
+func (m *MockElection) Campaign(ctx context.Context, hostname string) (context.Context, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Campaign", ctx, hostname)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Campaign indicates an expected call of Campaign.
 func (mr *MockElectionMockRecorder) Campaign(ctx, hostname any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Campaign", reflect.TypeOf((*MockElection)(nil).Campaign), ctx, hostname)
-}
-
-// Cleanup mocks base method.
-func (m *MockElection) Cleanup(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Cleanup", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Cleanup indicates an expected call of Cleanup.
-func (mr *MockElectionMockRecorder) Cleanup(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cleanup", reflect.TypeOf((*MockElection)(nil).Cleanup), ctx)
-}
-
-// Done mocks base method.
-func (m *MockElection) Done() <-chan struct{} {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Done")
-	ret0, _ := ret[0].(<-chan struct{})
-	return ret0
-}
-
-// Done indicates an expected call of Done.
-func (mr *MockElectionMockRecorder) Done() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Done", reflect.TypeOf((*MockElection)(nil).Done))
 }
 
 // Guard mocks base method.

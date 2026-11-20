@@ -207,3 +207,127 @@ func TestParseExecutorKey_HostMetadata(t *testing.T) {
 	assert.Equal(t, "exec-1", executorID)
 	assert.Equal(t, ExecutorHostMetadataKey, keyType)
 }
+
+func TestBuildRangesPrefix(t *testing.T) {
+	got := BuildRangesPrefix("/cadence", "test-ns")
+	assert.Equal(t, "/cadence/test-ns/ranges/", got)
+}
+
+func TestBuildRangeKey(t *testing.T) {
+	got := BuildRangeKey("/cadence", "test-ns", "range-1")
+	assert.Equal(t, "/cadence/test-ns/ranges/range-1", got)
+}
+
+// The ranges keyspace must not collide with the executor, drained-shard, or
+// drained-host keyspaces, otherwise a prefix scan for one would pick up keys
+// belonging to another.
+func TestRangesPrefixIsDisjointFromSiblingPrefixes(t *testing.T) {
+	ranges := BuildRangesPrefix("/cadence", "test-ns")
+	siblings := []string{
+		BuildExecutorsPrefix("/cadence", "test-ns"),
+		BuildDrainedShardsPrefix("/cadence", "test-ns"),
+		BuildDrainedHostsPrefix("/cadence", "test-ns"),
+	}
+
+	for _, sibling := range siblings {
+		assert.NotEqual(t, ranges, sibling)
+		assert.False(t, strings.HasPrefix(ranges, sibling))
+		assert.False(t, strings.HasPrefix(sibling, ranges))
+	}
+}
+
+func TestValidateRangeID(t *testing.T) {
+	tests := []struct {
+		name    string
+		rangeID string
+		wantErr string
+	}{
+		{name: "uuid", rangeID: "00000000-0000-4000-8000-000000000001"},
+		{name: "simple", rangeID: "range-1"},
+		{name: "empty", rangeID: "", wantErr: "must not be empty"},
+		{name: "leading slash", rangeID: "/range-1", wantErr: "must not contain '/'"},
+		{name: "trailing slash", rangeID: "range-1/", wantErr: "must not contain '/'"},
+		{name: "embedded slash", rangeID: "range/1", wantErr: "must not contain '/'"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateRangeID(tc.rangeID)
+			if tc.wantErr != "" {
+				assert.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestParseRangeKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		key     string
+		wantID  string
+		wantErr string
+	}{
+		{
+			name:   "valid uuid",
+			key:    "/cadence/test-ns/ranges/00000000-0000-4000-8000-000000000001",
+			wantID: "00000000-0000-4000-8000-000000000001",
+		},
+		{
+			name:   "valid identifier",
+			key:    "/cadence/test-ns/ranges/range-1",
+			wantID: "range-1",
+		},
+		{
+			name:    "wrong prefix",
+			key:     "/wrong/prefix/ranges/range-1",
+			wantErr: "does not have expected ranges prefix",
+		},
+		{
+			name:    "different namespace",
+			key:     "/cadence/other-ns/ranges/range-1",
+			wantErr: "does not have expected ranges prefix",
+		},
+		{
+			name:    "missing range ID",
+			key:     "/cadence/test-ns/ranges/",
+			wantErr: "must not be empty",
+		},
+		{
+			name:    "extra path segment",
+			key:     "/cadence/test-ns/ranges/range-1/extra",
+			wantErr: "must not contain '/'",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ParseRangeKey("/cadence", "test-ns", tc.key)
+			if tc.wantErr != "" {
+				assert.ErrorContains(t, err, tc.wantErr)
+				assert.Empty(t, got)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantID, got)
+		})
+	}
+}
+
+func TestRangeKeyRoundTrip(t *testing.T) {
+	rangeIDs := []string{
+		"range-1",
+		"range-2",
+		"00000000-0000-4000-8000-000000000001",
+	}
+
+	for _, rangeID := range rangeIDs {
+		t.Run(rangeID, func(t *testing.T) {
+			key := BuildRangeKey("/cadence", "test-ns", rangeID)
+			got, err := ParseRangeKey("/cadence", "test-ns", key)
+			require.NoError(t, err)
+			assert.Equal(t, rangeID, got)
+		})
+	}
+}

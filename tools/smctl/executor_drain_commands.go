@@ -246,7 +246,7 @@ func executorUndrainCommand(cf ClientFactory) *cliv3.Command {
 	return &cliv3.Command{
 		Name:  "undrain",
 		Usage: "Undrain executor hosts so their executors can be assigned shards again",
-		Description: "Calls UndrainHosts on shard-manager and prints the hostnames this call actually undrained. " +
+		Description: "Calls UndrainHosts on shard-manager and prints the requested hostnames, none of which are drained after the call. " +
 			"Repeat --hostname for multiple hosts. The call is idempotent.",
 		Flags: []cliv3.Flag{
 			&cliv3.StringSliceFlag{

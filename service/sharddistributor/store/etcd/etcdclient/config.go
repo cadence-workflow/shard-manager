@@ -22,8 +22,7 @@ type ExecutorStoreConfig struct {
 
 // LeaderStoreConfig extends BaseConfig with leader-specific settings.
 type LeaderStoreConfig struct {
-	BaseConfig  `yaml:",inline"`
-	ElectionTTL time.Duration `yaml:"electionTTL"`
+	BaseConfig `yaml:",inline"`
 }
 
 // NewExecutorStoreConfig parses ExecutorStoreConfig from ShardDistribution config.

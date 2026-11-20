@@ -44,7 +44,6 @@ func SetupStoreTestCluster(t *testing.T) *StoreTestCluster {
 		"endpoints":   endpoints,
 		"dialTimeout": "5s",
 		"prefix":      etcdPrefix,
-		"electionTTL": "5s", // Needed for leader config part
 		"compression": "snappy",
 	}
 

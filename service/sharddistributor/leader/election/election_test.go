@@ -28,10 +28,13 @@ var (
 )
 
 var (
-	_testLeaderPeriod           = time.Minute
-	_testMaxRandomDelay         = time.Second
 	_testFailedElectionCooldown = 10 * time.Second
 )
+
+// campaignForever wins a term that only ends when the elector's context is cancelled.
+func campaignForever(ctx context.Context, _ string) (context.Context, error) {
+	return ctx, nil
+}
 
 func TestElector_Run(t *testing.T) {
 	defer goleak.VerifyNone(t)
@@ -41,16 +44,14 @@ func TestElector_Run(t *testing.T) {
 	timeSource := clock.NewMockedTimeSource()
 
 	election := store.NewMockElection(ctrl)
-	election.EXPECT().Campaign(gomock.Any(), _testHost).Return(nil)
-	election.EXPECT().Done().Return(make(chan struct{}))
+	election.EXPECT().Campaign(gomock.Any(), _testHost).DoAndReturn(campaignForever)
 
 	finished := make(chan struct{})
-	// once test is done cleanup will be called
+	// once test is done resign will be called
 	election.EXPECT().Resign(gomock.Any()).DoAndReturn(func(_ context.Context) error {
 		close(finished)
 		return nil
 	})
-	election.EXPECT().Cleanup(gomock.Any()).Return(nil)
 
 	leaderStore := store.NewMockElector(ctrl)
 	leaderStore.EXPECT().CreateElection(gomock.Any(), _testNamespace.Name).Return(election, nil)
@@ -65,8 +66,6 @@ func TestElector_Run(t *testing.T) {
 		HostName: _testHost,
 		Cfg: config.ShardDistribution{
 			Election: config.Election{
-				LeaderPeriod:           _testLeaderPeriod,
-				MaxRandomDelay:         _testMaxRandomDelay,
 				FailedElectionCooldown: _testFailedElectionCooldown,
 			},
 		},
@@ -97,13 +96,6 @@ func TestElector_Run(t *testing.T) {
 		return nil
 	})
 
-	go func() {
-		// Wait until run will stop on timer
-		timeSource.BlockUntil(1)
-		// Advance the time to kick in the election.
-		timeSource.Advance(_testMaxRandomDelay)
-	}()
-
 	leaderChan := el.Run(ctx)
 	assert.True(t, <-leaderChan)
 	assert.True(t, onLeaderCalled, "OnLeader callback should have been called")
@@ -111,7 +103,7 @@ func TestElector_Run(t *testing.T) {
 	cancel()
 	<-finished
 	// Drain leaderChan until it is closed: the goroutine sends false and then
-	// closes the channel only after resign() (including Cleanup) has returned,
+	// closes the channel only after resign() has returned,
 	// so this guarantees all mock expectations are satisfied before the test exits.
 	for range leaderChan {
 	}
@@ -128,17 +120,7 @@ func TestElector_Run_Resign(t *testing.T) {
 		for range leaderChan {
 		}
 	})
-	t.Run("session_expired", func(t *testing.T) {
-		leaderChan, p := prepareRun(t, nil, nil)
-		p.election.EXPECT().Resign(gomock.Any()).Return(nil)
-		close(p.electionCh)
-		assert.False(t, <-leaderChan)
-		p.cancel()
-		// Wait for the goroutine to exit
-		for range leaderChan {
-		}
-	})
-	t.Run("leader_resign", func(t *testing.T) {
+	t.Run("term_ended", func(t *testing.T) {
 		// Verify onResign is called before resignation
 		onResignCalled := false
 		leaderChan, p := prepareRun(t, nil, func(ctx context.Context) error {
@@ -146,15 +128,13 @@ func TestElector_Run_Resign(t *testing.T) {
 			return nil
 		})
 
-		// We should be blocked on the timer.
-		p.timeSource.BlockUntil(1)
-
 		p.election.EXPECT().Resign(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
 			assert.True(t, onResignCalled, "OnResign callback should be called before Resign")
 			return nil
 		})
 
-		p.timeSource.Advance(_testLeaderPeriod + 1)
+		p.endTerm()
+		// The next term starts straight away.
 		p.timeSource.BlockUntil(1)
 		assert.False(t, <-leaderChan)
 		p.cancel()
@@ -174,11 +154,7 @@ func TestElector_Run_Resign(t *testing.T) {
 
 		leaderChan, p := prepareRun(t, nil, onResign)
 		p.election.EXPECT().Resign(gomock.Any()).Return(nil)
-		// We should be blocked on the timer.
-		p.timeSource.BlockUntil(1)
-
-		// The resign function on election should not be called if onResign returns an error
-		p.timeSource.Advance(_testLeaderPeriod + 1)
+		p.endTerm()
 		p.timeSource.BlockUntil(1)
 		assert.False(t, <-leaderChan)
 		assert.True(t, onResignCalled, "OnResign callback should have been called")
@@ -199,11 +175,7 @@ func TestElector_Run_Resign(t *testing.T) {
 
 		leaderChan, p := prepareRun(t, nil, onResign)
 		p.election.EXPECT().Resign(gomock.Any()).Return(fmt.Errorf("failed to resign"))
-		// We should be blocked on the timer.
-		p.timeSource.BlockUntil(1)
-
-		// The resign function on election should not be called if onResign returns an error
-		p.timeSource.Advance(_testLeaderPeriod + 1)
+		p.endTerm()
 		p.timeSource.BlockUntil(1)
 		assert.False(t, <-leaderChan)
 		assert.True(t, onResignCalled, "OnResign callback should have been called")
@@ -219,7 +191,7 @@ type runParams struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	timeSource clock.MockedTimeSource
-	electionCh chan struct{}
+	endTerm    context.CancelFunc
 	election   *store.MockElection
 	onLeader   ProcessFunc
 	onResign   ProcessFunc
@@ -230,15 +202,18 @@ func prepareRun(t *testing.T, onLeader, onResign ProcessFunc) (<-chan bool, runP
 	logger := testlogger.New(t)
 	timeSource := clock.NewMockedTimeSource()
 
-	electionCh := make(chan struct{})
-
+	var endTerm context.CancelFunc
 	election := store.NewMockElection(ctrl)
-	election.EXPECT().Campaign(gomock.Any(), _testHost).Return(nil)
-	election.EXPECT().Cleanup(gomock.Any()).Return(nil)
-	election.EXPECT().Done().Return(electionCh)
+	election.EXPECT().Campaign(gomock.Any(), _testHost).DoAndReturn(func(ctx context.Context, _ string) (context.Context, error) {
+		termCtx, cancel := context.WithCancel(ctx)
+		endTerm = cancel
+		return termCtx, nil
+	})
 
 	leaderStore := store.NewMockElector(ctrl)
 	leaderStore.EXPECT().CreateElection(gomock.Any(), _testNamespace.Name).Return(election, nil)
+	// The next term fails to start, so the elector waits out the cooldown.
+	leaderStore.EXPECT().CreateElection(gomock.Any(), _testNamespace.Name).Return(nil, errors.New("next term")).AnyTimes()
 
 	shardStore := store.NewMockStore(ctrl)
 
@@ -250,8 +225,6 @@ func prepareRun(t *testing.T, onLeader, onResign ProcessFunc) (<-chan bool, runP
 		HostName: _testHost,
 		Cfg: config.ShardDistribution{
 			Election: config.Election{
-				LeaderPeriod:           _testLeaderPeriod,
-				MaxRandomDelay:         _testMaxRandomDelay,
 				FailedElectionCooldown: _testFailedElectionCooldown,
 			},
 		},
@@ -283,13 +256,6 @@ func prepareRun(t *testing.T, onLeader, onResign ProcessFunc) (<-chan bool, runP
 	processRunner.EXPECT().Run(gomock.Any()).DoAndReturn(onLeader)
 	processRunner.EXPECT().Terminate(gomock.Any()).DoAndReturn(onResign)
 
-	go func() {
-		// Wait until run will stop on timer
-		timeSource.BlockUntil(1)
-		// Advance the time to kick in the election.
-		timeSource.Advance(_testMaxRandomDelay)
-	}()
-
 	leaderChan := elector.Run(ctx)
 	assert.True(t, <-leaderChan)
 
@@ -297,7 +263,7 @@ func prepareRun(t *testing.T, onLeader, onResign ProcessFunc) (<-chan bool, runP
 		ctx:        ctx,
 		cancel:     cancel,
 		timeSource: timeSource,
-		electionCh: electionCh,
+		endTerm:    endTerm,
 		election:   election,
 		onLeader:   onLeader,
 		onResign:   onResign,
@@ -312,10 +278,9 @@ func TestOnLeader_Error(t *testing.T) {
 	timeSource := clock.NewMockedTimeSource()
 
 	election := store.NewMockElection(ctrl)
-	election.EXPECT().Campaign(gomock.Any(), _testHost).Return(nil)
+	election.EXPECT().Campaign(gomock.Any(), _testHost).DoAndReturn(campaignForever)
 	// Expect resignation after onLeader failure
 	election.EXPECT().Resign(gomock.Any()).Return(nil)
-	election.EXPECT().Cleanup(gomock.Any()).Return(nil)
 
 	leaderStore := store.NewMockElector(ctrl)
 	leaderStore.EXPECT().CreateElection(gomock.Any(), _testNamespace.Name).Return(election, nil)
@@ -333,8 +298,6 @@ func TestOnLeader_Error(t *testing.T) {
 		store:       shardStore,
 		logger:      logger,
 		cfg: config.Election{
-			LeaderPeriod:           _testLeaderPeriod,
-			MaxRandomDelay:         _testMaxRandomDelay,
 			FailedElectionCooldown: _testFailedElectionCooldown,
 		},
 		clock:          timeSource,
@@ -350,13 +313,6 @@ func TestOnLeader_Error(t *testing.T) {
 	onLeaderErr := errors.New("leader error")
 	processRunner.EXPECT().Run(gomock.Any()).Return(onLeaderErr)
 	processRunner.EXPECT().Terminate(gomock.Any()).Return(nil)
-
-	go func() {
-		// Wait until run will stop on timer
-		timeSource.BlockUntil(1)
-		// Advance the time to kick in the election.
-		timeSource.Advance(_testMaxRandomDelay)
-	}()
 
 	// Run the test
 	leaderCh := make(chan bool, 1)

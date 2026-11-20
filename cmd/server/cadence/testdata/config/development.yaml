@@ -8,8 +8,6 @@ shardDistribution:
       endpoints:
         - ${ETCD_ENDPOINTS:"localhost:2379"}
   election:
-    leaderPeriod: 30s
-    maxRandomDelay: 5s
     failedElectionCooldown: 30s
   namespaces:
     - name: cadence-matching-dev

@@ -67,7 +67,6 @@ arguments=[["loop","method-call","recover","return", "immediate-recover"]]
 
 #### unused utilities
 
-# [rule.file-header] # could possibly replace `copyright -verifyOnly`?
 # [rule.imports-blacklist] # simple way to ban imports / enforce wrappers, likely useful
 
 #### disabled but maybe desirable

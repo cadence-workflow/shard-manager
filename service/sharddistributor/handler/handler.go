@@ -1,25 +1,3 @@
-// The MIT License (MIT)
-
-// Copyright (c) 2017-2020 Uber Technologies Inc.
-
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
 package handler
 
 import (
@@ -392,7 +370,7 @@ func (h *handlerImpl) DrainShards(ctx context.Context, request *types.DrainShard
 }
 
 // UndrainShards removes the requested shards from the namespace's drained set
-// The call is idempotent, and the response returns only the shards this call removed
+// The call is idempotent, so the response lists every requested shard, whether or not it was drained
 func (h *handlerImpl) UndrainShards(ctx context.Context, request *types.UndrainShardsRequest) (resp *types.UndrainShardsResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 
@@ -418,7 +396,7 @@ func (h *handlerImpl) UndrainShards(ctx context.Context, request *types.UndrainS
 		tag.Dynamic("undrained_shards", undrained),
 	)
 
-	return &types.UndrainShardsResponse{UndrainedShardKeys: undrained}, nil
+	return &types.UndrainShardsResponse{UndrainedShardKeys: shardKeys}, nil
 }
 
 // GetDrainedShards returns the shards currently drained for the namespace.
@@ -478,7 +456,7 @@ func (h *handlerImpl) DrainHosts(ctx context.Context, request *types.DrainHostsR
 }
 
 // UndrainHosts removes the requested hosts from the namespace's drained set.
-// The call is idempotent, and the response returns only the hosts this call removed.
+// The call is idempotent, so the response lists every requested host, whether or not it was drained.
 func (h *handlerImpl) UndrainHosts(ctx context.Context, request *types.UndrainHostsRequest) (resp *types.UndrainHostsResponse, retError error) {
 	defer func() { log.CapturePanic(recover(), h.logger, &retError) }()
 
@@ -504,7 +482,7 @@ func (h *handlerImpl) UndrainHosts(ctx context.Context, request *types.UndrainHo
 		tag.Dynamic("undrained_hosts", undrained),
 	)
 
-	return &types.UndrainHostsResponse{UndrainedHostnames: undrained}, nil
+	return &types.UndrainHostsResponse{UndrainedHostnames: hostnames}, nil
 }
 
 // GetDrainedHosts returns the hosts currently drained for the namespace.

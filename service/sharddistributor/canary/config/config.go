@@ -1,12 +1,18 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 )
 
-const heartBeatInterval = time.Second
+const (
+	heartBeatInterval = time.Second
+
+	maxLoadExecutorsPerSecond = 100
+)
 
 // Config is the configuration for the shard distributor canary
 type Config struct {
@@ -19,6 +25,9 @@ type CanaryConfig struct {
 
 	// Ephemeral is the namespace the canary creates shards in
 	Ephemeral NamespaceConfig `yaml:"ephemeral"`
+
+	// Load configures the periodic load run. The run is disabled when Load.Namespace is empty.
+	Load LoadConfig `yaml:"load"`
 }
 
 // NamespaceConfig configures the executors the canary runs for one namespace.
@@ -34,10 +43,62 @@ type NamespaceConfig struct {
 
 // ClientConfig returns the executor and spectator client config for the canary namespaces.
 func (c CanaryConfig) ClientConfig() clientcommon.Config {
-	return clientcommon.Config{
-		Namespaces: []clientcommon.NamespaceConfig{
-			{Namespace: c.Fixed.Name, HeartBeatInterval: heartBeatInterval},
-			{Namespace: c.Ephemeral.Name, HeartBeatInterval: heartBeatInterval},
-		},
+	namespaces := []clientcommon.NamespaceConfig{
+		{Namespace: c.Fixed.Name, HeartBeatInterval: heartBeatInterval},
+		{Namespace: c.Ephemeral.Name, HeartBeatInterval: heartBeatInterval},
 	}
+	if c.Load.Namespace != "" {
+		namespaces = append(namespaces, clientcommon.NamespaceConfig{Namespace: c.Load.Namespace, HeartBeatInterval: heartBeatInterval})
+	}
+	return clientcommon.Config{Namespaces: namespaces}
+}
+
+// LoadConfig configures the periodic load run against a dedicated fixed namespace.
+type LoadConfig struct {
+	// Namespace is the namespace the load run targets
+	// Empty disables the load run.
+	Namespace string `yaml:"namespace"`
+
+	// Interval is the time between runs, before jitter
+	Interval time.Duration `yaml:"interval"`
+
+	// BaselineExecutors is the number of executors each canary instance runs constantly
+	BaselineExecutors int `yaml:"baselineExecutors"`
+
+	// NumExecutors is the number of executors each canary instance adds on top
+	// of its baseline during a run
+	NumExecutors int `yaml:"numExecutors"`
+
+	// ExecutorsPerSecond is the highest rate at which a run starts and stops the
+	// extra executors
+	ExecutorsPerSecond int `yaml:"executorsPerSecond"`
+
+	// Hold is how long a run keeps extra executors running before stopping them
+	Hold time.Duration `yaml:"hold"`
+
+	// ConvergenceTimeout is how long a run waits, after scaling up and after
+	// scaling down, for the shard distributor's namespace state to agree with
+	// the local shard holders
+	ConvergenceTimeout time.Duration `yaml:"convergenceTimeout"`
+}
+
+// Validate reports the first invalid setting of an enabled load run
+func (c LoadConfig) Validate() error {
+	switch {
+	case c.Namespace == "":
+		return errors.New("namespace must be set")
+	case c.Interval <= 0:
+		return errors.New("interval must be positive")
+	case c.BaselineExecutors <= 0:
+		return errors.New("number of baseline executors must be positive")
+	case c.NumExecutors <= 0:
+		return errors.New("number of executors must be positive")
+	case c.ExecutorsPerSecond <= 0 || c.ExecutorsPerSecond > maxLoadExecutorsPerSecond:
+		return fmt.Errorf("executors per second must be in (0, %d]", maxLoadExecutorsPerSecond)
+	case c.Hold < 0:
+		return errors.New("hold must not be negative")
+	case c.ConvergenceTimeout <= 0:
+		return errors.New("convergence timeout must be positive")
+	}
+	return nil
 }

@@ -133,14 +133,22 @@ func (w *namespaceWatcher) watchNamespace(namespace string, changeChan chan<- st
 
 	// The whole namespace is watched as one range so assignment, metadata and
 	// drained-shard changes arrive in revision order on a single watch.
-	watchChan := w.client.Watch(
+	watchChan, err := watchCreated(
 		// WithRequireLeader ensures that the etcd cluster has a leader
 		clientv3.WithRequireLeader(w.watchCtx),
+		w.client,
 		etcdkeys.BuildNamespacePrefix(w.prefix, namespace),
 		clientv3.WithPrefix(),
 		clientv3.WithPrevKV(),
-		clientv3.WithCreatedNotify(),
 	)
+	if err != nil {
+		return err
+	}
+
+	// A reconnected watch resumes at the current revision, so anything written while
+	// it was down is never delivered. Signalling once etcd confirms the watch is created
+	// makes the subscriber re-read, and every write after that read is delivered.
+	w.signalNamespaceChange(changeChan)
 
 	for watchResp := range watchChan {
 		if err := watchResp.Err(); err != nil {
@@ -150,10 +158,7 @@ func (w *namespaceWatcher) watchNamespace(namespace string, changeChan chan<- st
 		sw := scope.StartTimer(metrics.ShardDistributorWatchProcessingLatency)
 		scope.AddCounter(metrics.ShardDistributorWatchEventsReceived, int64(len(watchResp.Events)))
 
-		// A reconnected watch resumes at the current revision, so anything written while
-		// it was down is never delivered. Signalling once etcd confirms the watch is created
-		// makes the subscriber re-read, and every write after that read is delivered.
-		if watchResp.Created || w.hasNamespaceStateChanged(watchResp, namespace) {
+		if w.hasNamespaceStateChanged(watchResp, namespace) {
 			w.signalNamespaceChange(changeChan)
 		}
 		sw.Stop()

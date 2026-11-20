@@ -363,15 +363,9 @@ func (s *executorStoreImpl) parseDrainedHostKVs(namespace string, kvs []*mvccpb.
 	return drained
 }
 
-func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {
-	// Start the watch in a blocking way, so the watch is live before returning.
-	watchChan := s.client.Watch(ctx,
-		etcdkeys.BuildExecutorsPrefix(s.prefix, namespace),
-		clientv3.WithPrefix(),
-		clientv3.WithPrevKV(),
-		clientv3.WithCreatedNotify(),
-	)
-	// Check the server has started the watch before returning.
+// watchCreated starts a watch and returns once etcd confirms it is created, so every later change is delivered.
+func watchCreated(ctx context.Context, client etcdclient.Client, key string, opts ...clientv3.OpOption) (clientv3.WatchChan, error) {
+	watchChan := client.Watch(ctx, key, append(opts, clientv3.WithCreatedNotify())...)
 	created, ok := <-watchChan
 	if !ok {
 		if err := ctx.Err(); err != nil {
@@ -381,6 +375,17 @@ func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context
 	}
 	if err := created.Err(); err != nil {
 		return nil, fmt.Errorf("create watch: %w", err)
+	}
+	return watchChan, nil
+}
+
+func (s *executorStoreImpl) SubscribeToExecutorStatusChanges(ctx context.Context, namespace string) (<-chan int64, error) {
+	watchChan, err := watchCreated(ctx, s.client, etcdkeys.BuildExecutorsPrefix(s.prefix, namespace),
+		clientv3.WithPrefix(),
+		clientv3.WithPrevKV(),
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	revisionChan := make(chan int64, 1)

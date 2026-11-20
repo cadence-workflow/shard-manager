@@ -160,7 +160,7 @@ func TestWatchNamespace_ReturnsWatchFailures(t *testing.T) {
 	close(watchChan)
 	err = w.watchNamespace(_watchTestNamespace, changeChan)
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "watch channel closed")
+	assert.ErrorContains(t, err, "watch closed before it was created")
 }
 
 // The signal channel holds one pending notification, so a subscriber that has not

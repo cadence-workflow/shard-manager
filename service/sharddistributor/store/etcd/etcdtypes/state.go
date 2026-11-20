@@ -129,8 +129,8 @@ type ParsedExecutorData struct {
 	LastHeartbeat  Time
 	Status         types.ExecutorStatus
 	ReportedShards map[string]*types.ShardStatusReport
-	AssignedState  *AssignedState
+	AssignedState  *store.AssignedState
 	Metadata       map[string]string
-	Statistics     map[string]ShardStatistics
+	Statistics     map[string]store.ShardStatistics
 	HostMetadata   *types.HostMetadata
 }

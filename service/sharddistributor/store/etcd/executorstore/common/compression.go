@@ -2,7 +2,6 @@ package common
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -81,18 +80,4 @@ func Decompress(data []byte) ([]byte, error) {
 	}
 
 	return decompressed, nil
-}
-
-// DecompressAndUnmarshal decompresses data and unmarshals it into the target
-func DecompressAndUnmarshal(data []byte, target interface{}) error {
-	decompressed, err := Decompress(data)
-	if err != nil {
-		return fmt.Errorf("decompress: %w", err)
-	}
-
-	if err := json.Unmarshal(decompressed, target); err != nil {
-		return fmt.Errorf("unmarshal: %w", err)
-	}
-
-	return nil
 }

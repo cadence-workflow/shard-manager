@@ -10,6 +10,7 @@ import (
 	"go.etcd.io/etcd/api/v3/mvccpb"
 
 	"github.com/cadence-workflow/shard-manager/common/types"
+	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdkeys"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store/etcd/etcdtypes"
 )
@@ -19,82 +20,99 @@ func TestParseExecutorKVs(t *testing.T) {
 	namespace := "test-ns"
 	executorID := "exec-1"
 
-	writer, err := NewRecordWriter(CompressionSnappy)
-	require.NoError(t, err)
-
 	heartbeatTime := time.Date(2025, 11, 18, 12, 0, 0, 0, time.UTC)
 	status := types.ExecutorStatusACTIVE
 	reportedShards := map[string]*types.ShardStatusReport{
 		"shard-1": {Status: types.ShardStatusREADY},
 	}
-	assignedState := &etcdtypes.AssignedState{
+	assignedState := &store.AssignedState{
 		AssignedShards: map[string]*types.ShardAssignment{
 			"shard-1": {Status: types.AssignmentStatusREADY},
 		},
-		LastUpdated: etcdtypes.Time(heartbeatTime),
+		ShardHandoverStats: map[string]store.ShardHandoverStats{
+			"shard-1": {PreviousExecutorLastHeartbeatTime: heartbeatTime, HandoverType: types.HandoverTypeGRACEFUL},
+		},
+		LastUpdated: heartbeatTime,
 	}
-	stats := map[string]etcdtypes.ShardStatistics{
-		"shard-1": {SmoothedLoad: 1.23, LastUpdateTime: etcdtypes.Time(heartbeatTime)},
-	}
-
-	marshal := func(v interface{}) []byte {
-		b, err := json.Marshal(v)
-		require.NoError(t, err)
-		compressed, err := writer.Write(b)
-		require.NoError(t, err)
-		return compressed
+	assignedStateModRevision := int64(123)
+	// float32 represents this load exactly, so both encodings return it unchanged.
+	smoothedLoad := 1.25
+	statistics := map[string]store.ShardStatistics{
+		"shard-1": {SmoothedLoad: smoothedLoad, LastUpdateTime: heartbeatTime},
 	}
 
-	kvs := []*mvccpb.KeyValue{
-		{
-			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorHeartbeatKey)),
-			Value: []byte(etcdtypes.FormatTime(heartbeatTime)),
-		},
-		{
-			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorStatusKey)),
-			Value: marshal(status),
-		},
-		{
-			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorReportedShardsKey)),
-			Value: marshal(reportedShards),
-		},
-		{
-			Key:         []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorAssignedStateKey)),
-			Value:       marshal(assignedState),
-			ModRevision: 123,
-		},
-		{
-			Key:   []byte(etcdkeys.BuildMetadataKey(prefix, namespace, executorID, "k1")),
-			Value: []byte("v1"),
-		},
-		{
-			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorShardStatisticsKey)),
-			Value: marshal(stats),
-		},
-		{
-			Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorHostMetadataKey)),
-			Value: []byte(`{"host_name":"host-name"}`),
-		},
+	encodings := map[string]Encoding{
+		"json":     EncodingJSON,
+		"protobuf": EncodingProtobuf,
 	}
 
-	result, err := ParseExecutorKVs(prefix, namespace, kvs)
-	require.NoError(t, err)
-	require.Len(t, result, 1)
+	for name, encoding := range encodings {
+		t.Run(name, func(t *testing.T) {
+			encoder, err := NewExecutorValueEncoder(CompressionSnappy, encoding)
+			require.NoError(t, err)
 
-	data, ok := result[executorID]
-	require.True(t, ok)
-	require.NotNil(t, data)
+			encodedStatus, err := encoder.EncodeExecutorStatus(status)
+			require.NoError(t, err)
+			encodedReportedShards, err := encoder.EncodeReportedShards(reportedShards)
+			require.NoError(t, err)
+			encodedAssignedState, err := encoder.EncodeAssignedState(assignedState)
+			require.NoError(t, err)
+			encodedStatistics, err := encoder.EncodeShardStatistics(statistics)
+			require.NoError(t, err)
 
-	assert.Equal(t, etcdtypes.Time(heartbeatTime), data.LastHeartbeat)
-	assert.Equal(t, status, data.Status)
-	assert.Equal(t, reportedShards, data.ReportedShards)
-	require.NotNil(t, data.AssignedState)
-	assert.Equal(t, assignedState.AssignedShards, data.AssignedState.AssignedShards)
-	assert.Equal(t, int64(123), data.AssignedState.ModRevision)
-	assert.Equal(t, map[string]string{"k1": "v1"}, data.Metadata)
-	assert.Equal(t, stats, data.Statistics)
-	require.NotNil(t, data.HostMetadata)
-	assert.Equal(t, "host-name", data.HostMetadata.HostName)
+			kvs := []*mvccpb.KeyValue{
+				{
+					Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorHeartbeatKey)),
+					Value: []byte(etcdtypes.FormatTime(heartbeatTime)),
+				},
+				{
+					Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorStatusKey)),
+					Value: encodedStatus,
+				},
+				{
+					Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorReportedShardsKey)),
+					Value: encodedReportedShards,
+				},
+				{
+					Key:         []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorAssignedStateKey)),
+					Value:       encodedAssignedState,
+					ModRevision: assignedStateModRevision,
+				},
+				{
+					Key:   []byte(etcdkeys.BuildMetadataKey(prefix, namespace, executorID, "k1")),
+					Value: []byte("v1"),
+				},
+				{
+					Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorShardStatisticsKey)),
+					Value: encodedStatistics,
+				},
+				{
+					Key:   []byte(etcdkeys.BuildExecutorKey(prefix, namespace, executorID, etcdkeys.ExecutorHostMetadataKey)),
+					Value: []byte(`{"host_name":"host-name"}`),
+				},
+			}
+
+			result, err := ParseExecutorKVs(prefix, namespace, kvs)
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+
+			data, ok := result[executorID]
+			require.True(t, ok)
+			require.NotNil(t, data)
+
+			wantAssignedState := *assignedState
+			wantAssignedState.ModRevision = assignedStateModRevision
+
+			assert.Equal(t, etcdtypes.Time(heartbeatTime), data.LastHeartbeat)
+			assert.Equal(t, status, data.Status)
+			assert.Equal(t, reportedShards, data.ReportedShards)
+			assert.Equal(t, &wantAssignedState, data.AssignedState)
+			assert.Equal(t, map[string]string{"k1": "v1"}, data.Metadata)
+			assert.Equal(t, statistics, data.Statistics)
+			require.NotNil(t, data.HostMetadata)
+			assert.Equal(t, "host-name", data.HostMetadata.HostName)
+		})
+	}
 }
 
 func TestParseExecutorKVs_SkipsUnknownKeyTypes(t *testing.T) {

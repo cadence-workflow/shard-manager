@@ -19,8 +19,7 @@ import (
 )
 
 var (
-	errStopped     = errors.New("store is stopping")
-	errGuardFailed = errors.New("transaction failed, leadership may have changed")
+	errStopped = errors.New("store is stopping")
 )
 
 var _ store.Store = (*Store)(nil)
@@ -28,6 +27,9 @@ var _ store.Store = (*Store)(nil)
 // Store keeps all state in process memory. Nothing survives a restart and nothing is
 // shared between processes, so every component of a deployment must use the same
 // instance.
+//
+// Leadership guards are not applied. A single in-process instance has no other leader
+// to be fenced from, and a guard could only check what its own instance believes.
 //
 // Revisions follow the etcd model the rest of the service is written against: one
 // counter for the whole store, advanced by every committed write, with each record
@@ -222,6 +224,8 @@ func (s *Store) GetState(_ context.Context, namespace string) (*store.NamespaceS
 		ShardStats:      make(map[string]store.ShardStatistics),
 		DrainedHosts:    cloneOrEmpty(ns.drainedHosts),
 	}
+	// Only GetAssignmentState reports the assignment version, as in the etcd store.
+	state.AssignmentRevision = 0
 	for executorID, executor := range ns.executors {
 		state.Executors[executorID] = executor.heartbeatState()
 		for shardID, statistics := range executor.statistics {
@@ -239,7 +243,7 @@ func (s *Store) GetAssignmentState(_ context.Context, namespace string) (*store.
 	return &state, nil
 }
 
-func (s *Store) AssignShards(_ context.Context, namespace string, request store.AssignShardsRequest, guard store.GuardFunc) error {
+func (s *Store) AssignShards(_ context.Context, namespace string, request store.AssignShardsRequest, _ store.GuardFunc) error {
 	writes := make(map[string]store.AssignedState, len(request.NewState.ShardAssignments))
 	for executorID, state := range request.NewState.ShardAssignments {
 		if _, changed := request.ChangedExecutors[executorID]; request.ChangedExecutors == nil || changed {
@@ -252,14 +256,6 @@ func (s *Store) AssignShards(_ context.Context, namespace string, request store.
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	held, err := checkGuard(guard)
-	if err != nil {
-		return err
-	}
-	if !held {
-		return fmt.Errorf("%w: %w", store.ErrVersionConflict, errGuardFailed)
-	}
 
 	// Every executor in the new state is compared, not just the written ones, so the
 	// plan is rejected if anything it was computed from has moved.
@@ -308,17 +304,13 @@ func (s *Store) AssignShards(_ context.Context, namespace string, request store.
 
 // DeleteExecutors removes every record of the given executors. The shards they own are
 // left for the leader to reassign.
-func (s *Store) DeleteExecutors(_ context.Context, namespace string, executorIDs []string, guard store.GuardFunc) error {
+func (s *Store) DeleteExecutors(_ context.Context, namespace string, executorIDs []string, _ store.GuardFunc) error {
 	if len(executorIDs) == 0 {
 		return nil
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if err := requireGuard(guard); err != nil {
-		return fmt.Errorf("delete executors: %w", err)
-	}
 
 	ns := s.namespace(namespace)
 	revision := s.commit()
@@ -334,7 +326,7 @@ func (s *Store) DeleteExecutors(_ context.Context, namespace string, executorIDs
 	return nil
 }
 
-func (s *Store) DeleteShardStats(_ context.Context, namespace string, shardIDs []string, guard store.GuardFunc) error {
+func (s *Store) DeleteShardStats(_ context.Context, namespace string, shardIDs []string, _ store.GuardFunc) error {
 	if len(shardIDs) == 0 {
 		return nil
 	}
@@ -351,31 +343,21 @@ func (s *Store) DeleteShardStats(_ context.Context, namespace string, shardIDs [
 	defer s.mu.Unlock()
 
 	ns := s.namespace(namespace)
-	var affected []string
+	changed := false
 	for executorID, executor := range ns.executors {
-		for shardID := range executor.statistics {
-			if _, ok := toDelete[shardID]; ok {
-				affected = append(affected, executorID)
-				break
-			}
-		}
-	}
-	if len(affected) == 0 {
-		return nil
-	}
-
-	if err := requireGuard(guard); err != nil {
-		return fmt.Errorf("delete shard stats: %w", err)
-	}
-
-	s.commit()
-	for _, executorID := range affected {
-		executor := ns.executors[executorID]
+		before := len(executor.statistics)
 		maps.DeleteFunc(executor.statistics, isDeleted)
+		if len(executor.statistics) == before {
+			continue
+		}
+		changed = true
 		if len(executor.statistics) == 0 {
 			executor.statistics = nil
 			ns.prune(executorID)
 		}
+	}
+	if changed {
+		s.commit()
 	}
 	return nil
 }

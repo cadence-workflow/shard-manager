@@ -15,10 +15,8 @@ applications embed:
   `GetShardOwner(shardKey)`, and can be plugged in as a YARPC peer chooser to route requests
   straight to the owning host.
 
-Namespaces are the unit of configuration. A namespace is either:
-
-* `fixed` — a static set of shards (`shardNum`), distributed across the executors of that namespace.
-* `ephemeral` — shards are created on demand, the first time someone asks for a shard key.
+Namespaces are the unit of configuration. A namespace has a static set of shards (`shardNum`),
+distributed across the executors of that namespace.
 
 Rebalancing is pluggable per namespace via the `naive` or `greedy` load balancer,
 tunable through dynamic config. See [Greedy load balancing](docs/greedy-load-balancing.md)

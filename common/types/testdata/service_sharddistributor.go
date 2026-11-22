@@ -167,9 +167,10 @@ var (
 				ShardNum: 32,
 			},
 			{
-				Name: "shard-distributor-canary-ephemeral",
-				Type: "ephemeral",
-				Mode: "distributed_pass",
+				Name:     "shard-distributor-canary-load",
+				Type:     "fixed",
+				Mode:     "onboarded",
+				ShardNum: 10000,
 			},
 		},
 	}

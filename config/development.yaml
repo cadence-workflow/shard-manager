@@ -30,7 +30,8 @@ shardDistribution:
       type: fixed
       shardNum: 10000
     - name: cadence-matching-dev
-      type: ephemeral
+      type: fixed
+      shardNum: 8192
   leaderStore:
     storageParams:
       endpoints:

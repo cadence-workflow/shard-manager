@@ -14,7 +14,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/hostname"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/namespaces/manager"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
@@ -85,10 +84,6 @@ func (h *handlerImpl) GetShardOwner(ctx context.Context, request *types.GetShard
 		}
 	}
 	if errors.Is(err, store.ErrShardNotFound) {
-		if ns.Config().Type == config.NamespaceTypeEphemeral {
-			return ns.Assigner().GetOrAssign(ctx, request.ShardKey)
-		}
-
 		return nil, &types.ShardNotFoundError{
 			Namespace: request.Namespace,
 			ShardKey:  request.ShardKey,

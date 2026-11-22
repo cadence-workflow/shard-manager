@@ -1631,11 +1631,11 @@ func (m *ListNamespacesResponse) GetNamespaces() []*NamespaceConfig {
 type NamespaceConfig struct {
 	// Name is the namespace identifier
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Type is "fixed" or "ephemeral".
+	// Type is "fixed".
 	Type string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	// Mode is the migration mode (e.g. "onboarded", "local_pass", "distributed_pass").
 	Mode string `protobuf:"bytes,3,opt,name=mode,proto3" json:"mode,omitempty"`
-	// ShardNum is the configured number of shards. Only for type="fixed".
+	// ShardNum is the configured number of shards.
 	ShardNum             int64    `protobuf:"varint,4,opt,name=shard_num,json=shardNum,proto3" json:"shard_num,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`

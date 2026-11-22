@@ -206,9 +206,6 @@ const (
 	// ShardDistributorForceResetNamespaceScope tracks ForceResetNamespace API calls received by service
 	ShardDistributorForceResetNamespaceScope
 
-	// ShardDistributorEphemeralAssignmentScope tracks on-demand ephemeral assignment batches.
-	ShardDistributorEphemeralAssignmentScope
-
 	// ShardDistributorDrainHostsScope tracks DrainHosts API calls received by service
 	ShardDistributorDrainHostsScope
 	// ShardDistributorUndrainHostsScope tracks UndrainHosts API calls received by service
@@ -275,7 +272,6 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorInspectShardScope:                          {operation: "InspectShard"},
 		ShardDistributorGetNamespaceStateIfNewerScope:              {operation: "GetNamespaceStateIfNewer"},
 		ShardDistributorForceResetNamespaceScope:                   {operation: "ForceResetNamespace"},
-		ShardDistributorEphemeralAssignmentScope:                   {operation: "EphemeralAssignment"},
 		ShardDistributorDrainHostsScope:                            {operation: "DrainHosts"},
 		ShardDistributorUndrainHostsScope:                          {operation: "UndrainHosts"},
 		ShardDistributorGetDrainedHostsScope:                       {operation: "GetDrainedHosts"},
@@ -320,9 +316,6 @@ const (
 	ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency
 	ShardDistributorStoreParseLatency
 
-	ShardDistributorEphemeralAssignmentBatchSize
-	ShardDistributorEphemeralAssignmentWriteAttempts
-
 	// ShardDistributorShardAssignmentDistributionLatency measures the time taken between assignment of a shard
 	// and the time it is fully distributed to executors
 	ShardDistributorShardAssignmentDistributionLatency
@@ -337,8 +330,6 @@ const (
 
 	// ShardDistributorAssignLoopLoadBasedMoves counts the number of shards moved due to load rebalancing
 	ShardDistributorAssignLoopLoadBasedMoves
-	// ShardDistributorAssignLoopDeletedShards counts the number of shards removed (DONE status) in a rebalance cycle
-	ShardDistributorAssignLoopDeletedShards
 	// ShardDistributorAssignLoopMovedShardLoad counts the reported load of shards moved due to load rebalancing
 	ShardDistributorAssignLoopMovedShardLoad
 	// ShardDistributorAssignLoopDroppedDrainedShards counts drained shards taken away from an executor in a rebalance cycle
@@ -405,9 +396,6 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ShardDistributorStoreGetAssignmentStateETCDRoundTripLatency: {metricName: "shard_distributor_store_get_assignment_state_etcd_round_trip_latency", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
 		ShardDistributorStoreParseLatency:                           {metricName: "shard_distributor_store_parse_latency", metricType: Histogram, buckets: ShardDistributorExecutorStoreLatencyBuckets},
 
-		ShardDistributorEphemeralAssignmentBatchSize:     {metricName: "shard_distributor_ephemeral_assignment_batch_size", metricType: Histogram, buckets: ShardDistributorEphemeralAssignmentBatchSizeBuckets},
-		ShardDistributorEphemeralAssignmentWriteAttempts: {metricName: "shard_distributor_ephemeral_assignment_write_attempts", metricType: Counter},
-
 		ShardDistributorShardAssignmentDistributionLatency: {metricName: "shard_distributor_shard_assignment_distribution_latency", metricType: Histogram, buckets: ShardDistributorShardAssignmentLatencyBuckets},
 		ShardDistributorShardHandoverLatency:               {metricName: "shard_distributor_shard_handover_latency", metricType: Histogram, buckets: ShardDistributorShardAssignmentLatencyBuckets},
 
@@ -415,7 +403,6 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ShardDistributorWatchEventsReceived:    {metricName: "shard_distributor_watch_events_received", metricType: Counter},
 
 		ShardDistributorAssignLoopLoadBasedMoves: {metricName: "shard_distributor_shard_assign_load_based_moves", metricType: Counter},
-		ShardDistributorAssignLoopDeletedShards:  {metricName: "shard_distributor_shard_assign_deleted_shards", metricType: Gauge},
 		ShardDistributorAssignLoopMovedShardLoad: {metricName: "shard_distributor_shard_assign_moved_load", metricType: Counter},
 
 		ShardDistributorAssignLoopDroppedDrainedShards: {metricName: "shard_distributor_shard_assign_dropped_drained_shards", metricType: Counter},
@@ -477,8 +464,6 @@ var (
 		50 * time.Second,
 		60 * time.Second,
 	})
-
-	ShardDistributorEphemeralAssignmentBatchSizeBuckets = tally.MustMakeExponentialValueBuckets(1, 2, 11) // 1..1024
 
 	ShardDistributorShardAssignmentLatencyBuckets = tally.DurationBuckets([]time.Duration{
 		// ShardDistributorShardHandoverLatency for GracefulHandoverType should be within 0s and 1s

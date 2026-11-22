@@ -12,7 +12,6 @@ import (
 
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
-	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
@@ -22,11 +21,10 @@ import (
 
 func TestNew(t *testing.T) {
 	cfg := config.ShardDistribution{Namespaces: []config.Namespace{
-		{Name: "fixed", Type: config.NamespaceTypeFixed, ShardNum: 1},
-		{Name: "ephemeral", Type: config.NamespaceTypeEphemeral},
-		{Name: "ephemeral-made-fixed", Type: config.NamespaceTypeEphemeral},
+		{Name: "static", Type: config.NamespaceTypeFixed, ShardNum: 1},
+		{Name: "overridden", Type: config.NamespaceTypeFixed, ShardNum: 1},
 	}}
-	fixedShardNums := map[string]int{"ephemeral-made-fixed": 8192}
+	fixedShardNums := map[string]int{"overridden": 8192}
 
 	mockStore := store.NewMockStore(gomock.NewController(t))
 	for _, ns := range cfg.Namespaces {
@@ -42,37 +40,28 @@ func TestNew(t *testing.T) {
 				return fixedShardNums[namespace]
 			},
 		},
-		Logger:        testlogger.New(t),
-		TimeSource:    clock.NewRealTimeSource(),
-		MetricsClient: metrics.NewNoopMetricsClient(),
-		Lifecycle:     lifecycle,
+		Logger:     testlogger.New(t),
+		TimeSource: clock.NewRealTimeSource(),
+		Lifecycle:  lifecycle,
 	})
 	lifecycle.RequireStart()
 	defer lifecycle.RequireStop()
 
 	tests := []struct {
-		name         string
-		namespace    string
-		wantErr      error
-		wantConfig   config.Namespace
-		wantAssigner bool
+		name       string
+		namespace  string
+		wantErr    error
+		wantConfig config.Namespace
 	}{
 		{
-			name:       "fixed has no assigner",
-			namespace:  "fixed",
-			wantConfig: config.Namespace{Name: "fixed", Type: config.NamespaceTypeFixed, ShardNum: 1},
+			name:       "static config",
+			namespace:  "static",
+			wantConfig: config.Namespace{Name: "static", Type: config.NamespaceTypeFixed, ShardNum: 1},
 		},
 		{
-			name:         "ephemeral has an assigner",
-			namespace:    "ephemeral",
-			wantConfig:   config.Namespace{Name: "ephemeral", Type: config.NamespaceTypeEphemeral},
-			wantAssigner: true,
-		},
-		{
-			name:         "ephemeral made fixed by dynamic config keeps its assigner",
-			namespace:    "ephemeral-made-fixed",
-			wantConfig:   config.Namespace{Name: "ephemeral-made-fixed", Type: config.NamespaceTypeFixed, ShardNum: 8192},
-			wantAssigner: true,
+			name:       "shard count overridden by dynamic config",
+			namespace:  "overridden",
+			wantConfig: config.Namespace{Name: "overridden", Type: config.NamespaceTypeFixed, ShardNum: 8192},
 		},
 		{name: "unknown", namespace: "unknown", wantErr: &types.NamespaceNotFoundError{Namespace: "unknown"}},
 	}
@@ -87,11 +76,10 @@ func TestNew(t *testing.T) {
 			assert.Equal(t, tt.namespace, ns.Name())
 			assert.Equal(t, tt.wantConfig, ns.Config())
 			assert.NotNil(t, ns.Cache())
-			assert.Equal(t, tt.wantAssigner, ns.Assigner() != nil)
 		})
 	}
 
-	assert.Len(t, m.List(), 3)
+	assert.Len(t, m.List(), 2)
 }
 
 func TestStartStop(t *testing.T) {
@@ -147,9 +135,9 @@ func TestStartStop(t *testing.T) {
 			logger, logs := testlogger.NewObserved(t)
 			noFixedShardNum := func(string) int { return 0 }
 			m := newManager(logger, []Namespace{
-				newNamespace(config.Namespace{Name: "a"}, noFixedShardNum, cacheA, nil),
-				newNamespace(config.Namespace{Name: "b"}, noFixedShardNum, cacheB, nil),
-				newNamespace(config.Namespace{Name: "c"}, noFixedShardNum, cacheC, nil),
+				newNamespace(config.Namespace{Name: "a"}, noFixedShardNum, cacheA),
+				newNamespace(config.Namespace{Name: "b"}, noFixedShardNum, cacheB),
+				newNamespace(config.Namespace{Name: "c"}, noFixedShardNum, cacheC),
 			})
 
 			if err := m.Start(); tt.wantErr != "" {

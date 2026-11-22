@@ -314,11 +314,11 @@ const (
 	// Allowed filters: N/A
 	ShardDistributorMaxEtcdTxnOps
 
-	// ShardDistributorFixedShardNum makes a namespace fixed with this many shards.
-	// A positive value overrides the namespace's type and shardNum from the static config.
+	// ShardDistributorFixedShardNum overrides the number of shards of a namespace.
+	// A positive value overrides the namespace's shardNum from the static config.
 	// Zero or a negative value keeps the static config.
 	// Only change it while the namespace has no heartbeating executors. The leader then deletes the
-	// stale executors with their assignments, so no shards from the previous type are left behind.
+	// stale executors with their assignments, so no shards from the previous shard count are left behind.
 	// KeyName: shardDistributor.fixedShardNum
 	// Value type: Int
 	// Default value: 0
@@ -462,14 +462,6 @@ const (
 	// Default value: 1 minute
 	// Allowed filters: namespace
 	ShardDistributorLoadBalancingGreedyLoadSmoothingTimeConstant
-
-	// ShardDistributorEphemeralAssignmentCoalescingWindow is how long the shard
-	// distributor collects initial-assignment requests before processing a batch.
-	// KeyName: shardDistributor.ephemeralAssignment.coalescingWindow
-	// Value type: Duration
-	// Default value: 10 milliseconds
-	// Allowed filters: namespace
-	ShardDistributorEphemeralAssignmentCoalescingWindow
 
 	// LastDurationKey must be the last one in this const group
 	LastDurationKey
@@ -675,12 +667,6 @@ var DurationKeys = map[DurationKey]DynamicDuration{
 		Filters:      []Filter{Namespace},
 		Description:  "ShardDistributorLoadBalancingGreedyLoadSmoothingTimeConstant is the time constant for exponential smoothing of shard load in greedy load balancing mode",
 		DefaultValue: time.Minute,
-	},
-	ShardDistributorEphemeralAssignmentCoalescingWindow: {
-		KeyName:      "shardDistributor.ephemeralAssignment.coalescingWindow",
-		Filters:      []Filter{Namespace},
-		Description:  "ShardDistributorEphemeralAssignmentCoalescingWindow is how long the shard distributor collects initial-assignment requests before processing a batch",
-		DefaultValue: 10 * time.Millisecond,
 	},
 }
 

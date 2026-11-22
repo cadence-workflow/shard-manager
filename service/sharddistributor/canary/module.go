@@ -12,7 +12,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/load"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/pinger"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processorephemeral"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/sharddistributorclient"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/sharddistributorexecutorclient"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
@@ -40,18 +39,11 @@ func opts(params Params) fx.Option {
 		fx.Provide(sharddistributorexecutorclient.NewShardDistributorExecutorClient),
 
 		// Modules for the shard distributor canary
-		fx.Provide(
-			func(params factory.Params) executorclient.ShardProcessorFactory[*processor.ShardProcessor] {
-				return factory.NewShardProcessorFactory(params, processor.NewShardProcessor)
-			},
-			func(params factory.Params) executorclient.ShardProcessorFactory[*processorephemeral.ShardProcessor] {
-				return factory.NewShardProcessorFactory(params, processorephemeral.NewShardProcessor)
-			},
-		),
+		fx.Provide(func(params factory.Params) executorclient.ShardProcessorFactory[*processor.ShardProcessor] {
+			return factory.NewShardProcessorFactory(params, processor.NewShardProcessor)
+		}),
 
-		executors.Module(cfg.Fixed, cfg.Ephemeral),
-
-		processorephemeral.ShardCreatorModule([]string{cfg.Ephemeral.Name}),
+		executors.Module(cfg.Fixed),
 
 		load.Module(cfg.Load),
 		spectatorclient.Module(),

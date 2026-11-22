@@ -6,8 +6,7 @@
 // because of misbehaving ones.
 //
 // The kind is selected by a deterministic hash of the shard ID, so the fixed
-// namespace's stable numeric shard IDs keep the same kind across restarts and
-// ephemeral UUID shards distribute across kinds at the configured rate.
+// namespace's stable numeric shard IDs keep the same kind across restarts.
 package latencykind
 
 import (

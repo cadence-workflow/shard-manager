@@ -56,7 +56,7 @@ It reads `config/development.yaml` by default, which points at `localhost:2379` 
 handful of development namespaces. The gRPC API is served on port `7943`.
 
 To see it doing something, run the canary — it spins up executors and a pinger against the
-`shard-distributor-canary` (fixed) and `shard-distributor-canary-ephemeral` namespaces:
+`shard-distributor-canary` namespace:
 
 ```
 make start-shard-manager-canary

@@ -8,15 +8,13 @@ import (
 
 	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processorephemeral"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
 
 // PingHandler handles ping requests to verify executor ownership of shards
 type PingHandler struct {
-	logger             *zap.Logger
-	executorsFixed     map[string]executorclient.Executor[*processor.ShardProcessor]          // namespace -> executor
-	executorsEphemeral map[string]executorclient.Executor[*processorephemeral.ShardProcessor] // namespace -> executor
+	logger         *zap.Logger
+	executorsFixed map[string]executorclient.Executor[*processor.ShardProcessor] // namespace -> executor
 }
 
 // Params are the parameters for creating a PingHandler
@@ -25,8 +23,7 @@ type Params struct {
 
 	Logger *zap.Logger
 
-	ExecutorsFixed     []executorclient.Executor[*processor.ShardProcessor]          `group:"executor-fixed-proc"`
-	ExecutorsEphemeral []executorclient.Executor[*processorephemeral.ShardProcessor] `group:"executor-ephemeral-proc"`
+	ExecutorsFixed []executorclient.Executor[*processor.ShardProcessor] `group:"executor-fixed-proc"`
 }
 
 // NewPingHandler creates a new PingHandler
@@ -36,16 +33,11 @@ func NewPingHandler(params Params) *PingHandler {
 	for _, executor := range params.ExecutorsFixed {
 		executorsFixed[executor.GetNamespace()] = executor
 	}
-	executorsEphemeral := make(map[string]executorclient.Executor[*processorephemeral.ShardProcessor])
-	for _, executor := range params.ExecutorsEphemeral {
-		executorsEphemeral[executor.GetNamespace()] = executor
-	}
 
 	// Return the handler
 	return &PingHandler{
-		logger:             params.Logger,
-		executorsFixed:     executorsFixed,
-		executorsEphemeral: executorsEphemeral,
+		logger:         params.Logger,
+		executorsFixed: executorsFixed,
 	}
 }
 
@@ -59,11 +51,6 @@ func (h *PingHandler) Ping(ctx context.Context, request *sharddistributorv1.Ping
 
 	// Check fixed executors
 	if executor, found := h.executorsFixed[namespace]; found {
-		return checkOwnerShipAndLog(ctx, executor, request, h), nil
-	}
-
-	// Check ephemeral executors
-	if executor, found := h.executorsEphemeral[namespace]; found {
 		return checkOwnerShipAndLog(ctx, executor, request, h), nil
 	}
 

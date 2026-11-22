@@ -377,9 +377,8 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 	metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopDroppedDrainedShards, int64(len(drainedAssignedShards)))
 	metricsLoopScope.UpdateGauge(metrics.ShardDistributorDrainedShards, float64(len(namespaceState.DrainedShards)))
 
-	// If there are deleted shards or stale executors, the distribution has changed.
-	assignedToEmptyExecutors := assignShardsToEmptyExecutors(currentAssignments)
-	updatedAssignments := p.updateAssignments(shardsToReassign, activeExecutors, currentAssignments)
+	assignShardsToEmptyExecutors(currentAssignments)
+	p.updateAssignments(shardsToReassign, activeExecutors, currentAssignments)
 
 	loadBalanceMoves, err := loadbalancer.PlanRebalance(
 		p.sdConfig,
@@ -400,21 +399,16 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 	p.emitExecutorMetric(namespaceState, metricsLoopScope)
 	loadbalancer.EmitAssignmentImbalanceMetrics(p.sdConfig, p.namespaceCfg.Name, metricsLoopScope, currentAssignments, namespaceState)
 
-	distributionChanged := len(deletedShards) > 0 ||
-		len(staleExecutors) > 0 ||
-		len(loadBalanceMoves) > 0 ||
-		len(drainedAssignedShards) > 0 ||
-		len(executorsToUnassign) > 0 ||
-		assignedToEmptyExecutors ||
-		updatedAssignments
-	if !distributionChanged {
-		p.logger.Info("No changes to distribution detected. Skipping rebalance.")
-		return nil
-	}
-
 	previousOwnersByShard := namespaceState.ShardOwners()
 	assignmentTime := p.timeSource.Now().UTC()
 	newAssignments, executorsWithChangedAssignments := p.buildNewAssignmentsState(namespaceState, currentAssignments, executorsToUnassign, previousOwnersByShard, assignmentTime)
+
+	// Comparing against the stored assignments also repairs a shard that is stored on two executors.
+	distributionUnchanged := len(executorsWithChangedAssignments) == 0 && len(staleExecutors) == 0
+	if distributionUnchanged {
+		p.logger.Info("No changes to distribution detected. Skipping rebalance.")
+		return nil
+	}
 
 	namespaceState.ShardAssignments = newAssignments
 	p.logger.Info("Applying new shard distribution.")
@@ -613,9 +607,9 @@ func findExecutorsToUnassign(namespaceState *store.NamespaceState, assignableExe
 	return executorsToUnassign
 }
 
-func (*namespaceProcessor) updateAssignments(shardsToReassign []string, activeExecutors []string, currentAssignments map[string][]string) (distributionChanged bool) {
+func (*namespaceProcessor) updateAssignments(shardsToReassign []string, activeExecutors []string, currentAssignments map[string][]string) {
 	if len(shardsToReassign) == 0 {
-		return false
+		return
 	}
 
 	i := rand.Intn(len(activeExecutors))
@@ -624,8 +618,6 @@ func (*namespaceProcessor) updateAssignments(shardsToReassign []string, activeEx
 		currentAssignments[executorID] = append(currentAssignments[executorID], shardID)
 		i++
 	}
-
-	return true
 }
 
 func applyMoves(currentAssignments map[string][]string, moves []plan.Move) error {
@@ -766,7 +758,7 @@ func (p *namespaceProcessor) logRebalanceError(failureMessage, conflictMessage s
 	p.logger.Error(failureMessage, tag.Error(err))
 }
 
-func assignShardsToEmptyExecutors(currentAssignments map[string][]string) bool {
+func assignShardsToEmptyExecutors(currentAssignments map[string][]string) {
 	emptyExecutors := make([]string, 0)
 	executorsWithShards := make([]string, 0)
 	minShardsCurrentlyAssigned := 0
@@ -791,7 +783,7 @@ func assignShardsToEmptyExecutors(currentAssignments map[string][]string) bool {
 
 	// If there are no empty executors or no executors with shards, we don't need to do anything.
 	if len(emptyExecutors) == 0 || len(executorsWithShards) == 0 {
-		return false
+		return
 	}
 
 	// We calculate the number of shards to assign each of the empty executors. The idea is to assume all current executors have
@@ -814,8 +806,6 @@ func assignShardsToEmptyExecutors(currentAssignments map[string][]string) bool {
 			currentAssignments[emptyExecutor] = append(currentAssignments[emptyExecutor], stolenShard)
 		}
 	}
-
-	return true
 }
 
 func getShards(cfg config.Namespace, namespaceState *store.NamespaceState, deletedShards map[string]store.ShardState) []string {

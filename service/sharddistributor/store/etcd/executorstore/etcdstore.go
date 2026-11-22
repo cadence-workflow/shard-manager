@@ -470,109 +470,25 @@ func sameExecutorStatus(previous, current []byte) bool {
 }
 
 func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, request store.AssignShardsRequest, guard store.GuardFunc) error {
-	var ops []clientv3.Op
-	var opsElse []clientv3.Op
-	var comparisons []clientv3.Cmp
-	comparisonMaps := make(map[string]int64)
+	ops := make([]clientv3.Op, 0, len(request.ExecutorsToDelete)+len(request.ShardAssignments))
 
-	// 1. Prepare operations to delete stale executors and add comparisons to ensure they haven't been modified
-	for executorID, expectedModRevision := range request.ExecutorsToDelete {
-		// Build the assigned state key to check for concurrent modifications
-		executorStateKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorAssignedStateKey)
-
-		// Add a comparison to ensure the executor's assigned state hasn't changed
-		// This prevents deleting an executor that just received a shard assignment
-		comparisons = append(comparisons, clientv3.Compare(clientv3.ModRevision(executorStateKey), "=", expectedModRevision))
-		comparisonMaps[executorStateKey] = expectedModRevision
-
-		// Delete all keys for this executor
-		executorPrefix := etcdkeys.BuildExecutorIDPrefix(s.prefix, namespace, executorID)
-		ops = append(ops, clientv3.OpDelete(executorPrefix, clientv3.WithPrefix()))
-		opsElse = append(opsElse, clientv3.OpGet(executorStateKey))
+	for _, executorID := range request.ExecutorsToDelete {
+		executorIDPrefix := etcdkeys.BuildExecutorIDPrefix(s.prefix, namespace, executorID)
+		ops = append(ops, clientv3.OpDelete(executorIDPrefix, clientv3.WithPrefix()))
 	}
 
-	// 2. Prepare operations to update executor states and shard ownership,
-	// and comparisons to check for concurrent modifications.
-	// All executors get a ModRevision comparison (optimistic lock), but only
-	// changed executors get an OpPut. When ChangedExecutors is nil, all
-	// executors are written (backwards-compatible default).
-	for executorID, state := range request.NewState.ShardAssignments {
-		executorStateKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorAssignedStateKey)
-
-		comparisons = append(comparisons, clientv3.Compare(clientv3.ModRevision(executorStateKey), "=", state.ModRevision))
-		comparisonMaps[executorStateKey] = state.ModRevision
-		opsElse = append(opsElse, clientv3.OpGet(executorStateKey))
-
-		_, isChanged := request.ChangedExecutors[executorID]
-		if request.ChangedExecutors != nil && !isChanged {
-			continue
-		}
-
-		encodedState, err := s.encoder.EncodeAssignedState(&state)
+	for executorID, assignedState := range request.ShardAssignments {
+		encodedState, err := s.encoder.EncodeAssignedState(&assignedState)
 		if err != nil {
 			return fmt.Errorf("encode assigned shards for executor %s: %w", executorID, err)
 		}
-		ops = append(ops, clientv3.OpPut(executorStateKey, string(encodedState)))
+		assignedStateKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorAssignedStateKey)
+		ops = append(ops, clientv3.OpPut(assignedStateKey, string(encodedState)))
 	}
 
-	if len(ops) == 0 {
-		return nil
+	if _, err := s.commitAssignmentOps(ctx, namespace, ops, guard); err != nil {
+		return fmt.Errorf("assign shards: %w", err)
 	}
-	// Committed with the assignments so readers see the version move with them.
-	ops = append(ops, s.touchAssignmentVersion(namespace))
-
-	// 3. Apply the guard function to get the base transaction, which may already have an 'If' condition for leadership.
-	nativeTxn := s.client.Txn(ctx)
-	guardedTxn, err := guard(nativeTxn)
-	if err != nil {
-		return fmt.Errorf("apply transaction guard: %w", err)
-	}
-	etcdGuardedTxn, ok := guardedTxn.(clientv3.Txn)
-	if !ok {
-		return fmt.Errorf("guard function returned invalid transaction type")
-	}
-
-	// 4. Create a nested transaction operation. This allows us to add our own 'If' (comparisons)
-	// and 'Then' (ops) logic that will only execute if the outer guard's 'If' condition passes.
-	// we catch what is the state in the else operations so we can identify which part of the condition failed
-	nestedTxnOp := clientv3.OpTxn(
-		comparisons, // Our IF conditions
-		ops,         // Our THEN operations
-		opsElse,     // Our ELSE operations
-	)
-
-	// 5. Add the nested transaction to the guarded transaction's THEN clause and commit.
-	etcdGuardedTxn = etcdGuardedTxn.Then(nestedTxnOp)
-	txnResp, err := etcdGuardedTxn.Commit()
-	if err != nil {
-		return fmt.Errorf("commit shard assignments transaction: %w", err)
-	}
-
-	// 6. Check the results of both the outer and nested transactions.
-	if !txnResp.Succeeded {
-		// This means the guard's condition (e.g., leadership) failed.
-		return fmt.Errorf("%w: transaction failed, leadership may have changed", store.ErrVersionConflict)
-	}
-
-	// The guard's condition passed. Now check if our nested transaction succeeded.
-	// Since we only have one Op in our 'Then', we check the first response.
-	if len(txnResp.Responses) == 0 {
-		return fmt.Errorf("unexpected empty response from transaction")
-	}
-
-	nestedResp := txnResp.Responses[0].GetResponseTxn()
-	if !nestedResp.Succeeded {
-		// This means our revision checks failed.
-		failingRevisionString := ""
-		for _, keyValue := range nestedResp.Responses[0].GetResponseRange().Kvs {
-			expectedValue, ok := comparisonMaps[string(keyValue.Key)]
-			if !ok || expectedValue != keyValue.ModRevision {
-				failingRevisionString = failingRevisionString + fmt.Sprintf("{ key: %s, expected:%v, actual: %v }", string(keyValue.Key), expectedValue, keyValue.ModRevision)
-			}
-		}
-		return fmt.Errorf("%w: transaction failed, a shard may have been concurrently assigned, %v", store.ErrVersionConflict, failingRevisionString)
-	}
-
 	return nil
 }
 
@@ -625,7 +541,7 @@ func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, gu
 			return nil, fmt.Errorf("commit batch: %w", err)
 		}
 		if !resp.Succeeded {
-			return nil, fmt.Errorf("transaction failed, leadership may have changed")
+			return nil, fmt.Errorf("%w: transaction failed, leadership may have changed", store.ErrVersionConflict)
 		}
 		resp.Responses = resp.Responses[:len(resp.Responses)-len(extraOps)]
 		responses = append(responses, resp)

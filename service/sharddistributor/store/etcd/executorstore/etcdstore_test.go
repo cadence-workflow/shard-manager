@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -288,11 +290,7 @@ func TestGetExecutorState(t *testing.T) {
 		},
 	}
 	require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
-		NewState: &store.NamespaceState{
-			AssignmentState: store.AssignmentState{
-				ShardAssignments: assignState,
-			},
-		},
+		ShardAssignments: assignState,
 	}, store.NopGuard()))
 
 	// 2. Get the heartbeat back
@@ -329,13 +327,9 @@ func TestGetState(t *testing.T) {
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID1, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID2, store.HeartbeatState{Status: types.ExecutorStatusDRAINING}))
 	require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
-		NewState: &store.NamespaceState{
-			AssignmentState: store.AssignmentState{
-				ShardAssignments: map[string]store.AssignedState{
-					executorID1: {AssignedShards: map[string]*types.ShardAssignment{shardID1: {}}},
-					executorID2: {AssignedShards: map[string]*types.ShardAssignment{shardID2: {}}},
-				},
-			},
+		ShardAssignments: map[string]store.AssignedState{
+			executorID1: {AssignedShards: map[string]*types.ShardAssignment{shardID1: {}}},
+			executorID2: {AssignedShards: map[string]*types.ShardAssignment{shardID2: {}}},
 		},
 	}, store.NopGuard()))
 
@@ -372,12 +366,8 @@ func TestGetAssignmentState(t *testing.T) {
 	}))
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, heartbeatOnlyID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
 	require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
-		NewState: &store.NamespaceState{
-			AssignmentState: store.AssignmentState{
-				ShardAssignments: map[string]store.AssignedState{
-					assignedID: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
-				},
-			},
+		ShardAssignments: map[string]store.AssignedState{
+			assignedID: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
 		},
 	}, store.NopGuard()))
 	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-2"}))
@@ -432,14 +422,10 @@ func TestReadsJSONAndProtobufValues(t *testing.T) {
 		require.NoError(t, err)
 
 		assignment := store.AssignShardsRequest{
-			NewState: &store.NamespaceState{
-				AssignmentState: store.AssignmentState{
-					ShardAssignments: map[string]store.AssignedState{
-						executorID: {
-							AssignedShards: map[string]*types.ShardAssignment{shardID: {Status: types.AssignmentStatusREADY}},
-							LastUpdated:    now,
-						},
-					},
+			ShardAssignments: map[string]store.AssignedState{
+				executorID: {
+					AssignedShards: map[string]*types.ShardAssignment{shardID: {Status: types.AssignmentStatusREADY}},
+					LastUpdated:    now,
 				},
 			},
 		}
@@ -510,11 +496,9 @@ func TestAssignmentRevision(t *testing.T) {
 			name: "assign shards",
 			write: func() error {
 				return executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{
-					NewState: &store.NamespaceState{AssignmentState: store.AssignmentState{
-						ShardAssignments: map[string]store.AssignedState{
-							executorID: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
-						},
-					}},
+					ShardAssignments: map[string]store.AssignedState{
+						executorID: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
+					},
 				}, store.NopGuard())
 			},
 			moves: true,
@@ -675,125 +659,116 @@ func emptyTxnResponse(numOps int) *clientv3.TxnResponse {
 	}
 }
 
-// TestAssignShards_WithRevisions tests the optimistic locking logic of AssignShards.
-func TestAssignShards_WithRevisions(t *testing.T) {
+func TestAssignShards(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	executorID1 := "exec-rev-1"
-	executorID2 := "exec-rev-2"
+	keptExecutorID := "exec-kept"
+	deletedExecutorID := "exec-deleted"
 
-	t.Run("Success", func(t *testing.T) {
+	t.Run("writes assignments and deletes executors", func(t *testing.T) {
 		tc := testhelper.SetupStoreTestCluster(t)
 		executorStore := createStore(t, tc)
-		recordHeartbeats(ctx, t, executorStore, tc.Namespace, executorID1, executorID2)
+		recordHeartbeats(ctx, t, executorStore, tc.Namespace, keptExecutorID, deletedExecutorID)
+		assignShardForTest(ctx, t, executorStore, tc.Namespace, "shard-1", deletedExecutorID)
 
-		// Define a new state: assign shard1 to exec1
-		newState := &store.NamespaceState{
-			AssignmentState: store.AssignmentState{
-				ShardAssignments: map[string]store.AssignedState{
-					executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
-				},
+		request := store.AssignShardsRequest{
+			ShardAssignments: map[string]store.AssignedState{
+				keptExecutorID: {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {}}},
 			},
+			ExecutorsToDelete: []string{deletedExecutorID},
 		}
-
-		// Assign - should succeed
-		err := executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: newState}, store.NopGuard())
+		err := executorStore.AssignShards(ctx, tc.Namespace, request, store.NopGuard())
 		require.NoError(t, err)
 
-		// Verify the assignment
 		state, err := executorStore.GetState(ctx, tc.Namespace)
 		require.NoError(t, err)
-		assert.Contains(t, state.ShardAssignments[executorID1].AssignedShards, "shard-1")
+		assert.Contains(t, state.ShardAssignments[keptExecutorID].AssignedShards, "shard-1")
+		assert.NotContains(t, state.ShardAssignments, deletedExecutorID)
+		assert.NotContains(t, state.Executors, deletedExecutorID)
 	})
 
-	t.Run("ConflictOnNewShard", func(t *testing.T) {
+	t.Run("overwrites an assignment written after it was read", func(t *testing.T) {
 		tc := testhelper.SetupStoreTestCluster(t)
 		executorStore := createStore(t, tc)
-		recordHeartbeats(ctx, t, executorStore, tc.Namespace, executorID1, executorID2)
+		recordHeartbeats(ctx, t, executorStore, tc.Namespace, keptExecutorID)
+		assignShardForTest(ctx, t, executorStore, tc.Namespace, "shard-1", keptExecutorID)
 
-		// Process A defines its desired state: assign shard-new to exec1
-		processAState := &store.NamespaceState{
-			AssignmentState: store.AssignmentState{
-				ShardAssignments: map[string]store.AssignedState{
-					executorID1: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
-					executorID2: {},
-				},
+		request := store.AssignShardsRequest{
+			ShardAssignments: map[string]store.AssignedState{
+				keptExecutorID: {AssignedShards: map[string]*types.ShardAssignment{"shard-2": {}}},
 			},
 		}
-
-		// Process B defines its desired state: assign shard-new to exec2
-		processBState := &store.NamespaceState{
-			AssignmentState: store.AssignmentState{
-				ShardAssignments: map[string]store.AssignedState{
-					executorID1: {},
-					executorID2: {AssignedShards: map[string]*types.ShardAssignment{"shard-new": {}}},
-				},
-			},
-		}
-
-		// Process A succeeds
-		err := executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: processAState}, store.NopGuard())
+		err := executorStore.AssignShards(ctx, tc.Namespace, request, store.NopGuard())
 		require.NoError(t, err)
 
-		// Process B tries to commit, but its revision check for shard-new (rev=0) will fail.
-		err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: processBState}, store.NopGuard())
-		require.Error(t, err)
-		assert.ErrorIs(t, err, store.ErrVersionConflict)
-	})
-
-	t.Run("ConflictOnExistingShard", func(t *testing.T) {
-		tc := testhelper.SetupStoreTestCluster(t)
-		executorStore := createStore(t, tc)
-		recordHeartbeats(ctx, t, executorStore, tc.Namespace, executorID1, executorID2)
-
-		shardID := "shard-to-move"
-		// 1. Setup: Assign the shard to executor1
-		setupState, err := executorStore.GetState(ctx, tc.Namespace)
-		require.NoError(t, err)
-		setupState.ShardAssignments = map[string]store.AssignedState{
-			executorID1: {AssignedShards: map[string]*types.ShardAssignment{shardID: {}}},
-		}
-		require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: setupState}, store.NopGuard()))
-
-		// 2. Process A reads the state, intending to move the shard to executor2
-		stateForProcA, err := executorStore.GetState(ctx, tc.Namespace)
-		require.NoError(t, err)
-		stateForProcA.ShardAssignments = map[string]store.AssignedState{
-			executorID1: {ModRevision: stateForProcA.ShardAssignments[executorID1].ModRevision},
-			executorID2: {AssignedShards: map[string]*types.ShardAssignment{shardID: {}}, ModRevision: 0},
-		}
-
-		// 3. In the meantime, another process makes a different change (e.g., re-assigns to same executor, which changes revision)
-		intermediateState, err := executorStore.GetState(ctx, tc.Namespace)
-		require.NoError(t, err)
-		intermediateState.ShardAssignments = map[string]store.AssignedState{
-			executorID1: {
-				AssignedShards: map[string]*types.ShardAssignment{shardID: {}},
-				ModRevision:    intermediateState.ShardAssignments[executorID1].ModRevision,
-			},
-		}
-		require.NoError(t, executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: intermediateState}, store.NopGuard()))
-
-		// 4. Process A tries to commit its change. It will fail because its stored revision for the shard is now stale.
-		err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: stateForProcA}, store.NopGuard())
-		require.Error(t, err)
-		assert.ErrorIs(t, err, store.ErrVersionConflict)
-	})
-
-	t.Run("NoChanges", func(t *testing.T) {
-		tc := testhelper.SetupStoreTestCluster(t)
-		executorStore := createStore(t, tc)
-		recordHeartbeats(ctx, t, executorStore, tc.Namespace, executorID1, executorID2)
-
-		// Get the current state
 		state, err := executorStore.GetState(ctx, tc.Namespace)
 		require.NoError(t, err)
-
-		// Call AssignShards with the same assignments
-		err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: state}, store.NopGuard())
-		require.NoError(t, err, "Assigning with no changes should succeed")
+		assignedShards := slices.Collect(maps.Keys(state.ShardAssignments[keptExecutorID].AssignedShards))
+		assert.Equal(t, []string{"shard-2"}, assignedShards)
 	})
+
+	t.Run("empty request writes nothing", func(t *testing.T) {
+		tc := testhelper.SetupStoreTestCluster(t)
+		executorStore := createStore(t, tc)
+		recordHeartbeats(ctx, t, executorStore, tc.Namespace, keptExecutorID)
+
+		stateBefore, err := executorStore.GetState(ctx, tc.Namespace)
+		require.NoError(t, err)
+
+		err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{}, store.NopGuard())
+		require.NoError(t, err)
+
+		stateAfter, err := executorStore.GetState(ctx, tc.Namespace)
+		require.NoError(t, err)
+		assert.Equal(t, stateBefore.Revision, stateAfter.Revision)
+	})
+}
+
+// A namespace can have more executors than fit in one etcd transaction, so a rebalance
+// that changes all of them has to be written rather than fail with
+// "etcdserver: too many operations in txn request".
+func TestAssignShardsSplitsOverTxnLimit(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	numAssignedExecutors := 200 // more than the configured MaxEtcdTxnOps of 128
+	numDeletedExecutors := 100
+
+	assignments := make(map[string]store.AssignedState, numAssignedExecutors)
+	for i := range numAssignedExecutors {
+		executorID := fmt.Sprintf("exec-assigned-%03d", i)
+		shardID := strconv.Itoa(i)
+		assignments[executorID] = store.AssignedState{
+			AssignedShards: map[string]*types.ShardAssignment{shardID: {Status: types.AssignmentStatusREADY}},
+		}
+	}
+	deletedExecutorIDs := make([]string, 0, numDeletedExecutors)
+	for i := range numDeletedExecutors {
+		deletedExecutorIDs = append(deletedExecutorIDs, fmt.Sprintf("exec-deleted-%03d", i))
+	}
+	recordHeartbeats(ctx, t, executorStore, tc.Namespace, deletedExecutorIDs...)
+
+	request := store.AssignShardsRequest{
+		ShardAssignments:  assignments,
+		ExecutorsToDelete: deletedExecutorIDs,
+	}
+	err := executorStore.AssignShards(ctx, tc.Namespace, request, store.NopGuard())
+	require.NoError(t, err)
+
+	state, err := executorStore.GetState(ctx, tc.Namespace)
+	require.NoError(t, err)
+	require.Len(t, state.ShardAssignments, numAssignedExecutors)
+	for executorID, assignedState := range assignments {
+		storedShards := slices.Collect(maps.Keys(state.ShardAssignments[executorID].AssignedShards))
+		expectedShards := slices.Collect(maps.Keys(assignedState.AssignedShards))
+		assert.Equal(t, expectedShards, storedShards, "executor %s", executorID)
+	}
+	for _, executorID := range deletedExecutorIDs {
+		assert.NotContains(t, state.Executors, executorID)
+	}
 }
 
 // TestGuardedOperations verifies that AssignShards and DeleteExecutors respect the leader guard.
@@ -824,11 +799,7 @@ func TestGuardedOperations(t *testing.T) {
 
 	// 3. Use the valid guard to assign shards - should succeed
 	assignState := map[string]store.AssignedState{"exec-1": {}}
-	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{
-		AssignmentState: store.AssignmentState{
-			ShardAssignments: assignState,
-		},
-	}}, validGuard)
+	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{ShardAssignments: assignState}, validGuard)
 	require.NoError(t, err, "Assigning shards with a valid leader guard should succeed")
 
 	// 4. First node resigns, second node becomes leader
@@ -837,12 +808,8 @@ func TestGuardedOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	// 5. Use the now-invalid guard from the first leader - should fail
-	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{NewState: &store.NamespaceState{
-		AssignmentState: store.AssignmentState{
-			ShardAssignments: assignState,
-		},
-	}}, validGuard)
-	require.Error(t, err, "Assigning shards with a stale leader guard should fail")
+	err = executorStore.AssignShards(ctx, tc.Namespace, store.AssignShardsRequest{ShardAssignments: assignState}, validGuard)
+	require.ErrorIs(t, err, store.ErrVersionConflict, "Assigning shards with a stale leader guard should fail")
 
 	// 6. Use the NopGuard to delete an executor - should succeed
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
@@ -1228,14 +1195,11 @@ func assignShardForTest(ctx context.Context, t *testing.T, executorStore *execut
 	}
 	assignedState.AssignedShards[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
 	assignedState.LastUpdated = executorStore.timeSource.Now().UTC()
-	namespaceState.ShardAssignments[executorID] = assignedState
 
-	err = executorStore.AssignShards(
-		ctx,
-		namespace,
-		store.AssignShardsRequest{NewState: namespaceState},
-		store.NopGuard(),
-	)
+	request := store.AssignShardsRequest{
+		ShardAssignments: map[string]store.AssignedState{executorID: assignedState},
+	}
+	err = executorStore.AssignShards(ctx, namespace, request, store.NopGuard())
 	require.NoError(t, err)
 }
 
@@ -1420,8 +1384,7 @@ func TestCommitOps_LeadershipLost_StopsEarly(t *testing.T) {
 	}
 	_, err := s.commitOps(context.Background(), ops, store.NopGuard())
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "leadership may have changed")
+	require.ErrorIs(t, err, store.ErrVersionConflict)
 	assert.Equal(t, 1, commitCount, "should stop after first leadership failure")
 }
 

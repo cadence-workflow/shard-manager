@@ -44,6 +44,10 @@ var (
 			HostName: "host-name",
 		},
 	}
+	namespaceRangeAssignments = []*types.RangeAssignment{
+		rangeAssignment("range-1", "executor-1", 0x00, 0x40),
+		finalRangeAssignment("range-2", "executor-2", 0x40),
+	}
 	ShardDistributorExecutorHeartbeatResponse = types.ExecutorHeartbeatResponse{
 		ShardAssignments: map[string]*types.ShardAssignment{
 			"shard-key-1": {
@@ -54,8 +58,7 @@ var (
 			},
 		},
 		RangeAssignments: []*types.RangeAssignment{
-			rangeAssignment("range-1", 0x00, 0x40),
-			finalRangeAssignment("range-2", 0x40),
+			rangeAssignment("range-1", "executor-1", 0x00, 0x40),
 		},
 	}
 	ShardDistributorWatchNamespaceStateRequest = types.WatchNamespaceStateRequest{
@@ -76,10 +79,7 @@ var (
 		},
 		DrainedShardKeys:   []string{"shard-4", "shard-5"},
 		AssignmentRevision: 5,
-		RangeAssignments: []*types.RangeAssignment{
-			rangeAssignment("range-1", 0x00, 0x40),
-			finalRangeAssignment("range-2", 0x40),
-		},
+		RangeAssignments:   namespaceRangeAssignments,
 	}
 	ShardDistributorGetNamespaceStateIfNewerRequest = types.GetNamespaceStateIfNewerRequest{
 		Namespace:          "namespace",
@@ -153,10 +153,7 @@ var (
 				Reason:    "maintenance",
 			},
 		},
-		RangeAssignments: []*types.RangeAssignment{
-			rangeAssignment("range-1", 0x00, 0x40),
-			finalRangeAssignment("range-2", 0x40),
-		},
+		RangeAssignments: namespaceRangeAssignments,
 	}
 	ShardDistributorGetExecutorStateRequest = types.GetExecutorStateRequest{
 		Namespace:  "namespace",
@@ -231,24 +228,24 @@ var (
 	}
 )
 
-func rangeAssignment(id string, low, high byte) *types.RangeAssignment {
+func rangeAssignment(id, executorID string, low, high byte) *types.RangeAssignment {
 	return &types.RangeAssignment{
 		ID:         id,
-		Range:      types.Range{LowInclusive: b8(low), HighExclusive: b8(high)},
-		ExecutorID: "executor-1",
+		Range:      types.Range{LowInclusive: eightByteBound(low), HighExclusive: eightByteBound(high)},
+		ExecutorID: executorID,
 		Status:     types.AssignmentStatusREADY,
 	}
 }
 
-func finalRangeAssignment(id string, low byte) *types.RangeAssignment {
+func finalRangeAssignment(id, executorID string, low byte) *types.RangeAssignment {
 	return &types.RangeAssignment{
 		ID:         id,
-		Range:      types.Range{LowInclusive: b8(low)},
-		ExecutorID: "executor-2",
+		Range:      types.Range{LowInclusive: eightByteBound(low)},
+		ExecutorID: executorID,
 		Status:     types.AssignmentStatusREADY,
 	}
 }
 
-func b8(b byte) []byte {
-	return []byte{b, 0, 0, 0, 0, 0, 0, 0}
+func eightByteBound(firstByte byte) []byte {
+	return []byte{firstByte, 0, 0, 0, 0, 0, 0, 0}
 }

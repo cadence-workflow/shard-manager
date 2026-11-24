@@ -400,7 +400,7 @@ func (v *ListNamespacesResponse) GetNamespaces() (o []*NamespaceConfig) {
 // loaded from the server's shardDistribution.namespaces YAML config at startup.
 type NamespaceConfig struct {
 	Name string
-	// Type is "fixed".
+	// Type is the namespace type. Currently, the only supported type is "fixed".
 	Type string
 	// Mode is the migration mode (e.g. "onboarded", "local_pass", "distributed_pass").
 	Mode string

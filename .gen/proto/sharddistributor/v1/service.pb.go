@@ -1631,7 +1631,7 @@ func (m *ListNamespacesResponse) GetNamespaces() []*NamespaceConfig {
 type NamespaceConfig struct {
 	// Name is the namespace identifier
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Type is "fixed".
+	// Type is the namespace type. Currently, the only supported type is "fixed".
 	Type string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	// Mode is the migration mode (e.g. "onboarded", "local_pass", "distributed_pass").
 	Mode string `protobuf:"bytes,3,opt,name=mode,proto3" json:"mode,omitempty"`

@@ -234,7 +234,7 @@ message ListNamespacesResponse {
 message NamespaceConfig {
   // Name is the namespace identifier
   string name = 1;
-  // Type is "fixed".
+  // Type is the namespace type. Currently, the only supported type is "fixed".
   string type = 2;
   // Mode is the migration mode (e.g. "onboarded", "local_pass", "distributed_pass").
   string mode = 3;

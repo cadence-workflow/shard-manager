@@ -48,8 +48,7 @@ func TestModule(t *testing.T) {
 
 	cfg := config.Config{
 		Canary: config.CanaryConfig{
-			Fixed:     config.NamespaceConfig{Name: "shard-distributor-canary"},
-			Ephemeral: config.NamespaceConfig{Name: "shard-distributor-canary-ephemeral"},
+			Fixed: config.NamespaceConfig{Name: "shard-distributor-canary"},
 		},
 	}
 

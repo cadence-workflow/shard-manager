@@ -30,7 +30,6 @@ const (
 	// Default configuration
 	defaultShardDistributorEndpoint = "127.0.0.1:7943"
 	defaultFixedNamespace           = "shard-distributor-canary"
-	defaultEphemeralNamespace       = "shard-distributor-canary-ephemeral"
 	defaultCanaryGRPCPort           = 7953 // Port for canary to receive ping requests
 	defaultNumExecutors             = 1
 
@@ -52,10 +51,6 @@ func runApp(c *cli.Command) {
 				Name:         c.String("fixed-namespace"),
 				NumExecutors: c.Int("num-fixed-executors"),
 			},
-			Ephemeral: canaryConfig.NamespaceConfig{
-				Name:         c.String("ephemeral-namespace"),
-				NumExecutors: c.Int("num-ephemeral-executors"),
-			},
 			Load: canaryConfig.LoadConfig{
 				Namespace:          c.String("load-namespace"),
 				Interval:           c.Duration("load-interval"),
@@ -69,9 +64,7 @@ func runApp(c *cli.Command) {
 	}
 
 	if c.IsSet("num-executors") {
-		numExecutors := c.Int("num-executors")
-		cfg.Canary.Fixed.NumExecutors = numExecutors
-		cfg.Canary.Ephemeral.NumExecutors = numExecutors
+		cfg.Canary.Fixed.NumExecutors = c.Int("num-executors")
 	}
 
 	fx.New(opts(c.String("endpoint"), c.Int("canary-grpc-port"), cfg)).Run()
@@ -180,11 +173,6 @@ func buildCLI() *cli.Command {
 					Value: defaultFixedNamespace,
 					Usage: "namespace for fixed shard processing",
 				},
-				&cli.StringFlag{
-					Name:  "ephemeral-namespace",
-					Value: defaultEphemeralNamespace,
-					Usage: "namespace for ephemeral shard creation testing",
-				},
 				&cli.IntFlag{
 					Name:  "canary-grpc-port",
 					Value: defaultCanaryGRPCPort,
@@ -193,17 +181,12 @@ func buildCLI() *cli.Command {
 				&cli.IntFlag{
 					Name:  "num-executors",
 					Value: defaultNumExecutors,
-					Usage: "number of executors for fixed and ephemeral to start. Overrides num-fixed-executors and num-ephemeral-executors flags",
+					Usage: "number of executors of fixed namespace to start. Overrides num-fixed-executors",
 				},
 				&cli.IntFlag{
 					Name:  "num-fixed-executors",
 					Value: defaultNumExecutors,
 					Usage: "number of executors of fixed namespace to start. Don't use with num-executors",
-				},
-				&cli.IntFlag{
-					Name:  "num-ephemeral-executors",
-					Value: defaultNumExecutors,
-					Usage: "number of executors of ephemeral namespace to start. Don't use with num-executors",
 				},
 				&cli.StringFlag{
 					Name:  "load-namespace",

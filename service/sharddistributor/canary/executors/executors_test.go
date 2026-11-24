@@ -14,7 +14,6 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/config"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processor"
-	"github.com/cadence-workflow/shard-manager/service/sharddistributor/canary/processorephemeral"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/executorclient"
 )
@@ -40,33 +39,6 @@ func TestNewExecutorsFixedNamespace(t *testing.T) {
 			params: createMockParams[*processor.ShardProcessor](ctrl, "shard-distributor-canary"),
 			newExecutor: func(params executorclient.Params[*processor.ShardProcessor]) (ExecutorResult, error) {
 				return NewExecutorWithFixedNamespace(params, "shard-distributor-canary")
-			}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := tt.newExecutor(tt.params)
-
-			require.NoError(t, err)
-			require.NotNil(t, result.Executor)
-			require.NotNil(t, result.ExecutorInfo)
-			assert.Equal(t, result.Executor.GetExecutorID(), result.ExecutorInfo.GetExecutorID())
-		})
-	}
-}
-
-func TestNewExecutorsEphemeralNamespace(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	tests := []struct {
-		name        string
-		params      executorclient.Params[*processorephemeral.ShardProcessor]
-		newExecutor func(params executorclient.Params[*processorephemeral.ShardProcessor]) (ExecutorEphemeralResult, error)
-	}{
-		{
-			name:   "TestNewExecutorWithEphemeralNamespace",
-			params: createMockParams[*processorephemeral.ShardProcessor](ctrl, "shard-distributor-canary-ephemeral"),
-			newExecutor: func(params executorclient.Params[*processorephemeral.ShardProcessor]) (ExecutorEphemeralResult, error) {
-				return NewExecutorWithEphemeralNamespace(params, "shard-distributor-canary-ephemeral")
 			}},
 	}
 
@@ -150,17 +122,13 @@ func TestNewExecutorsModule(t *testing.T) {
 					executorclient.NewMockExecutor[*processor.ShardProcessor](ctrl),
 					executorclient.NewMockExecutor[*processor.ShardProcessor](ctrl),
 				},
-				Executorsephemeral: []executorclient.Executor[*processorephemeral.ShardProcessor]{
-					executorclient.NewMockExecutor[*processorephemeral.ShardProcessor](ctrl),
-				},
 			},
-			expectedInvocation: 3,
+			expectedInvocation: 2,
 		},
 		{
 			name: "no executors",
 			params: ExecutorsParams{
-				ExecutorsFixed:     []executorclient.Executor[*processor.ShardProcessor]{},
-				Executorsephemeral: []executorclient.Executor[*processorephemeral.ShardProcessor]{},
+				ExecutorsFixed: []executorclient.Executor[*processor.ShardProcessor]{},
 			},
 			expectedInvocation: 0,
 		},
@@ -249,62 +217,6 @@ func TestNewExecutorsWithFixedNamespace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			params := createMockParams[*processor.ShardProcessor](ctrl, tt.namespace)
 			result, err := NewExecutorsWithFixedNamespace(params, config.NamespaceConfig{Name: tt.namespace, NumExecutors: tt.numExecutors})
-
-			require.NoError(t, err)
-			assert.Len(t, result.Executors, tt.expected)
-			assert.Len(t, result.ExecutorInfos, tt.expected)
-			for i, executor := range result.Executors {
-				assert.NotNil(t, executor)
-				assert.Equal(t, executor.GetExecutorID(), result.ExecutorInfos[i].GetExecutorID())
-			}
-		})
-	}
-}
-
-func TestNewExecutorsWithEphemeralNamespace(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	tests := []struct {
-		name         string
-		namespace    string
-		numExecutors int
-		expected     int
-	}{
-		{
-			name:         "zero executors defaults to one",
-			namespace:    "test-namespace",
-			numExecutors: 0,
-			expected:     1,
-		},
-		{
-			name:         "negative executors defaults to one",
-			namespace:    "test-namespace",
-			numExecutors: -1,
-			expected:     1,
-		},
-		{
-			name:         "one executor",
-			namespace:    "test-namespace",
-			numExecutors: 1,
-			expected:     1,
-		},
-		{
-			name:         "two executors",
-			namespace:    "test-namespace",
-			numExecutors: 2,
-			expected:     2,
-		},
-		{
-			name:         "five executors",
-			namespace:    "test-namespace",
-			numExecutors: 5,
-			expected:     5,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			params := createMockParams[*processorephemeral.ShardProcessor](ctrl, tt.namespace)
-			result, err := NewExecutorsWithEphemeralNamespace(params, config.NamespaceConfig{Name: tt.namespace, NumExecutors: tt.numExecutors})
 
 			require.NoError(t, err)
 			assert.Len(t, result.Executors, tt.expected)

@@ -23,9 +23,6 @@ type CanaryConfig struct {
 	// Fixed is the namespace with a fixed set of shards
 	Fixed NamespaceConfig `yaml:"fixed"`
 
-	// Ephemeral is the namespace the canary creates shards in
-	Ephemeral NamespaceConfig `yaml:"ephemeral"`
-
 	// Load configures the periodic load run. The run is disabled when Load.Namespace is empty.
 	Load LoadConfig `yaml:"load"`
 }
@@ -45,7 +42,6 @@ type NamespaceConfig struct {
 func (c CanaryConfig) ClientConfig() clientcommon.Config {
 	namespaces := []clientcommon.NamespaceConfig{
 		{Namespace: c.Fixed.Name, HeartBeatInterval: heartBeatInterval},
-		{Namespace: c.Ephemeral.Name, HeartBeatInterval: heartBeatInterval},
 	}
 	if c.Load.Namespace != "" {
 		namespaces = append(namespaces, clientcommon.NamespaceConfig{Namespace: c.Load.Namespace, HeartBeatInterval: heartBeatInterval})

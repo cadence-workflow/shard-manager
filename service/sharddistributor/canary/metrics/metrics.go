@@ -11,10 +11,8 @@ const (
 	CanaryPingSuccess           = "canary_ping_success"
 	CanaryPingFailure           = "canary_ping_failure"
 	CanaryPingOwnershipMismatch = "canary_ping_ownership_mismatch"
-	CanaryShardCreated          = "canary_shard_created"
 	CanaryShardStarted          = "canary_shard_started"
 	CanaryShardStopped          = "canary_shard_stopped"
-	CanaryShardDone             = "canary_shard_done"
 	CanaryShardProcessStep      = "canary_shard_process_step"
 	// CanaryShardLifecycleInjected counts every Start/Stop call where the
 	// canary intentionally injected a delay. Tagged by lifecycle ("start" or

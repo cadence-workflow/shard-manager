@@ -403,7 +403,6 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 	assignmentTime := p.timeSource.Now().UTC()
 	newAssignments, executorsWithChangedAssignments := p.buildNewAssignmentsState(namespaceState, currentAssignments, executorsToUnassign, previousOwnersByShard, assignmentTime)
 
-	// Comparing against the stored assignments also repairs a shard that is stored on two executors.
 	distributionUnchanged := len(executorsWithChangedAssignments) == 0 && len(staleExecutors) == 0
 	if distributionUnchanged {
 		p.logger.Info("No changes to distribution detected. Skipping rebalance.")

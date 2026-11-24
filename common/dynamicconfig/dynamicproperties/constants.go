@@ -307,10 +307,11 @@ const (
 
 	// ShardDistributorMaxEtcdTxnOps is the maximum number of operations per etcd transaction.
 	// etcd enforces a server-side limit (--max-txn-ops, default 128).
+	// The default is half of that to stay well within etcd's request size limit.
 	// This value must not exceed the etcd cluster's configured limit.
 	// KeyName: shardDistributor.maxEtcdTxnOps
 	// Value type: Int
-	// Default value: 128
+	// Default value: 64
 	// Allowed filters: N/A
 	ShardDistributorMaxEtcdTxnOps
 
@@ -508,8 +509,8 @@ var IntKeys = map[IntKey]DynamicInt{
 	},
 	ShardDistributorMaxEtcdTxnOps: {
 		KeyName:      "shardDistributor.maxEtcdTxnOps",
-		Description:  "ShardDistributorMaxEtcdTxnOps is the maximum number of operations per etcd transaction, must not exceed the etcd cluster's configured --max-txn-ops limit",
-		DefaultValue: 128,
+		Description:  "ShardDistributorMaxEtcdTxnOps is the maximum number of operations per etcd transaction, must not exceed the etcd cluster's configured --max-txn-ops limit. Defaults to half of etcd's default --max-txn-ops to stay well within the request size limit",
+		DefaultValue: 64,
 	},
 	ShardDistributorFixedShardNum: {
 		KeyName:      "shardDistributor.fixedShardNum",

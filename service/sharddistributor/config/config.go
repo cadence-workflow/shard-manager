@@ -55,7 +55,7 @@ type (
 
 	Namespace struct {
 		Name string `yaml:"name"`
-		Type string `yaml:"type"` // The field is a string since it is shared between global config. Supported values: fixed.
+		Type string `yaml:"type"` // Type is the namespace type. Currently, the only supported type is "fixed".
 		// ShardNum is the number of shards in the namespace.
 		ShardNum int64 `yaml:"shardNum"`
 	}

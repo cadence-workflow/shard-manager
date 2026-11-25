@@ -17,6 +17,7 @@ type (
 		MaxEtcdTxnOps                       dynamicproperties.IntPropertyFn
 		EphemeralAssignmentCoalescingWindow dynamicproperties.DurationPropertyFnWithNamespaceFilters
 		FixedShardNum                       dynamicproperties.IntPropertyFnWithNamespaceFilters
+		WriteExecutorValuesAsProtobuf       dynamicproperties.BoolPropertyFn
 
 		LoadBalancingNaive  LoadBalancingNaiveConfig
 		LoadBalancingGreedy LoadBalancingGreedyConfig
@@ -103,6 +104,7 @@ func NewConfig(dc *dynamicconfig.Collection) *Config {
 		MaxEtcdTxnOps:                       dc.GetIntProperty(dynamicproperties.ShardDistributorMaxEtcdTxnOps),
 		EphemeralAssignmentCoalescingWindow: dc.GetDurationPropertyFilteredByNamespace(dynamicproperties.ShardDistributorEphemeralAssignmentCoalescingWindow),
 		FixedShardNum:                       dc.GetIntPropertyFilteredByNamespace(dynamicproperties.ShardDistributorFixedShardNum),
+		WriteExecutorValuesAsProtobuf:       dc.GetBoolProperty(dynamicproperties.ShardDistributorWriteExecutorValuesAsProtobuf),
 
 		LoadBalancingNaive: LoadBalancingNaiveConfig{
 			MaxDeviation: dc.GetFloat64PropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingNaiveMaxDeviation),

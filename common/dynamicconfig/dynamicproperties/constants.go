@@ -514,7 +514,7 @@ var IntKeys = map[IntKey]DynamicInt{
 	ShardDistributorFixedShardNum: {
 		KeyName:      "shardDistributor.fixedShardNum",
 		Filters:      []Filter{Namespace},
-		Description:  "ShardDistributorFixedShardNum makes a namespace fixed with this many shards. A positive value overrides the namespace's type and shardNum from the static config, zero or a negative value keeps the static config. Only change it while the namespace has no heartbeating executors",
+		Description:  "ShardDistributorFixedShardNum overrides the number of shards of a namespace. A positive value overrides the namespace's shardNum from the static config, zero or a negative value keeps the static config. Only change it while the namespace has no heartbeating executors",
 		DefaultValue: 0,
 	},
 }

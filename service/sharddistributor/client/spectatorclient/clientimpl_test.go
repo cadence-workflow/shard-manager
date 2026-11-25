@@ -28,7 +28,7 @@ func TestWatchLoopBasicFlow(t *testing.T) {
 	// Create a context to control when the mock stream should unblock
 	streamCtx, cancelStream := context.WithCancel(context.Background())
 
-	spectator := newTestSpectator(t, Params{Client: mockClient})
+	spectator := newTestSpectator(t, mockClient, Params{})
 
 	// Expect stream creation
 	mockClient.EXPECT().
@@ -87,7 +87,7 @@ func TestGetShardOwner_CacheMiss_FallbackToRPC(t *testing.T) {
 	// Create a context to control when the mock stream should unblock
 	streamCtx, cancelStream := context.WithCancel(context.Background())
 
-	spectator := newTestSpectator(t, Params{Client: mockClient})
+	spectator := newTestSpectator(t, mockClient, Params{})
 
 	// Setup stream
 	mockClient.EXPECT().
@@ -192,7 +192,7 @@ func TestGetShardOwner_DrainedShard(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			spectator := newTestSpectator(t, Params{Client: sharddistributor.NewMockClient(ctrl)})
+			spectator := newTestSpectator(t, sharddistributor.NewMockClient(ctrl), Params{})
 
 			spectator.watcher.handleResponse(tt.response)
 
@@ -217,7 +217,7 @@ func TestGetShardOwner_UndrainStopsRefusing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := sharddistributor.NewMockClient(ctrl)
 
-	spectator := newTestSpectator(t, Params{Client: mockClient})
+	spectator := newTestSpectator(t, mockClient, Params{})
 
 	spectator.watcher.handleResponse(&types.WatchNamespaceStateResponse{
 		DrainedShardKeys: []string{"shard-1"},
@@ -244,7 +244,7 @@ func TestGetShardOwner_TimeoutBeforeFirstState(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := sharddistributor.NewMockClient(ctrl)
 
-	spectator := newTestSpectator(t, Params{Client: mockClient})
+	spectator := newTestSpectator(t, mockClient, Params{})
 
 	// Create a context with a short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
@@ -261,7 +261,7 @@ func TestWatchLoopDisabled(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	timeSource := clock.NewMockedTimeSource()
-	spectator := newTestSpectator(t, Params{TimeSource: timeSource, Enabled: func() bool { return false }})
+	spectator := newTestSpectator(t, nil, Params{TimeSource: timeSource, Enabled: func() bool { return false }})
 
 	err := spectator.Start(context.Background())
 	assert.NoError(t, err)
@@ -281,7 +281,7 @@ func TestWatchLoopDisabled(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func newTestSpectator(t *testing.T, params Params) *spectatorImpl {
+func newTestSpectator(t *testing.T, client sharddistributor.Client, params Params) *spectatorImpl {
 	params.Logger = zap.NewNop()
 	if params.MetricsScope == nil {
 		params.MetricsScope = tally.NoopScope
@@ -289,7 +289,7 @@ func newTestSpectator(t *testing.T, params Params) *spectatorImpl {
 	if params.TimeSource == nil {
 		params.TimeSource = clock.NewRealTimeSource()
 	}
-	spectator, err := newSpectatorWithConfig(params, &clientcommon.NamespaceConfig{Namespace: "test-ns"})
+	spectator, err := newSpectatorWithConfig(client, params, &clientcommon.NamespaceConfig{Namespace: "test-ns"})
 	require.NoError(t, err)
 	return spectator.(*spectatorImpl)
 }

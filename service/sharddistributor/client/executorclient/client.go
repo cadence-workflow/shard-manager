@@ -144,12 +144,7 @@ func NewExecutor[SP ShardProcessor](params Params[SP]) (Executor[SP], error) {
 }
 
 func newExecutorWithConfig[SP ShardProcessor](params Params[SP], namespaceConfig *clientcommon.NamespaceConfig) (Executor[SP], error) {
-	hedgeShare := params.HedgeShare
-	if hedgeShare == nil {
-		hedgeShare = func() float64 { return 0.1 }
-	}
-
-	shardDistributorClient, err := createShardDistributorExecutorClient(params.ExecutorClient, params.TimeSource, params.MetricsScope, hedgeShare)
+	shardDistributorClient, err := createShardDistributorExecutorClient(params.ExecutorClient, params.TimeSource, params.MetricsScope, params.HedgeShare)
 	if err != nil {
 		return nil, fmt.Errorf("create shard distributor executor client: %w", err)
 	}

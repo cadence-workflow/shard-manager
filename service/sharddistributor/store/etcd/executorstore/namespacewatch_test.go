@@ -53,11 +53,11 @@ func rewrite(key, prevValue, value string) *clientv3.Event {
 	return event
 }
 
-func del(key string) *clientv3.Event {
+func del(key, prevValue string) *clientv3.Event {
 	return &clientv3.Event{
 		Type:   clientv3.EventTypeDelete,
 		Kv:     &mvccpb.KeyValue{Key: []byte(key)},
-		PrevKv: &mvccpb.KeyValue{Key: []byte(key)},
+		PrevKv: &mvccpb.KeyValue{Key: []byte(key), Value: []byte(prevValue)},
 	}
 }
 
@@ -71,6 +71,7 @@ func TestHasNamespaceStateChanged(t *testing.T) {
 	assignedStateKey := etcdkeys.BuildExecutorKey(_watchTestPrefix, _watchTestNamespace, _watchTestExecutor, etcdkeys.ExecutorAssignedStateKey)
 	reportedShardsKey := etcdkeys.BuildExecutorKey(_watchTestPrefix, _watchTestNamespace, _watchTestExecutor, etcdkeys.ExecutorReportedShardsKey)
 	metadataKey := etcdkeys.BuildMetadataKey(_watchTestPrefix, _watchTestNamespace, _watchTestExecutor, "metadata-key")
+	rangeKey := etcdkeys.BuildRangeKey(_watchTestPrefix, _watchTestNamespace, "range-1")
 
 	tests := []struct {
 		name     string
@@ -91,7 +92,7 @@ func TestHasNamespaceStateChanged(t *testing.T) {
 			// Drain and undrain both store an empty value, so this must not be mistaken
 			// for an unchanged key.
 			name:     "shard undrained",
-			events:   []*clientv3.Event{del(drainedKey)},
+			events:   []*clientv3.Event{del(drainedKey, "")},
 			expected: true,
 		},
 		{
@@ -130,6 +131,31 @@ func TestHasNamespaceStateChanged(t *testing.T) {
 			name:     "drain alongside an untracked key",
 			events:   []*clientv3.Event{put(leaderKey, "host-1"), put(drainedKey, "")},
 			expected: true,
+		},
+		{
+			name:     "range added",
+			events:   []*clientv3.Event{put(rangeKey, "new")},
+			expected: true,
+		},
+		{
+			name:     "range changed",
+			events:   []*clientv3.Event{rewrite(rangeKey, "old", "new")},
+			expected: true,
+		},
+		{
+			name:     "range rewritten with same value",
+			events:   []*clientv3.Event{rewrite(rangeKey, "same", "same")},
+			expected: false,
+		},
+		{
+			name:     "range deleted",
+			events:   []*clientv3.Event{del(rangeKey, "old")},
+			expected: true,
+		},
+		{
+			name:     "malformed range key",
+			events:   []*clientv3.Event{put(etcdkeys.BuildRangesPrefix(_watchTestPrefix, _watchTestNamespace)+"range/1", "new")},
+			expected: false,
 		},
 	}
 

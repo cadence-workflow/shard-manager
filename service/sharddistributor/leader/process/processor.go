@@ -221,14 +221,14 @@ func (p *namespaceProcessor) cleanupShardStats(ctx context.Context) {
 }
 
 // identifyStaleExecutors returns a list of executors who have not reported a heartbeat recently.
-func (p *namespaceProcessor) identifyStaleExecutors(namespaceState *store.NamespaceState) map[string]int64 {
-	expiredExecutors := make(map[string]int64)
+func (p *namespaceProcessor) identifyStaleExecutors(namespaceState *store.NamespaceState) map[string]struct{} {
+	expiredExecutors := make(map[string]struct{})
 	now := p.timeSource.Now().UTC()
 
 	for executorID, state := range namespaceState.Executors {
 		if now.Sub(state.LastHeartbeat) > p.cfg.HeartbeatTTL {
 			p.logger.Info("Executor has not reported a heartbeat recently", tag.ShardExecutor(executorID), tag.ShardNamespace(p.namespaceCfg.Name), tag.Value(state.LastHeartbeat))
-			expiredExecutors[executorID] = namespaceState.ShardAssignments[executorID].ModRevision
+			expiredExecutors[executorID] = struct{}{}
 		}
 	}
 
@@ -325,6 +325,7 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 		return fmt.Errorf("get state: %w", err)
 	}
 	p.emitActiveShardMetric(namespaceState.ShardAssignments, metricsLoopScope)
+	p.emitMaxOwnersPerShardMetric(namespaceState.ShardAssignments, metricsLoopScope)
 	p.emitOldestExecutorHeartbeatLag(namespaceState, metricsLoopScope)
 	metricsLoopScope.UpdateGauge(metrics.ShardDistributorDrainedHosts, float64(len(namespaceState.DrainedHosts)))
 
@@ -395,23 +396,21 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 
 	previousOwnersByShard := namespaceState.ShardOwners()
 	assignmentTime := p.timeSource.Now().UTC()
-	newAssignments, executorsWithChangedAssignments := p.buildNewAssignmentsState(namespaceState, currentAssignments, executorsToUnassign, previousOwnersByShard, assignmentTime)
+	newAssignments, changedAssignments := p.buildNewAssignmentsState(namespaceState, currentAssignments, executorsToUnassign, previousOwnersByShard, assignmentTime)
 
-	distributionUnchanged := len(executorsWithChangedAssignments) == 0 && len(staleExecutors) == 0
+	distributionUnchanged := len(changedAssignments) == 0 && len(staleExecutors) == 0
 	if distributionUnchanged {
 		p.logger.Info("No changes to distribution detected. Skipping rebalance.")
 		return nil
 	}
 
-	namespaceState.ShardAssignments = newAssignments
 	p.logger.Info("Applying new shard distribution.")
 
-	// Use the leader guard for the assign and delete operation.
-	err = p.shardStore.AssignShards(ctx, p.namespaceCfg.Name, store.AssignShardsRequest{
-		NewState:          namespaceState,
-		ExecutorsToDelete: staleExecutors,
-		ChangedExecutors:  executorsWithChangedAssignments,
-	}, p.election.Guard())
+	assignShardsRequest := store.AssignShardsRequest{
+		ShardAssignments:  changedAssignments,
+		ExecutorsToDelete: slices.Sorted(maps.Keys(staleExecutors)),
+	}
+	err = p.shardStore.AssignShards(ctx, p.namespaceCfg.Name, assignShardsRequest, p.election.Guard())
 	if err != nil {
 		return fmt.Errorf("assign shards: %w", err)
 	}
@@ -433,7 +432,6 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 		}
 	}
 
-	p.emitMaxOwnersPerShardMetric(namespaceState.ShardAssignments, metricsLoopScope)
 	return nil
 }
 
@@ -558,8 +556,8 @@ func findShardsToReassign(
 }
 
 // findExecutorsToUnassign returns the executors whose stored assignment must be cleared
-func findExecutorsToUnassign(namespaceState *store.NamespaceState, assignableExecutors map[string]struct{}, staleExecutors map[string]int64) map[string]int64 {
-	executorsToUnassign := make(map[string]int64)
+func findExecutorsToUnassign(namespaceState *store.NamespaceState, assignableExecutors map[string]struct{}, staleExecutors map[string]struct{}) map[string]struct{} {
+	executorsToUnassign := make(map[string]struct{})
 
 	for executorID, state := range namespaceState.ShardAssignments {
 		// An already-emptied record needs no write. Without this the executor would
@@ -578,7 +576,7 @@ func findExecutorsToUnassign(namespaceState *store.NamespaceState, assignableExe
 			continue
 		}
 
-		executorsToUnassign[executorID] = state.ModRevision
+		executorsToUnassign[executorID] = struct{}{}
 	}
 
 	return executorsToUnassign
@@ -611,16 +609,16 @@ func applyMoves(currentAssignments map[string][]string, moves []plan.Move) error
 	return nil
 }
 
-// buildNewAssignmentsState builds a new assignment map without modifying namespaceState.
+// buildNewAssignmentsState builds the new assignment of every given executor, and the subset that differs from the stored one.
 func (p *namespaceProcessor) buildNewAssignmentsState(
 	namespaceState *store.NamespaceState,
 	currentAssignments map[string][]string,
-	executorsToUnassign map[string]int64,
+	executorsToUnassign map[string]struct{},
 	previousOwnersByShard map[string]string,
 	now time.Time,
-) (map[string]store.AssignedState, map[string]struct{}) {
-	newAssignments := make(map[string]store.AssignedState, len(currentAssignments)+len(executorsToUnassign))
-	executorsWithChangedAssignments := make(map[string]struct{})
+) (newAssignments map[string]store.AssignedState, changedAssignments map[string]store.AssignedState) {
+	newAssignments = make(map[string]store.AssignedState, len(currentAssignments)+len(executorsToUnassign))
+	changedAssignments = make(map[string]store.AssignedState)
 
 	for executorID, shards := range currentAssignments {
 		assignedShardsMap := make(map[string]*types.ShardAssignment)
@@ -629,38 +627,35 @@ func (p *namespaceProcessor) buildNewAssignmentsState(
 			assignedShardsMap[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
 		}
 
-		modRevision := int64(0)
-		lastUpdated := now
-
 		oldState, existed := namespaceState.ShardAssignments[executorID]
-		if existed && shardSetsEqual(oldState.AssignedShards, assignedShardsMap) {
-			modRevision = oldState.ModRevision
+		sameShards := existed && shardSetsEqual(oldState.AssignedShards, assignedShardsMap)
+
+		lastUpdated := now
+		if sameShards {
 			lastUpdated = oldState.LastUpdated
-		} else {
-			executorsWithChangedAssignments[executorID] = struct{}{}
-			if existed {
-				modRevision = oldState.ModRevision
-			}
 		}
 
-		newAssignments[executorID] = store.AssignedState{
+		assignedState := store.AssignedState{
 			AssignedShards:     assignedShardsMap,
 			LastUpdated:        lastUpdated,
-			ModRevision:        modRevision,
 			ShardHandoverStats: p.buildHandoverStats(namespaceState, previousOwnersByShard, executorID, shards),
 		}
-	}
-
-	for executorID, modRevision := range executorsToUnassign {
-		executorsWithChangedAssignments[executorID] = struct{}{}
-		newAssignments[executorID] = store.AssignedState{
-			AssignedShards: make(map[string]*types.ShardAssignment),
-			LastUpdated:    now,
-			ModRevision:    modRevision,
+		newAssignments[executorID] = assignedState
+		if !sameShards {
+			changedAssignments[executorID] = assignedState
 		}
 	}
 
-	return newAssignments, executorsWithChangedAssignments
+	for executorID := range executorsToUnassign {
+		emptiedState := store.AssignedState{
+			AssignedShards: make(map[string]*types.ShardAssignment),
+			LastUpdated:    now,
+		}
+		newAssignments[executorID] = emptiedState
+		changedAssignments[executorID] = emptiedState
+	}
+
+	return newAssignments, changedAssignments
 }
 
 func shardSetsEqual(a map[string]*types.ShardAssignment, b map[string]*types.ShardAssignment) bool {

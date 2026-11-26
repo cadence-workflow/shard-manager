@@ -160,6 +160,10 @@ func (c *meteredStore) ListRanges(ctx context.Context, namespace string) (rpa1 [
 	return
 }
 
+func (c *meteredStore) MaxAssignShardsExecutors() (i1 int) {
+	return c.wrapped.MaxAssignShardsExecutors()
+}
+
 func (c *meteredStore) RecordHeartbeat(ctx context.Context, namespace string, executorID string, state _sourceStore.HeartbeatState) (err error) {
 	op := func() error {
 		err = c.wrapped.RecordHeartbeat(ctx, namespace, executorID, state)

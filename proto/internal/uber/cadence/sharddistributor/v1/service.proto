@@ -145,6 +145,7 @@ message GetFullNamespaceStateResponse {
   map<string, AssignedState> shard_assignments = 4;
   repeated string drained_shards = 5;
   map<string, DrainedHost> drained_hosts = 6;
+  repeated RangeAssignment range_assignments = 7;
 }
 
 message HeartbeatState {
@@ -201,6 +202,7 @@ message WatchNamespaceStateResponse {
   // including a namespace reset. Hosts holding the same state report the same value, so it is
   // comparable across hosts.
   int64 assignment_revision = 3;
+  repeated RangeAssignment range_assignments = 4;
 }
 
 message GetNamespaceStateIfNewerRequest {

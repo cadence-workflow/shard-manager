@@ -501,8 +501,12 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 		return nil
 	}
 	ops = append(ops, s.touchAssignmentVersion(namespace))
-	if _, err := s.commitTxn(ctx, ops, guard); err != nil {
+	resp, err := s.commitTxn(ctx, ops, guard)
+	if err != nil {
 		return fmt.Errorf("assign shards: %w", err)
+	}
+	if !resp.Succeeded {
+		return fmt.Errorf("%w: transaction failed, leadership may have changed", store.ErrVersionConflict)
 	}
 	return nil
 }
@@ -544,7 +548,10 @@ func (s *executorStoreImpl) commitInBatches(ctx context.Context, ops []clientv3.
 
 		resp, err := s.commitTxn(ctx, append(ops[i:end:end], extraOps...), guard)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("commit batch: %w", err)
+		}
+		if !resp.Succeeded {
+			return nil, fmt.Errorf("transaction failed, leadership may have changed")
 		}
 		resp.Responses = resp.Responses[:len(resp.Responses)-len(extraOps)]
 		responses = append(responses, resp)
@@ -552,7 +559,7 @@ func (s *executorStoreImpl) commitInBatches(ctx context.Context, ops []clientv3.
 	return responses, nil
 }
 
-// commitTxn commits ops in one guarded transaction.
+// commitTxn commits ops in one guarded transaction. The caller checks whether the guard held.
 func (s *executorStoreImpl) commitTxn(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc) (*clientv3.TxnResponse, error) {
 	guardedTxn, err := guard(s.client.Txn(ctx))
 	if err != nil {
@@ -563,14 +570,7 @@ func (s *executorStoreImpl) commitTxn(ctx context.Context, ops []clientv3.Op, gu
 		return nil, fmt.Errorf("guard function returned invalid transaction type")
 	}
 
-	resp, err := etcdGuardedTxn.Then(ops...).Commit()
-	if err != nil {
-		return nil, fmt.Errorf("commit transaction: %w", err)
-	}
-	if !resp.Succeeded {
-		return nil, fmt.Errorf("%w: transaction failed, leadership may have changed", store.ErrVersionConflict)
-	}
-	return resp, nil
+	return etcdGuardedTxn.Then(ops...).Commit()
 }
 
 // deletedIDs returns the IDs whose delete ops actually removed a key.

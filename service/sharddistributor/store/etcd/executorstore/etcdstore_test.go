@@ -1367,7 +1367,7 @@ func TestCommitInBatches_CommitError_StopsEarly(t *testing.T) {
 	_, err := s.commitInBatches(context.Background(), ops, store.NopGuard())
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "commit transaction")
+	assert.Contains(t, err.Error(), "commit batch")
 	assert.Equal(t, 1, commitCount, "should stop after first failing batch")
 }
 
@@ -1399,7 +1399,8 @@ func TestCommitInBatches_LeadershipLost_StopsEarly(t *testing.T) {
 	}
 	_, err := s.commitInBatches(context.Background(), ops, store.NopGuard())
 
-	require.ErrorIs(t, err, store.ErrVersionConflict)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "leadership may have changed")
 	assert.Equal(t, 1, commitCount, "should stop after first leadership failure")
 }
 

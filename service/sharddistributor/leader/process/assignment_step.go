@@ -24,16 +24,16 @@ type shardChange struct {
 	shardID string
 	// from are the stored owners that lose the shard.
 	from []string
-	// to gains the shard. It is empty when the shard is dropped, or when it already holds the shard.
+	// to gains the shard. It is empty when the shard is dropped, or when the planned owner already holds the shard.
 	to string
-	// unserved is true when no assignable executor holds the shard in storage.
-	unserved bool
+	// needsNewOwner is true when no assignable executor holds the shard in storage.
+	needsNewOwner bool
 }
 
 // nextAssignmentStep returns the changes from storedAssignments toward plannedAssignments that fit in
-// maxChangedExecutors writes and deletes. It moves whole shards, unserved ones first, and leaves the
-// rest for the next step. An executor missing from plannedAssignments loses its shards, and a stale
-// executor is deleted once it holds no shards.
+// maxChangedExecutors writes and deletes. It moves whole shards, the ones that need a new owner first,
+// and leaves the rest for the next step. An executor missing from plannedAssignments loses its
+// shards, and a stale executor is deleted once it holds no shards.
 func nextAssignmentStep(
 	storedAssignments map[string]store.AssignedState,
 	plannedAssignments map[string][]string,
@@ -43,8 +43,8 @@ func nextAssignmentStep(
 ) assignmentStep {
 	changes := findShardChanges(storedAssignments, plannedAssignments, assignableExecutors)
 	slices.SortFunc(changes, func(a, b shardChange) int {
-		if a.unserved != b.unserved {
-			if a.unserved {
+		if a.needsNewOwner != b.needsNewOwner {
+			if a.needsNewOwner {
 				return -1
 			}
 			return 1
@@ -132,10 +132,10 @@ func findShardChanges(
 	var changes []shardChange
 	for shardID := range shardIDs {
 		plannedOwner := plannedOwners[shardID]
-		change := shardChange{shardID: shardID, to: plannedOwner, unserved: true}
+		change := shardChange{shardID: shardID, to: plannedOwner, needsNewOwner: true}
 		for _, storedOwner := range storedOwners[shardID] {
 			if _, isAssignable := assignableExecutors[storedOwner]; isAssignable {
-				change.unserved = false
+				change.needsNewOwner = false
 			}
 			if storedOwner == plannedOwner {
 				change.to = ""

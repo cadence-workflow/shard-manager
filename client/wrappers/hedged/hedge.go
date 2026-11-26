@@ -13,6 +13,8 @@ import (
 const (
 	// hedgeDelay avoids hedging calls that are already fast.
 	hedgeDelay = 100 * time.Millisecond
+	// defaultShare is the share of calls that may be hedged when the caller does not set one.
+	defaultShare = 0.1
 
 	hedgesSent    = "shard_distributor_client_hedges"
 	hedgeWins     = "shard_distributor_client_hedge_wins"
@@ -27,6 +29,9 @@ type hedger struct {
 }
 
 func newHedger(timeSource clock.TimeSource, metrics tally.Scope, share func() float64) *hedger {
+	if share == nil {
+		share = func() float64 { return defaultShare }
+	}
 	return &hedger{timeSource: timeSource, metrics: metrics, budget: newBudget(share)}
 }
 

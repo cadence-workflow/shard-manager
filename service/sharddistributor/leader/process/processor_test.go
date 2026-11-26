@@ -38,6 +38,8 @@ type testDependencies struct {
 	cfg          config.Namespace
 	sdConfig     *config.Config
 	observedLogs *observer.ObservedLogs
+	// maxAssignShardsExecutors is what the store reports as its AssignShards limit.
+	maxAssignShardsExecutors int
 }
 
 func setupProcessorTest(t *testing.T) *testDependencies {
@@ -49,7 +51,13 @@ func setupProcessorTest(t *testing.T) *testDependencies {
 		election:   store.NewMockElection(ctrl),
 		timeSource: mockedClock,
 		cfg:        config.Namespace{Name: "test-ns", ShardNum: 2, Type: config.NamespaceTypeFixed},
+
+		maxAssignShardsExecutors: 100,
 	}
+	// Every rebalance asks for the limit, so the tests read it from the field instead of expecting it.
+	deps.store.EXPECT().MaxAssignShardsExecutors().DoAndReturn(func() int {
+		return deps.maxAssignShardsExecutors
+	}).AnyTimes()
 	deps.sdConfig = &config.Config{
 		LoadBalancingMode: func(namespace string) string {
 			return config.LoadBalancingModeNAIVE
@@ -313,6 +321,47 @@ func TestRebalanceShards_ExecutorStale(t *testing.T) {
 
 	err := processor.rebalanceShards(context.Background())
 	require.NoError(t, err)
+}
+
+func TestRebalanceShards_DefersChangesOverStoreLimit(t *testing.T) {
+	mocks := setupProcessorTest(t)
+	mocks.maxAssignShardsExecutors = 2
+	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
+	testScope := tally.NewTestScope("test", nil)
+	processor.metricsClient = metrics.NewClient(testScope, metrics.ShardDistributor, metrics.MigrationConfig{})
+
+	now := mocks.timeSource.Now()
+	heartbeats := map[string]store.HeartbeatState{
+		"exec-1":     {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+		"exec-2":     {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
+		"exec-stale": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now.Add(-2 * time.Second)},
+	}
+	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
+		AssignmentState: store.AssignmentState{
+			ShardAssignments: assignmentsFor("exec-stale", "0", "1"),
+		},
+		Executors: heartbeats}, nil)
+	mocks.election.EXPECT().Guard().Return(store.NopGuard())
+	mocks.store.EXPECT().AssignShards(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) error {
+			// Moving shard 0 takes both executors the limit allows, so shard 1 stays on the stale executor.
+			require.Len(t, request.ShardAssignments, 2)
+			assert.Equal(t, []string{"1"}, slices.Collect(maps.Keys(request.ShardAssignments["exec-stale"].AssignedShards)))
+			assert.Empty(t, request.ExecutorsToDelete, "the stale executor still holds shard 1")
+			return nil
+		},
+	)
+
+	err := processor.rebalanceShards(context.Background())
+	require.NoError(t, err)
+
+	entries := mocks.observedLogs.FilterMessage("Assignment changes do not fit in one write, deferring the rest to the next round").All()
+	require.Len(t, entries, 1)
+	assert.Equal(t, zapcore.InfoLevel, entries[0].Level)
+
+	counters := testScope.Snapshot().Counters()
+	metricTags := "namespace=test-ns,namespace_type=fixed,operation=ShardAssignLoop"
+	assert.Equal(t, int64(1), counters["test.shard_distributor_shard_assign_deferred_shards+"+metricTags].Value())
 }
 
 func TestRebalanceShards_NoActiveExecutors(t *testing.T) {
@@ -1323,17 +1372,16 @@ func TestBuildNewAssignmentsState_OnlyChangedExecutors(t *testing.T) {
 		},
 	}
 
-	currentAssignments := map[string][]string{
+	assignments := map[string][]string{
 		"exec-1": {"shard-1", "shard-2"}, // unchanged
 		"exec-2": {"shard-3", "shard-4"}, // changed (added shard-4)
 		"exec-3": {"shard-5"},            // new
+		"exec-4": nil,                    // emptied
 	}
-	executorsToUnassign := map[string]struct{}{"exec-4": {}}
 
 	newAssignments, changedAssignments := processor.buildNewAssignmentsState(
 		namespaceState,
-		currentAssignments,
-		executorsToUnassign,
+		assignments,
 		namespaceState.ShardOwners(),
 		now,
 	)

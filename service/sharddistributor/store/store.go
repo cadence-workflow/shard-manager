@@ -22,6 +22,10 @@ var (
 	// ErrVersionConflict is an error that is returned if during operations some precondition failed.
 	ErrVersionConflict = fmt.Errorf("version conflict")
 
+	// ErrTooManyAssignmentChanges is returned by AssignShards for a request that writes and deletes
+	// more executors than MaxAssignShardsExecutors allows.
+	ErrTooManyAssignmentChanges = fmt.Errorf("too many assignment changes")
+
 	// ErrExecutorNotRunning is an error that is returned when shard is attempted to be assigned to a not running executor.
 	ErrExecutorNotRunning = fmt.Errorf("executor not running")
 )
@@ -62,8 +66,12 @@ type Store interface {
 	// skips the host drains, statistics and reported shards that GetState decodes.
 	GetAssignmentState(ctx context.Context, namespace string) (*AssignmentState, error)
 
-	// AssignShards writes the changed assignments and deletes the given executors, guarded by the GuardFunc.
-	// A request too large for one transaction is split over several and is not atomic.
+	// MaxAssignShardsExecutors returns how many executors one AssignShards request can write and delete in total.
+	MaxAssignShardsExecutors() int
+
+	// AssignShards writes the changed assignments and deletes the given executors in one transaction,
+	// guarded by the GuardFunc. It returns ErrTooManyAssignmentChanges for a request with more
+	// executors than MaxAssignShardsExecutors.
 	AssignShards(ctx context.Context, namespace string, request AssignShardsRequest, guard GuardFunc) error
 
 	// RecordShardStatisticsBatch records complete statistics maps for multiple

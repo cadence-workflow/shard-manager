@@ -394,13 +394,21 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 	p.emitExecutorMetric(namespaceState, metricsLoopScope)
 	loadbalancer.EmitAssignmentImbalanceMetrics(p.sdConfig, p.namespaceCfg.Name, metricsLoopScope, currentAssignments, namespaceState)
 
+	// Executors left out of the plan, such as draining and stale ones, lose their shards. Changes that
+	// do not fit in one write are left out, and the next round plans again from storage.
+	maxChangedExecutors := p.shardStore.MaxAssignShardsExecutors()
+	assignmentStep := nextAssignmentStep(namespaceState.ShardAssignments, currentAssignments, assignableExecutors, staleExecutors, maxChangedExecutors)
+	if assignmentStep.deferredShards > 0 {
+		p.logger.Info("Assignment changes do not fit in one write, deferring the rest to the next round",
+			tag.Dynamic("deferred-shards", assignmentStep.deferredShards))
+	}
+	metricsLoopScope.AddCounter(metrics.ShardDistributorAssignLoopDeferredShards, int64(assignmentStep.deferredShards))
+
 	previousOwnersByShard := namespaceState.ShardOwners()
 	assignmentTime := p.timeSource.Now().UTC()
-	newAssignments, changedAssignments := p.buildNewAssignmentsState(namespaceState, currentAssignments, executorsToUnassign, previousOwnersByShard, assignmentTime)
+	newAssignments, changedAssignments := p.buildNewAssignmentsState(namespaceState, assignmentStep.assignments, previousOwnersByShard, assignmentTime)
 
-	// A round that is cut off part way can leave a shard on two executors.
-	// Comparing against the stored assignments makes the next round repair it.
-	distributionUnchanged := len(changedAssignments) == 0 && len(staleExecutors) == 0
+	distributionUnchanged := len(changedAssignments) == 0 && len(assignmentStep.executorsToDelete) == 0
 	if distributionUnchanged {
 		p.logger.Info("No changes to distribution detected. Skipping rebalance.")
 		return nil
@@ -410,7 +418,7 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 
 	assignShardsRequest := store.AssignShardsRequest{
 		ShardAssignments:  changedAssignments,
-		ExecutorsToDelete: slices.Sorted(maps.Keys(staleExecutors)),
+		ExecutorsToDelete: assignmentStep.executorsToDelete,
 	}
 	err = p.shardStore.AssignShards(ctx, p.namespaceCfg.Name, assignShardsRequest, p.election.Guard())
 	if err != nil {
@@ -557,13 +565,13 @@ func findShardsToReassign(
 	return shardsToReassign, currentAssignments
 }
 
-// findExecutorsToUnassign returns the executors whose stored assignment must be cleared
+// findExecutorsToUnassign returns the non-assignable executors that still hold shards in storage, so
+// the round can log them. The step empties them because they are not in the plan.
 func findExecutorsToUnassign(namespaceState *store.NamespaceState, assignableExecutors map[string]struct{}, staleExecutors map[string]struct{}) map[string]struct{} {
 	executorsToUnassign := make(map[string]struct{})
 
 	for executorID, state := range namespaceState.ShardAssignments {
-		// An already-emptied record needs no write. Without this the executor would
-		// be rewritten on every loop and the distribution would never settle.
+		// An already-emptied record has nothing left to log.
 		if len(state.AssignedShards) == 0 {
 			continue
 		}
@@ -571,8 +579,7 @@ func findExecutorsToUnassign(namespaceState *store.NamespaceState, assignableExe
 			continue
 		}
 
-		// AssignShards deletes a stale executor's whole key prefix, so emptying one here
-		// would write a key under the prefix that is being deleted.
+		// Stale executors are logged separately and deleted once they hold no shards.
 		if _, isStale := staleExecutors[executorID]; isStale {
 			continue
 		}
@@ -610,20 +617,18 @@ func applyMoves(currentAssignments map[string][]string, moves []plan.Move) error
 	return nil
 }
 
-// buildNewAssignmentsState builds every executor's new assignment, and the subset that differs from the stored one.
+// buildNewAssignmentsState builds the new assignment of every given executor, and the subset that differs from the stored one.
 func (p *namespaceProcessor) buildNewAssignmentsState(
 	namespaceState *store.NamespaceState,
-	currentAssignments map[string][]string,
-	executorsToUnassign map[string]struct{},
+	assignments map[string][]string,
 	previousOwnersByShard map[string]string,
 	now time.Time,
 ) (newAssignments map[string]store.AssignedState, changedAssignments map[string]store.AssignedState) {
-	newAssignments = make(map[string]store.AssignedState, len(currentAssignments)+len(executorsToUnassign))
+	newAssignments = make(map[string]store.AssignedState, len(assignments))
 	changedAssignments = make(map[string]store.AssignedState)
 
-	for executorID, shards := range currentAssignments {
-		assignedShardsMap := make(map[string]*types.ShardAssignment)
-
+	for executorID, shards := range assignments {
+		assignedShardsMap := make(map[string]*types.ShardAssignment, len(shards))
 		for _, shardID := range shards {
 			assignedShardsMap[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
 		}
@@ -645,15 +650,6 @@ func (p *namespaceProcessor) buildNewAssignmentsState(
 		if !sameShards {
 			changedAssignments[executorID] = assignedState
 		}
-	}
-
-	for executorID := range executorsToUnassign {
-		emptiedState := store.AssignedState{
-			AssignedShards: make(map[string]*types.ShardAssignment),
-			LastUpdated:    now,
-		}
-		newAssignments[executorID] = emptiedState
-		changedAssignments[executorID] = emptiedState
 	}
 
 	return newAssignments, changedAssignments

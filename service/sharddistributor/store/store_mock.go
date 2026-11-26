@@ -238,6 +238,20 @@ func (mr *MockStoreMockRecorder) ListRanges(ctx, namespace any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRanges", reflect.TypeOf((*MockStore)(nil).ListRanges), ctx, namespace)
 }
 
+// MaxAssignShardsExecutors mocks base method.
+func (m *MockStore) MaxAssignShardsExecutors() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MaxAssignShardsExecutors")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// MaxAssignShardsExecutors indicates an expected call of MaxAssignShardsExecutors.
+func (mr *MockStoreMockRecorder) MaxAssignShardsExecutors() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MaxAssignShardsExecutors", reflect.TypeOf((*MockStore)(nil).MaxAssignShardsExecutors))
+}
+
 // RecordHeartbeat mocks base method.
 func (m *MockStore) RecordHeartbeat(ctx context.Context, namespace, executorID string, state HeartbeatState) error {
 	m.ctrl.T.Helper()

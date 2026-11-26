@@ -469,8 +469,19 @@ func sameExecutorStatus(previous, current []byte) bool {
 	return previousStatus == currentStatus
 }
 
+// MaxAssignShardsExecutors leaves room for the leadership guard and the assignment version next to
+// the one operation each executor takes, so an AssignShards request fits in one etcd transaction.
+func (s *executorStoreImpl) MaxAssignShardsExecutors() int {
+	return s.cfg.MaxEtcdTxnOps() - guardOpOverhead - 1
+}
+
 func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, request store.AssignShardsRequest, guard store.GuardFunc) error {
-	ops := make([]clientv3.Op, 0, len(request.ExecutorsToDelete)+len(request.ShardAssignments))
+	numExecutors := len(request.ExecutorsToDelete) + len(request.ShardAssignments)
+	if maxExecutors := s.MaxAssignShardsExecutors(); numExecutors > maxExecutors {
+		return fmt.Errorf("%w: %d executors, at most %d", store.ErrTooManyAssignmentChanges, numExecutors, maxExecutors)
+	}
+
+	ops := make([]clientv3.Op, 0, numExecutors+1)
 
 	for _, executorID := range request.ExecutorsToDelete {
 		executorIDPrefix := etcdkeys.BuildExecutorIDPrefix(s.prefix, namespace, executorID)
@@ -486,7 +497,11 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 		ops = append(ops, clientv3.OpPut(assignedStateKey, string(encodedState)))
 	}
 
-	if _, err := s.commitAssignmentOps(ctx, namespace, ops, guard); err != nil {
+	if len(ops) == 0 {
+		return nil
+	}
+	ops = append(ops, s.touchAssignmentVersion(namespace))
+	if _, err := s.commitTxn(ctx, ops, guard); err != nil {
 		return fmt.Errorf("assign shards: %w", err)
 	}
 	return nil
@@ -498,12 +513,12 @@ func (s *executorStoreImpl) touchAssignmentVersion(namespace string) clientv3.Op
 	return clientv3.OpPut(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace), "{}")
 }
 
-// commitAssignmentOps commits ops that change assignments or drained shards, moving the assignment version with every batch.
-func (s *executorStoreImpl) commitAssignmentOps(ctx context.Context, namespace string, ops []clientv3.Op, guard store.GuardFunc) ([]*clientv3.TxnResponse, error) {
-	return s.commitOps(ctx, ops, guard, s.touchAssignmentVersion(namespace))
+// commitInBatchesTouchingVersion commits ops in batches and moves the assignment version in each batch, for writes that spectators must notice.
+func (s *executorStoreImpl) commitInBatchesTouchingVersion(ctx context.Context, namespace string, ops []clientv3.Op, guard store.GuardFunc) ([]*clientv3.TxnResponse, error) {
+	return s.commitInBatches(ctx, ops, guard, s.touchAssignmentVersion(namespace))
 }
 
-// commitOps commits the given operations in batches to stay within etcd's
+// commitInBatches commits the given operations in batches to stay within etcd's
 // per-transaction operation limit, returning each batch's response in submission
 // order so callers can inspect per-op outcomes.
 //
@@ -511,7 +526,7 @@ func (s *executorStoreImpl) commitAssignmentOps(ctx context.Context, namespace s
 // immediately and leaves earlier batches committed.
 //
 // extraOps are added to every batch and their responses are left out of the returned responses.
-func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc, extraOps ...clientv3.Op) ([]*clientv3.TxnResponse, error) {
+func (s *executorStoreImpl) commitInBatches(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc, extraOps ...clientv3.Op) ([]*clientv3.TxnResponse, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
@@ -527,21 +542,9 @@ func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, gu
 	for i := 0; i < len(ops); i += batchSize {
 		end := min(i+batchSize, len(ops))
 
-		guardedTxn, err := guard(s.client.Txn(ctx))
+		resp, err := s.commitTxn(ctx, append(ops[i:end:end], extraOps...), guard)
 		if err != nil {
-			return nil, fmt.Errorf("apply transaction guard: %w", err)
-		}
-		etcdGuardedTxn, ok := guardedTxn.(clientv3.Txn)
-		if !ok {
-			return nil, fmt.Errorf("guard function returned invalid transaction type")
-		}
-
-		resp, err := etcdGuardedTxn.Then(append(ops[i:end:end], extraOps...)...).Commit()
-		if err != nil {
-			return nil, fmt.Errorf("commit batch: %w", err)
-		}
-		if !resp.Succeeded {
-			return nil, fmt.Errorf("%w: transaction failed, leadership may have changed", store.ErrVersionConflict)
+			return nil, err
 		}
 		resp.Responses = resp.Responses[:len(resp.Responses)-len(extraOps)]
 		responses = append(responses, resp)
@@ -549,8 +552,29 @@ func (s *executorStoreImpl) commitOps(ctx context.Context, ops []clientv3.Op, gu
 	return responses, nil
 }
 
+// commitTxn commits ops in one guarded transaction.
+func (s *executorStoreImpl) commitTxn(ctx context.Context, ops []clientv3.Op, guard store.GuardFunc) (*clientv3.TxnResponse, error) {
+	guardedTxn, err := guard(s.client.Txn(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("apply transaction guard: %w", err)
+	}
+	etcdGuardedTxn, ok := guardedTxn.(clientv3.Txn)
+	if !ok {
+		return nil, fmt.Errorf("guard function returned invalid transaction type")
+	}
+
+	resp, err := etcdGuardedTxn.Then(ops...).Commit()
+	if err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+	if !resp.Succeeded {
+		return nil, fmt.Errorf("%w: transaction failed, leadership may have changed", store.ErrVersionConflict)
+	}
+	return resp, nil
+}
+
 // deletedIDs returns the IDs whose delete ops actually removed a key.
-// responses are in the same order as ids; commitOps preserves that across batches.
+// responses are in the same order as ids; commitInBatches preserves that across batches.
 func deletedIDs(responses []*clientv3.TxnResponse, ids []string) ([]string, error) {
 	removed := make([]string, 0, len(ids))
 	opIdx := 0
@@ -581,7 +605,7 @@ func (s *executorStoreImpl) DeleteExecutors(ctx context.Context, namespace strin
 		ops = append(ops, clientv3.OpDelete(executorIDPrefix, clientv3.WithPrefix()))
 	}
 
-	if _, err := s.commitAssignmentOps(ctx, namespace, ops, guard); err != nil {
+	if _, err := s.commitInBatchesTouchingVersion(ctx, namespace, ops, guard); err != nil {
 		return fmt.Errorf("delete executors: %w", err)
 	}
 	return nil
@@ -650,7 +674,7 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 		ops = append(ops, clientv3.OpPut(statsKey, string(encodedStatistics)))
 	}
 
-	if _, err := s.commitOps(ctx, ops, guard); err != nil {
+	if _, err := s.commitInBatches(ctx, ops, guard); err != nil {
 		return fmt.Errorf("delete shard stats: %w", err)
 	}
 	return nil
@@ -693,7 +717,7 @@ func (s *executorStoreImpl) DrainShards(ctx context.Context, namespace string, s
 		ops = append(ops, clientv3.OpPut(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID), ""))
 	}
 
-	if _, err := s.commitAssignmentOps(ctx, namespace, ops, store.NopGuard()); err != nil {
+	if _, err := s.commitInBatchesTouchingVersion(ctx, namespace, ops, store.NopGuard()); err != nil {
 		return fmt.Errorf("drain shards: %w", err)
 	}
 	return nil
@@ -718,7 +742,7 @@ func (s *executorStoreImpl) UndrainShards(ctx context.Context, namespace string,
 		ops = append(ops, clientv3.OpDelete(etcdkeys.BuildDrainedShardKey(s.prefix, namespace, shardID)))
 	}
 
-	responses, err := s.commitAssignmentOps(ctx, namespace, ops, store.NopGuard())
+	responses, err := s.commitInBatchesTouchingVersion(ctx, namespace, ops, store.NopGuard())
 	if err != nil {
 		return nil, fmt.Errorf("undrain shards: %w", err)
 	}
@@ -771,7 +795,7 @@ func (s *executorStoreImpl) DrainHosts(ctx context.Context, namespace string, ho
 		return nil
 	}
 
-	if _, err := s.commitOps(ctx, ops, store.NopGuard()); err != nil {
+	if _, err := s.commitInBatches(ctx, ops, store.NopGuard()); err != nil {
 		return fmt.Errorf("drain hosts: %w", err)
 	}
 	return nil
@@ -795,7 +819,7 @@ func (s *executorStoreImpl) UndrainHosts(ctx context.Context, namespace string, 
 		ops = append(ops, clientv3.OpDelete(etcdkeys.BuildDrainedHostKey(s.prefix, namespace, hostname)))
 	}
 
-	responses, err := s.commitOps(ctx, ops, store.NopGuard())
+	responses, err := s.commitInBatches(ctx, ops, store.NopGuard())
 	if err != nil {
 		return nil, fmt.Errorf("undrain hosts: %w", err)
 	}

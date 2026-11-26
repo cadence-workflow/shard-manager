@@ -725,50 +725,65 @@ func TestAssignShards(t *testing.T) {
 	})
 }
 
-// A namespace can have more executors than fit in one etcd transaction, so a rebalance
-// that changes all of them has to be written rather than fail with
-// "etcdserver: too many operations in txn request".
-func TestAssignShardsSplitsOverTxnLimit(t *testing.T) {
-	tc := testhelper.SetupStoreTestCluster(t)
-	executorStore := createStore(t, tc)
+func TestAssignShardsTxnLimit(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	numAssignedExecutors := 200 // more than the configured MaxEtcdTxnOps of 128
-	numDeletedExecutors := 100
+	t.Run("writes as many executors as the limit in one transaction", func(t *testing.T) {
+		tc := testhelper.SetupStoreTestCluster(t)
+		executorStore := createStore(t, tc)
 
-	assignments := make(map[string]store.AssignedState, numAssignedExecutors)
-	for i := range numAssignedExecutors {
-		executorID := fmt.Sprintf("exec-assigned-%03d", i)
-		shardID := strconv.Itoa(i)
-		assignments[executorID] = store.AssignedState{
-			AssignedShards: map[string]*types.ShardAssignment{shardID: {Status: types.AssignmentStatusREADY}},
+		maxExecutors := executorStore.MaxAssignShardsExecutors()
+		numDeletedExecutors := 20
+		numAssignedExecutors := maxExecutors - numDeletedExecutors
+
+		assignments := assignmentsForExecutors(numAssignedExecutors)
+		deletedExecutorIDs := make([]string, 0, numDeletedExecutors)
+		for i := range numDeletedExecutors {
+			deletedExecutorIDs = append(deletedExecutorIDs, fmt.Sprintf("exec-deleted-%03d", i))
 		}
-	}
-	deletedExecutorIDs := make([]string, 0, numDeletedExecutors)
-	for i := range numDeletedExecutors {
-		deletedExecutorIDs = append(deletedExecutorIDs, fmt.Sprintf("exec-deleted-%03d", i))
-	}
-	recordHeartbeats(ctx, t, executorStore, tc.Namespace, deletedExecutorIDs...)
+		recordHeartbeats(ctx, t, executorStore, tc.Namespace, deletedExecutorIDs...)
 
-	request := store.AssignShardsRequest{
-		ShardAssignments:  assignments,
-		ExecutorsToDelete: deletedExecutorIDs,
-	}
-	err := executorStore.AssignShards(ctx, tc.Namespace, request, store.NopGuard())
-	require.NoError(t, err)
+		request := store.AssignShardsRequest{
+			ShardAssignments:  assignments,
+			ExecutorsToDelete: deletedExecutorIDs,
+		}
+		err := executorStore.AssignShards(ctx, tc.Namespace, request, store.NopGuard())
+		require.NoError(t, err)
 
-	state, err := executorStore.GetState(ctx, tc.Namespace)
-	require.NoError(t, err)
-	require.Len(t, state.ShardAssignments, numAssignedExecutors)
-	for executorID, assignedState := range assignments {
-		storedShards := slices.Collect(maps.Keys(state.ShardAssignments[executorID].AssignedShards))
-		expectedShards := slices.Collect(maps.Keys(assignedState.AssignedShards))
-		assert.Equal(t, expectedShards, storedShards, "executor %s", executorID)
-	}
-	for _, executorID := range deletedExecutorIDs {
-		assert.NotContains(t, state.Executors, executorID)
-	}
+		state, err := executorStore.GetState(ctx, tc.Namespace)
+		require.NoError(t, err)
+		require.Len(t, state.ShardAssignments, numAssignedExecutors)
+		for executorID, assignedState := range assignments {
+			storedShards := slices.Collect(maps.Keys(state.ShardAssignments[executorID].AssignedShards))
+			expectedShards := slices.Collect(maps.Keys(assignedState.AssignedShards))
+			assert.Equal(t, expectedShards, storedShards, "executor %s", executorID)
+		}
+		for _, executorID := range deletedExecutorIDs {
+			assert.NotContains(t, state.Executors, executorID)
+		}
+	})
+
+	t.Run("rejects more executors than the limit and writes nothing", func(t *testing.T) {
+		tc := testhelper.SetupStoreTestCluster(t)
+		executorStore := createStore(t, tc)
+		recordHeartbeats(ctx, t, executorStore, tc.Namespace, "exec-existing")
+
+		numAssignedExecutors := executorStore.MaxAssignShardsExecutors() + 1
+		request := store.AssignShardsRequest{
+			ShardAssignments: assignmentsForExecutors(numAssignedExecutors),
+		}
+
+		stateBefore, err := executorStore.GetState(ctx, tc.Namespace)
+		require.NoError(t, err)
+
+		err = executorStore.AssignShards(ctx, tc.Namespace, request, store.NopGuard())
+		require.ErrorIs(t, err, store.ErrTooManyAssignmentChanges)
+
+		stateAfter, err := executorStore.GetState(ctx, tc.Namespace)
+		require.NoError(t, err)
+		assert.Equal(t, stateBefore.Revision, stateAfter.Revision, "a rejected request should not write anything")
+	})
 }
 
 // TestGuardedOperations verifies that AssignShards and DeleteExecutors respect the leader guard.
@@ -1231,7 +1246,7 @@ func (t *trackingTxn) Commit() (*clientv3.TxnResponse, error) {
 	return t.commitFn(t.opsCount)
 }
 
-func TestCommitOps_Batching(t *testing.T) {
+func TestCommitInBatches_Batching(t *testing.T) {
 	const testMaxTxnOps = 128
 	const testMaxOpsPerBatch = testMaxTxnOps - guardOpOverhead
 
@@ -1303,7 +1318,7 @@ func TestCommitOps_Batching(t *testing.T) {
 				client: mockClient,
 				cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
 			}
-			responses, err := s.commitOps(context.Background(), ops, store.NopGuard())
+			responses, err := s.commitInBatches(context.Background(), ops, store.NopGuard())
 			require.NoError(t, err)
 			assert.Len(t, responses, tt.expectedBatches, "one response per committed batch")
 
@@ -1319,7 +1334,7 @@ func TestCommitOps_Batching(t *testing.T) {
 	}
 }
 
-func TestCommitOps_CommitError_StopsEarly(t *testing.T) {
+func TestCommitInBatches_CommitError_StopsEarly(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := etcdclient.NewMockClient(ctrl)
 
@@ -1349,14 +1364,14 @@ func TestCommitOps_CommitError_StopsEarly(t *testing.T) {
 		client: mockClient,
 		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
 	}
-	_, err := s.commitOps(context.Background(), ops, store.NopGuard())
+	_, err := s.commitInBatches(context.Background(), ops, store.NopGuard())
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "commit batch")
+	assert.Contains(t, err.Error(), "commit transaction")
 	assert.Equal(t, 1, commitCount, "should stop after first failing batch")
 }
 
-func TestCommitOps_LeadershipLost_StopsEarly(t *testing.T) {
+func TestCommitInBatches_LeadershipLost_StopsEarly(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := etcdclient.NewMockClient(ctrl)
 
@@ -1382,13 +1397,13 @@ func TestCommitOps_LeadershipLost_StopsEarly(t *testing.T) {
 		client: mockClient,
 		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
 	}
-	_, err := s.commitOps(context.Background(), ops, store.NopGuard())
+	_, err := s.commitInBatches(context.Background(), ops, store.NopGuard())
 
 	require.ErrorIs(t, err, store.ErrVersionConflict)
 	assert.Equal(t, 1, commitCount, "should stop after first leadership failure")
 }
 
-func TestCommitOps_GuardError(t *testing.T) {
+func TestCommitInBatches_GuardError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := etcdclient.NewMockClient(ctrl)
 
@@ -1409,7 +1424,7 @@ func TestCommitOps_GuardError(t *testing.T) {
 		client: mockClient,
 		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(128)},
 	}
-	_, err := s.commitOps(context.Background(), ops, failingGuard)
+	_, err := s.commitInBatches(context.Background(), ops, failingGuard)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "apply transaction guard")
@@ -1417,7 +1432,7 @@ func TestCommitOps_GuardError(t *testing.T) {
 
 // The guard is applied to every batch, not just the first.
 // A leadership change part-way through a large write must stop the remaining batches.
-func TestCommitOps_GuardAppliedPerBatch(t *testing.T) {
+func TestCommitInBatches_GuardAppliedPerBatch(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := etcdclient.NewMockClient(ctrl)
 
@@ -1446,7 +1461,7 @@ func TestCommitOps_GuardAppliedPerBatch(t *testing.T) {
 		client: mockClient,
 		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
 	}
-	responses, err := s.commitOps(context.Background(), ops, countingGuard)
+	responses, err := s.commitInBatches(context.Background(), ops, countingGuard)
 
 	require.NoError(t, err)
 	assert.Len(t, responses, 2)
@@ -1455,7 +1470,7 @@ func TestCommitOps_GuardAppliedPerBatch(t *testing.T) {
 
 // UndrainShards maps per-op delete counts back to its input by walking the returned
 // responses in order, so the responses must line up with how the ops were submitted.
-func TestCommitOps_ResponsesFollowSubmissionOrder(t *testing.T) {
+func TestCommitInBatches_ResponsesFollowSubmissionOrder(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockClient := etcdclient.NewMockClient(ctrl)
 
@@ -1488,7 +1503,7 @@ func TestCommitOps_ResponsesFollowSubmissionOrder(t *testing.T) {
 		client: mockClient,
 		cfg:    &config.Config{MaxEtcdTxnOps: dynamicproperties.GetIntPropertyFn(testMaxTxnOps)},
 	}
-	responses, err := s.commitOps(context.Background(), ops, store.NopGuard())
+	responses, err := s.commitInBatches(context.Background(), ops, store.NopGuard())
 	require.NoError(t, err)
 
 	var deleted []int64
@@ -1926,6 +1941,19 @@ func hostnames(hosts []store.DrainedHost) []string {
 		out = append(out, host.Hostname)
 	}
 	return out
+}
+
+// assignmentsForExecutors assigns one shard to each of numExecutors executors.
+func assignmentsForExecutors(numExecutors int) map[string]store.AssignedState {
+	assignments := make(map[string]store.AssignedState, numExecutors)
+	for i := range numExecutors {
+		executorID := fmt.Sprintf("exec-assigned-%03d", i)
+		shardID := strconv.Itoa(i)
+		assignments[executorID] = store.AssignedState{
+			AssignedShards: map[string]*types.ShardAssignment{shardID: {Status: types.AssignmentStatusREADY}},
+		}
+	}
+	return assignments
 }
 
 func createStore(t *testing.T, tc *testhelper.StoreTestCluster) *executorStoreImpl {

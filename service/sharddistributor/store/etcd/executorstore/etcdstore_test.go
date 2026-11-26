@@ -428,9 +428,20 @@ func TestGetAssignmentState(t *testing.T) {
 		},
 	}, store.NopGuard()))
 	require.NoError(t, executorStore.DrainShards(ctx, tc.Namespace, []string{"shard-2"}))
+	cover := &store.RangeAssignment{
+		ID:         "range-1",
+		Range:      mustFinalRange(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}),
+		ExecutorID: assignedID,
+		Status:     types.AssignmentStatusREADY,
+	}
+	putRangeFixture(t, tc, cover)
+	// A malformed range is dropped rather than failing the read for the whole namespace.
+	_, err := tc.Client.Put(ctx, etcdkeys.BuildRangeKey(tc.EtcdPrefix, tc.Namespace, "range-2"), "not-json")
+	require.NoError(t, err)
 
 	state, err := executorStore.GetAssignmentState(ctx, tc.Namespace)
 	require.NoError(t, err)
+	assert.Equal(t, []*store.RangeAssignment{cover}, state.Ranges)
 
 	// An executor holding nothing still has to be visible, or the cache cannot resolve it.
 	require.Len(t, state.ExecutorMetadata, 2)

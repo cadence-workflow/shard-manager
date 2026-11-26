@@ -118,6 +118,9 @@ type AssignmentState struct {
 	// Key: ShardID
 	DrainedShards map[string]struct{}
 
+	// Ranges holds the stored ranges as read. NewRangeCover sorts and validates them.
+	Ranges []*RangeAssignment
+
 	// Revision is the store revision the snapshot was read at. Readers that cache the
 	// state use it to discard a snapshot older than the one they hold.
 	Revision int64

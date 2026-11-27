@@ -334,6 +334,8 @@ const (
 	ShardDistributorAssignLoopMovedShardLoad
 	// ShardDistributorAssignLoopDroppedDrainedShards counts drained shards taken away from an executor in a rebalance cycle
 	ShardDistributorAssignLoopDroppedDrainedShards
+	// ShardDistributorAssignLoopDeferredShards counts shard changes left for a later rebalance cycle because they did not fit in one write
+	ShardDistributorAssignLoopDeferredShards
 	// ShardDistributorDrainedShards tracks how many shards are currently drained in the namespace
 	ShardDistributorDrainedShards
 	// ShardDistributorDrainedHosts tracks how many hosts are currently drained in the namespace
@@ -406,6 +408,7 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ShardDistributorAssignLoopMovedShardLoad: {metricName: "shard_distributor_shard_assign_moved_load", metricType: Counter},
 
 		ShardDistributorAssignLoopDroppedDrainedShards: {metricName: "shard_distributor_shard_assign_dropped_drained_shards", metricType: Counter},
+		ShardDistributorAssignLoopDeferredShards:       {metricName: "shard_distributor_shard_assign_deferred_shards", metricType: Counter},
 		ShardDistributorDrainedShards:                  {metricName: "shard_distributor_drained_shards", metricType: Gauge},
 		ShardDistributorDrainedHosts:                   {metricName: "shard_distributor_drained_hosts", metricType: Gauge},
 

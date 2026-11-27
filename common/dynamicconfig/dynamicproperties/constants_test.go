@@ -76,7 +76,7 @@ func TestShardDistributorKeys(t *testing.T) {
 			name:         "max etcd transaction operations",
 			key:          ShardDistributorMaxEtcdTxnOps,
 			keyName:      "shardDistributor.maxEtcdTxnOps",
-			defaultValue: 128,
+			defaultValue: 64,
 		},
 		{
 			name:         "write executor values as protobuf",

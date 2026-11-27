@@ -22,6 +22,10 @@ var (
 	// ErrVersionConflict is an error that is returned if during operations some precondition failed.
 	ErrVersionConflict = fmt.Errorf("version conflict")
 
+	// ErrTooManyAssignmentChanges is returned by AssignShards for a request that writes and deletes
+	// more executors than MaxAssignShardsExecutors allows.
+	ErrTooManyAssignmentChanges = fmt.Errorf("too many assignment changes")
+
 	// ErrExecutorNotRunning is an error that is returned when shard is attempted to be assigned to a not running executor.
 	ErrExecutorNotRunning = fmt.Errorf("executor not running")
 )
@@ -45,17 +49,11 @@ func NopGuard() GuardFunc {
 
 // AssignShardsRequest is a request to assign shards to executors, and remove unused shards.
 type AssignShardsRequest struct {
-	// NewState is the new state of the namespace, containing the new assignments of shards to executors.
-	NewState *NamespaceState
-	// ExecutorsToDelete maps executor IDs to their expected ModRevision for deletion.
-	// The ModRevision is used to ensure the executor's assigned state hasn't changed since we decided to delete it.
-	ExecutorsToDelete map[string]int64
-	// ChangedExecutors is the set of executor IDs whose assigned state actually
-	// changed and need to be written. All executors in NewState.ShardAssignments
-	// are still included in the transactional ModRevision guard, but only those
-	// in ChangedExecutors get an OpPut. If nil, all executors are written
-	// (backwards-compatible default for callers that don't track deltas).
-	ChangedExecutors map[string]struct{}
+	// ShardAssignments holds the new assigned state of every executor whose assignment changes.
+	// Key: ExecutorID
+	ShardAssignments map[string]AssignedState
+	// ExecutorsToDelete are deleted with everything stored for them.
+	ExecutorsToDelete []string
 }
 
 type Store interface {
@@ -67,9 +65,13 @@ type Store interface {
 	// skips the host drains, statistics and reported shards that GetState decodes.
 	GetAssignmentState(ctx context.Context, namespace string) (*AssignmentState, error)
 
+	// MaxAssignShardsExecutors returns how many executors one AssignShards request can write and delete in total.
+	MaxAssignShardsExecutors() int
+
 	// AssignShards assigns multiple shards to executors within a namespace and
 	// deletes specified executors.
 	// The operation is atomic and guarded by the provided GuardFunc.
+	// It returns ErrTooManyAssignmentChanges for a request with more executors than MaxAssignShardsExecutors.
 	AssignShards(ctx context.Context, namespace string, request AssignShardsRequest, guard GuardFunc) error
 
 	// RecordShardStatisticsBatch records complete statistics maps for multiple

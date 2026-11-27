@@ -39,7 +39,7 @@ func (e Executor) Hostname() string {
 	return e.Heartbeat.Hostname()
 }
 
-func (e Executor) IsAssignable(staleExecutors map[string]int64) bool {
+func (e Executor) IsAssignable(staleExecutors map[string]struct{}) bool {
 	if e.Status() != types.ExecutorStatusACTIVE || e.HostDrained {
 		return false
 	}
@@ -206,7 +206,7 @@ func (ns *NamespaceState) Executor(executorID string) (Executor, bool) {
 }
 
 // AssignableExecutorIDs returns the IDs of the executors that may hold shards
-func (ns *NamespaceState) AssignableExecutorIDs(staleExecutors map[string]int64) []string {
+func (ns *NamespaceState) AssignableExecutorIDs(staleExecutors map[string]struct{}) []string {
 	var ids []string
 	for executorID, heartbeat := range ns.Executors {
 		if ns.newExecutor(executorID, heartbeat).IsAssignable(staleExecutors) {

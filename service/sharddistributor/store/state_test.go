@@ -204,11 +204,11 @@ func TestNamespaceState_AssignableExecutorIDs(t *testing.T) {
 		DrainedHosts: map[string]DrainedHost{"host-a": {Hostname: "host-a"}},
 	}
 
-	assert.Equal(t, []string{"exec-a", "exec-b", "exec-c"}, state.AssignableExecutorIDs(map[string]int64{"stale": 1}))
+	assert.Equal(t, []string{"exec-a", "exec-b", "exec-c"}, state.AssignableExecutorIDs(map[string]struct{}{"stale": {}}))
 }
 
 func TestExecutor_IsAssignable(t *testing.T) {
-	staleExecutors := map[string]int64{"stale": 1}
+	staleExecutors := map[string]struct{}{"stale": {}}
 
 	tests := []struct {
 		name     string

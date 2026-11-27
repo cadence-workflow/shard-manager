@@ -565,8 +565,7 @@ func findShardsToReassign(
 	return shardsToReassign, currentAssignments
 }
 
-// findExecutorsToUnassign returns the non-assignable executors that still hold shards in storage, so
-// the round can log them. The step empties them because they are not in the plan.
+// findExecutorsToUnassign returns the non-assignable executors that still hold shards, for logging.
 func findExecutorsToUnassign(namespaceState *store.NamespaceState, assignableExecutors map[string]struct{}, staleExecutors map[string]struct{}) map[string]struct{} {
 	executorsToUnassign := make(map[string]struct{})
 

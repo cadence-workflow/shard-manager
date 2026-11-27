@@ -73,7 +73,7 @@ func nextAssignmentStep(
 	}
 
 	// Executors without shards still get an assignment record.
-	for _, executorID := range slices.Sorted(maps.Keys(assignableExecutors)) {
+	for executorID := range assignableExecutors {
 		_, hasAssignment := shardsByExecutor[executorID]
 		if hasAssignment || len(changedExecutors) >= maxChangedExecutors {
 			continue
@@ -82,7 +82,7 @@ func nextAssignmentStep(
 		shardsByExecutor[executorID] = make(map[string]struct{})
 	}
 
-	for _, executorID := range slices.Sorted(maps.Keys(staleExecutors)) {
+	for executorID := range staleExecutors {
 		if len(shardsByExecutor[executorID]) > 0 {
 			continue
 		}
@@ -97,7 +97,7 @@ func nextAssignmentStep(
 
 	nextStep.assignments = make(map[string][]string, len(shardsByExecutor))
 	for executorID, shards := range shardsByExecutor {
-		nextStep.assignments[executorID] = slices.Sorted(maps.Keys(shards))
+		nextStep.assignments[executorID] = slices.Collect(maps.Keys(shards))
 	}
 	return nextStep
 }

@@ -1,6 +1,7 @@
 package process
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -189,8 +190,12 @@ func TestNextAssignmentStep(t *testing.T) {
 				tc.maxChangedExecutors,
 			)
 
+			// The step returns each executor's shards in no particular order.
+			for _, shardIDs := range assignmentStep.assignments {
+				slices.Sort(shardIDs)
+			}
 			assert.Equal(t, tc.expectedAssignments, assignmentStep.assignments)
-			assert.Equal(t, tc.expectedExecutorsToDelete, assignmentStep.executorsToDelete)
+			assert.ElementsMatch(t, tc.expectedExecutorsToDelete, assignmentStep.executorsToDelete)
 			assert.Equal(t, tc.expectedDeferredShards, assignmentStep.deferredShards)
 		})
 	}

@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -14,6 +15,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log"
 	"github.com/cadence-workflow/shard-manager/common/log/tag"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
 
@@ -62,16 +64,23 @@ type shardCache struct {
 	// refreshTimeout bounds an in-flight refresh; defaults to
 	// refreshOperationTimeout.
 	refreshTimeout time.Duration
+
+	metricsClient metrics.Client
+	// rangeCover is the last valid range cover read, nil until one is loaded.
+	rangeCover *store.RangeCover
 }
 
 var _ ShardCache = (*shardCache)(nil)
 
+// ErrRangeCoverNotReady is returned when a range namespace has no valid cover to serve.
+var ErrRangeCoverNotReady = errors.New("range cover not ready")
+
 // NewShardCache builds the cache of one namespace.
-func NewShardCache(namespace string, executorStore store.Store, logger log.Logger, timeSource clock.TimeSource) ShardCache {
-	return newShardCache(namespace, executorStore, logger, timeSource)
+func NewShardCache(namespace string, executorStore store.Store, logger log.Logger, timeSource clock.TimeSource, metricsClient metrics.Client) ShardCache {
+	return newShardCache(namespace, executorStore, logger, timeSource, metricsClient)
 }
 
-func newShardCache(namespace string, executorStore store.Store, logger log.Logger, timeSource clock.TimeSource) *shardCache {
+func newShardCache(namespace string, executorStore store.Store, logger log.Logger, timeSource clock.TimeSource, metricsClient metrics.Client) *shardCache {
 	return &shardCache{
 		shardToExecutor:  make(map[string]*store.ShardOwner),
 		executorToShards: make(map[*store.ShardOwner][]string),
@@ -85,6 +94,7 @@ func newShardCache(namespace string, executorStore store.Store, logger log.Logge
 		pubSub:           newExecutorStatePubSub(),
 		timeSource:       timeSource,
 		refreshTimeout:   refreshOperationTimeout,
+		metricsClient:    metricsClient,
 	}
 }
 
@@ -128,6 +138,29 @@ func (c *shardCache) GetShardOwner(ctx context.Context, shardID string) (*store.
 	}
 
 	return nil, store.ErrShardNotFound
+}
+
+// GetRangeForShardKey returns the range assignment that owns fingerprint. Once the namespace
+// state is loaded, a missing cover fails without a store read.
+func (c *shardCache) GetRangeForShardKey(ctx context.Context, fingerprint []byte) (*store.RangeAssignment, error) {
+	cover, loaded := c.lookupRangeCover()
+	if !loaded {
+		if err := c.refreshSingleFlight(ctx); err != nil {
+			return nil, fmt.Errorf("%w: refresh for namespace %s: %w", ErrRangeCoverNotReady, c.namespace, err)
+		}
+		cover, _ = c.lookupRangeCover()
+	}
+	if cover == nil {
+		return nil, ErrRangeCoverNotReady
+	}
+	return cover.GetRangeForKey(fingerprint), nil
+}
+
+// lookupRangeCover returns the cached cover, and whether the cache holds a loaded snapshot at all.
+func (c *shardCache) lookupRangeCover() (cover *store.RangeCover, loaded bool) {
+	c.RLock()
+	defer c.RUnlock()
+	return c.rangeCover, c.lastRevision > 0
 }
 
 // IsShardDrained answers from the cached drained set, which the namespace watch keeps current
@@ -279,8 +312,7 @@ func (c *shardCache) snapshotLocked() store.AssignmentSnapshot {
 	}
 }
 
-// refreshNamespaceState reads every keyspace the cache tracks in one store call, so both
-// the executor state and the drained set advance together under a single store revision.
+// refreshNamespaceState reads every keyspace the cache tracks at one store revision.
 func (c *shardCache) refreshNamespaceState(ctx context.Context) (bool, error) {
 	state, err := c.executorStore.GetAssignmentState(ctx, c.namespace)
 	if err != nil {
@@ -312,7 +344,7 @@ func (c *shardCache) applyNamespaceState(state *store.AssignmentState) bool {
 		maps.Copy(shardOwner.Metadata, executorMetadata)
 	}
 
-	return c.replaceNamespaceState(state.Revision, state.AssignmentRevision, shardToExecutor, executorState, executorRevision, shardOwners, state.DrainedShards)
+	return c.replaceNamespaceState(state.Revision, state.AssignmentRevision, shardToExecutor, executorState, executorRevision, shardOwners, state.DrainedShards, state.Ranges)
 }
 
 func (c *shardCache) replaceNamespaceState(
@@ -323,6 +355,7 @@ func (c *shardCache) replaceNamespaceState(
 	executorRevision map[string]int64,
 	shardOwners map[string]*store.ShardOwner,
 	drainedShards map[string]struct{},
+	ranges []*store.RangeAssignment,
 ) bool {
 	c.Lock()
 	defer c.Unlock()
@@ -342,7 +375,27 @@ func (c *shardCache) replaceNamespaceState(
 	c.executorRevision = executorRevision
 	c.shardOwners = shardOwners
 	c.drainedShards = drainedShards
+	c.updateRangeCoverLocked(ranges)
 	return true
+}
+
+// updateRangeCoverLocked keeps the previous cover when ranges do not form a valid one.
+// The caller must hold the lock.
+func (c *shardCache) updateRangeCoverLocked(ranges []*store.RangeAssignment) {
+	// No cover has been written yet.
+	if len(ranges) == 0 && c.rangeCover == nil {
+		return
+	}
+
+	cover, err := store.NewRangeCover(ranges)
+	if err != nil {
+		c.metricsClient.Scope(metrics.ShardDistributorRangeCoverScope).
+			Tagged(metrics.NamespaceTag(c.namespace)).
+			IncCounter(metrics.ShardDistributorRangeCoverInvalid)
+		c.logger.Error("invalid range cover, keeping the previous one", tag.Error(err))
+		return
+	}
+	c.rangeCover = cover
 }
 
 // getOrCreateShardOwner retrieves an existing ShardOwner from the map or creates a new one if it doesn't exist

@@ -276,6 +276,7 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 		clientv3.OpGet(etcdkeys.BuildExecutorsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 		clientv3.OpGet(etcdkeys.BuildDrainedShardsPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 		clientv3.OpGet(etcdkeys.BuildAssignmentVersionKey(s.prefix, namespace)),
+		clientv3.OpGet(etcdkeys.BuildRangesPrefix(s.prefix, namespace), clientv3.WithPrefix()),
 	)
 	roundTripStart := s.timeSource.Now()
 	txnResp, err := txn.Commit()
@@ -283,8 +284,8 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 	if err != nil {
 		return nil, fmt.Errorf("get namespace assignment state: %w", err)
 	}
-	if len(txnResp.Responses) != 3 {
-		return nil, fmt.Errorf("get namespace assignment state: expected 3 responses, got %d", len(txnResp.Responses))
+	if len(txnResp.Responses) != 4 {
+		return nil, fmt.Errorf("get namespace assignment state: expected 4 responses, got %d", len(txnResp.Responses))
 	}
 
 	parseStart := s.timeSource.Now()
@@ -304,6 +305,7 @@ func (s *executorStoreImpl) GetAssignmentState(ctx context.Context, namespace st
 		ExecutorMetadata:   metadata,
 		ShardAssignments:   assignments,
 		DrainedShards:      s.parseDrainedShardKVs(namespace, txnResp.Responses[1].GetResponseRange().Kvs),
+		Ranges:             s.parseRangeKVs(namespace, txnResp.Responses[3].GetResponseRange().Kvs),
 		Revision:           txnResp.Header.Revision,
 		AssignmentRevision: assignmentRevision,
 	}, nil

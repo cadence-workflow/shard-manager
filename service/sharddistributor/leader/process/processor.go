@@ -647,12 +647,12 @@ func (p *namespaceProcessor) buildNewAssignmentsState(
 	}
 
 	for executorID := range executorsToUnassign {
-		emptiedState := store.AssignedState{
+		emptyAssignment := store.AssignedState{
 			AssignedShards: make(map[string]*types.ShardAssignment),
 			LastUpdated:    now,
 		}
-		newAssignments[executorID] = emptiedState
-		changedAssignments[executorID] = emptiedState
+		newAssignments[executorID] = emptyAssignment
+		changedAssignments[executorID] = emptyAssignment
 	}
 
 	return newAssignments, changedAssignments

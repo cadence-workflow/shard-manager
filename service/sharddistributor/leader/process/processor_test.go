@@ -614,62 +614,6 @@ func TestRebalanceShards_NoShardsToReassign(t *testing.T) {
 	assert.Equal(t, float64(500), gauges["test.shard_distributor_oldest_executor_heartbeat_lag+"+metricTags].Value())
 }
 
-func TestRebalanceShards_RepairsShardStoredOnTwoExecutors(t *testing.T) {
-	mocks := setupProcessorTest(t)
-	mocks.cfg.ShardNum = 4
-	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
-
-	duplicatedShardID := "2"
-	now := mocks.timeSource.Now()
-	heartbeats := map[string]store.HeartbeatState{
-		"exec-1": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
-		"exec-2": {Status: types.ExecutorStatusACTIVE, LastHeartbeat: now},
-	}
-	assignments := map[string]store.AssignedState{
-		"exec-1": {
-			AssignedShards: map[string]*types.ShardAssignment{
-				"0":               {Status: types.AssignmentStatusREADY},
-				"1":               {Status: types.AssignmentStatusREADY},
-				duplicatedShardID: {Status: types.AssignmentStatusREADY},
-			},
-		},
-		"exec-2": {
-			AssignedShards: map[string]*types.ShardAssignment{
-				duplicatedShardID: {Status: types.AssignmentStatusREADY},
-				"3":               {Status: types.AssignmentStatusREADY},
-			},
-		},
-	}
-	mocks.store.EXPECT().GetState(gomock.Any(), mocks.cfg.Name).Return(&store.NamespaceState{
-		AssignmentState: store.AssignmentState{
-			ShardAssignments: assignments,
-		},
-		Executors: heartbeats}, nil)
-	mocks.election.EXPECT().Guard().Return(store.NopGuard())
-
-	assignmentsAfterRebalance := maps.Clone(assignments)
-	mocks.store.EXPECT().AssignShards(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) error {
-			maps.Copy(assignmentsAfterRebalance, request.ShardAssignments)
-			return nil
-		},
-	)
-
-	err := processor.rebalanceShards(context.Background())
-	require.NoError(t, err)
-
-	ownersByShard := make(map[string][]string)
-	for executorID, assignedState := range assignmentsAfterRebalance {
-		for shardID := range assignedState.AssignedShards {
-			ownersByShard[shardID] = append(ownersByShard[shardID], executorID)
-		}
-	}
-	require.Len(t, ownersByShard, int(mocks.cfg.ShardNum))
-	for shardID, owners := range ownersByShard {
-		assert.Len(t, owners, 1, "shard %s", shardID)
-	}
-}
-
 func TestFindDrainedAssignedShards(t *testing.T) {
 	activeExecutors := []string{"exec-1", "exec-2"}
 

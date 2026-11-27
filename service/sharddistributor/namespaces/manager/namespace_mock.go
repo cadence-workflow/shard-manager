@@ -16,7 +16,6 @@ import (
 
 	cache "github.com/cadence-workflow/shard-manager/service/sharddistributor/cache"
 	config "github.com/cadence-workflow/shard-manager/service/sharddistributor/config"
-	ephemeralassigner "github.com/cadence-workflow/shard-manager/service/sharddistributor/ephemeralassigner"
 )
 
 // MockNamespace is a mock of Namespace interface.
@@ -41,20 +40,6 @@ func NewMockNamespace(ctrl *gomock.Controller) *MockNamespace {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockNamespace) EXPECT() *MockNamespaceMockRecorder {
 	return m.recorder
-}
-
-// Assigner mocks base method.
-func (m *MockNamespace) Assigner() *ephemeralassigner.Assigner {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Assigner")
-	ret0, _ := ret[0].(*ephemeralassigner.Assigner)
-	return ret0
-}
-
-// Assigner indicates an expected call of Assigner.
-func (mr *MockNamespaceMockRecorder) Assigner() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Assigner", reflect.TypeOf((*MockNamespace)(nil).Assigner))
 }
 
 // Cache mocks base method.

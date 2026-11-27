@@ -2,7 +2,6 @@ package config
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,8 +19,6 @@ func TestNewDynamicConfigCreatesInstanceWithProperties(t *testing.T) {
 
 	assert.NotNil(t, config)
 	assert.NotNil(t, config.LoadBalancingMode)
-	assert.NotNil(t, config.EphemeralAssignmentCoalescingWindow)
-	assert.Equal(t, 10*time.Millisecond, config.EphemeralAssignmentCoalescingWindow("test-namespace"))
 	assert.Equal(t, 0, config.FixedShardNum("test-namespace"))
 	assert.NotNil(t, config.LoadBalancingNaive.MaxDeviation)
 	assert.NotNil(t, config.LoadBalancingGreedy.PerShardCooldown)
@@ -30,16 +27,6 @@ func TestNewDynamicConfigCreatesInstanceWithProperties(t *testing.T) {
 	assert.NotNil(t, config.LoadBalancingGreedy.HysteresisUpperBand)
 	assert.NotNil(t, config.LoadBalancingGreedy.HysteresisLowerBand)
 	assert.NotNil(t, config.LoadBalancingGreedy.SevereImbalanceRatio)
-}
-
-func TestEphemeralAssignmentCoalescingWindowUpdates(t *testing.T) {
-	client := dynamicconfig.NewInMemoryClient()
-	dc := dynamicconfig.NewCollection(client, testlogger.New(t))
-	config := NewConfig(dc)
-
-	assert.Equal(t, 10*time.Millisecond, config.EphemeralAssignmentCoalescingWindow("test-namespace"))
-	require.NoError(t, client.UpdateValue(dynamicproperties.ShardDistributorEphemeralAssignmentCoalescingWindow, 100*time.Millisecond))
-	assert.Equal(t, 100*time.Millisecond, config.EphemeralAssignmentCoalescingWindow("test-namespace"))
 }
 
 func TestGetLoadBalancingMode(t *testing.T) {
@@ -85,8 +72,7 @@ func TestGetLoadBalancingMode(t *testing.T) {
 }
 
 func TestEffectiveNamespace(t *testing.T) {
-	ephemeralNamespace := Namespace{Name: "ephemeral-namespace", Type: NamespaceTypeEphemeral}
-	fixedNamespace := Namespace{Name: "fixed-namespace", Type: NamespaceTypeFixed, ShardNum: 32}
+	namespace := Namespace{Name: "test-namespace", Type: NamespaceTypeFixed, ShardNum: 32}
 
 	tests := []struct {
 		name          string
@@ -96,27 +82,21 @@ func TestEffectiveNamespace(t *testing.T) {
 	}{
 		{
 			name:          "zero keeps the static config",
-			static:        ephemeralNamespace,
+			static:        namespace,
 			fixedShardNum: 0,
-			want:          ephemeralNamespace,
+			want:          namespace,
 		},
 		{
 			name:          "negative keeps the static config",
-			static:        ephemeralNamespace,
+			static:        namespace,
 			fixedShardNum: -1,
-			want:          ephemeralNamespace,
+			want:          namespace,
 		},
 		{
-			name:          "positive makes an ephemeral namespace fixed",
-			static:        ephemeralNamespace,
-			fixedShardNum: 8192,
-			want:          Namespace{Name: "ephemeral-namespace", Type: NamespaceTypeFixed, ShardNum: 8192},
-		},
-		{
-			name:          "positive replaces the shard count of a fixed namespace",
-			static:        fixedNamespace,
+			name:          "positive replaces the shard count",
+			static:        namespace,
 			fixedShardNum: 64,
-			want:          Namespace{Name: "fixed-namespace", Type: NamespaceTypeFixed, ShardNum: 64},
+			want:          Namespace{Name: "test-namespace", Type: NamespaceTypeFixed, ShardNum: 64},
 		},
 	}
 

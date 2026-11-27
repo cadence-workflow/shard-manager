@@ -11,7 +11,8 @@ shardDistribution:
     failedElectionCooldown: 30s
   namespaces:
     - name: cadence-matching-dev
-      type: ephemeral
+      type: fixed
+      shardNum: 8192
   process:
     period: 2s
 

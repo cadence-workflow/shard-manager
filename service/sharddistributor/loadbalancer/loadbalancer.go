@@ -19,40 +19,6 @@ import (
 // would still need to switch implementations dynamically based on the current
 // value of the dynamic config.
 
-// PlanInitialPlacement returns planned placements for a batch of unassigned shards.
-// Duplicate shard IDs are collapsed so a shard is never placed onto more than one executor
-func PlanInitialPlacement(
-	cfg *config.Config,
-	namespace string,
-	state *store.NamespaceState,
-	shardIDs []string,
-) ([]plan.Placement, error) {
-	shardIDs = dedupeShardIDs(shardIDs)
-	mode := cfg.GetLoadBalancingMode(namespace)
-	switch mode {
-	case types.LoadBalancingModeNAIVE:
-		return naive.PlanInitialPlacement(state, shardIDs)
-	case types.LoadBalancingModeGREEDY:
-		return greedy.PlanInitialPlacement(state, shardIDs)
-	default:
-		return nil, fmt.Errorf("unsupported load balancing mode: %s", mode)
-	}
-}
-
-// dedupeShardIDs returns the unique shard IDs, preserving first-seen order
-func dedupeShardIDs(shardIDs []string) []string {
-	seen := make(map[string]struct{}, len(shardIDs))
-	unique := make([]string, 0, len(shardIDs))
-	for _, shardID := range shardIDs {
-		if _, ok := seen[shardID]; ok {
-			continue
-		}
-		seen[shardID] = struct{}{}
-		unique = append(unique, shardID)
-	}
-	return unique
-}
-
 // PlanRebalance returns planned shard moves for the current assignment state.
 func PlanRebalance(
 	cfg *config.Config,

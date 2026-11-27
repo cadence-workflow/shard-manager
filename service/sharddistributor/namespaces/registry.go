@@ -60,14 +60,11 @@ func validate(ns config.Namespace) error {
 	if strings.HasPrefix(ns.Name, "_") {
 		return errors.New("name must not start with an underscore")
 	}
-	switch ns.Type {
-	case config.NamespaceTypeFixed:
-		if ns.ShardNum <= 0 {
-			return fmt.Errorf("fixed namespace must have a positive shardNum, got %d", ns.ShardNum)
-		}
-	case config.NamespaceTypeEphemeral:
-	default:
-		return fmt.Errorf("unknown type %q, must be %q or %q", ns.Type, config.NamespaceTypeFixed, config.NamespaceTypeEphemeral)
+	if ns.Type != config.NamespaceTypeFixed {
+		return fmt.Errorf("unknown type %q, must be %q", ns.Type, config.NamespaceTypeFixed)
+	}
+	if ns.ShardNum <= 0 {
+		return fmt.Errorf("shardNum must be positive, got %d", ns.ShardNum)
 	}
 	return nil
 }

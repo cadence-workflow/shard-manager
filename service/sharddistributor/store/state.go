@@ -136,10 +136,6 @@ type DrainedHost struct {
 	Reason    string    `json:"reason,omitempty"`
 }
 
-type ShardState struct {
-	ExecutorID string
-}
-
 type ShardStatistics struct {
 	// Exponential weighted moving average of shard load that persists across executor changes
 	SmoothedLoad float64

@@ -13,11 +13,10 @@ import (
 type (
 	// Config represents configuration for shard manager service
 	Config struct {
-		LoadBalancingMode                   dynamicproperties.StringPropertyFnWithNamespaceFilters
-		MaxEtcdTxnOps                       dynamicproperties.IntPropertyFn
-		EphemeralAssignmentCoalescingWindow dynamicproperties.DurationPropertyFnWithNamespaceFilters
-		FixedShardNum                       dynamicproperties.IntPropertyFnWithNamespaceFilters
-		WriteExecutorValuesAsProtobuf       dynamicproperties.BoolPropertyFn
+		LoadBalancingMode             dynamicproperties.StringPropertyFnWithNamespaceFilters
+		MaxEtcdTxnOps                 dynamicproperties.IntPropertyFn
+		FixedShardNum                 dynamicproperties.IntPropertyFnWithNamespaceFilters
+		WriteExecutorValuesAsProtobuf dynamicproperties.BoolPropertyFn
 
 		LoadBalancingNaive  LoadBalancingNaiveConfig
 		LoadBalancingGreedy LoadBalancingGreedyConfig
@@ -57,8 +56,8 @@ type (
 
 	Namespace struct {
 		Name string `yaml:"name"`
-		Type string `yaml:"type"` // The field is a string since it is shared between global config Supported values: fixed|ephemeral.
-		// ShardNum is defined for fixed namespace.
+		Type string `yaml:"type"` // Type is the namespace type. Currently, the only supported type is "fixed".
+		// ShardNum is the number of shards in the namespace.
 		ShardNum int64 `yaml:"shardNum"`
 	}
 
@@ -92,19 +91,15 @@ type (
 	}
 )
 
-const (
-	NamespaceTypeFixed     = "fixed"
-	NamespaceTypeEphemeral = "ephemeral"
-)
+const NamespaceTypeFixed = "fixed"
 
 // NewConfig returns a new instance of Config
 func NewConfig(dc *dynamicconfig.Collection) *Config {
 	return &Config{
-		LoadBalancingMode:                   dc.GetStringPropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingMode),
-		MaxEtcdTxnOps:                       dc.GetIntProperty(dynamicproperties.ShardDistributorMaxEtcdTxnOps),
-		EphemeralAssignmentCoalescingWindow: dc.GetDurationPropertyFilteredByNamespace(dynamicproperties.ShardDistributorEphemeralAssignmentCoalescingWindow),
-		FixedShardNum:                       dc.GetIntPropertyFilteredByNamespace(dynamicproperties.ShardDistributorFixedShardNum),
-		WriteExecutorValuesAsProtobuf:       dc.GetBoolProperty(dynamicproperties.ShardDistributorWriteExecutorValuesAsProtobuf),
+		LoadBalancingMode:             dc.GetStringPropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingMode),
+		MaxEtcdTxnOps:                 dc.GetIntProperty(dynamicproperties.ShardDistributorMaxEtcdTxnOps),
+		FixedShardNum:                 dc.GetIntPropertyFilteredByNamespace(dynamicproperties.ShardDistributorFixedShardNum),
+		WriteExecutorValuesAsProtobuf: dc.GetBoolProperty(dynamicproperties.ShardDistributorWriteExecutorValuesAsProtobuf),
 
 		LoadBalancingNaive: LoadBalancingNaiveConfig{
 			MaxDeviation: dc.GetFloat64PropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingNaiveMaxDeviation),
@@ -145,12 +140,11 @@ func (c *Config) GetLoadBalancingMode(namespace string) types.LoadBalancingMode 
 }
 
 // EffectiveNamespace returns the configuration ns runs with. A positive fixedShardNum
-// makes it fixed with that many shards, otherwise ns is returned unchanged.
+// overrides its shard count, otherwise ns is returned unchanged.
 func EffectiveNamespace(ns Namespace, fixedShardNum int) Namespace {
 	if fixedShardNum <= 0 {
 		return ns
 	}
-	ns.Type = NamespaceTypeFixed
 	ns.ShardNum = int64(fixedShardNum)
 	return ns
 }

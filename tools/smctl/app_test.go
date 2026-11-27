@@ -299,7 +299,7 @@ func TestListNamespaces(t *testing.T) {
 	twoNamespaces := &types.ListNamespacesResponse{
 		Namespaces: []*types.NamespaceConfig{
 			{Name: "shard-distributor-canary", Type: "fixed", Mode: "onboarded", ShardNum: 32},
-			{Name: "ephemeral-ns", Type: "ephemeral", Mode: "distributed_pass"},
+			{Name: "cadence-matching-dev", Type: "fixed", Mode: "distributed_pass", ShardNum: 8192},
 		},
 	}
 
@@ -331,19 +331,15 @@ func TestListNamespaces(t *testing.T) {
 				if !strings.Contains(lines[0], "NAME") || !strings.Contains(lines[0], "TYPE") || !strings.Contains(lines[0], "SHARDS") {
 					t.Errorf("header missing expected columns: %q", lines[0])
 				}
-				// Rows are sorted by name; "ephemeral-ns" precedes "shard-distributor-canary".
-				if !strings.HasPrefix(lines[1], "ephemeral-ns") {
-					t.Errorf("expected ephemeral-ns first, got: %q", lines[1])
+				// Rows are sorted by name; "cadence-matching-dev" precedes "shard-distributor-canary".
+				if !strings.HasPrefix(lines[1], "cadence-matching-dev") {
+					t.Errorf("expected cadence-matching-dev first, got: %q", lines[1])
 				}
-				// Ephemeral has no shard count -> "-".
-				if !strings.Contains(lines[1], "ephemeral") || !strings.Contains(lines[1], "distributed_pass") {
-					t.Errorf("ephemeral row missing fields: %q", lines[1])
-				}
-				if !strings.Contains(lines[1], " - ") && !strings.HasSuffix(strings.TrimSpace(lines[1]), "-") {
-					t.Errorf("expected ephemeral row to render shard count as '-': %q", lines[1])
+				if !strings.Contains(lines[1], "distributed_pass") || !strings.Contains(lines[1], "8192") {
+					t.Errorf("cadence-matching-dev row missing fields: %q", lines[1])
 				}
 				if !strings.Contains(lines[2], "shard-distributor-canary") || !strings.Contains(lines[2], "32") {
-					t.Errorf("fixed row missing fields: %q", lines[2])
+					t.Errorf("shard-distributor-canary row missing fields: %q", lines[2])
 				}
 			},
 		},

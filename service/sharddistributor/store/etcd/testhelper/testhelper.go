@@ -40,11 +40,12 @@ func SetupStoreTestCluster(t *testing.T) *StoreTestCluster {
 	t.Logf("ETCD endpoints: %v", endpoints)
 
 	etcdPrefix := fmt.Sprintf("/test-shard-store/%s", t.Name())
+	compression := "snappy"
 	etcdConfigRaw := map[string]interface{}{
 		"endpoints":   endpoints,
 		"dialTimeout": "5s",
 		"prefix":      etcdPrefix,
-		"compression": "snappy",
+		"compression": compression,
 	}
 
 	yamlCfg, err := yaml.Marshal(etcdConfigRaw)
@@ -66,9 +67,10 @@ func SetupStoreTestCluster(t *testing.T) *StoreTestCluster {
 	require.NoError(t, err)
 
 	return &StoreTestCluster{
-		Namespace:  namespace,
-		EtcdPrefix: etcdPrefix,
-		SDConfig:   sdConfig,
-		Client:     etcdclient.NewClient(rawClient),
+		Namespace:   namespace,
+		EtcdPrefix:  etcdPrefix,
+		SDConfig:    sdConfig,
+		Client:      etcdclient.NewClient(rawClient),
+		Compression: compression,
 	}
 }

@@ -80,6 +80,7 @@ func nextAssignmentStep(
 	shardChanges := findShardChanges(storedAssignments, plannedAssignments, assignableExecutors)
 	slices.SortFunc(shardChanges, needsNewOwnerFirst)
 
+	// A copy of the stored shards, which the changes below are applied to.
 	shardsByExecutor := make(map[string]map[string]struct{}, len(storedAssignments))
 	for executorID, assignedState := range storedAssignments {
 		shards := make(map[string]struct{}, len(assignedState.AssignedShards))

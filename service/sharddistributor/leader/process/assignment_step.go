@@ -42,15 +42,7 @@ func nextAssignmentStep(
 	maxChangedExecutors int,
 ) assignmentStep {
 	changes := findShardChanges(storedAssignments, plannedAssignments, assignableExecutors)
-	slices.SortFunc(changes, func(a, b shardChange) int {
-		if a.needsNewOwner != b.needsNewOwner {
-			if a.needsNewOwner {
-				return -1
-			}
-			return 1
-		}
-		return cmp.Compare(a.shardID, b.shardID)
-	})
+	slices.SortFunc(changes, needsNewOwnerFirst)
 
 	shardsByExecutor := make(map[string]map[string]struct{}, len(storedAssignments))
 	for executorID, assignedState := range storedAssignments {
@@ -145,6 +137,17 @@ func findShardChanges(
 		})
 	}
 	return changes
+}
+
+// needsNewOwnerFirst orders the changes that need a new owner first, then by shard ID.
+func needsNewOwnerFirst(a, b shardChange) int {
+	if a.needsNewOwner != b.needsNewOwner {
+		if a.needsNewOwner {
+			return -1
+		}
+		return 1
+	}
+	return cmp.Compare(a.shardID, b.shardID)
 }
 
 func countExecutorsNotYetChanged(changedExecutors map[string]struct{}, change shardChange) int {

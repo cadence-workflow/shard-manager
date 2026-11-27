@@ -95,7 +95,7 @@ type executorImpl[SP ShardProcessor] struct {
 	shardProcessorFactory ShardProcessorFactory[SP]
 	namespace             string
 	executorID            string
-	stopC                 chan struct{}
+	cancel                context.CancelFunc
 	heartBeatInterval     time.Duration
 	ttlShard              time.Duration
 	managedProcessors     syncgeneric.Map[string, *managedProcessor[SP]]
@@ -112,20 +112,17 @@ type executorImpl[SP ShardProcessor] struct {
 
 func (e *executorImpl[SP]) Start(ctx context.Context) {
 	e.logger.Info("starting shard distributor executor", zap.String(tag.Namespace, e.namespace))
-	e.processLoopWG.Add(2)
-	go func() {
-		defer e.processLoopWG.Done()
-		e.heartbeatloop(context.WithoutCancel(ctx))
-	}()
-	go func() {
-		defer e.processLoopWG.Done()
-		e.shardCleanUpLoop(context.WithoutCancel(ctx))
-	}()
+	// Use context.WithoutCancel to inherit values but not cancellation from fx lifecycle ctx
+	ctx, e.cancel = context.WithCancel(context.WithoutCancel(ctx))
+	e.processLoopWG.Go(func() { e.heartbeatloop(ctx) })
+	e.processLoopWG.Go(func() { e.shardCleanUpLoop(ctx) })
 }
 
 func (e *executorImpl[SP]) Stop() {
 	e.logger.Info("stopping shard distributor executor", zap.String(tag.Namespace, e.namespace))
-	close(e.stopC)
+	if e.cancel != nil {
+		e.cancel()
+	}
 	e.processLoopWG.Wait()
 }
 
@@ -176,11 +173,6 @@ func (e *executorImpl[SP]) heartbeatloop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			e.logger.Info("shard distributor executor context done, stopping")
-			e.stopShardProcessors()
-			e.sendDrainingHeartbeat()
-			return
-		case <-e.stopC:
 			e.logger.Info("shard distributor executor stopped")
 			e.stopShardProcessors()
 			e.sendDrainingHeartbeat()
@@ -225,8 +217,6 @@ func (e *executorImpl[SP]) waitForUndrain(ctx context.Context) bool {
 
 	select {
 	case <-ctx.Done():
-		return false
-	case <-e.stopC:
 		return false
 	case <-undrainCh:
 		return true
@@ -412,10 +402,7 @@ func (e *executorImpl[SP]) shardCleanUpLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			e.logger.Info("stopping cleanUpLoop: context done")
-			return
-		case <-e.stopC:
-			e.logger.Info("stopping cleanUpLoop: stop signal")
+			e.logger.Info("stopping cleanUpLoop")
 			return
 		case <-shardCleanUpTimer.Chan():
 			e.logger.Info("running cleanUpLoop")

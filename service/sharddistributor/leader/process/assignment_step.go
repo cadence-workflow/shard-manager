@@ -10,8 +10,7 @@ import (
 
 // assignmentStep is the part of a planned distribution that one AssignShards request can hold.
 type assignmentStep struct {
-	// changedAssignments holds the shards after this step of every executor this step changes and
-	// does not delete, including new executors that get an empty assignment.
+	// changedAssignments holds the new shards of every executor this step writes.
 	changedAssignments map[string][]string
 	// executorsToDelete are the stale executors that hold no shards after this step.
 	executorsToDelete []string

@@ -53,7 +53,6 @@ type AssignShardsRequest struct {
 	// Key: ExecutorID
 	ShardAssignments map[string]AssignedState
 	// ExecutorsToDelete are deleted with everything stored for them.
-	// They must not appear in ShardAssignments.
 	ExecutorsToDelete []string
 }
 

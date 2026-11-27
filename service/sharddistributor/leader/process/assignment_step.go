@@ -55,7 +55,8 @@ func nextAssignmentStep(
 	nextStep := assignmentStep{}
 	changedExecutors := make(map[string]struct{})
 	for _, change := range changes {
-		if len(changedExecutors)+countExecutorsNotYetChanged(changedExecutors, change) > maxChangedExecutors {
+		executorsAfterChange := len(changedExecutors) + countExecutorsNotYetChanged(changedExecutors, change)
+		if executorsAfterChange > maxChangedExecutors {
 			nextStep.deferredShards++
 			continue
 		}

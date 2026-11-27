@@ -36,6 +36,27 @@ type changedExecutorBudget struct {
 	maxChangedExecutors int
 }
 
+// tryAdd counts the executors and returns true if they fit. Empty IDs are skipped, and nothing is
+// counted when they do not fit.
+func (b *changedExecutorBudget) tryAdd(executorIDs ...string) bool {
+	executorsAfterAdd := len(b.changedExecutors)
+	for _, executorID := range executorIDs {
+		_, alreadyCounted := b.changedExecutors[executorID]
+		if executorID != "" && !alreadyCounted {
+			executorsAfterAdd++
+		}
+	}
+	if executorsAfterAdd > b.maxChangedExecutors {
+		return false
+	}
+	for _, executorID := range executorIDs {
+		if executorID != "" {
+			b.changedExecutors[executorID] = struct{}{}
+		}
+	}
+	return true
+}
+
 // nextAssignmentStep returns the changes from storedAssignments toward plannedAssignments that fit in
 // maxChangedExecutors writes and deletes. It moves whole shards, the ones that need a new owner first,
 // and leaves the rest for the next step. An executor missing from plannedAssignments loses its
@@ -167,27 +188,6 @@ func needsNewOwnerFirst(a, b shardChange) int {
 		return 1
 	}
 	return cmp.Compare(a.shardID, b.shardID)
-}
-
-// tryAdd counts the executors and returns true if they fit. Empty IDs are skipped, and nothing is
-// counted when they do not fit.
-func (b *changedExecutorBudget) tryAdd(executorIDs ...string) bool {
-	executorsAfterAdd := len(b.changedExecutors)
-	for _, executorID := range executorIDs {
-		_, alreadyCounted := b.changedExecutors[executorID]
-		if executorID != "" && !alreadyCounted {
-			executorsAfterAdd++
-		}
-	}
-	if executorsAfterAdd > b.maxChangedExecutors {
-		return false
-	}
-	for _, executorID := range executorIDs {
-		if executorID != "" {
-			b.changedExecutors[executorID] = struct{}{}
-		}
-	}
-	return true
 }
 
 func applyShardChange(shardsByExecutor map[string]map[string]struct{}, change shardChange) {

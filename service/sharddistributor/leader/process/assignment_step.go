@@ -172,14 +172,14 @@ func needsNewOwnerFirst(a, b shardChange) int {
 // tryAdd counts the executors and returns true if they fit. Empty IDs are skipped, and nothing is
 // counted when they do not fit.
 func (b *changedExecutorBudget) tryAdd(executorIDs ...string) bool {
-	notYetCounted := 0
+	executorsAfterAdd := len(b.changedExecutors)
 	for _, executorID := range executorIDs {
-		_, counted := b.changedExecutors[executorID]
-		if executorID != "" && !counted {
-			notYetCounted++
+		_, alreadyCounted := b.changedExecutors[executorID]
+		if executorID != "" && !alreadyCounted {
+			executorsAfterAdd++
 		}
 	}
-	if len(b.changedExecutors)+notYetCounted > b.maxChangedExecutors {
+	if executorsAfterAdd > b.maxChangedExecutors {
 		return false
 	}
 	for _, executorID := range executorIDs {

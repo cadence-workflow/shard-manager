@@ -40,8 +40,8 @@ func nextAssignmentStep(
 	staleExecutors map[string]struct{},
 	maxChangedExecutors int,
 ) assignmentStep {
-	changes := findShardChanges(storedAssignments, plannedAssignments, assignableExecutors)
-	slices.SortFunc(changes, needsNewOwnerFirst)
+	shardChanges := findShardChanges(storedAssignments, plannedAssignments, assignableExecutors)
+	slices.SortFunc(shardChanges, needsNewOwnerFirst)
 
 	shardsByExecutor := make(map[string]map[string]struct{}, len(storedAssignments))
 	for executorID, assignedState := range storedAssignments {
@@ -54,7 +54,7 @@ func nextAssignmentStep(
 
 	nextStep := assignmentStep{}
 	changedExecutors := make(map[string]struct{})
-	for _, change := range changes {
+	for _, change := range shardChanges {
 		executorsAfterChange := len(changedExecutors) + countExecutorsNotYetChanged(changedExecutors, change)
 		if executorsAfterChange > maxChangedExecutors {
 			nextStep.deferredShards++
@@ -105,43 +105,50 @@ func findShardChanges(
 	plannedAssignments map[string][]string,
 	assignableExecutors map[string]struct{},
 ) []shardChange {
-	storedOwners := make(map[string]string)
+	storedOwnersByShard := make(map[string]string)
 	for executorID, assignedState := range storedAssignments {
 		for shardID := range assignedState.AssignedShards {
-			storedOwners[shardID] = executorID
+			storedOwnersByShard[shardID] = executorID
 		}
 	}
-	plannedOwners := make(map[string]string)
+	plannedOwnersByShard := make(map[string]string)
 	for executorID, shards := range plannedAssignments {
 		for _, shardID := range shards {
-			plannedOwners[shardID] = executorID
+			plannedOwnersByShard[shardID] = executorID
 		}
 	}
 
-	shardIDs := make(map[string]struct{}, len(storedOwners)+len(plannedOwners))
-	for shardID := range storedOwners {
-		shardIDs[shardID] = struct{}{}
-	}
-	for shardID := range plannedOwners {
-		shardIDs[shardID] = struct{}{}
-	}
-
-	var changes []shardChange
-	for shardID := range shardIDs {
-		storedOwner := storedOwners[shardID]
-		plannedOwner := plannedOwners[shardID]
+	var shardChanges []shardChange
+	// Stored shards that move or are dropped. plannedOwner is empty for a dropped shard.
+	for shardID, storedOwner := range storedOwnersByShard {
+		plannedOwner := plannedOwnersByShard[shardID]
 		if storedOwner == plannedOwner {
 			continue
 		}
 		_, storedOwnerIsAssignable := assignableExecutors[storedOwner]
-		changes = append(changes, shardChange{
+		change := shardChange{
 			shardID:       shardID,
 			from:          storedOwner,
 			to:            plannedOwner,
 			needsNewOwner: !storedOwnerIsAssignable,
-		})
+		}
+		shardChanges = append(shardChanges, change)
 	}
-	return changes
+
+	// Planned shards that no executor stores, such as a shard that was just undrained.
+	for shardID, plannedOwner := range plannedOwnersByShard {
+		if _, hasStoredOwner := storedOwnersByShard[shardID]; hasStoredOwner {
+			continue
+		}
+		change := shardChange{
+			shardID:       shardID,
+			from:          "",
+			to:            plannedOwner,
+			needsNewOwner: true,
+		}
+		shardChanges = append(shardChanges, change)
+	}
+	return shardChanges
 }
 
 // needsNewOwnerFirst orders the changes that need a new owner first, then by shard ID.

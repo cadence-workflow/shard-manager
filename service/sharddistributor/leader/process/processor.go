@@ -394,8 +394,8 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 	p.emitExecutorMetric(namespaceState, metricsLoopScope)
 	loadbalancer.EmitAssignmentImbalanceMetrics(p.sdConfig, p.namespaceCfg.Name, metricsLoopScope, currentAssignments, namespaceState)
 
-	// Executors left out of the plan, such as draining and stale ones, lose their shards. Changes that
-	// do not fit in one write are left out, and the next round plans again from storage.
+	// Executors missing from the plan, such as draining and stale ones, lose their shards. Changes that
+	// do not fit in one write wait for the next round, which plans again from what this round wrote.
 	maxChangedExecutors := p.shardStore.MaxAssignShardsExecutors()
 	assignmentStep := nextAssignmentStep(namespaceState.ShardAssignments, currentAssignments, assignableExecutors, staleExecutors, maxChangedExecutors)
 	if assignmentStep.deferredShards > 0 {

@@ -102,7 +102,7 @@ func nextAssignmentStep(
 		applyShardChange(shardsByExecutor, change)
 	}
 
-	// Executors without shards still get an assignment record.
+	// Assignable executors without an assignment record get an empty one.
 	for executorID := range assignableExecutors {
 		if _, hasAssignment := shardsByExecutor[executorID]; hasAssignment {
 			continue

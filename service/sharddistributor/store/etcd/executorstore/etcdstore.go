@@ -501,11 +501,11 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 		return nil
 	}
 	ops = append(ops, s.touchAssignmentVersion(namespace))
-	resp, err := s.commitTxn(ctx, ops, guard)
+	txnResp, err := s.commitTxn(ctx, ops, guard)
 	if err != nil {
 		return fmt.Errorf("assign shards: %w", err)
 	}
-	if !resp.Succeeded {
+	if !txnResp.Succeeded {
 		return fmt.Errorf("%w: transaction failed, leadership may have changed", store.ErrVersionConflict)
 	}
 	return nil

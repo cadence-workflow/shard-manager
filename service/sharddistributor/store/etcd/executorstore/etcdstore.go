@@ -519,7 +519,7 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 	ops = append(ops, s.touchAssignmentVersion(namespace))
 	txnResp, err := s.commitTxn(ctx, ops, guard)
 	if err != nil {
-		return fmt.Errorf("assign shards: %w", err)
+		return fmt.Errorf("commit shard assignments transaction: %w", err)
 	}
 	if !txnResp.Succeeded {
 		return fmt.Errorf("%w: transaction failed, leadership may have changed", store.ErrVersionConflict)

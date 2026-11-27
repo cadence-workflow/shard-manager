@@ -1284,62 +1284,33 @@ func TestBuildHandoverStats_MultipleShards(t *testing.T) {
 	assert.Equal(t, expected, stats)
 }
 
-func TestBuildNewAssignmentsState_OnlyChangedExecutors(t *testing.T) {
+func TestBuildNewAssignmentsState(t *testing.T) {
 	mocks := setupProcessorTest(t)
 	processor := mocks.factory.CreateProcessor(mocks.cfg, mocks.store, mocks.election).(*namespaceProcessor)
 
 	now := mocks.timeSource.Now().UTC()
-	oldTime := now.Add(-time.Hour)
-
 	namespaceState := &store.NamespaceState{
 		AssignmentState: store.AssignmentState{
 			ShardAssignments: map[string]store.AssignedState{
-				"exec-1": {
-					AssignedShards: map[string]*types.ShardAssignment{
-						"shard-1": {Status: types.AssignmentStatusREADY},
-						"shard-2": {Status: types.AssignmentStatusREADY},
-					},
-					LastUpdated: oldTime,
-				},
-				"exec-2": {
-					AssignedShards: map[string]*types.ShardAssignment{
-						"shard-3": {Status: types.AssignmentStatusREADY},
-					},
-					LastUpdated: oldTime,
-				},
-				"exec-4": {
-					AssignedShards: map[string]*types.ShardAssignment{
-						"shard-6": {Status: types.AssignmentStatusREADY},
-					},
-					LastUpdated: oldTime,
-				},
+				"exec-gaining": {AssignedShards: map[string]*types.ShardAssignment{"shard-1": {Status: types.AssignmentStatusREADY}}},
+				"exec-emptied": {AssignedShards: map[string]*types.ShardAssignment{"shard-2": {Status: types.AssignmentStatusREADY}}},
 			},
 		},
 	}
 
-	assignments := map[string][]string{
-		"exec-1": {"shard-1", "shard-2"}, // unchanged
-		"exec-2": {"shard-3", "shard-4"}, // changed (added shard-4)
-		"exec-3": {"shard-5"},            // new
-		"exec-4": nil,                    // emptied
+	changedAssignments := map[string][]string{
+		"exec-gaining": {"shard-1", "shard-3"},
+		"exec-new":     {"shard-4"},
+		"exec-emptied": nil,
 	}
 
-	newAssignments, changedAssignments := processor.buildNewAssignmentsState(
-		namespaceState,
-		assignments,
-		namespaceState.ShardOwners(),
-		now,
-	)
+	assignedStates := processor.buildNewAssignmentsState(namespaceState, changedAssignments, namespaceState.ShardOwners(), now)
 
-	assert.Len(t, newAssignments, 4)
-	assert.Equal(t, oldTime, newAssignments["exec-1"].LastUpdated)
-	assert.Equal(t, now, newAssignments["exec-2"].LastUpdated)
-	assert.Empty(t, newAssignments["exec-4"].AssignedShards, "cleared assignments")
-
-	changedExecutors := slices.Sorted(maps.Keys(changedAssignments))
-	require.Equal(t, []string{"exec-2", "exec-3", "exec-4"}, changedExecutors)
-	for _, executorID := range changedExecutors {
-		assert.Equal(t, newAssignments[executorID], changedAssignments[executorID])
+	require.Len(t, assignedStates, len(changedAssignments))
+	for executorID, expectedShards := range changedAssignments {
+		assignedState := assignedStates[executorID]
+		assert.ElementsMatch(t, expectedShards, slices.Collect(maps.Keys(assignedState.AssignedShards)), "executor %s", executorID)
+		assert.Equal(t, now, assignedState.LastUpdated, "executor %s", executorID)
 	}
 }
 

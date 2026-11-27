@@ -10,9 +10,9 @@ import (
 
 // assignmentStep is the part of a planned distribution that one AssignShards request can hold.
 type assignmentStep struct {
-	// assignments holds the shards after this step of every stored executor that is not deleted,
-	// and of the new executors written in this step.
-	assignments map[string][]string
+	// changedAssignments holds the shards after this step of every executor this step changes and
+	// does not delete, including new executors that get an empty assignment.
+	changedAssignments map[string][]string
 	// executorsToDelete are the stale executors that hold no shards after this step.
 	executorsToDelete []string
 	// deferredShards counts the shard changes left for a later step.
@@ -87,9 +87,13 @@ func nextAssignmentStep(
 		delete(shardsByExecutor, executorID)
 	}
 
-	nextStep.assignments = make(map[string][]string, len(shardsByExecutor))
-	for executorID, shards := range shardsByExecutor {
-		nextStep.assignments[executorID] = slices.Collect(maps.Keys(shards))
+	nextStep.changedAssignments = make(map[string][]string, len(changedExecutors))
+	for executorID := range changedExecutors {
+		shards, isKept := shardsByExecutor[executorID]
+		if !isKept {
+			continue
+		}
+		nextStep.changedAssignments[executorID] = slices.Collect(maps.Keys(shards))
 	}
 	return nextStep
 }

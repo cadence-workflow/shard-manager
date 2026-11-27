@@ -19,9 +19,9 @@ func TestNextAssignmentStep(t *testing.T) {
 		staleExecutors      map[string]struct{}
 		maxChangedExecutors int
 
-		expectedAssignments       map[string][]string
-		expectedExecutorsToDelete []string
-		expectedDeferredShards    int
+		expectedChangedAssignments map[string][]string
+		expectedExecutorsToDelete  []string
+		expectedDeferredShards     int
 	}{
 		{
 			name: "changes that fit are written, new executors get an assignment and empty stale executors are deleted",
@@ -36,7 +36,7 @@ func TestNextAssignmentStep(t *testing.T) {
 			staleExecutors:      map[string]struct{}{"exec-stale": {}},
 			maxChangedExecutors: 3,
 
-			expectedAssignments: map[string][]string{
+			expectedChangedAssignments: map[string][]string{
 				"exec-a":   {"shard-1", "shard-2"},
 				"exec-new": nil,
 			},
@@ -57,8 +57,7 @@ func TestNextAssignmentStep(t *testing.T) {
 			assignableExecutors: map[string]struct{}{"exec-a": {}, "exec-b": {}, "exec-c": {}},
 			maxChangedExecutors: 2,
 
-			expectedAssignments: map[string][]string{
-				"exec-a":        {"shard-1"},
+			expectedChangedAssignments: map[string][]string{
 				"exec-c":        {"shard-2"},
 				"exec-draining": nil,
 			},
@@ -78,11 +77,8 @@ func TestNextAssignmentStep(t *testing.T) {
 			assignableExecutors: map[string]struct{}{"exec-a": {}, "exec-b": {}},
 			maxChangedExecutors: 1,
 
-			expectedAssignments: map[string][]string{
-				"exec-a": {"shard-1"},
-				"exec-b": nil,
-			},
-			expectedDeferredShards: 1,
+			expectedChangedAssignments: map[string][]string{},
+			expectedDeferredShards:     1,
 		},
 		{
 			// The move takes the whole budget, so exec-new is not written yet.
@@ -98,7 +94,7 @@ func TestNextAssignmentStep(t *testing.T) {
 			assignableExecutors: map[string]struct{}{"exec-a": {}, "exec-b": {}, "exec-new": {}},
 			maxChangedExecutors: 2,
 
-			expectedAssignments: map[string][]string{
+			expectedChangedAssignments: map[string][]string{
 				"exec-a": nil,
 				"exec-b": {"shard-1"},
 			},
@@ -118,9 +114,8 @@ func TestNextAssignmentStep(t *testing.T) {
 			staleExecutors:      map[string]struct{}{"exec-stale": {}},
 			maxChangedExecutors: 2,
 
-			expectedAssignments: map[string][]string{
+			expectedChangedAssignments: map[string][]string{
 				"exec-a":     {"shard-1"},
-				"exec-b":     nil,
 				"exec-stale": {"shard-2"},
 			},
 			expectedDeferredShards: 1,
@@ -142,10 +137,8 @@ func TestNextAssignmentStep(t *testing.T) {
 			staleExecutors:      map[string]struct{}{"exec-stale": {}},
 			maxChangedExecutors: 2,
 
-			expectedAssignments: map[string][]string{
+			expectedChangedAssignments: map[string][]string{
 				"exec-a": {"shard-1"},
-				"exec-c": {"shard-2"},
-				"exec-d": nil,
 			},
 			expectedExecutorsToDelete: []string{"exec-stale"},
 			expectedDeferredShards:    1,
@@ -165,10 +158,10 @@ func TestNextAssignmentStep(t *testing.T) {
 			)
 
 			// The step returns each executor's shards in no particular order.
-			for _, shardIDs := range assignmentStep.assignments {
+			for _, shardIDs := range assignmentStep.changedAssignments {
 				slices.Sort(shardIDs)
 			}
-			assert.Equal(t, tc.expectedAssignments, assignmentStep.assignments)
+			assert.Equal(t, tc.expectedChangedAssignments, assignmentStep.changedAssignments)
 			assert.ElementsMatch(t, tc.expectedExecutorsToDelete, assignmentStep.executorsToDelete)
 			assert.Equal(t, tc.expectedDeferredShards, assignmentStep.deferredShards)
 		})

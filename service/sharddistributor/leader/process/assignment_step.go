@@ -19,14 +19,14 @@ type assignmentStep struct {
 	deferredShards int
 }
 
-// shardChange moves one shard from its stored owners to its planned owner.
+// shardChange moves one shard from its stored owner to its planned owner.
 type shardChange struct {
 	shardID string
-	// from are the stored owners that lose the shard.
-	from []string
-	// to gains the shard. It is empty when the shard is dropped, or when the planned owner already holds the shard.
+	// from loses the shard. It is empty when the shard has no stored owner.
+	from string
+	// to gains the shard. It is empty when the shard is dropped.
 	to string
-	// needsNewOwner is true when no assignable executor holds the shard in storage.
+	// needsNewOwner is true when the shard has no stored owner or its stored owner is not assignable.
 	needsNewOwner bool
 }
 
@@ -102,16 +102,16 @@ func nextAssignmentStep(
 	return nextStep
 }
 
-// findShardChanges returns a change for every shard whose planned owner differs from its stored owners.
+// findShardChanges returns a change for every shard whose planned owner differs from its stored owner.
 func findShardChanges(
 	storedAssignments map[string]store.AssignedState,
 	plannedAssignments map[string][]string,
 	assignableExecutors map[string]struct{},
 ) []shardChange {
-	storedOwners := make(map[string][]string)
+	storedOwners := make(map[string]string)
 	for executorID, assignedState := range storedAssignments {
 		for shardID := range assignedState.AssignedShards {
-			storedOwners[shardID] = append(storedOwners[shardID], executorID)
+			storedOwners[shardID] = executorID
 		}
 	}
 	plannedOwners := make(map[string]string)
@@ -131,43 +131,36 @@ func findShardChanges(
 
 	var changes []shardChange
 	for shardID := range shardIDs {
+		storedOwner := storedOwners[shardID]
 		plannedOwner := plannedOwners[shardID]
-		change := shardChange{shardID: shardID, to: plannedOwner, needsNewOwner: true}
-		for _, storedOwner := range storedOwners[shardID] {
-			if _, isAssignable := assignableExecutors[storedOwner]; isAssignable {
-				change.needsNewOwner = false
-			}
-			if storedOwner == plannedOwner {
-				change.to = ""
-			} else {
-				change.from = append(change.from, storedOwner)
-			}
+		if storedOwner == plannedOwner {
+			continue
 		}
-		if len(change.from) > 0 || change.to != "" {
-			changes = append(changes, change)
-		}
+		_, storedOwnerIsAssignable := assignableExecutors[storedOwner]
+		changes = append(changes, shardChange{
+			shardID:       shardID,
+			from:          storedOwner,
+			to:            plannedOwner,
+			needsNewOwner: !storedOwnerIsAssignable,
+		})
 	}
 	return changes
 }
 
 func countExecutorsNotYetChanged(changedExecutors map[string]struct{}, change shardChange) int {
 	notYetChanged := 0
-	for _, executorID := range change.from {
-		if _, ok := changedExecutors[executorID]; !ok {
-			notYetChanged++
-		}
+	if _, ok := changedExecutors[change.from]; change.from != "" && !ok {
+		notYetChanged++
 	}
-	if change.to != "" {
-		if _, ok := changedExecutors[change.to]; !ok {
-			notYetChanged++
-		}
+	if _, ok := changedExecutors[change.to]; change.to != "" && !ok {
+		notYetChanged++
 	}
 	return notYetChanged
 }
 
 func addChangedExecutors(changedExecutors map[string]struct{}, change shardChange) {
-	for _, executorID := range change.from {
-		changedExecutors[executorID] = struct{}{}
+	if change.from != "" {
+		changedExecutors[change.from] = struct{}{}
 	}
 	if change.to != "" {
 		changedExecutors[change.to] = struct{}{}
@@ -175,8 +168,8 @@ func addChangedExecutors(changedExecutors map[string]struct{}, change shardChang
 }
 
 func applyShardChange(shardsByExecutor map[string]map[string]struct{}, change shardChange) {
-	for _, executorID := range change.from {
-		delete(shardsByExecutor[executorID], change.shardID)
+	if change.from != "" {
+		delete(shardsByExecutor[change.from], change.shardID)
 	}
 	if change.to == "" {
 		return

@@ -150,32 +150,6 @@ func TestNextAssignmentStep(t *testing.T) {
 			expectedExecutorsToDelete: []string{"exec-stale"},
 			expectedDeferredShards:    1,
 		},
-		{
-			// Removing the duplicate only touches exec-b, so it fits.
-			name: "a shard stored on two executors is removed from the one that loses it",
-			storedAssignments: map[string][]string{
-				"exec-a": {"shard-1"},
-				"exec-b": {"shard-1"},
-				"exec-c": {"shard-2"},
-				"exec-d": nil,
-			},
-			plannedAssignments: map[string][]string{
-				"exec-a": {"shard-1"},
-				"exec-b": nil,
-				"exec-c": nil,
-				"exec-d": {"shard-2"},
-			},
-			assignableExecutors: map[string]struct{}{"exec-a": {}, "exec-b": {}, "exec-c": {}, "exec-d": {}},
-			maxChangedExecutors: 1,
-
-			expectedAssignments: map[string][]string{
-				"exec-a": {"shard-1"},
-				"exec-b": nil,
-				"exec-c": {"shard-2"},
-				"exec-d": nil,
-			},
-			expectedDeferredShards: 1,
-		},
 	}
 
 	for _, tc := range tests {

@@ -30,14 +30,14 @@ import (
 )
 
 type testDependencies struct {
-	ctrl         *gomock.Controller
-	store        *store.MockStore
-	election     *store.MockElection
-	timeSource   clock.MockedTimeSource
-	factory      Factory
-	cfg          config.Namespace
-	sdConfig     *config.Config
-	observedLogs *observer.ObservedLogs
+	ctrl                     *gomock.Controller
+	store                    *store.MockStore
+	election                 *store.MockElection
+	timeSource               clock.MockedTimeSource
+	factory                  Factory
+	cfg                      config.Namespace
+	sdConfig                 *config.Config
+	observedLogs             *observer.ObservedLogs
 	maxAssignShardsExecutors int
 }
 

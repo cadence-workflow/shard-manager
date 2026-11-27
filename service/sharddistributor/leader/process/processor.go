@@ -578,7 +578,7 @@ func findExecutorsToUnassign(namespaceState *store.NamespaceState, assignableExe
 			continue
 		}
 
-		// Stale executors are logged separately and deleted once they hold no shards.
+		// Stale executors are logged separately.
 		if _, isStale := staleExecutors[executorID]; isStale {
 			continue
 		}

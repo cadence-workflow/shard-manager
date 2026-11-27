@@ -38,7 +38,6 @@ type testDependencies struct {
 	cfg          config.Namespace
 	sdConfig     *config.Config
 	observedLogs *observer.ObservedLogs
-	// maxAssignShardsExecutors is what the store reports as its AssignShards limit.
 	maxAssignShardsExecutors int
 }
 

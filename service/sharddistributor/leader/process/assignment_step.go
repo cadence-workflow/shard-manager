@@ -36,8 +36,8 @@ type changedExecutorBudget struct {
 	maxChangedExecutors int
 }
 
-// tryAdd counts the executors and returns true if they fit. Empty IDs are skipped, and nothing is
-// counted when they do not fit.
+// tryAdd counts the executors only if they all fit within the budget, and returns whether they did.
+// Empty IDs are skipped.
 func (b *changedExecutorBudget) tryAdd(executorIDs ...string) bool {
 	executorsAfterAdd := len(b.changedExecutors)
 	for _, executorID := range executorIDs {

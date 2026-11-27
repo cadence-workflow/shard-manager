@@ -766,7 +766,8 @@ func TestAssignShards(t *testing.T) {
 
 		stateAfter, err := executorStore.GetState(ctx, tc.Namespace)
 		require.NoError(t, err)
-		assert.Equal(t, stateBefore.Revision, stateAfter.Revision)
+		assert.Equal(t, stateBefore.AssignmentRevision, stateAfter.AssignmentRevision)
+		assert.Equal(t, stateBefore.ShardAssignments, stateAfter.ShardAssignments)
 	})
 }
 
@@ -827,7 +828,8 @@ func TestAssignShardsTxnLimit(t *testing.T) {
 
 		stateAfter, err := executorStore.GetState(ctx, tc.Namespace)
 		require.NoError(t, err)
-		assert.Equal(t, stateBefore.Revision, stateAfter.Revision, "a rejected request should not write anything")
+		assert.Equal(t, stateBefore.AssignmentRevision, stateAfter.AssignmentRevision, "a rejected request should not write anything")
+		assert.Equal(t, stateBefore.ShardAssignments, stateAfter.ShardAssignments)
 	})
 }
 

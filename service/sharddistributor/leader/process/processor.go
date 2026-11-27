@@ -628,17 +628,18 @@ func (p *namespaceProcessor) buildNewAssignmentsState(
 	changedAssignments = make(map[string]store.AssignedState)
 
 	for executorID, shards := range assignments {
-		assignedShardsMap := make(map[string]*types.ShardAssignment, len(shards))
+		assignedShardsMap := make(map[string]*types.ShardAssignment)
+
 		for _, shardID := range shards {
 			assignedShardsMap[shardID] = &types.ShardAssignment{Status: types.AssignmentStatusREADY}
 		}
 
-		previousState, previouslyAssigned := namespaceState.ShardAssignments[executorID]
-		sameShards := previouslyAssigned && shardSetsEqual(previousState.AssignedShards, assignedShardsMap)
+		oldState, existed := namespaceState.ShardAssignments[executorID]
+		sameShards := existed && shardSetsEqual(oldState.AssignedShards, assignedShardsMap)
 
 		lastUpdated := now
 		if sameShards {
-			lastUpdated = previousState.LastUpdated
+			lastUpdated = oldState.LastUpdated
 		}
 
 		assignedState := store.AssignedState{

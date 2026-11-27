@@ -185,6 +185,14 @@ func MigrationModeFuzzer(e *types.MigrationMode, c fuzz.Continue) {
 	*e = types.MigrationMode(c.Intn(3)) // 0-2
 }
 
+// RangeFuzzer normalises an empty HighExclusive to nil because an empty high_exclusive decodes as nil.
+func RangeFuzzer(r *types.Range, c fuzz.Continue) {
+	c.FuzzNoCustom(r)
+	if len(r.HighExclusive) == 0 {
+		r.HighExclusive = nil
+	}
+}
+
 // ExecutorHeartbeatRequestFuzzer avoids nil map values: the mapper constructs a new
 // struct from nil-safe getters, so nil and &ShardStatusReport{} round-trip identically.
 func ExecutorHeartbeatRequestFuzzer(r *types.ExecutorHeartbeatRequest, c fuzz.Continue) {
@@ -192,6 +200,11 @@ func ExecutorHeartbeatRequestFuzzer(r *types.ExecutorHeartbeatRequest, c fuzz.Co
 	for k, v := range r.ShardStatusReports {
 		if v == nil {
 			r.ShardStatusReports[k] = &types.ShardStatusReport{}
+		}
+	}
+	for k, v := range r.RangeLoadReports {
+		if v == nil {
+			r.RangeLoadReports[k] = &types.RangeLoadReport{}
 		}
 	}
 }
@@ -203,6 +216,11 @@ func ExecutorHeartbeatResponseFuzzer(r *types.ExecutorHeartbeatResponse, c fuzz.
 	for k, v := range r.ShardAssignments {
 		if v == nil {
 			r.ShardAssignments[k] = &types.ShardAssignment{}
+		}
+	}
+	for i, a := range r.RangeAssignments {
+		if a == nil {
+			r.RangeAssignments[i] = &types.RangeAssignment{}
 		}
 	}
 }
@@ -226,6 +244,11 @@ func WatchNamespaceStateResponseFuzzer(r *types.WatchNamespaceStateResponse, c f
 					executor.AssignedShards[j] = &types.Shard{}
 				}
 			}
+		}
+	}
+	for i, a := range r.RangeAssignments {
+		if a == nil {
+			r.RangeAssignments[i] = &types.RangeAssignment{}
 		}
 	}
 }
@@ -291,7 +314,7 @@ func TestWatchNamespaceStateResponseFuzz(t *testing.T) {
 	// WatchNamespaceStateResponseFuzzer avoids nil slices/elements because protobuf
 	// cannot distinguish nil from empty repeated fields — both round-trip to non-nil [].
 	testutils.RunMapperFuzzTest(t, FromShardDistributorWatchNamespaceStateResponse, ToShardDistributorWatchNamespaceStateResponse,
-		testutils.WithCustomFuncs(WatchNamespaceStateResponseFuzzer),
+		testutils.WithCustomFuncs(WatchNamespaceStateResponseFuzzer, RangeFuzzer, AssignmentStatusFuzzer),
 	)
 }
 
@@ -301,7 +324,7 @@ func TestGetNamespaceStateIfNewerRequestFuzz(t *testing.T) {
 
 func TestGetNamespaceStateIfNewerResponseFuzz(t *testing.T) {
 	testutils.RunMapperFuzzTest(t, FromShardDistributorGetNamespaceStateIfNewerResponse, ToShardDistributorGetNamespaceStateIfNewerResponse,
-		testutils.WithCustomFuncs(WatchNamespaceStateResponseFuzzer),
+		testutils.WithCustomFuncs(WatchNamespaceStateResponseFuzzer, RangeFuzzer, AssignmentStatusFuzzer),
 	)
 }
 
@@ -341,7 +364,7 @@ func TestExecutorHeartbeatRequestFuzz(t *testing.T) {
 
 func TestExecutorHeartbeatResponseFuzz(t *testing.T) {
 	testutils.RunMapperFuzzTest(t, FromShardDistributorExecutorHeartbeatResponse, ToShardDistributorExecutorHeartbeatResponse,
-		testutils.WithCustomFuncs(AssignmentStatusFuzzer, MigrationModeFuzzer, ExecutorHeartbeatResponseFuzzer),
+		testutils.WithCustomFuncs(AssignmentStatusFuzzer, MigrationModeFuzzer, ExecutorHeartbeatResponseFuzzer, RangeFuzzer),
 	)
 }
 

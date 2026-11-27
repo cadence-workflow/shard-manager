@@ -8,8 +8,16 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
+	sharddistributorv1 "github.com/cadence-workflow/shard-manager/.gen/proto/sharddistributor/v1"
 	"github.com/cadence-workflow/shard-manager/client/sharddistributor"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/grpc"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/hedged"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/metered"
+	"github.com/cadence-workflow/shard-manager/client/wrappers/retryable"
+	timeoutwrapper "github.com/cadence-workflow/shard-manager/client/wrappers/timeout"
+	"github.com/cadence-workflow/shard-manager/common"
 	"github.com/cadence-workflow/shard-manager/common/clock"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/client/clientcommon"
 )
 
@@ -67,16 +75,30 @@ type Spectator interface {
 	GetShardOwner(ctx context.Context, shardKey string) (*ShardOwner, error)
 }
 
+// newClient adds hedging, timeouts, retries and metrics to a raw shard distributor client.
+func newClient(client sharddistributor.Client, timeSource clock.TimeSource, metricsScope tally.Scope, hedgeShare func() float64) sharddistributor.Client {
+	// Hedging sits inside the timeout so both attempts share one deadline, and inside the retries so a hedge
+	// is a single call rather than a second retry loop.
+	client = hedged.NewShardDistributorClient(client, timeSource, metricsScope, hedgeShare)
+	client = timeoutwrapper.NewShardDistributorClient(client, timeoutwrapper.ShardDistributorDefaultTimeout)
+	client = retryable.NewShardDistributorClient(client, common.CreateShardDistributorServiceRetryPolicy(), common.IsServiceTransientError)
+	return metered.NewShardDistributorClient(client, metrics.NewClient(metricsScope, metrics.ShardDistributor, metrics.MigrationConfig{}))
+}
+
 type Params struct {
 	fx.In
 
-	Client       sharddistributor.Client
+	YarpcClient  sharddistributorv1.ShardDistributorAPIYARPCClient
 	MetricsScope tally.Scope
 	Logger       *zap.Logger
 	Config       clientcommon.Config
 	TimeSource   clock.TimeSource
 
 	Enabled EnabledFunc `optional:"true"`
+
+	// HedgeShare is the share of unary calls to the shard distributor that may be hedged. It is read on
+	// every call, so callers can back it with dynamic config. 0 turns hedging off, nil means 0.1.
+	HedgeShare func() float64 `optional:"true"`
 }
 
 // NewSpectatorWithNamespace creates a spectator for a specific namespace
@@ -100,10 +122,11 @@ func newSpectatorImpl(params Params, namespace string) (Spectator, error) {
 		return nil, fmt.Errorf("get config for namespace %s: %w", namespace, err)
 	}
 
-	return newSpectatorWithConfig(params, namespaceConfig)
+	client := newClient(grpc.NewShardDistributorClient(params.YarpcClient), params.TimeSource, params.MetricsScope, params.HedgeShare)
+	return newSpectatorWithConfig(client, params, namespaceConfig)
 }
 
-func newSpectatorWithConfig(params Params, namespaceConfig *clientcommon.NamespaceConfig) (Spectator, error) {
+func newSpectatorWithConfig(client sharddistributor.Client, params Params, namespaceConfig *clientcommon.NamespaceConfig) (Spectator, error) {
 	enabled := params.Enabled
 	if enabled == nil {
 		enabled = func() bool { return true }
@@ -115,12 +138,12 @@ func newSpectatorWithConfig(params Params, namespaceConfig *clientcommon.Namespa
 
 	impl := &spectatorImpl{
 		namespace: namespaceConfig.Namespace,
-		client:    params.Client,
+		client:    client,
 		logger:    params.Logger,
 		registry:  registry,
 		watcher: &streamWatcher{
 			namespace:  namespaceConfig.Namespace,
-			client:     params.Client,
+			client:     client,
 			registry:   registry,
 			reconnect:  reconnect,
 			enabled:    enabled,
@@ -130,7 +153,7 @@ func newSpectatorWithConfig(params Params, namespaceConfig *clientcommon.Namespa
 		},
 		poller: &poller{
 			namespace:  namespaceConfig.Namespace,
-			client:     params.Client,
+			client:     client,
 			registry:   registry,
 			timeSource: params.TimeSource,
 			logger:     params.Logger,

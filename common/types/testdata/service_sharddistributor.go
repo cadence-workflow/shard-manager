@@ -30,6 +30,12 @@ var (
 				ShardLoad: 0.75,
 			},
 		},
+		RangeLoadReports: map[string]*types.RangeLoadReport{
+			"range-1": {
+				RangeLoad:    1.5,
+				TopShardKeys: map[string]float64{"shard-1": 0.9, "shard-2": 0.6},
+			},
+		},
 		Metadata: map[string]string{
 			"key-1": "value-1",
 			"key-2": "value-2",
@@ -37,6 +43,10 @@ var (
 		HostMetadata: &types.HostMetadata{
 			HostName: "host-name",
 		},
+	}
+	namespaceRangeAssignments = []*types.RangeAssignment{
+		rangeAssignment("range-1", "executor-1", 0x00, 0x40),
+		finalRangeAssignment("range-2", "executor-2", 0x40),
 	}
 	ShardDistributorExecutorHeartbeatResponse = types.ExecutorHeartbeatResponse{
 		ShardAssignments: map[string]*types.ShardAssignment{
@@ -46,6 +56,9 @@ var (
 			"shard-key-2": {
 				Status: types.AssignmentStatusINVALID,
 			},
+		},
+		RangeAssignments: []*types.RangeAssignment{
+			rangeAssignment("range-1", "executor-1", 0x00, 0x40),
 		},
 	}
 	ShardDistributorWatchNamespaceStateRequest = types.WatchNamespaceStateRequest{
@@ -66,6 +79,7 @@ var (
 		},
 		DrainedShardKeys:   []string{"shard-4", "shard-5"},
 		AssignmentRevision: 5,
+		RangeAssignments:   namespaceRangeAssignments,
 	}
 	ShardDistributorGetNamespaceStateIfNewerRequest = types.GetNamespaceStateIfNewerRequest{
 		Namespace:          "namespace",
@@ -139,6 +153,7 @@ var (
 				Reason:    "maintenance",
 			},
 		},
+		RangeAssignments: namespaceRangeAssignments,
 	}
 	ShardDistributorGetExecutorStateRequest = types.GetExecutorStateRequest{
 		Namespace:  "namespace",
@@ -213,3 +228,25 @@ var (
 		},
 	}
 )
+
+func rangeAssignment(id, executorID string, low, high byte) *types.RangeAssignment {
+	return &types.RangeAssignment{
+		ID:         id,
+		Range:      types.Range{LowInclusive: eightByteBound(low), HighExclusive: eightByteBound(high)},
+		ExecutorID: executorID,
+		Status:     types.AssignmentStatusREADY,
+	}
+}
+
+func finalRangeAssignment(id, executorID string, low byte) *types.RangeAssignment {
+	return &types.RangeAssignment{
+		ID:         id,
+		Range:      types.Range{LowInclusive: eightByteBound(low)},
+		ExecutorID: executorID,
+		Status:     types.AssignmentStatusREADY,
+	}
+}
+
+func eightByteBound(firstByte byte) []byte {
+	return []byte{firstByte, 0, 0, 0, 0, 0, 0, 0}
+}

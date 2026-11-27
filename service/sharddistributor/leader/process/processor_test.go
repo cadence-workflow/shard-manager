@@ -205,6 +205,7 @@ func TestRebalanceShards_ExecutorRemoved(t *testing.T) {
 	mocks.store.EXPECT().AssignShards(gomock.Any(), mocks.cfg.Name, gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, _ string, request store.AssignShardsRequest, _ store.GuardFunc) error {
 			assert.Len(t, request.ShardAssignments["exec-1"].AssignedShards, 2)
+			require.Contains(t, request.ShardAssignments, "exec-2", "the draining executor's emptied assignment has to be written out")
 			assert.Len(t, request.ShardAssignments["exec-2"].AssignedShards, 0)
 			assert.Lenf(t, request.ShardAssignments["exec-1"].ShardHandoverStats, 2, "both shards move from the draining executor in the snapshot")
 			assert.Lenf(t, request.ShardAssignments["exec-2"].ShardHandoverStats, 0, "no handover stats should be present for drained executor")

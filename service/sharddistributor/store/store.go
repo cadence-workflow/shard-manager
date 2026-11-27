@@ -47,7 +47,7 @@ func NopGuard() GuardFunc {
 	}
 }
 
-// AssignShardsRequest holds the assignment changes of one rebalance.
+// AssignShardsRequest is a request to assign shards to executors, and remove unused shards.
 type AssignShardsRequest struct {
 	// ShardAssignments holds the new assigned state of every executor whose assignment changes.
 	// Key: ExecutorID
@@ -68,9 +68,10 @@ type Store interface {
 	// MaxAssignShardsExecutors returns how many executors one AssignShards request can write and delete in total.
 	MaxAssignShardsExecutors() int
 
-	// AssignShards writes the changed assignments and deletes the given executors in one transaction,
-	// guarded by the GuardFunc. It returns ErrTooManyAssignmentChanges for a request with more
-	// executors than MaxAssignShardsExecutors.
+	// AssignShards assigns multiple shards to executors within a namespace and
+	// deletes specified executors.
+	// The operation is atomic and guarded by the provided GuardFunc.
+	// It returns ErrTooManyAssignmentChanges for a request with more executors than MaxAssignShardsExecutors.
 	AssignShards(ctx context.Context, namespace string, request AssignShardsRequest, guard GuardFunc) error
 
 	// RecordShardStatisticsBatch records complete statistics maps for multiple

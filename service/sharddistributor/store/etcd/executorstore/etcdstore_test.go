@@ -688,7 +688,7 @@ func TestAssignShards(t *testing.T) {
 		assert.NotContains(t, state.Executors, deletedExecutorID)
 	})
 
-	t.Run("overwrites an assignment written after it was read", func(t *testing.T) {
+	t.Run("overwrites the stored assignment", func(t *testing.T) {
 		tc := testhelper.SetupStoreTestCluster(t)
 		executorStore := createStore(t, tc)
 		recordHeartbeats(ctx, t, executorStore, tc.Namespace, keptExecutorID)

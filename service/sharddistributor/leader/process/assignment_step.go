@@ -23,7 +23,7 @@ type shardChange struct {
 	shardID string
 	// from loses the shard. It is empty when the shard has no stored owner.
 	from string
-	// to gains the shard. It is empty when the shard is dropped.
+	// to gains the shard. It is empty when no executor should own the shard anymore.
 	to string
 	// needsNewOwner is true when the shard has no stored owner or its stored owner is not assignable.
 	needsNewOwner bool
@@ -119,8 +119,8 @@ func findShardChanges(
 	}
 
 	var shardChanges []shardChange
-	// Shards with a stored owner that move to another owner or lose their owner, such as a shard that
-	// was just drained. plannedOwner is empty when the shard loses its owner.
+	// Shards with a stored owner that move to another owner or that no executor should own anymore,
+	// such as a shard that was just drained. plannedOwner is empty for those.
 	for shardID, storedOwner := range storedOwnersByShard {
 		plannedOwner := plannedOwnersByShard[shardID]
 		if storedOwner == plannedOwner {

@@ -16,6 +16,7 @@ import (
 	"github.com/cadence-workflow/shard-manager/common/backoff"
 	"github.com/cadence-workflow/shard-manager/common/clock"
 	"github.com/cadence-workflow/shard-manager/common/log/testlogger"
+	"github.com/cadence-workflow/shard-manager/common/metrics"
 	"github.com/cadence-workflow/shard-manager/common/types"
 	"github.com/cadence-workflow/shard-manager/service/sharddistributor/store"
 )
@@ -299,6 +300,7 @@ func seedState(c *shardCache, revision int64, executorID, shardID string) {
 		map[string]int64{executorID: revision},
 		map[string]*store.ShardOwner{executorID: owner},
 		map[string]struct{}{shardID: {}},
+		nil,
 	)
 }
 
@@ -476,12 +478,12 @@ func setupShardCacheTestCase(t *testing.T) *shardCacheTestCase {
 		Return((<-chan struct{})(tc.changeCh), nil).
 		AnyTimes()
 
-	tc.c = newShardCache(tc.namespace, tc.store, testlogger.New(t), tc.timeSource)
+	tc.c = newShardCache(tc.namespace, tc.store, testlogger.New(t), tc.timeSource, metrics.NewNoopMetricsClient())
 	return tc
 }
 
 func newTestShardCache(t *testing.T, namespace string, executorStore store.Store) *shardCache {
-	return newShardCache(namespace, executorStore, testlogger.New(t), clock.NewMockedTimeSource())
+	return newShardCache(namespace, executorStore, testlogger.New(t), clock.NewMockedTimeSource(), metrics.NewNoopMetricsClient())
 }
 
 // state builds a namespace snapshot holding the test case's executor with shard-1 assigned.

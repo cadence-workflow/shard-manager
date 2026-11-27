@@ -216,6 +216,9 @@ const (
 	// ShardDistributorGetDrainedHostsScope tracks GetDrainedHosts API calls received by service
 	ShardDistributorGetDrainedHostsScope
 
+	// ShardDistributorRangeCoverScope tracks the range cover the shard cache builds per namespace
+	ShardDistributorRangeCoverScope
+
 	NumShardDistributorScopes
 )
 
@@ -279,6 +282,7 @@ var ScopeDefs = map[ServiceIdx]map[ScopeIdx]scopeDefinition{
 		ShardDistributorDrainHostsScope:                            {operation: "DrainHosts"},
 		ShardDistributorUndrainHostsScope:                          {operation: "UndrainHosts"},
 		ShardDistributorGetDrainedHostsScope:                       {operation: "GetDrainedHosts"},
+		ShardDistributorRangeCoverScope:                            {operation: "RangeCover"},
 	},
 }
 
@@ -368,6 +372,9 @@ const (
 	// closed stream. These are expected terminations (client disconnect, server shutdown), not failures.
 	ShardDistributorErrContextCanceledCounter
 
+	// ShardDistributorRangeCoverInvalid counts range covers read from the store that failed validation.
+	ShardDistributorRangeCoverInvalid
+
 	NumShardDistributorMetrics
 )
 
@@ -433,6 +440,7 @@ var MetricDefs = map[ServiceIdx]map[MetricIdx]metricDefinition{
 		ShardDistributorIsLeader:                    {metricName: "shard_distributor_is_leader", metricType: Gauge},
 		ShardDistributorAssignLoopNoActiveExecutors: {metricName: "shard_distributor_shard_assign_no_active_executors", metricType: Counter},
 		ShardDistributorErrContextCanceledCounter:   {metricName: "shard_distributor_err_context_canceled", metricType: Counter},
+		ShardDistributorRangeCoverInvalid:           {metricName: "shard_distributor_range_cover_invalid", metricType: Counter},
 	},
 }
 

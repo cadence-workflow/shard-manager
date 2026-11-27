@@ -57,6 +57,21 @@ func (mr *MockShardCacheMockRecorder) GetExecutor(ctx, executorID any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExecutor", reflect.TypeOf((*MockShardCache)(nil).GetExecutor), ctx, executorID)
 }
 
+// GetRangeForShardKey mocks base method.
+func (m *MockShardCache) GetRangeForShardKey(ctx context.Context, fingerprint []byte) (*store.RangeAssignment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRangeForShardKey", ctx, fingerprint)
+	ret0, _ := ret[0].(*store.RangeAssignment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRangeForShardKey indicates an expected call of GetRangeForShardKey.
+func (mr *MockShardCacheMockRecorder) GetRangeForShardKey(ctx, fingerprint any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRangeForShardKey", reflect.TypeOf((*MockShardCache)(nil).GetRangeForShardKey), ctx, fingerprint)
+}
+
 // GetShardAssignments mocks base method.
 func (m *MockShardCache) GetShardAssignments() store.AssignmentSnapshot {
 	m.ctrl.T.Helper()

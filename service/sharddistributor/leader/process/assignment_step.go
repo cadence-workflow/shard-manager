@@ -119,7 +119,8 @@ func findShardChanges(
 	}
 
 	var shardChanges []shardChange
-	// Shards with a stored owner that move or are dropped. plannedOwner is empty for a dropped shard.
+	// Shards with a stored owner that move to another owner or lose their owner, such as a shard that
+	// was just drained. plannedOwner is empty when the shard loses its owner.
 	for shardID, storedOwner := range storedOwnersByShard {
 		plannedOwner := plannedOwnersByShard[shardID]
 		if storedOwner == plannedOwner {

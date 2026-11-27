@@ -89,8 +89,9 @@ func nextAssignmentStep(
 
 	nextStep.changedAssignments = make(map[string][]string, len(changedExecutors))
 	for executorID := range changedExecutors {
-		shards, isKept := shardsByExecutor[executorID]
-		if !isKept {
+		// Executors deleted in this step have no assignment left to write.
+		shards, hasAssignment := shardsByExecutor[executorID]
+		if !hasAssignment {
 			continue
 		}
 		nextStep.changedAssignments[executorID] = slices.Collect(maps.Keys(shards))

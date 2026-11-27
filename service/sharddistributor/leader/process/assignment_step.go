@@ -74,12 +74,14 @@ func nextAssignmentStep(
 		shardsByExecutor[executorID] = make(map[string]struct{})
 	}
 
+	// Stale executors are deleted once they hold no shards.
 	for executorID := range staleExecutors {
 		if len(shardsByExecutor[executorID]) > 0 {
 			continue
 		}
-		_, alreadyChanged := changedExecutors[executorID]
-		if !alreadyChanged && len(changedExecutors) >= maxChangedExecutors {
+		// An executor that lost its last shard in this step is already counted against the limit.
+		_, alreadyCounted := changedExecutors[executorID]
+		if !alreadyCounted && len(changedExecutors) >= maxChangedExecutors {
 			continue
 		}
 		changedExecutors[executorID] = struct{}{}

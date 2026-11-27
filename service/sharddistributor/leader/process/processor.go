@@ -408,7 +408,7 @@ func (p *namespaceProcessor) rebalanceShardsImpl(ctx context.Context, namespaceC
 
 	assignShardsRequest := store.AssignShardsRequest{
 		ShardAssignments:  changedAssignments,
-		ExecutorsToDelete: slices.Sorted(maps.Keys(staleExecutors)),
+		ExecutorsToDelete: slices.Collect(maps.Keys(staleExecutors)),
 	}
 	err = p.shardStore.AssignShards(ctx, p.namespaceCfg.Name, assignShardsRequest, p.election.Guard())
 	if err != nil {

@@ -76,18 +76,15 @@ func TestRecordHeartbeat(t *testing.T) {
 	resp, err = tc.Client.Get(ctx, stateKey)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), resp.Count, "State key should exist")
-	decompressedState, err := common.Decompress(resp.Kvs[0].Value)
+	storedStatus, err := common.DecodeExecutorStatus(resp.Kvs[0].Value)
 	require.NoError(t, err)
-	assert.Equal(t, stringStatus(types.ExecutorStatusACTIVE), string(decompressedState))
+	assert.Equal(t, types.ExecutorStatusACTIVE, storedStatus)
 
 	resp, err = tc.Client.Get(ctx, reportedShardsKey)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), resp.Count, "Reported shards key should exist")
 
-	decompressedReportedShards, err := common.Decompress(resp.Kvs[0].Value)
-	require.NoError(t, err)
-	var reportedShards map[string]*types.ShardStatusReport
-	err = json.Unmarshal(decompressedReportedShards, &reportedShards)
+	reportedShards, err := common.DecodeReportedShards(resp.Kvs[0].Value)
 	require.NoError(t, err)
 	require.Len(t, reportedShards, 1)
 	assert.Equal(t, types.ShardStatusREADY, reportedShards["shard-TestRecordHeartbeat"].Status)
@@ -180,19 +177,67 @@ func TestRecordHeartbeat_NoCompression(t *testing.T) {
 	reportedShardsKey := etcdkeys.BuildExecutorKey(tc.EtcdPrefix, tc.Namespace, executorID, etcdkeys.ExecutorReportedShardsKey)
 	require.NoError(t, err)
 
+	// Without compression, the stored values are exactly the protobuf encoding.
+	uncompressedEncoder, err := common.NewExecutorValueEncoder("none", common.EncodingProtobuf)
+	require.NoError(t, err)
+	wantStatus, err := uncompressedEncoder.EncodeExecutorStatus(req.Status)
+	require.NoError(t, err)
+	wantReportedShards, err := uncompressedEncoder.EncodeReportedShards(req.ReportedShards)
+	require.NoError(t, err)
+
 	stateResp, err := tc.Client.Get(ctx, stateKey)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), stateResp.Count)
-	statusJSON, err := json.Marshal(req.Status)
-	require.NoError(t, err)
-	assert.Equal(t, string(statusJSON), string(stateResp.Kvs[0].Value))
+	assert.Equal(t, wantStatus, stateResp.Kvs[0].Value)
 
 	reportedResp, err := tc.Client.Get(ctx, reportedShardsKey)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), reportedResp.Count)
-	reportedJSON, err := json.Marshal(req.ReportedShards)
-	require.NoError(t, err)
-	assert.Equal(t, string(reportedJSON), string(reportedResp.Kvs[0].Value))
+	assert.Equal(t, wantReportedShards, reportedResp.Kvs[0].Value)
+}
+
+// The store reads the encoding from dynamic config on every write, so changing it takes
+// effect without a restart.
+func TestRecordHeartbeatEncodingFollowsDynamicConfig(t *testing.T) {
+	tc := testhelper.SetupStoreTestCluster(t)
+	executorStore := createStore(t, tc)
+	writeAsProtobuf := true
+	executorStore.cfg.WriteExecutorValuesAsProtobuf = func(...dynamicproperties.FilterOption) bool { return writeAsProtobuf }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	executorID := "executor-encoding"
+	status := types.ExecutorStatusACTIVE
+	statusKey := etcdkeys.BuildExecutorKey(tc.EtcdPrefix, tc.Namespace, executorID, etcdkeys.ExecutorStatusKey)
+
+	tests := []struct {
+		name            string
+		writeAsProtobuf bool
+		wantEncoding    common.Encoding
+	}{
+		{name: "protobuf when enabled", writeAsProtobuf: true, wantEncoding: common.EncodingProtobuf},
+		{name: "json when disabled", writeAsProtobuf: false, wantEncoding: common.EncodingJSON},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			writeAsProtobuf = tt.writeAsProtobuf
+
+			err := executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: status})
+			require.NoError(t, err)
+
+			wantEncoder, err := common.NewExecutorValueEncoder(tc.Compression, tt.wantEncoding)
+			require.NoError(t, err)
+			wantStatus, err := wantEncoder.EncodeExecutorStatus(status)
+			require.NoError(t, err)
+
+			resp, err := tc.Client.Get(ctx, statusKey)
+			require.NoError(t, err)
+			require.Len(t, resp.Kvs, 1)
+			assert.Equal(t, wantStatus, resp.Kvs[0].Value)
+		})
+	}
 }
 
 func TestRecordShardStatisticsWritesPreparedStatistics(t *testing.T) {
@@ -204,8 +249,10 @@ func TestRecordShardStatisticsWritesPreparedStatistics(t *testing.T) {
 
 	executorID := "executor-shard-stats"
 	shardID := "shard-with-load"
-	preparedSmoothedLoad := 45.6
-	now := time.Now().UTC()
+	// Protobuf stores loads as float32 and timestamps in milliseconds, so these values
+	// are read back unchanged.
+	preparedSmoothedLoad := 45.5
+	now := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC).Add(123 * time.Millisecond)
 
 	require.NoError(t, executorStore.RecordHeartbeat(ctx, tc.Namespace, executorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE}))
 	assignShardForTest(ctx, t, executorStore, tc.Namespace, shardID, executorID)
@@ -391,10 +438,8 @@ func TestGetAssignmentState(t *testing.T) {
 func TestReadsJSONAndProtobufValues(t *testing.T) {
 	tc := testhelper.SetupStoreTestCluster(t)
 	jsonStore := createStore(t, tc)
+	jsonStore.cfg.WriteExecutorValuesAsProtobuf = dynamicproperties.GetBoolPropertyFn(false)
 	protobufStore := createStore(t, tc)
-	protobufEncoder, err := common.NewExecutorValueEncoder(tc.Compression, common.EncodingProtobuf)
-	require.NoError(t, err)
-	protobufStore.encoder = protobufEncoder
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -1085,7 +1130,8 @@ func TestRecordShardStatisticsBatch(t *testing.T) {
 
 	firstExecutorID := "executor-1"
 	secondExecutorID := "executor-2"
-	now := time.Now().UTC()
+	// Protobuf stores timestamps in milliseconds, so this time is read back unchanged.
+	now := time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC).Add(123 * time.Millisecond)
 
 	// 1. Register the executors whose statistics will be recorded.
 	err := executorStore.RecordHeartbeat(ctx, tc.Namespace, firstExecutorID, store.HeartbeatState{Status: types.ExecutorStatusACTIVE})
@@ -1965,8 +2011,9 @@ func createStore(t *testing.T, tc *testhelper.StoreTestCluster) *executorStoreIm
 
 	timeSource := clock.NewMockedTimeSourceAt(time.Now())
 	impl, err := newExecutorStoreImpl(tc.Client, etcdConfig, testlogger.New(t), timeSource, &config.Config{
-		LoadBalancingMode: func(namespace string) string { return config.LoadBalancingModeNAIVE },
-		MaxEtcdTxnOps:     dynamicproperties.GetIntPropertyFn(128),
+		LoadBalancingMode:             func(namespace string) string { return config.LoadBalancingModeNAIVE },
+		MaxEtcdTxnOps:                 dynamicproperties.GetIntPropertyFn(128),
+		WriteExecutorValuesAsProtobuf: dynamicproperties.GetBoolPropertyFn(true),
 		LoadBalancingGreedy: config.LoadBalancingGreedyConfig{
 			LoadSmoothingTimeConstant: func(string) time.Duration { return statistics.DefaultLoadSmoothingTimeConstant },
 		},

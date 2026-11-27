@@ -11,7 +11,7 @@ import (
 
 func TestListAllProductionKeys(t *testing.T) {
 	keys := ListAllProductionKeys()
-	require.Len(t, keys, 12)
+	require.Len(t, keys, 13)
 	for _, key := range keys {
 		assert.Contains(t, strings.ToLower(key.String()), "sharddistributor")
 	}
@@ -77,6 +77,12 @@ func TestShardDistributorKeys(t *testing.T) {
 			key:          ShardDistributorMaxEtcdTxnOps,
 			keyName:      "shardDistributor.maxEtcdTxnOps",
 			defaultValue: 64,
+		},
+		{
+			name:         "write executor values as protobuf",
+			key:          ShardDistributorWriteExecutorValuesAsProtobuf,
+			keyName:      "shardDistributor.writeExecutorValuesAsProtobuf",
+			defaultValue: true,
 		},
 		{
 			name:         "load balancing mode",

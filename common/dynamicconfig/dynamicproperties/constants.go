@@ -341,6 +341,14 @@ const (
 	TestGetBoolPropertyFilteredByDomainIDAndWorkflowIDKey
 	TestGetBoolPropertyFilteredByShardIDKey
 
+	// ShardDistributorWriteExecutorValuesAsProtobuf makes the executor store write executor values
+	// as protobuf. Setting it to false writes them as JSON instead. Reads accept both encodings.
+	// KeyName: shardDistributor.writeExecutorValuesAsProtobuf
+	// Value type: Bool
+	// Default value: true
+	// Allowed filters: N/A
+	ShardDistributorWriteExecutorValuesAsProtobuf
+
 	// LastBoolKey must be the last one in this const group
 	LastBoolKey
 )
@@ -553,6 +561,11 @@ var BoolKeys = map[BoolKey]DynamicBool{
 		Description:  "",
 		DefaultValue: false,
 		Filters:      []Filter{ShardID},
+	},
+	ShardDistributorWriteExecutorValuesAsProtobuf: {
+		KeyName:      "shardDistributor.writeExecutorValuesAsProtobuf",
+		Description:  "ShardDistributorWriteExecutorValuesAsProtobuf makes the executor store write executor values as protobuf. Setting it to false writes them as JSON instead. Reads accept both encodings",
+		DefaultValue: true,
 	},
 }
 

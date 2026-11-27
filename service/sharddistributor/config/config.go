@@ -13,9 +13,10 @@ import (
 type (
 	// Config represents configuration for shard manager service
 	Config struct {
-		LoadBalancingMode dynamicproperties.StringPropertyFnWithNamespaceFilters
-		MaxEtcdTxnOps     dynamicproperties.IntPropertyFn
-		FixedShardNum     dynamicproperties.IntPropertyFnWithNamespaceFilters
+		LoadBalancingMode             dynamicproperties.StringPropertyFnWithNamespaceFilters
+		MaxEtcdTxnOps                 dynamicproperties.IntPropertyFn
+		FixedShardNum                 dynamicproperties.IntPropertyFnWithNamespaceFilters
+		WriteExecutorValuesAsProtobuf dynamicproperties.BoolPropertyFn
 
 		LoadBalancingNaive  LoadBalancingNaiveConfig
 		LoadBalancingGreedy LoadBalancingGreedyConfig
@@ -95,9 +96,10 @@ const NamespaceTypeFixed = "fixed"
 // NewConfig returns a new instance of Config
 func NewConfig(dc *dynamicconfig.Collection) *Config {
 	return &Config{
-		LoadBalancingMode: dc.GetStringPropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingMode),
-		MaxEtcdTxnOps:     dc.GetIntProperty(dynamicproperties.ShardDistributorMaxEtcdTxnOps),
-		FixedShardNum:     dc.GetIntPropertyFilteredByNamespace(dynamicproperties.ShardDistributorFixedShardNum),
+		LoadBalancingMode:             dc.GetStringPropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingMode),
+		MaxEtcdTxnOps:                 dc.GetIntProperty(dynamicproperties.ShardDistributorMaxEtcdTxnOps),
+		FixedShardNum:                 dc.GetIntPropertyFilteredByNamespace(dynamicproperties.ShardDistributorFixedShardNum),
+		WriteExecutorValuesAsProtobuf: dc.GetBoolProperty(dynamicproperties.ShardDistributorWriteExecutorValuesAsProtobuf),
 
 		LoadBalancingNaive: LoadBalancingNaiveConfig{
 			MaxDeviation: dc.GetFloat64PropertyFilteredByNamespace(dynamicproperties.ShardDistributorLoadBalancingNaiveMaxDeviation),

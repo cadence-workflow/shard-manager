@@ -32,13 +32,14 @@ const (
 )
 
 type executorStoreImpl struct {
-	client        etcdclient.Client
-	prefix        string
-	logger        log.Logger
-	timeSource    clock.TimeSource
-	encoder       *common.ExecutorValueEncoder
-	cfg           *config.Config
-	metricsClient metrics.Client
+	client          etcdclient.Client
+	prefix          string
+	logger          log.Logger
+	timeSource      clock.TimeSource
+	jsonEncoder     *common.ExecutorValueEncoder
+	protobufEncoder *common.ExecutorValueEncoder
+	cfg             *config.Config
+	metricsClient   metrics.Client
 }
 
 func newExecutorStoreImpl(
@@ -49,19 +50,24 @@ func newExecutorStoreImpl(
 	cfg *config.Config,
 	metricsClient metrics.Client,
 ) (*executorStoreImpl, error) {
-	encoder, err := common.NewExecutorValueEncoder(etcdCfg.Compression, common.EncodingJSON)
+	jsonEncoder, err := common.NewExecutorValueEncoder(etcdCfg.Compression, common.EncodingJSON)
 	if err != nil {
-		return nil, fmt.Errorf("create executor value encoder: %w", err)
+		return nil, fmt.Errorf("create json executor value encoder: %w", err)
+	}
+	protobufEncoder, err := common.NewExecutorValueEncoder(etcdCfg.Compression, common.EncodingProtobuf)
+	if err != nil {
+		return nil, fmt.Errorf("create protobuf executor value encoder: %w", err)
 	}
 
 	return &executorStoreImpl{
-		client:        client,
-		prefix:        etcdCfg.Prefix,
-		logger:        logger,
-		timeSource:    timeSource,
-		encoder:       encoder,
-		cfg:           cfg,
-		metricsClient: metricsClient,
+		client:          client,
+		prefix:          etcdCfg.Prefix,
+		logger:          logger,
+		timeSource:      timeSource,
+		jsonEncoder:     jsonEncoder,
+		protobufEncoder: protobufEncoder,
+		cfg:             cfg,
+		metricsClient:   metricsClient,
 	}, nil
 }
 
@@ -72,12 +78,13 @@ func (s *executorStoreImpl) RecordHeartbeat(ctx context.Context, namespace, exec
 	stateKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorStatusKey)
 	reportedShardsKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, executorID, etcdkeys.ExecutorReportedShardsKey)
 
-	encodedReportedShards, err := s.encoder.EncodeReportedShards(request.ReportedShards)
+	encoder := s.valueEncoder()
+	encodedReportedShards, err := encoder.EncodeReportedShards(request.ReportedShards)
 	if err != nil {
 		return fmt.Errorf("encode reported shards: %w", err)
 	}
 
-	encodedStatus, err := s.encoder.EncodeExecutorStatus(request.Status)
+	encodedStatus, err := encoder.EncodeExecutorStatus(request.Status)
 	if err != nil {
 		return fmt.Errorf("encode executor status: %w", err)
 	}
@@ -127,7 +134,7 @@ func (s *executorStoreImpl) RecordShardStatistics(
 	assignmentModRevision int64,
 	statistics map[string]store.ShardStatistics,
 ) error {
-	encodedStatistics, err := s.encoder.EncodeShardStatistics(statistics)
+	encodedStatistics, err := s.valueEncoder().EncodeShardStatistics(statistics)
 	if err != nil {
 		return fmt.Errorf("encode executor shard statistics: %w", err)
 	}
@@ -451,6 +458,14 @@ func (s *executorStoreImpl) hasExecutorStatusChanged(watchResp clientv3.WatchRes
 	return false
 }
 
+// valueEncoder returns the encoder for the encoding executor values are currently written in.
+func (s *executorStoreImpl) valueEncoder() *common.ExecutorValueEncoder {
+	if s.cfg.WriteExecutorValuesAsProtobuf() {
+		return s.protobufEncoder
+	}
+	return s.jsonEncoder
+}
+
 // The same status is stored as different bytes depending on the encoding and compression
 // of the writer, so values that differ are decoded and compared.
 func sameExecutorStatus(previous, current []byte) bool {
@@ -488,8 +503,9 @@ func (s *executorStoreImpl) AssignShards(ctx context.Context, namespace string, 
 		ops = append(ops, clientv3.OpDelete(executorIDPrefix, clientv3.WithPrefix()))
 	}
 
+	encoder := s.valueEncoder()
 	for executorID, assignedState := range request.ShardAssignments {
-		encodedState, err := s.encoder.EncodeAssignedState(&assignedState)
+		encodedState, err := encoder.EncodeAssignedState(&assignedState)
 		if err != nil {
 			return fmt.Errorf("encode assigned shards for executor %s: %w", executorID, err)
 		}
@@ -639,6 +655,8 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 		return err
 	}
 
+	encoder := s.valueEncoder()
+
 	for executorID, executorData := range parsedData {
 		executorStats := executorData.Statistics
 
@@ -660,7 +678,7 @@ func (s *executorStoreImpl) DeleteShardStats(ctx context.Context, namespace stri
 			continue
 		}
 
-		encodedStatistics, err := s.encoder.EncodeShardStatistics(executorStats)
+		encodedStatistics, err := encoder.EncodeShardStatistics(executorStats)
 		if err != nil {
 			s.logger.Warn(
 				"failed to encode executor shard statistics during cleanup",
@@ -867,6 +885,7 @@ func validateDrainedHosts(hosts []store.DrainedHost, now time.Time) (map[string]
 // executors.
 func (s *executorStoreImpl) RecordShardStatisticsBatch(ctx context.Context, namespace string, updates []store.ExecutorShardStatistics) error {
 	var multiError error
+	encoder := s.valueEncoder()
 	for _, update := range updates {
 		statsKey := etcdkeys.BuildExecutorKey(s.prefix, namespace, update.ExecutorID, etcdkeys.ExecutorShardStatisticsKey)
 
@@ -877,7 +896,7 @@ func (s *executorStoreImpl) RecordShardStatisticsBatch(ctx context.Context, name
 			continue
 		}
 
-		encodedStatistics, err := s.encoder.EncodeShardStatistics(update.Statistics)
+		encodedStatistics, err := encoder.EncodeShardStatistics(update.Statistics)
 		if err != nil {
 			multiError = errors.Join(multiError, fmt.Errorf("failed to encode shard statistics for executor %s: %w", update.ExecutorID, err))
 			continue

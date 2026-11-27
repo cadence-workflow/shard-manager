@@ -54,7 +54,6 @@ func setupProcessorTest(t *testing.T) *testDependencies {
 
 		maxAssignShardsExecutors: 100,
 	}
-	// Every rebalance asks for the limit, so the tests read it from the field instead of expecting it.
 	deps.store.EXPECT().MaxAssignShardsExecutors().DoAndReturn(func() int {
 		return deps.maxAssignShardsExecutors
 	}).AnyTimes()

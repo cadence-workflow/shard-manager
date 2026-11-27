@@ -29,6 +29,18 @@ type shardChange struct {
 	needsNewOwner bool
 }
 
+// affectedExecutors returns the executors whose assignment the change touches.
+func (c shardChange) affectedExecutors() []string {
+	var affectedExecutors []string
+	if c.from != "" {
+		affectedExecutors = append(affectedExecutors, c.from)
+	}
+	if c.to != "" {
+		affectedExecutors = append(affectedExecutors, c.to)
+	}
+	return affectedExecutors
+}
+
 // changedExecutorBudget counts the executors a step changes, up to what one AssignShards request holds.
 // An executor counts once, however many of its shards change.
 type changedExecutorBudget struct {
@@ -36,13 +48,12 @@ type changedExecutorBudget struct {
 	maxChangedExecutors int
 }
 
-// tryAdd counts the executors only if they all fit within the budget, and returns whether they did.
-// Empty IDs are skipped.
-func (b *changedExecutorBudget) tryAdd(executorIDs ...string) bool {
+// tryMarkExecutorsChanged counts the executors only if they all fit within the budget, and returns
+// whether they did.
+func (b *changedExecutorBudget) tryMarkExecutorsChanged(executorIDs ...string) bool {
 	executorsAfterAdd := len(b.changedExecutors)
 	for _, executorID := range executorIDs {
-		_, alreadyCounted := b.changedExecutors[executorID]
-		if executorID != "" && !alreadyCounted {
+		if _, alreadyCounted := b.changedExecutors[executorID]; !alreadyCounted {
 			executorsAfterAdd++
 		}
 	}
@@ -50,9 +61,7 @@ func (b *changedExecutorBudget) tryAdd(executorIDs ...string) bool {
 		return false
 	}
 	for _, executorID := range executorIDs {
-		if executorID != "" {
-			b.changedExecutors[executorID] = struct{}{}
-		}
+		b.changedExecutors[executorID] = struct{}{}
 	}
 	return true
 }
@@ -86,7 +95,7 @@ func nextAssignmentStep(
 		maxChangedExecutors: maxChangedExecutors,
 	}
 	for _, change := range shardChanges {
-		if !budget.tryAdd(change.from, change.to) {
+		if !budget.tryMarkExecutorsChanged(change.affectedExecutors()...) {
 			nextStep.deferredShards++
 			continue
 		}
@@ -98,7 +107,7 @@ func nextAssignmentStep(
 		if _, hasAssignment := shardsByExecutor[executorID]; hasAssignment {
 			continue
 		}
-		if budget.tryAdd(executorID) {
+		if budget.tryMarkExecutorsChanged(executorID) {
 			shardsByExecutor[executorID] = make(map[string]struct{})
 		}
 	}
@@ -108,7 +117,7 @@ func nextAssignmentStep(
 		if len(shardsByExecutor[executorID]) > 0 {
 			continue
 		}
-		if budget.tryAdd(executorID) {
+		if budget.tryMarkExecutorsChanged(executorID) {
 			nextStep.executorsToDelete = append(nextStep.executorsToDelete, executorID)
 			delete(shardsByExecutor, executorID)
 		}
